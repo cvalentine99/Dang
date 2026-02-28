@@ -30,6 +30,14 @@ import {
   Layers,
   Timer,
   Target,
+  FileJson2,
+  ArrowDown,
+  Eye,
+  EyeOff,
+  Shield,
+  GitBranch,
+  Brain,
+  Swords,
 } from "lucide-react";
 
 // ── Stage Config ───────────────────────────────────────────────────────────
@@ -378,6 +386,9 @@ function PipelineRunCard({ run }: { run: any }) {
             <ReplayButton runId={run.runId} />
           )}
 
+          {/* Direction 6: Artifacts Drill-Down */}
+          <ArtifactsDrillDown runId={run.runId} />
+
           {/* Metadata */}
           <div className="flex items-center gap-4 text-[10px] text-muted-foreground/30">
             <span>Run ID: <span className="font-mono">{run.runId}</span></span>
@@ -438,6 +449,216 @@ function ReplayButton({ runId }: { runId: string }) {
       {replay.isError && (
         <div className="mt-2 p-2 rounded bg-red-500/5 border border-red-500/20">
           <span className="text-[10px] text-red-300">{replay.error.message}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ── Direction 6: Artifacts Drill-Down ────────────────────────────────────
+
+const ARTIFACT_STAGES = [
+  { key: "rawAlert", label: "Raw Alert", icon: FileJson2, color: "text-red-400", borderColor: "border-red-500/30", bgColor: "bg-red-500/5" },
+  { key: "triage", label: "Triage Output", icon: Shield, color: "text-cyan-400", borderColor: "border-cyan-500/30", bgColor: "bg-cyan-500/5" },
+  { key: "correlation", label: "Correlation Bundle", icon: GitBranch, color: "text-violet-400", borderColor: "border-violet-500/30", bgColor: "bg-violet-500/5" },
+  { key: "hypothesis", label: "Hypothesis / Living Case", icon: Brain, color: "text-amber-400", borderColor: "border-amber-500/30", bgColor: "bg-amber-500/5" },
+  { key: "actions", label: "Materialized Actions", icon: Swords, color: "text-emerald-400", borderColor: "border-emerald-500/30", bgColor: "bg-emerald-500/5" },
+] as const;
+
+function ArtifactsDrillDown({ runId }: { runId: string }) {
+  const [showArtifacts, setShowArtifacts] = useState(false);
+  const [expandedStage, setExpandedStage] = useState<string | null>(null);
+
+  const { data, isLoading } = trpc.pipeline.getPipelineArtifacts.useQuery(
+    { runId },
+    { enabled: showArtifacts }
+  );
+
+  return (
+    <div className="space-y-2">
+      {/* Toggle Button */}
+      <button
+        onClick={() => setShowArtifacts(!showArtifacts)}
+        className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs bg-violet-500/5 border border-violet-500/20 text-violet-300 hover:bg-violet-500/10 transition-colors w-full"
+      >
+        {showArtifacts ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+        <span className="font-[Space_Grotesk] font-semibold">
+          {showArtifacts ? "Hide" : "Show"} Artifact Lineage
+        </span>
+        <span className="text-[10px] text-muted-foreground/40 ml-auto">
+          raw alert → triage → correlation → hypothesis → actions
+        </span>
+      </button>
+
+      {showArtifacts && (
+        <div className="space-y-1">
+          {isLoading ? (
+            <div className="p-4 flex items-center justify-center">
+              <Loader2 className="w-4 h-4 text-violet-400 animate-spin mr-2" />
+              <span className="text-xs text-muted-foreground/40">Loading artifact chain...</span>
+            </div>
+          ) : !data ? (
+            <div className="p-4 text-center text-xs text-muted-foreground/30">
+              No artifact data available for this run.
+            </div>
+          ) : (
+            <>
+              {/* Lineage Summary Bar */}
+              <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+                <div className="flex items-center gap-2 mb-2">
+                  <GitBranch className="w-3.5 h-3.5 text-violet-400" />
+                  <span className="text-xs font-semibold text-foreground/70 font-[Space_Grotesk]">Lineage Chain</span>
+                </div>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {data.lineage.alertId && (
+                    <>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-300">
+                        Alert: {data.lineage.alertId}
+                      </span>
+                      <ArrowRight className="w-3 h-3 text-muted-foreground/20" />
+                    </>
+                  )}
+                  {data.lineage.triageId && (
+                    <>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">
+                        Triage: {data.lineage.triageId}
+                      </span>
+                      <ArrowRight className="w-3 h-3 text-muted-foreground/20" />
+                    </>
+                  )}
+                  {data.lineage.correlationId && (
+                    <>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-300">
+                        Corr: {data.lineage.correlationId}
+                      </span>
+                      <ArrowRight className="w-3 h-3 text-muted-foreground/20" />
+                    </>
+                  )}
+                  {data.lineage.livingCaseId && (
+                    <>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                        Case: #{data.lineage.livingCaseId}
+                      </span>
+                      <ArrowRight className="w-3 h-3 text-muted-foreground/20" />
+                    </>
+                  )}
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+                    {data.lineage.responseActionsCount} Actions
+                  </span>
+                </div>
+              </div>
+
+              {/* Per-Stage Metrics */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {Object.entries(data.stageMetrics).map(([key, metrics]: [string, any]) => {
+                  const stageConf = STAGE_CONFIG[key];
+                  const statusConf = STATUS_CONFIG[metrics.status] ?? STATUS_CONFIG.pending;
+                  const StatusIcon = statusConf.icon;
+                  return (
+                    <div key={key} className="p-2 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <StatusIcon className={`w-3 h-3 ${statusConf.color} ${metrics.status === "running" ? "animate-spin" : ""}`} />
+                        <span className={`text-[10px] font-semibold font-[Space_Grotesk] ${stageConf?.color ?? "text-foreground/50"}`}>
+                          {stageConf?.label ?? key}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        {metrics.latencyMs != null && (
+                          <span className="text-[10px] font-mono text-muted-foreground/40">
+                            {(metrics.latencyMs / 1000).toFixed(2)}s
+                          </span>
+                        )}
+                        <span className={`text-[9px] ${metrics.hasArtifact ? "text-emerald-400" : "text-muted-foreground/25"}`}>
+                          {metrics.hasArtifact ? "✓ artifact" : "no artifact"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Expandable Artifact Panels */}
+              <div className="space-y-1">
+                {ARTIFACT_STAGES.map((stage) => {
+                  const artifactData = data.artifacts[stage.key as keyof typeof data.artifacts];
+                  const hasData = artifactData !== null && artifactData !== undefined &&
+                    (Array.isArray(artifactData) ? artifactData.length > 0 : true);
+                  const isExpanded = expandedStage === stage.key;
+                  const StageIcon = stage.icon;
+
+                  return (
+                    <div key={stage.key} className={`rounded-lg border ${stage.borderColor} overflow-hidden`}>
+                      <button
+                        onClick={() => setExpandedStage(isExpanded ? null : stage.key)}
+                        disabled={!hasData}
+                        className={`w-full p-2.5 flex items-center gap-2 text-left transition-colors ${
+                          hasData ? "hover:bg-white/[0.02] cursor-pointer" : "opacity-40 cursor-not-allowed"
+                        } ${isExpanded ? stage.bgColor : ""}`}
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="w-3 h-3 text-muted-foreground/40" />
+                        ) : (
+                          <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
+                        )}
+                        <StageIcon className={`w-3.5 h-3.5 ${stage.color}`} />
+                        <span className={`text-xs font-semibold font-[Space_Grotesk] ${stage.color}`}>
+                          {stage.label}
+                        </span>
+                        {!hasData && (
+                          <span className="text-[9px] text-muted-foreground/25 ml-auto">No data</span>
+                        )}
+                        {hasData && Array.isArray(artifactData) && (
+                          <span className="text-[9px] text-muted-foreground/40 ml-auto">
+                            {artifactData.length} item{artifactData.length !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </button>
+
+                      {isExpanded && hasData && (
+                        <div className={`border-t ${stage.borderColor} p-3`}>
+                          {stage.key === "actions" && Array.isArray(artifactData) ? (
+                            <div className="space-y-2">
+                              {(artifactData as any[]).map((action: any, i: number) => (
+                                <div key={i} className="p-2 rounded bg-white/[0.02] border border-white/[0.06]">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded border ${
+                                      action.state === "proposed" ? "bg-violet-500/10 border-violet-500/20 text-violet-300" :
+                                      action.state === "approved" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" :
+                                      action.state === "rejected" ? "bg-red-500/10 border-red-500/20 text-red-300" :
+                                      action.state === "executed" ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-300" :
+                                      "bg-yellow-500/10 border-yellow-500/20 text-yellow-300"
+                                    }`}>
+                                      {action.state}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-foreground/60 truncate">{action.title}</span>
+                                    <span className="text-[9px] text-muted-foreground/30 ml-auto">{action.category}</span>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-[9px] text-muted-foreground/30">
+                                    <span>ID: <span className="font-mono">{action.actionId}</span></span>
+                                    {action.targetType && <span>Target: {action.targetType}={action.targetValue}</span>}
+                                    {action.urgency && <span>Urgency: {action.urgency}</span>}
+                                    {action.semanticWarning && (
+                                      <span className="text-yellow-400/60">⚠ {action.semanticWarning}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <RawJsonViewer
+                              data={artifactData}
+                              title={stage.label}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

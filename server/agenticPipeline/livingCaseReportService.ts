@@ -112,34 +112,37 @@ export async function assembleLivingCaseReportData(
     .where(eq(investigationSessions.id, caseId))
     .limit(1);
 
-  // Fetch source triage object (from the correlation bundle's sourceTriageId)
+  // ── Direction 2: Exact linkage via sourceTriageId / sourceCorrelationId ────
+  // Reports are defensible — we use exact lineage IDs stored on the case row,
+  // not "loop through recent rows" heuristics.
   let triageObject: TriageObject | null = null;
   let correlationBundle: CorrelationBundle | null = null;
 
-  // Find correlation bundles linked to this case
-  const corrRows = await db
-    .select()
-    .from(correlationBundles)
-    .orderBy(desc(correlationBundles.createdAt))
-    .limit(10);
+  // 1. Fetch correlation by exact ID stored on the case
+  if (caseRow.sourceCorrelationId) {
+    const [corrRow] = await db
+      .select()
+      .from(correlationBundles)
+      .where(eq(correlationBundles.correlationId, caseRow.sourceCorrelationId))
+      .limit(1);
+    if (corrRow) {
+      correlationBundle = corrRow.bundleData as unknown as CorrelationBundle;
+    }
+  }
 
-  // Find the one that matches our case
-  for (const row of corrRows) {
-    const bundle = row.bundleData as unknown as CorrelationBundle;
-    if (bundle) {
-      correlationBundle = bundle;
-      // Fetch the triage object
-      if (bundle.sourceTriageId) {
-        const [triageRow] = await db
-          .select()
-          .from(triageObjects)
-          .where(eq(triageObjects.triageId, bundle.sourceTriageId))
-          .limit(1);
-        if (triageRow) {
-          triageObject = triageRow.triageData as unknown as TriageObject;
-        }
-      }
-      break;
+  // 2. Fetch triage by exact ID stored on the case (preferred) or from correlation
+  const triageIdToFetch = caseRow.sourceTriageId
+    ?? correlationBundle?.sourceTriageId
+    ?? null;
+
+  if (triageIdToFetch) {
+    const [triageRow] = await db
+      .select()
+      .from(triageObjects)
+      .where(eq(triageObjects.triageId, triageIdToFetch))
+      .limit(1);
+    if (triageRow) {
+      triageObject = triageRow.triageData as unknown as TriageObject;
     }
   }
 

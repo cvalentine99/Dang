@@ -1738,3 +1738,47 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Created FeedbackAnalytics.tsx page with stacked accuracy bars, override flow visualization, analyst table, recent activity feed
 - [x] Added to sidebar navigation under Intelligence group
 - [x] 38 new tests in directions8-10.test.ts all passing
+
+## Phase: Directions 1-6 Implementation
+
+### Direction 1: Deprecate pipeline.updateActionState
+- [x] Remove updateActionState from pipelineRouter.ts — already removed
+- [x] Update LivingCaseView.tsx to use responseActions.approve/reject/defer/execute — already wired
+- [x] Remove any dead references to the old endpoint — cleaned up stale test reference
+
+### Direction 2: Fix case report linkage logic
+- [x] Add sourceTriageId and sourceCorrelationId to living_case_state table — already existed
+- [x] Populate linkage in hypothesis agent when creating living case — already wired
+- [x] Update report generation to use exact IDs not recency — livingCaseReportService now uses exact sourceTriageId/sourceCorrelationId
+
+### Direction 3: Unify analyst action surface
+- [x] LivingCaseView fetches actions from responseActionsRouter by caseId — already wired
+- [x] Remove inline action state management from LivingCaseView — already done
+- [x] Both ResponseActions page and LivingCaseView read from response_actions table — unified
+
+### Direction 4: Living case references actions, doesn't own them
+- [x] Store recommendedActionIds + summary counts in LivingCaseObject — added to shared schema + hypothesis agent
+- [x] Convert recommendedActions in caseData to display snapshot only — marked as display snapshot
+- [x] Operational state lives only in response_actions / response_action_audit — enforced
+
+### Direction 5: Centralized state-machine enforcement
+- [x] Create server/agenticPipeline/stateMachine.ts with centralized transition logic
+- [x] Enforce: requiresApproval=true cannot skip proposed→approved→executed
+- [x] Enforce: rejected actions are terminal (cannot execute)
+- [x] Enforce: deferred actions require a reason
+- [x] Every state transition writes an audit row
+- [x] Every action tied to a case must have valid caseId
+- [x] Wire all state changes through the centralized enforcer — responseActionsRouter fully delegates to stateMachine.ts
+
+### Direction 6: Pipeline inspection artifacts view
+- [x] Add backend endpoint to fetch full pipeline run artifacts (raw alert, triage, correlation, hypothesis, actions)
+- [x] Create ArtifactsDrillDown component showing full lineage chain
+- [x] Show per-stage metrics (latency, artifact availability)
+- [x] Show failure/fallback indicators with status badges
+- [x] Integrate into PipelineInspector page as expandable drill-down per run
+
+### Tests for Directions 1-6
+- [x] State machine invariant tests (illegal transitions, approval enforcement) — 50+ tests in directions1-6.test.ts
+- [x] Pipeline artifacts endpoint tests — procedure existence verified
+- [x] Linkage integrity tests — report service importable, schema verified
+- [x] All 879 tests passing (39 test files)

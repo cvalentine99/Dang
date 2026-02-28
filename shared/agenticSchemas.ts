@@ -450,7 +450,28 @@ export interface LivingCaseObject {
 
   // ── Response Recommendations ───────────────────────────────────────────────
 
-  /** Recommended response actions, grouped by urgency */
+  /**
+   * Direction 4: IDs of materialized response actions in the response_actions table.
+   * The living case references actions but doesn't own them — operational state
+   * (approve/reject/defer/execute) lives only in response_actions / response_action_audit.
+   */
+  recommendedActionIds?: string[];
+
+  /** Summary counts for quick display without fetching full action rows */
+  actionSummary?: {
+    total: number;
+    proposed: number;
+    approved: number;
+    rejected: number;
+    executed: number;
+    deferred: number;
+  };
+
+  /**
+   * Display-only snapshot of recommended actions from the LLM.
+   * DO NOT use this for operational state — it's frozen at hypothesis time.
+   * For current action state, always query response_actions table by caseId.
+   */
   recommendedActions: Array<{
     /** What to do */
     action: string;
@@ -468,7 +489,7 @@ export interface LivingCaseObject {
     evidenceBasis: string[];
     /** Linked playbook, if any */
     playbookRef?: string;
-    /** Current state of this recommendation */
+    /** Current state of this recommendation (snapshot only — not authoritative) */
     state: "proposed" | "approved" | "rejected" | "executed" | "deferred";
     /** Analyst who approved/rejected, if applicable */
     decidedBy?: string;

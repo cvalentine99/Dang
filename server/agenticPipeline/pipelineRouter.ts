@@ -41,7 +41,7 @@ import {
   type ReportType,
 } from "./livingCaseReportService";
 import { getDb } from "../db";
-import { triageObjects, alertQueue, correlationBundles, livingCaseState, pipelineRuns } from "../../drizzle/schema";
+import { triageObjects, alertQueue, correlationBundles, livingCaseState, pipelineRuns, responseActions } from "../../drizzle/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 
 export const pipelineRouter = router({
@@ -1345,6 +1345,182 @@ export const pipelineRouter = router({
       result.totalLatencyMs = Date.now() - startTime;
       result.status = "completed";
       return result;
+    }),
+
+  /**
+   * Direction 6: Pipeline Artifacts — full lineage drill-down.
+   * Fetches the complete artifact chain for a pipeline run:
+   *   raw alert → triage output → correlation bundle → hypothesis/living case → materialized actions
+   * Plus per-stage latency, token usage, and failure indicators.
+   */
+  getPipelineArtifacts: protectedProcedure
+    .input(z.object({ runId: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+
+      // 1. Fetch the pipeline run
+      const [run] = await db
+        .select()
+        .from(pipelineRuns)
+        .where(eq(pipelineRuns.runId, input.runId))
+        .limit(1);
+
+      if (!run) return null;
+
+      // 2. Fetch raw alert from alert queue (if available)
+      let rawAlert: Record<string, unknown> | null = null;
+      if (run.queueItemId) {
+        const [queueItem] = await db
+          .select()
+          .from(alertQueue)
+          .where(eq(alertQueue.id, run.queueItemId))
+          .limit(1);
+        if (queueItem?.rawJson) {
+          rawAlert = typeof queueItem.rawJson === "string"
+            ? JSON.parse(queueItem.rawJson)
+            : queueItem.rawJson as Record<string, unknown>;
+        }
+      }
+
+      // 3. Fetch triage artifact
+      let triageArtifact: Record<string, unknown> | null = null;
+      if (run.triageId) {
+        const [triageRow] = await db
+          .select()
+          .from(triageObjects)
+          .where(eq(triageObjects.triageId, run.triageId))
+          .limit(1);
+        if (triageRow) {
+          triageArtifact = {
+            triageId: triageRow.triageId,
+            severity: triageRow.severity,
+            route: triageRow.route,
+            status: triageRow.status,
+            agentId: triageRow.agentId,
+            ruleId: triageRow.ruleId,
+            triageData: triageRow.triageData,
+            createdAt: triageRow.createdAt,
+          };
+        }
+      }
+
+      // 4. Fetch correlation artifact
+      let correlationArtifact: Record<string, unknown> | null = null;
+      if (run.correlationId) {
+        const [corrRow] = await db
+          .select()
+          .from(correlationBundles)
+          .where(eq(correlationBundles.correlationId, run.correlationId))
+          .limit(1);
+        if (corrRow) {
+          correlationArtifact = {
+            correlationId: corrRow.correlationId,
+            sourceTriageId: corrRow.sourceTriageId,
+            relatedAlertCount: corrRow.relatedAlertCount,
+            discoveredEntityCount: corrRow.discoveredEntityCount,
+            bundleData: corrRow.bundleData,
+            createdAt: corrRow.createdAt,
+          };
+        }
+      }
+
+      // 5. Fetch living case / hypothesis artifact
+      let hypothesisArtifact: Record<string, unknown> | null = null;
+      if (run.livingCaseId) {
+        const [caseRow] = await db
+          .select()
+          .from(livingCaseState)
+          .where(eq(livingCaseState.sessionId, run.livingCaseId))
+          .limit(1);
+        if (caseRow) {
+          hypothesisArtifact = {
+            caseId: caseRow.sessionId,
+            caseData: caseRow.caseData,
+            workingTheory: caseRow.workingTheory,
+            theoryConfidence: caseRow.theoryConfidence,
+            sourceTriageId: caseRow.sourceTriageId,
+            sourceCorrelationId: caseRow.sourceCorrelationId,
+            completedPivotCount: caseRow.completedPivotCount,
+            evidenceGapCount: caseRow.evidenceGapCount,
+            pendingActionCount: caseRow.pendingActionCount,
+            createdAt: caseRow.createdAt,
+            updatedAt: caseRow.updatedAt,
+          };
+        }
+      }
+
+      // 6. Fetch materialized response actions
+      let actionsArtifact: Array<Record<string, unknown>> = [];
+      if (run.livingCaseId) {
+        const actionRows = await db
+          .select()
+          .from(responseActions)
+          .where(eq(responseActions.caseId, run.livingCaseId))
+          .orderBy(desc(responseActions.createdAt));
+        actionsArtifact = actionRows.map((a) => ({
+          actionId: a.actionId,
+          category: a.category,
+          title: a.title,
+          description: a.description,
+          state: a.state,
+          urgency: a.urgency,
+          targetType: a.targetType,
+          targetValue: a.targetValue,
+          requiresApproval: a.requiresApproval,
+          proposedBy: a.proposedBy,
+          approvedBy: a.approvedBy,
+          executedBy: a.executedBy,
+          semanticWarning: a.semanticWarning,
+          createdAt: a.createdAt,
+        }));
+      }
+
+      // 7. Build lineage summary
+      const lineage = {
+        alertId: run.alertId,
+        triageId: run.triageId,
+        correlationId: run.correlationId,
+        livingCaseId: run.livingCaseId,
+        responseActionsCount: actionsArtifact.length,
+      };
+
+      // 8. Build per-stage metrics
+      const stageMetrics = {
+        triage: {
+          status: run.triageStatus,
+          latencyMs: run.triageLatencyMs,
+          hasArtifact: !!triageArtifact,
+        },
+        correlation: {
+          status: run.correlationStatus,
+          latencyMs: run.correlationLatencyMs,
+          hasArtifact: !!correlationArtifact,
+        },
+        hypothesis: {
+          status: run.hypothesisStatus,
+          latencyMs: run.hypothesisLatencyMs,
+          hasArtifact: !!hypothesisArtifact,
+        },
+        responseActions: {
+          status: run.responseActionsStatus,
+          count: actionsArtifact.length,
+          hasArtifact: actionsArtifact.length > 0,
+        },
+      };
+
+      return {
+        run,
+        lineage,
+        stageMetrics,
+        artifacts: {
+          rawAlert,
+          triage: triageArtifact,
+          correlation: correlationArtifact,
+          hypothesis: hypothesisArtifact,
+          actions: actionsArtifact,
+        },
+      };
     }),
 
   /** Generate a structured report from a Living Case. */

@@ -844,6 +844,26 @@ export async function runHypothesisAgent(
     ctx
   );
 
+  // 7b. Direction 4: Store action IDs + summary on the living case (reference, not ownership)
+  if (materializedActionIds.length > 0) {
+    livingCase.recommendedActionIds = materializedActionIds;
+    livingCase.actionSummary = {
+      total: materializedActionIds.length,
+      proposed: materializedActionIds.length,
+      approved: 0,
+      rejected: 0,
+      executed: 0,
+      deferred: 0,
+    };
+    // Update the persisted case with the action references
+    const dbUpdate = await getDb();
+    if (dbUpdate) {
+      await dbUpdate.update(livingCaseState)
+        .set({ caseData: livingCase as any })
+        .where(eq(livingCaseState.sessionId, sessionId));
+    }
+  }
+
   // 8. Calculate metrics
   const tokensUsed = extractTokenCount(llmResult);
   const latencyMs = Date.now() - startTime;

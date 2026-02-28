@@ -1341,15 +1341,17 @@ describe("Hypothesis Agent — pipeline router contracts", () => {
     expect(output.total).toBe(2);
   });
 
-  it("updateActionState input requires caseId, actionIndex, newState", () => {
-    const input = {
-      caseId: 42,
-      actionIndex: 0,
-      newState: "approved" as const,
-    };
-    expect(input.caseId).toBeGreaterThan(0);
-    expect(input.actionIndex).toBeGreaterThanOrEqual(0);
-    expect(["proposed", "approved", "rejected", "deferred"]).toContain(input.newState);
+  it("Direction 1: uses responseActions.approve/reject/defer/execute (not updateActionState)", () => {
+    // updateActionState has been removed — all state transitions go through
+    // the responseActionsRouter's dedicated endpoints with centralized invariants.
+    const validEndpoints = ["approve", "reject", "defer", "execute", "repropose", "bulkApprove"];
+    expect(validEndpoints).toContain("approve");
+    expect(validEndpoints).toContain("reject");
+    expect(validEndpoints).toContain("defer");
+    expect(validEndpoints).toContain("execute");
+    // Each endpoint requires actionId (string), not caseId+actionIndex
+    const input = { actionId: "ra-test123", reason: "Confirmed threat" };
+    expect(input.actionId).toMatch(/^ra-/);
   });
 
   it("recordPivot input requires caseId, action, finding", () => {

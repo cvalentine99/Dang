@@ -5,6 +5,9 @@
  * Every state transition is logged to the audit table.
  * Nothing lives inside LLM markdown output.
  *
+ * Direction 5: All state transitions are delegated to the centralized state machine
+ * in stateMachine.ts. This router is the API surface; the state machine is the enforcer.
+ *
  * State Machine:
  *   proposed → approved → executed
  *   proposed → rejected
@@ -17,7 +20,7 @@
  */
 
 import { z } from "zod";
-import { eq, and, desc, sql, inArray, count } from "drizzle-orm";
+import { eq, and, desc, sql, count } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -28,166 +31,14 @@ import {
   RESPONSE_ACTION_STATES,
   RESPONSE_ACTION_URGENCY,
 } from "../../drizzle/schema";
-
-// ── Valid State Transitions ──────────────────────────────────────────────────
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  proposed: ["approved", "rejected", "deferred"],
-  approved: ["executed", "rejected"],
-  deferred: ["proposed"],
-  // rejected and executed are terminal states
-  rejected: [],
-  executed: [],
-};
-
-function isValidTransition(from: string, to: string): boolean {
-  return VALID_TRANSITIONS[from]?.includes(to) ?? false;
-}
-
-// ── Audit Logger ─────────────────────────────────────────────────────────────
-async function logAudit(
-  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
-  opts: {
-    actionDbId: number;
-    actionIdStr: string;
-    fromState: string;
-    toState: string;
-    performedBy: string;
-    reason?: string;
-    metadata?: Record<string, unknown>;
-  }
-) {
-  await db.insert(responseActionAudit).values({
-    actionId: opts.actionDbId,
-    actionIdStr: opts.actionIdStr,
-    fromState: opts.fromState,
-    toState: opts.toState,
-    performedBy: opts.performedBy,
-    reason: opts.reason ?? null,
-    metadata: opts.metadata ?? null,
-  });
-}
-
-// ── Transition Helper ────────────────────────────────────────────────────────
-async function transitionState(
-  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
-  opts: {
-    actionId: string;
-    targetState: typeof RESPONSE_ACTION_STATES[number];
-    userId: number;
-    reason?: string;
-    metadata?: Record<string, unknown>;
-  }
-): Promise<{ success: boolean; error?: string; action?: typeof responseActions.$inferSelect }> {
-  // Fetch current action
-  const [action] = await db
-    .select()
-    .from(responseActions)
-    .where(eq(responseActions.actionId, opts.actionId))
-    .limit(1);
-
-  if (!action) {
-    return { success: false, error: `Action ${opts.actionId} not found` };
-  }
-
-  if (!isValidTransition(action.state, opts.targetState)) {
-    return {
-      success: false,
-      error: `Invalid transition: ${action.state} → ${opts.targetState}. Allowed: ${VALID_TRANSITIONS[action.state]?.join(", ") || "none (terminal state)"}`,
-    };
-  }
-
-  // ── Direction 5 Invariants ─────────────────────────────────────────────────
-
-  // Invariant 1: requiresApproval=true cannot go proposed→executed without approved step.
-  // The state machine already enforces proposed→approved→executed, but guard explicitly.
-  if (
-    opts.targetState === "executed" &&
-    action.requiresApproval === 1 &&
-    action.state !== "approved"
-  ) {
-    return {
-      success: false,
-      error: `Action requires approval before execution. Current state: ${action.state}. Must be approved first.`,
-    };
-  }
-
-  // Invariant 2: Deferred actions require a reason.
-  if (opts.targetState === "deferred" && (!opts.reason || opts.reason.trim().length === 0)) {
-    return {
-      success: false,
-      error: "Deferred actions require a reason. Provide a reason explaining why this action is being deferred.",
-    };
-  }
-
-  // Invariant 3: Rejected actions require a reason.
-  if (opts.targetState === "rejected" && (!opts.reason || opts.reason.trim().length === 0)) {
-    return {
-      success: false,
-      error: "Rejected actions require a reason. Provide a reason explaining why this action is being rejected.",
-    };
-  }
-
-  const fromState = action.state;
-  const performer = `user:${opts.userId}`;
-  const now = new Date();
-
-  // Build the update payload based on target state
-  const updatePayload: Record<string, unknown> = { state: opts.targetState };
-
-  switch (opts.targetState) {
-    case "approved":
-      updatePayload.approvedBy = performer;
-      updatePayload.approvedAt = now;
-      updatePayload.decidedBy = performer;
-      updatePayload.decidedAt = now;
-      break;
-    case "rejected":
-      updatePayload.decidedBy = performer;
-      updatePayload.decidedAt = now;
-      updatePayload.decisionReason = opts.reason ?? null;
-      break;
-    case "executed":
-      updatePayload.executedBy = performer;
-      updatePayload.executedAt = now;
-      break;
-    case "deferred":
-      updatePayload.decidedBy = performer;
-      updatePayload.decidedAt = now;
-      updatePayload.decisionReason = opts.reason ?? null;
-      break;
-    case "proposed":
-      // Re-propose from deferred — clear previous decision
-      updatePayload.decidedBy = null;
-      updatePayload.decidedAt = null;
-      updatePayload.decisionReason = null;
-      break;
-  }
-
-  await db
-    .update(responseActions)
-    .set(updatePayload as any)
-    .where(eq(responseActions.id, action.id));
-
-  // Log audit trail
-  await logAudit(db, {
-    actionDbId: action.id,
-    actionIdStr: action.actionId,
-    fromState,
-    toState: opts.targetState,
-    performedBy: performer,
-    reason: opts.reason,
-    metadata: opts.metadata,
-  });
-
-  // Return updated action
-  const [updated] = await db
-    .select()
-    .from(responseActions)
-    .where(eq(responseActions.id, action.id))
-    .limit(1);
-
-  return { success: true, action: updated };
-}
+import {
+  transitionActionState,
+  approveAction,
+  rejectAction,
+  executeAction,
+  deferAction,
+  reproposeAction,
+} from "./stateMachine";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Router
@@ -248,9 +99,9 @@ export const responseActionsRouter = router({
         .where(eq(responseActions.actionId, actionId))
         .limit(1);
 
-      // Log creation audit
-      await logAudit(db, {
-        actionDbId: inserted.id,
+      // Log creation audit via the centralized state machine's audit pattern
+      await db.insert(responseActionAudit).values({
+        actionId: inserted.id,
         actionIdStr: actionId,
         fromState: "none",
         toState: "proposed",
@@ -268,41 +119,27 @@ export const responseActionsRouter = router({
       return { success: true as const, actionId, action: inserted };
     }),
 
-  // ── Approve ────────────────────────────────────────────────────────────────
+  // ── Approve ── (delegates to centralized state machine) ───────────────────
   approve: protectedProcedure
     .input(z.object({
       actionId: z.string().min(1),
       reason: z.string().max(2000).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error("Database not available");
-      return transitionState(db, {
-        actionId: input.actionId,
-        targetState: "approved",
-        userId: ctx.user.id,
-        reason: input.reason,
-      });
+      return approveAction(input.actionId, ctx.user.id, input.reason);
     }),
 
-  // ── Reject ─────────────────────────────────────────────────────────────────
+  // ── Reject ── (delegates to centralized state machine) ────────────────────
   reject: protectedProcedure
     .input(z.object({
       actionId: z.string().min(1),
       reason: z.string().min(1).max(2000),
     }))
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error("Database not available");
-      return transitionState(db, {
-        actionId: input.actionId,
-        targetState: "rejected",
-        userId: ctx.user.id,
-        reason: input.reason,
-      });
+      return rejectAction(input.actionId, ctx.user.id, input.reason);
     }),
 
-  // ── Execute ────────────────────────────────────────────────────────────────
+  // ── Execute ── (delegates to centralized state machine) ───────────────────
   execute: protectedProcedure
     .input(z.object({
       actionId: z.string().min(1),
@@ -310,85 +147,58 @@ export const responseActionsRouter = router({
       executionSuccess: z.boolean().default(true),
     }))
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error("Database not available");
-
-      const result = await transitionState(db, {
-        actionId: input.actionId,
-        targetState: "executed",
-        userId: ctx.user.id,
-        metadata: {
-          executionResult: input.executionResult,
-          executionSuccess: input.executionSuccess,
-        },
+      const result = await executeAction(input.actionId, ctx.user.id, {
+        executionResult: input.executionResult,
+        executionSuccess: input.executionSuccess,
       });
 
       if (result.success && result.action) {
         // Also store execution result on the action itself
-        await db
-          .update(responseActions)
-          .set({
-            executionResult: input.executionResult ?? null,
-            executionSuccess: input.executionSuccess ? 1 : 0,
-          })
-          .where(eq(responseActions.actionId, input.actionId));
+        const db = await getDb();
+        if (db) {
+          await db
+            .update(responseActions)
+            .set({
+              executionResult: input.executionResult ?? null,
+              executionSuccess: input.executionSuccess ? 1 : 0,
+            })
+            .where(eq(responseActions.actionId, input.actionId));
+        }
       }
 
       return result;
     }),
 
-  // ── Defer ──────────────────────────────────────────────────────────────────
+  // ── Defer ── (delegates to centralized state machine) ─────────────────────
   defer: protectedProcedure
     .input(z.object({
       actionId: z.string().min(1),
       reason: z.string().min(1).max(2000),
     }))
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error("Database not available");
-      return transitionState(db, {
-        actionId: input.actionId,
-        targetState: "deferred",
-        userId: ctx.user.id,
-        reason: input.reason,
-      });
+      return deferAction(input.actionId, ctx.user.id, input.reason);
     }),
 
-  // ── Re-propose (from deferred) ────────────────────────────────────────────
+  // ── Re-propose (from deferred) ── (delegates to centralized state machine)
   repropose: protectedProcedure
     .input(z.object({
       actionId: z.string().min(1),
       reason: z.string().max(2000).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error("Database not available");
-      return transitionState(db, {
-        actionId: input.actionId,
-        targetState: "proposed",
-        userId: ctx.user.id,
-        reason: input.reason ?? "Re-proposed from deferred",
-      });
+      return reproposeAction(input.actionId, ctx.user.id, input.reason);
     }),
 
-  // ── Bulk Approve ───────────────────────────────────────────────────────────
+  // ── Bulk Approve ── (delegates each to centralized state machine) ─────────
   bulkApprove: protectedProcedure
     .input(z.object({
       actionIds: z.array(z.string().min(1)).min(1).max(50),
       reason: z.string().max(2000).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error("Database not available");
-
       const results: Array<{ actionId: string; success: boolean; error?: string }> = [];
       for (const actionId of input.actionIds) {
-        const result = await transitionState(db, {
-          actionId,
-          targetState: "approved",
-          userId: ctx.user.id,
-          reason: input.reason ?? "Bulk approved",
-        });
+        const result = await approveAction(actionId, ctx.user.id, input.reason ?? "Bulk approved");
         results.push({ actionId, success: result.success, error: result.error });
       }
 
