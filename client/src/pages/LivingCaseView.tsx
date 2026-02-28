@@ -50,6 +50,7 @@ import {
   CircleDot,
   Download,
   ClipboardCopy,
+  Play,
 } from "lucide-react";
 
 // ── Severity & Priority Colors ──────────────────────────────────────────────
@@ -372,62 +373,121 @@ function TimelineCard({ events }: { events: any[] }) {
 
 // ── Recommended Actions Card ────────────────────────────────────────────────
 
+/**
+ * Direction 3: RecommendedActionsCard now fetches from responseActions.getByCase
+ * — the single source of truth. caseData.recommendedActions is a display-only snapshot;
+ * operational state (approve/reject/defer/execute) lives in response_actions table.
+ */
 function RecommendedActionsCard({
-  actions,
   caseId,
-  onRefresh,
 }: {
-  actions: any[];
   caseId: number;
-  onRefresh?: () => void;
 }) {
-  const updateAction = trpc.pipeline.updateActionState.useMutation({
-    onSuccess: () => {
-      toast.success("Action state updated");
-      onRefresh?.();
-    },
-    onError: (err) => toast.error("Failed to update action", { description: err.message }),
+  const [reasonDialogAction, setReasonDialogAction] = useState<{ actionId: string; targetState: string } | null>(null);
+  const [reasonText, setReasonText] = useState("");
+
+  // Fetch from the REAL source of truth: response_actions table
+  const { data, isLoading, refetch } = trpc.responseActions.getByCase.useQuery(
+    { caseId },
+    { enabled: caseId > 0, refetchInterval: 15_000 }
+  );
+
+  const approveMut = trpc.responseActions.approve.useMutation({
+    onSuccess: () => { toast.success("Action approved"); refetch(); },
+    onError: (err) => toast.error("Approval failed", { description: err.message }),
+  });
+  const rejectMut = trpc.responseActions.reject.useMutation({
+    onSuccess: () => { toast.success("Action rejected"); refetch(); setReasonDialogAction(null); setReasonText(""); },
+    onError: (err) => toast.error("Rejection failed", { description: err.message }),
+  });
+  const deferMut = trpc.responseActions.defer.useMutation({
+    onSuccess: () => { toast.success("Action deferred"); refetch(); setReasonDialogAction(null); setReasonText(""); },
+    onError: (err) => toast.error("Defer failed", { description: err.message }),
+  });
+  const executeMut = trpc.responseActions.execute.useMutation({
+    onSuccess: () => { toast.success("Action executed"); refetch(); },
+    onError: (err) => toast.error("Execution failed", { description: err.message }),
   });
 
-  if (!actions || actions.length === 0) return null;
+  const actions = data?.actions ?? [];
+  const isPending = approveMut.isPending || rejectMut.isPending || deferMut.isPending || executeMut.isPending;
 
-  const categories = ["immediate", "next", "optional"] as const;
+  if (isLoading) {
+    return (
+      <GlassPanel className="p-5 animate-pulse">
+        <div className="h-4 w-48 bg-white/[0.06] rounded mb-4" />
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => <div key={i} className="h-16 bg-white/[0.03] rounded" />)}
+        </div>
+      </GlassPanel>
+    );
+  }
+
+  if (actions.length === 0) return null;
+
+  const urgencyOrder = ["immediate", "next", "scheduled", "optional"] as const;
+
+  const handleReasonSubmit = () => {
+    if (!reasonDialogAction || !reasonText.trim()) return;
+    if (reasonDialogAction.targetState === "rejected") {
+      rejectMut.mutate({ actionId: reasonDialogAction.actionId, reason: reasonText.trim() });
+    } else if (reasonDialogAction.targetState === "deferred") {
+      deferMut.mutate({ actionId: reasonDialogAction.actionId, reason: reasonText.trim() });
+    }
+  };
 
   return (
     <GlassPanel className="p-5">
       <div className="flex items-center gap-2 mb-4">
         <ListChecks className="w-4 h-4 text-orange-400" />
-        <h3 className="text-sm font-semibold font-[Space_Grotesk] text-orange-300 uppercase tracking-wider">Recommended Actions</h3>
+        <h3 className="text-sm font-semibold font-[Space_Grotesk] text-orange-300 uppercase tracking-wider">Response Actions</h3>
+        <span className="text-[10px] bg-violet-500/10 border border-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded">
+          DB-backed
+        </span>
         <span className="text-[10px] text-muted-foreground/40 ml-auto">
           {actions.filter((a: any) => a.state === "proposed").length} pending / {actions.length} total
         </span>
       </div>
 
-      {categories.map((cat) => {
-        const catActions = actions.filter((a: any) => a.category === cat);
-        if (catActions.length === 0) return null;
+      {urgencyOrder.map((urg) => {
+        const urgActions = actions.filter((a: any) => a.urgency === urg);
+        if (urgActions.length === 0) return null;
 
-        const catLabel = cat === "immediate" ? "Immediate (< 1 hour)" : cat === "next" ? "Next (< 24 hours)" : "Optional Follow-ups";
-        const catColor = cat === "immediate" ? "text-red-400" : cat === "next" ? "text-yellow-400" : "text-blue-400";
+        const urgLabel = urg === "immediate" ? "Immediate (< 1 hour)" : urg === "next" ? "Next (< 24 hours)" : urg === "scheduled" ? "Scheduled" : "Optional";
+        const urgColor = urg === "immediate" ? "text-red-400" : urg === "next" ? "text-yellow-400" : urg === "scheduled" ? "text-cyan-400" : "text-blue-400";
 
         return (
-          <div key={cat} className="mb-4 last:mb-0">
-            <div className={`text-[10px] uppercase tracking-wider ${catColor} mb-2`}>{catLabel}</div>
+          <div key={urg} className="mb-4 last:mb-0">
+            <div className={`text-[10px] uppercase tracking-wider ${urgColor} mb-2`}>{urgLabel}</div>
             <div className="space-y-2">
-              {catActions.map((action: any, i: number) => {
+              {urgActions.map((action: any) => {
                 const stateConfig = ACTION_STATE_CONFIG[action.state] ?? ACTION_STATE_CONFIG.proposed;
                 const StateIcon = stateConfig.icon;
-                const actionIdx = actions.indexOf(action);
 
                 return (
-                  <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+                  <div key={action.actionId} className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.06]">
                     <div className="flex items-start gap-3">
                       <StateIcon className={`w-4 h-4 ${stateConfig.color} shrink-0 mt-0.5`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-foreground/85">{action.action}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-foreground/85 font-medium">{action.title}</p>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.04] text-muted-foreground/50 font-mono">
+                            {action.category}
+                          </span>
+                        </div>
+                        {action.description && (
+                          <p className="text-[10px] text-muted-foreground/50 mt-1">{action.description}</p>
+                        )}
+                        {action.targetValue && (
+                          <div className="mt-1">
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-300 font-mono">
+                              {action.targetType}: {action.targetValue}
+                            </span>
+                          </div>
+                        )}
                         {action.evidenceBasis?.length > 0 && (
                           <div className="mt-1 flex flex-wrap gap-1">
-                            {action.evidenceBasis.map((e: string, j: number) => (
+                            {(action.evidenceBasis as string[]).map((e: string, j: number) => (
                               <span key={j} className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.04] text-muted-foreground/50">
                                 {e}
                               </span>
@@ -435,44 +495,64 @@ function RecommendedActionsCard({
                           </div>
                         )}
                         <div className="flex items-center gap-2 mt-2">
-                          {action.requiresApproval && (
+                          {action.requiresApproval === 1 && (
                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 text-orange-300">
                               Requires Approval
                             </span>
                           )}
                           <span className={`text-[9px] ${stateConfig.color}`}>{stateConfig.label}</span>
+                          {action.proposedBy && (
+                            <span className="text-[9px] text-muted-foreground/30 font-mono">
+                              by {action.proposedBy}
+                            </span>
+                          )}
+                          <span className="text-[9px] text-muted-foreground/30 font-mono ml-auto">
+                            {action.actionId}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Action buttons for proposed items */}
-                      {action.state === "proposed" && (
-                        <div className="flex items-center gap-1 shrink-0">
+                      {/* State transition buttons — use the REAL responseActions endpoints */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {action.state === "proposed" && (
+                          <>
+                            <button
+                              onClick={() => approveMut.mutate({ actionId: action.actionId })}
+                              disabled={isPending}
+                              className="p-1.5 rounded hover:bg-emerald-500/15 text-emerald-400/60 hover:text-emerald-400 transition-colors"
+                              title="Approve"
+                            >
+                              <CheckSquare className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setReasonDialogAction({ actionId: action.actionId, targetState: "rejected" })}
+                              disabled={isPending}
+                              className="p-1.5 rounded hover:bg-red-500/15 text-red-400/60 hover:text-red-400 transition-colors"
+                              title="Reject (requires reason)"
+                            >
+                              <XSquare className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setReasonDialogAction({ actionId: action.actionId, targetState: "deferred" })}
+                              disabled={isPending}
+                              className="p-1.5 rounded hover:bg-yellow-500/15 text-yellow-400/60 hover:text-yellow-400 transition-colors"
+                              title="Defer (requires reason)"
+                            >
+                              <PauseCircle className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                        {action.state === "approved" && (
                           <button
-                            onClick={() => updateAction.mutate({ caseId, actionIndex: actionIdx, newState: "approved" })}
-                            disabled={updateAction.isPending}
-                            className="p-1.5 rounded hover:bg-emerald-500/15 text-emerald-400/60 hover:text-emerald-400 transition-colors"
-                            title="Approve"
+                            onClick={() => executeMut.mutate({ actionId: action.actionId })}
+                            disabled={isPending}
+                            className="p-1.5 rounded hover:bg-violet-500/15 text-violet-400/60 hover:text-violet-400 transition-colors"
+                            title="Mark Executed"
                           >
-                            <CheckSquare className="w-3.5 h-3.5" />
+                            <Play className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            onClick={() => updateAction.mutate({ caseId, actionIndex: actionIdx, newState: "rejected" })}
-                            disabled={updateAction.isPending}
-                            className="p-1.5 rounded hover:bg-red-500/15 text-red-400/60 hover:text-red-400 transition-colors"
-                            title="Reject"
-                          >
-                            <XSquare className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => updateAction.mutate({ caseId, actionIndex: actionIdx, newState: "deferred" })}
-                            disabled={updateAction.isPending}
-                            className="p-1.5 rounded hover:bg-yellow-500/15 text-yellow-400/60 hover:text-yellow-400 transition-colors"
-                            title="Defer"
-                          >
-                            <PauseCircle className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -481,6 +561,41 @@ function RecommendedActionsCard({
           </div>
         );
       })}
+
+      {/* Reason dialog for reject/defer — invariant: these require a reason */}
+      {reasonDialogAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[oklch(0.18_0.02_280)] border border-white/[0.08] rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <h4 className="text-sm font-semibold font-[Space_Grotesk] text-foreground/80 mb-3">
+              {reasonDialogAction.targetState === "rejected" ? "Reject" : "Defer"} Action
+            </h4>
+            <p className="text-xs text-muted-foreground/50 mb-3">
+              A reason is required for {reasonDialogAction.targetState === "rejected" ? "rejecting" : "deferring"} actions.
+            </p>
+            <textarea
+              value={reasonText}
+              onChange={(e) => setReasonText(e.target.value)}
+              placeholder="Enter reason..."
+              className="w-full h-24 bg-white/[0.04] border border-white/[0.08] rounded-lg p-3 text-xs text-foreground/80 placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-violet-500/40 resize-none"
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                onClick={() => { setReasonDialogAction(null); setReasonText(""); }}
+                className="px-3 py-1.5 rounded-lg text-xs text-muted-foreground/60 hover:text-foreground/80 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReasonSubmit}
+                disabled={!reasonText.trim() || isPending}
+                className="px-3 py-1.5 rounded-lg text-xs bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:bg-violet-500/30 disabled:opacity-30 transition-colors"
+              >
+                {reasonDialogAction.targetState === "rejected" ? "Reject" : "Defer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </GlassPanel>
   );
 }
@@ -1049,12 +1164,8 @@ function LivingCaseDetailView({ caseId }: { caseId: number }) {
       {/* Timeline */}
       <TimelineCard events={caseData?.timelineSummary ?? []} />
 
-      {/* Recommended Actions */}
-      <RecommendedActionsCard
-        actions={caseData?.recommendedActions ?? []}
-        caseId={row.id}
-        onRefresh={() => refetch()}
-      />
+      {/* Response Actions — fetched from response_actions table, NOT caseData JSON */}
+      <RecommendedActionsCard caseId={row.id} />
 
       {/* Completed Pivots */}
       <CompletedPivotsCard

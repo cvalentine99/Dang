@@ -37,6 +37,8 @@ import AutoQueueRules from "./pages/AutoQueueRules";
 import TriagePipeline from "./pages/TriagePipeline";
 import LivingCaseView from "./pages/LivingCaseView";
 import ResponseActions from "./pages/ResponseActions";
+import PipelineInspector from "./pages/PipelineInspector";
+import FeedbackAnalytics from "./pages/FeedbackAnalytics";
 
 function Router() {
   return (
@@ -81,6 +83,8 @@ function Router() {
               <Route path="/living-cases" component={LivingCaseView} />
               <Route path="/living-cases/:id" component={LivingCaseView} />
               <Route path="/response-actions" component={ResponseActions} />
+              <Route path="/pipeline-inspector" component={PipelineInspector} />
+              <Route path="/feedback-analytics" component={FeedbackAnalytics} />
               <Route path="/404" component={NotFound} />
               <Route component={NotFound} />
             </Switch>

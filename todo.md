@@ -1677,3 +1677,64 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Wrote end-to-end handoff chain test (server/pipelineHandoff.test.ts — 46 tests)
 - [x] Produced SOC_COMPLIANCE_EVIDENCE.md — claim-by-claim evidence with file paths
 - [x] All 780 tests passing (37 test files), 0 TypeScript errors
+
+## Phase: Code Review Feedback — 10 Directions
+
+### Direction 1: Deprecate pipeline.updateActionState (split-brain elimination)
+- [ ] Remove updateActionState endpoint from pipelineRouter.ts
+- [ ] Remove all references to updateActionState from LivingCaseView.tsx
+- [ ] LivingCaseView must call responseActions.approve/reject/defer/execute instead
+
+### Direction 2: Fix case report linkage logic
+- [ ] Add sourceTriageId and sourceCorrelationId fields to living_case_state table
+- [ ] Populate linkage fields when hypothesis agent creates the living case
+- [ ] Report service fetches exact triage/correlation rows by ID, not by recency
+- [ ] Reports are defensible — exact lineage, no "loop through recent rows"
+
+### Direction 3: Unify analyst action surface (one source of truth)
+- [ ] LivingCaseView fetches actions from responseActionsRouter by caseId, not from caseData.recommendedActions
+- [ ] ResponseActions page = global operations queue
+- [ ] LivingCaseView = contextual case-local view
+- [ ] Both read from the same response_actions table
+
+### Direction 4: Living case references actions, doesn't own them
+- [ ] LivingCaseObject stores recommendedActionIds + summary counts, not full mutable action objects
+- [ ] Operational state lives only in response_actions / response_action_audit
+- [ ] recommendedActions in caseData becomes a display snapshot only
+
+### Direction 5: Harden workflow invariants
+- [ ] requiresApproval=true cannot go proposed→executed without approved step
+- [ ] rejected actions cannot be executed
+- [ ] deferred actions require a reason
+- [ ] every state transition writes an audit row (enforce centrally)
+- [ ] every action tied to a case must have a valid caseId
+- [ ] Encode invariants centrally, test mercilessly
+
+### Direction 6: Pipeline inspection/replay page
+- [ ] Build PipelineInspection page showing per-run artifacts
+- [ ] Show: raw alert, triage output, correlation bundle, hypothesis output, materialized actions
+- [ ] Show: token usage, latency per stage, failures/fallback usage
+- [ ] Add to sidebar navigation
+
+### Direction 7: Separate AI recommendation from human decision in UI
+- [x] Action cards always show: recommendation, why, evidence basis, approval required, current state, who changed, when
+- [x] Clear visual separation between "AI suggested" and "human decided"
+- [x] Wording choices: "Recommended" not "Required", "Proposed" not "Ordered"
+
+### Direction 8: Tighten category semantics from LLM
+- [x] Define strict internal contract for LLM action output: action_type, urgency, target_type, target_value, requires_approval, rationale, evidence_basis
+- [x] Validate contract on ingest, not infer from fuzzy strings — added category-target semantic validation with semanticWarning column
+- [x] Less "interpret the LLM," more "validate the contract" — materializeResponseActions now validates category-target pairs
+
+### Direction 9: Pipeline Replay Endpoint
+- [x] Added replayPipelineRun endpoint that detects first failed stage and re-runs from there
+- [x] Replay reuses completed stage artifacts (triageId, correlationId)
+- [x] Creates new pipeline_runs record with replay- prefix
+- [x] Added Replay button to PipelineInspector UI for failed/partial runs
+- [x] 38 new tests covering semantic validation, replay logic, and feedback analytics
+
+### Direction 10: Feedback Analytics View
+- [x] Added feedbackAnalytics endpoint with coverage metrics, severity/route override distributions, per-analyst activity
+- [x] Created FeedbackAnalytics.tsx page with stacked accuracy bars, override flow visualization, analyst table, recent activity feed
+- [x] Added to sidebar navigation under Intelligence group
+- [x] 38 new tests in directions8-10.test.ts all passing

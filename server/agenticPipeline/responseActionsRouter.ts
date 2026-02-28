@@ -96,6 +96,37 @@ async function transitionState(
     };
   }
 
+  // ── Direction 5 Invariants ─────────────────────────────────────────────────
+
+  // Invariant 1: requiresApproval=true cannot go proposed→executed without approved step.
+  // The state machine already enforces proposed→approved→executed, but guard explicitly.
+  if (
+    opts.targetState === "executed" &&
+    action.requiresApproval === 1 &&
+    action.state !== "approved"
+  ) {
+    return {
+      success: false,
+      error: `Action requires approval before execution. Current state: ${action.state}. Must be approved first.`,
+    };
+  }
+
+  // Invariant 2: Deferred actions require a reason.
+  if (opts.targetState === "deferred" && (!opts.reason || opts.reason.trim().length === 0)) {
+    return {
+      success: false,
+      error: "Deferred actions require a reason. Provide a reason explaining why this action is being deferred.",
+    };
+  }
+
+  // Invariant 3: Rejected actions require a reason.
+  if (opts.targetState === "rejected" && (!opts.reason || opts.reason.trim().length === 0)) {
+    return {
+      success: false,
+      error: "Rejected actions require a reason. Provide a reason explaining why this action is being rejected.",
+    };
+  }
+
   const fromState = action.state;
   const performer = `user:${opts.userId}`;
   const now = new Date();

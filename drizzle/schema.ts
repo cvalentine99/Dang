@@ -835,6 +835,10 @@ export const livingCaseState = mysqlTable("living_case_state", {
   pendingActionCount: int("pendingActionCount").default(0).notNull(),
   /** Number of actions requiring approval */
   approvalRequiredCount: int("approvalRequiredCount").default(0).notNull(),
+  /** Primary triage ID that originated this case (exact lineage, not recency) */
+  sourceTriageId: varchar("sourceTriageId", { length: 64 }),
+  /** Primary correlation ID that originated this case (exact lineage, not recency) */
+  sourceCorrelationId: varchar("sourceCorrelationId", { length: 64 }),
   /** Linked triage IDs (JSON array of triageId strings) */
   linkedTriageIds: json("linkedTriageIds").$type<string[]>(),
   /** Linked correlation IDs (JSON array of correlationId strings) */
@@ -977,6 +981,10 @@ export const responseActions = mysqlTable("response_actions", {
   linkedAlertIds: json("linkedAlertIds").$type<string[]>(),
   /** Agent IDs affected by this action (JSON array) */
   linkedAgentIds: json("linkedAgentIds").$type<string[]>(),
+
+  // ── Semantic Validation ────────────────────────────────────────────────────
+  /** Warning if LLM output had category-target mismatch */
+  semanticWarning: text("semanticWarning"),
 
   // ── Execution Result ───────────────────────────────────────────────────────
   /** Result of execution (success/failure details) */

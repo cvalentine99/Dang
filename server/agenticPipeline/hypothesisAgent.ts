@@ -312,7 +312,23 @@ function buildHypothesisPrompt(ctx: HypothesisContext, sessionId: number): strin
     "Use real timestamps from the data. Order chronologically.",
     "",
     "### recommendedActions",
-    "Array of { action: string, category: 'immediate'|'next'|'optional', requiresApproval: boolean, evidenceBasis: string[], state: 'proposed' }",
+    "Array of response actions. Each action MUST use one of these exact category values:",
+    "  isolate_host | disable_account | block_ioc | escalate_ir | suppress_alert | tune_rule | add_watchlist | collect_evidence | notify_stakeholder | custom",
+    "Each action MUST use one of these exact urgency values:",
+    "  immediate | next | scheduled | optional",
+    "Each action MUST include targetType (ip|hostname|user|hash|domain|rule|alert|other) and targetValue (the specific entity).",
+    "Format: { action: string, category: <enum above>, urgency: <enum above>, targetType: string, targetValue: string, requiresApproval: boolean, evidenceBasis: string[], state: 'proposed' }",
+    "- isolate_host: target is the host IP or hostname to isolate",
+    "- disable_account: target is the username or account to disable",
+    "- block_ioc: target is the IOC value (IP, domain, hash) to block",
+    "- escalate_ir: target is the incident or alert ID to escalate",
+    "- suppress_alert: target is the rule ID to suppress",
+    "- tune_rule: target is the rule ID to tune",
+    "- add_watchlist: target is the entity to monitor",
+    "- collect_evidence: target is the data source or artifact to collect",
+    "- notify_stakeholder: target is the stakeholder or team to notify",
+    "- requiresApproval MUST be true for: isolate_host, disable_account, block_ioc, escalate_ir",
+    "- requiresApproval can be false for: suppress_alert, tune_rule, add_watchlist, collect_evidence, notify_stakeholder",
     "",
     "### draftDocumentation",
     "{ shiftHandoff: string, escalationSummary: string|null, executiveSummary: string, tuningSuggestions: string|null }",
@@ -407,11 +423,14 @@ const HYPOTHESIS_JSON_SCHEMA = {
             properties: {
               action: { type: "string" },
               category: { type: "string" },
+              urgency: { type: "string" },
+              targetType: { type: "string" },
+              targetValue: { type: "string" },
               requiresApproval: { type: "boolean" },
               evidenceBasis: { type: "array", items: { type: "string" } },
               state: { type: "string" },
             },
-            required: ["action", "category", "requiresApproval", "evidenceBasis", "state"],
+            required: ["action", "category", "urgency", "targetType", "targetValue", "requiresApproval", "evidenceBasis", "state"],
             additionalProperties: false,
           },
         },
@@ -528,6 +547,9 @@ function assembleLivingCase(
     recommendedActions: (llmOutput.recommendedActions ?? []).map((a: any) => ({
       action: a.action ?? "",
       category: normCategory(a.category ?? "next"),
+      urgency: (["immediate", "high", "medium", "low"] as const).includes(a.urgency?.toLowerCase()) ? a.urgency.toLowerCase() as "immediate" | "high" | "medium" | "low" : undefined,
+      targetType: a.targetType ?? undefined,
+      targetValue: a.targetValue ?? undefined,
       requiresApproval: a.requiresApproval ?? true,
       evidenceBasis: a.evidenceBasis ?? [],
       state: "proposed" as const,
@@ -564,7 +586,9 @@ function clampConfidence(v: number): number {
 async function persistLivingCase(
   sessionId: number,
   livingCase: LivingCaseObject,
-  isNew: boolean
+  isNew: boolean,
+  sourceTriageId?: string,
+  sourceCorrelationId?: string
 ): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -595,6 +619,8 @@ async function persistLivingCase(
           ).length,
           linkedTriageIds: livingCase.linkedTriageIds,
           linkedCorrelationIds: livingCase.linkedCorrelationIds,
+          ...(sourceTriageId ? { sourceTriageId } : {}),
+          ...(sourceCorrelationId ? { sourceCorrelationId } : {}),
           lastUpdatedBy: "hypothesis_agent",
         })
         .where(eq(livingCaseState.id, existing.id));
@@ -616,6 +642,8 @@ async function persistLivingCase(
       approvalRequiredCount: livingCase.recommendedActions.filter(
         (a) => a.requiresApproval && a.state === "proposed"
       ).length,
+      sourceTriageId: sourceTriageId ?? null,
+      sourceCorrelationId: sourceCorrelationId ?? null,
       linkedTriageIds: livingCase.linkedTriageIds,
       linkedCorrelationIds: livingCase.linkedCorrelationIds,
       lastUpdatedBy: "hypothesis_agent",
@@ -650,6 +678,8 @@ async function persistLivingCase(
           ).length,
           linkedTriageIds: merged.linkedTriageIds,
           linkedCorrelationIds: merged.linkedCorrelationIds,
+          ...(sourceTriageId ? { sourceTriageId } : {}),
+          ...(sourceCorrelationId ? { sourceCorrelationId } : {}),
           lastUpdatedBy: "hypothesis_agent",
         })
         .where(eq(livingCaseState.id, existing.id));
@@ -671,6 +701,8 @@ async function persistLivingCase(
       approvalRequiredCount: livingCase.recommendedActions.filter(
         (a) => a.requiresApproval && a.state === "proposed"
       ).length,
+      sourceTriageId: sourceTriageId ?? null,
+      sourceCorrelationId: sourceCorrelationId ?? null,
       linkedTriageIds: livingCase.linkedTriageIds,
       linkedCorrelationIds: livingCase.linkedCorrelationIds,
       lastUpdatedBy: "hypothesis_agent",
@@ -795,8 +827,14 @@ export async function runHypothesisAgent(
   // 5. Assemble the LivingCaseObject
   const livingCase = assembleLivingCase(sessionId, ctx, llmOutput);
 
-  // 6. Persist to database
-  const caseStateId = await persistLivingCase(sessionId, livingCase, isNew);
+  // 6. Persist to database — pass exact lineage IDs, not recency-based
+  const caseStateId = await persistLivingCase(
+    sessionId,
+    livingCase,
+    isNew,
+    ctx.triage.triageId,          // sourceTriageId — exact lineage
+    ctx.bundle.correlationId      // sourceCorrelationId — exact lineage
+  );
 
   // 7. Materialize response actions as first-class DB rows
   //    The LLM output is the *source*, the DB rows are the *system of record*.
@@ -992,15 +1030,71 @@ async function materializeResponseActions(
         else category = "custom";
       }
 
-      // Resolve urgency
-      let urgency = URGENCY_MAP[rec.category?.toLowerCase() ?? ""] ?? "next";
+      // Resolve urgency — prefer LLM-provided urgency field, then map, then default
+      const recUrgency = rec.urgency?.toLowerCase() ?? "";
+      let urgency = VALID_URGENCY.includes(recUrgency)
+        ? recUrgency
+        : URGENCY_MAP[recUrgency] ?? "next";
       if (!VALID_URGENCY.includes(urgency)) urgency = "next";
 
-      // Extract target from entities if available
-      const entities = ctx.triage.entities ?? [];
-      const primaryTarget = entities.find(e =>
-        ["ip", "hostname", "user", "hash", "domain"].includes(e.type)
-      );
+      // Resolve target — prefer LLM-provided targetType/targetValue, then infer from entities
+      let targetType = rec.targetType ?? null;
+      let targetValue = rec.targetValue ?? null;
+      if (!targetType || !targetValue) {
+        // Fallback: infer from triage entities based on category
+        const entities = ctx.triage.entities ?? [];
+        const CATEGORY_TARGET_TYPE: Record<string, string[]> = {
+          isolate_host: ["ip", "hostname"],
+          disable_account: ["user"],
+          block_ioc: ["ip", "hash", "domain"],
+          escalate_ir: ["alert"],
+          suppress_alert: ["rule"],
+          tune_rule: ["rule"],
+          add_watchlist: ["ip", "hostname", "user", "hash", "domain"],
+          collect_evidence: ["ip", "hostname"],
+          notify_stakeholder: ["user"],
+        };
+        const preferredTypes = CATEGORY_TARGET_TYPE[category] ?? ["ip", "hostname", "user", "hash", "domain"];
+        const match = entities.find(e => preferredTypes.includes(e.type));
+        if (match) {
+          targetType = targetType ?? match.type;
+          targetValue = targetValue ?? match.value;
+        }
+      }
+
+      // ── Direction 8: Category-semantic validation ─────────────────────────
+      // Validate that the target type is semantically consistent with the category.
+      // If the LLM says "isolate_host" but provides a user target, that's a mismatch.
+      const CATEGORY_REQUIRED_TARGET: Record<string, { expectedTypes: string[]; requiresTarget: boolean }> = {
+        isolate_host: { expectedTypes: ["ip", "hostname", "host"], requiresTarget: true },
+        disable_account: { expectedTypes: ["user", "account", "email"], requiresTarget: true },
+        block_ioc: { expectedTypes: ["ip", "hash", "domain", "url", "ioc"], requiresTarget: true },
+        escalate_ir: { expectedTypes: ["alert", "case", "incident"], requiresTarget: false },
+        suppress_alert: { expectedTypes: ["rule", "alert", "signature"], requiresTarget: false },
+        tune_rule: { expectedTypes: ["rule", "detection", "signature"], requiresTarget: false },
+        add_watchlist: { expectedTypes: ["ip", "hostname", "user", "hash", "domain", "email"], requiresTarget: true },
+        collect_evidence: { expectedTypes: ["ip", "hostname", "host", "user", "file"], requiresTarget: false },
+        notify_stakeholder: { expectedTypes: ["user", "team", "email", "group"], requiresTarget: false },
+        custom: { expectedTypes: [], requiresTarget: false },
+      };
+
+      const semanticRule = CATEGORY_REQUIRED_TARGET[category];
+      let semanticWarning: string | null = null;
+
+      if (semanticRule && targetType) {
+        const normalizedTarget = targetType.toLowerCase();
+        if (semanticRule.expectedTypes.length > 0 && !semanticRule.expectedTypes.includes(normalizedTarget)) {
+          // Target type doesn't match category expectations — log warning but still materialize
+          semanticWarning = `Category '${category}' expects target types [${semanticRule.expectedTypes.join(", ")}] but got '${targetType}'`;
+          console.warn(`[HypothesisAgent] Semantic mismatch: ${semanticWarning}`);
+        }
+      }
+
+      if (semanticRule?.requiresTarget && !targetValue) {
+        semanticWarning = (semanticWarning ? semanticWarning + "; " : "") +
+          `Category '${category}' expects a target value but none was provided`;
+        console.warn(`[HypothesisAgent] Missing target: Category '${category}' requires a target value`);
+      }
 
       await db.insert(responseActions).values({
         actionId,
@@ -1012,13 +1106,14 @@ async function materializeResponseActions(
         state: "proposed",
         proposedBy: "hypothesis_agent",
         evidenceBasis: rec.evidenceBasis ?? null,
-        targetValue: primaryTarget?.value?.slice(0, 512) ?? null,
-        targetType: primaryTarget?.type ?? null,
+        targetValue: targetValue?.slice(0, 512) ?? null,
+        targetType: targetType ?? null,
         caseId,
         correlationId: ctx.bundle.correlationId,
         triageId: ctx.triage.triageId,
         linkedAlertIds: ctx.bundle.relatedAlerts?.map(a => a.alertId ?? "").filter(Boolean).slice(0, 20) ?? null,
         linkedAgentIds: ctx.triage.agent?.id ? [ctx.triage.agent.id] : null,
+        semanticWarning,
       });
 
       // Log creation audit

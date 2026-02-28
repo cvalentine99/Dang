@@ -42,17 +42,17 @@ import {
 } from "lucide-react";
 
 // ── Category Config ──────────────────────────────────────────────────────────
-const CATEGORY_CONFIG: Record<string, { icon: LucideIcon; label: string; color: string }> = {
-  isolate_host: { icon: Ban, label: "Isolate Host", color: "text-red-400" },
-  disable_account: { icon: UserX, label: "Disable Account", color: "text-orange-400" },
-  block_ioc: { icon: ShieldX, label: "Block IOC", color: "text-red-400" },
-  escalate_ir: { icon: AlertTriangle, label: "Escalate to IR", color: "text-yellow-400" },
-  suppress_alert: { icon: Bell, label: "Suppress Alert", color: "text-blue-400" },
-  tune_rule: { icon: Wrench, label: "Tune Rule", color: "text-violet-400" },
-  add_watchlist: { icon: Eye, label: "Add to Watchlist", color: "text-cyan-400" },
-  collect_evidence: { icon: Search, label: "Collect Evidence", color: "text-emerald-400" },
-  notify_stakeholder: { icon: Bell, label: "Notify Stakeholder", color: "text-amber-400" },
-  custom: { icon: Zap, label: "Custom Action", color: "text-violet-300" },
+const CATEGORY_CONFIG: Record<string, { icon: LucideIcon; label: string; color: string; guidance: string }> = {
+  isolate_host: { icon: Ban, label: "Isolate Host", color: "text-red-400", guidance: "Network-isolate the target host to contain lateral movement. Requires EDR/firewall integration." },
+  disable_account: { icon: UserX, label: "Disable Account", color: "text-orange-400", guidance: "Disable the compromised account in Active Directory/IAM to prevent further access." },
+  block_ioc: { icon: ShieldX, label: "Block IOC", color: "text-red-400", guidance: "Add the IOC (IP/domain/hash) to firewall/proxy blocklists to prevent communication." },
+  escalate_ir: { icon: AlertTriangle, label: "Escalate to IR", color: "text-yellow-400", guidance: "Escalate to the Incident Response team for hands-on investigation and containment." },
+  suppress_alert: { icon: Bell, label: "Suppress Alert", color: "text-blue-400", guidance: "Suppress this alert rule to reduce noise. Verify it is a confirmed false positive first." },
+  tune_rule: { icon: Wrench, label: "Tune Rule", color: "text-violet-400", guidance: "Adjust detection rule thresholds or conditions to improve signal-to-noise ratio." },
+  add_watchlist: { icon: Eye, label: "Add to Watchlist", color: "text-cyan-400", guidance: "Add the entity to a monitoring watchlist for enhanced visibility without blocking." },
+  collect_evidence: { icon: Search, label: "Collect Evidence", color: "text-emerald-400", guidance: "Collect forensic artifacts (logs, memory dumps, disk images) for analysis." },
+  notify_stakeholder: { icon: Bell, label: "Notify Stakeholder", color: "text-amber-400", guidance: "Notify relevant stakeholders (management, legal, compliance) about the incident." },
+  custom: { icon: Zap, label: "Custom Action", color: "text-violet-300", guidance: "Custom response action. Review the description for specific instructions." },
 };
 
 const STATE_CONFIG: Record<string, { icon: LucideIcon; color: string; bg: string; label: string }> = {
@@ -670,12 +670,63 @@ function ResponseActionCard({
             </div>
           )}
 
-          {/* Linked IDs */}
-          <div className="flex items-center gap-4 text-[10px] text-muted-foreground/40">
-            {action.caseId && <span>Case: #{action.caseId}</span>}
-            {action.correlationId && <span className="font-mono">Corr: {action.correlationId}</span>}
-            {action.triageId && <span className="font-mono">Triage: {action.triageId}</span>}
-            {action.playbookRef && <span>Playbook: {action.playbookRef}</span>}
+          {/* Category Guidance */}
+          <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+            <label className="text-[10px] text-muted-foreground/40 mb-1 block uppercase tracking-wider">Action Guidance</label>
+            <p className="text-xs text-foreground/50 leading-relaxed">{cat.guidance}</p>
+          </div>
+
+          {/* Linked Entities */}
+          {((action.linkedAgentIds && action.linkedAgentIds.length > 0) || (action.linkedAlertIds && action.linkedAlertIds.length > 0)) && (
+            <div className="grid grid-cols-2 gap-3">
+              {action.linkedAgentIds && action.linkedAgentIds.length > 0 && (
+                <div>
+                  <label className="text-[10px] text-muted-foreground/40 mb-1 block uppercase tracking-wider">Linked Agents</label>
+                  <div className="flex flex-wrap gap-1">
+                    {(action.linkedAgentIds as string[]).map((id: string) => (
+                      <span key={id} className="px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-300 text-[10px] font-mono">{id}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {action.linkedAlertIds && action.linkedAlertIds.length > 0 && (
+                <div>
+                  <label className="text-[10px] text-muted-foreground/40 mb-1 block uppercase tracking-wider">Linked Alerts</label>
+                  <div className="flex flex-wrap gap-1">
+                    {(action.linkedAlertIds as string[]).slice(0, 10).map((id: string) => (
+                      <span key={id} className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-mono truncate max-w-[120px]">{id}</span>
+                    ))}
+                    {(action.linkedAlertIds as string[]).length > 10 && (
+                      <span className="text-[10px] text-muted-foreground/40">+{(action.linkedAlertIds as string[]).length - 10} more</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Lineage Links */}
+          <div className="flex items-center gap-4 text-[10px]">
+            {action.caseId && (
+              <a href={`/living-cases/${action.caseId}`} className="text-violet-400 hover:text-violet-300 hover:underline transition-colors">
+                Case #{action.caseId}
+              </a>
+            )}
+            {action.correlationId && (
+              <span className="font-mono text-muted-foreground/40" title="Correlation ID">
+                Corr: {action.correlationId}
+              </span>
+            )}
+            {action.triageId && (
+              <span className="font-mono text-muted-foreground/40" title="Triage ID">
+                Triage: {action.triageId}
+              </span>
+            )}
+            {action.playbookRef && (
+              <span className="text-cyan-400" title="Playbook Reference">
+                Playbook: {action.playbookRef}
+              </span>
+            )}
           </div>
 
           {/* Action Buttons */}

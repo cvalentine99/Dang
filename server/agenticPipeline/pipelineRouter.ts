@@ -333,6 +333,107 @@ export const pipelineRouter = router({
       };
     }),
 
+  /**
+   * Direction 10: Detailed feedback analytics for SOC managers.
+   * Returns severity override distribution, route override patterns,
+   * per-analyst activity, and AI accuracy metrics.
+   */
+  feedbackAnalytics: protectedProcedure
+    .query(async () => {
+      const db = await getDb();
+      if (!db) return null;
+
+      // 1. Overall feedback coverage
+      const [coverage] = await db.select({
+        total: sql<number>`COUNT(*)`,
+        withFeedback: sql<number>`SUM(CASE WHEN feedbackAt IS NOT NULL THEN 1 ELSE 0 END)`,
+        confirmed: sql<number>`SUM(CASE WHEN analystConfirmed = 1 THEN 1 ELSE 0 END)`,
+        rejected: sql<number>`SUM(CASE WHEN analystConfirmed = 0 AND feedbackAt IS NOT NULL THEN 1 ELSE 0 END)`,
+        severityOverridden: sql<number>`SUM(CASE WHEN analystSeverityOverride IS NOT NULL THEN 1 ELSE 0 END)`,
+        routeOverridden: sql<number>`SUM(CASE WHEN analystRouteOverride IS NOT NULL THEN 1 ELSE 0 END)`,
+        withNotes: sql<number>`SUM(CASE WHEN analystNotes IS NOT NULL AND analystNotes != '' THEN 1 ELSE 0 END)`,
+      }).from(triageObjects).where(eq(triageObjects.status, "completed"));
+
+      // 2. Severity override distribution: AI severity → analyst override
+      const severityOverrides = await db.select({
+        aiSeverity: triageObjects.severity,
+        analystSeverity: triageObjects.analystSeverityOverride,
+        count: sql<number>`COUNT(*)`,
+      }).from(triageObjects)
+        .where(sql`analystSeverityOverride IS NOT NULL`)
+        .groupBy(triageObjects.severity, triageObjects.analystSeverityOverride);
+
+      // 3. Route override distribution
+      const routeOverrides = await db.select({
+        aiRoute: triageObjects.route,
+        analystRoute: triageObjects.analystRouteOverride,
+        count: sql<number>`COUNT(*)`,
+      }).from(triageObjects)
+        .where(sql`analystRouteOverride IS NOT NULL`)
+        .groupBy(triageObjects.route, triageObjects.analystRouteOverride);
+
+      // 4. Feedback by severity (how often each AI severity gets confirmed vs overridden)
+      const bySeverity = await db.select({
+        severity: triageObjects.severity,
+        total: sql<number>`COUNT(*)`,
+        confirmed: sql<number>`SUM(CASE WHEN analystConfirmed = 1 THEN 1 ELSE 0 END)`,
+        overridden: sql<number>`SUM(CASE WHEN analystSeverityOverride IS NOT NULL THEN 1 ELSE 0 END)`,
+        pending: sql<number>`SUM(CASE WHEN feedbackAt IS NULL THEN 1 ELSE 0 END)`,
+      }).from(triageObjects)
+        .where(eq(triageObjects.status, "completed"))
+        .groupBy(triageObjects.severity);
+
+      // 5. Per-analyst activity
+      const byAnalyst = await db.select({
+        analystUserId: triageObjects.analystUserId,
+        feedbackCount: sql<number>`COUNT(*)`,
+        confirmations: sql<number>`SUM(CASE WHEN analystConfirmed = 1 THEN 1 ELSE 0 END)`,
+        severityOverrides: sql<number>`SUM(CASE WHEN analystSeverityOverride IS NOT NULL THEN 1 ELSE 0 END)`,
+        routeOverrides: sql<number>`SUM(CASE WHEN analystRouteOverride IS NOT NULL THEN 1 ELSE 0 END)`,
+        notesWritten: sql<number>`SUM(CASE WHEN analystNotes IS NOT NULL AND analystNotes != '' THEN 1 ELSE 0 END)`,
+      }).from(triageObjects)
+        .where(sql`feedbackAt IS NOT NULL`)
+        .groupBy(triageObjects.analystUserId);
+
+      // 6. Recent feedback activity (last 20)
+      const recentFeedback = await db.select({
+        triageId: triageObjects.triageId,
+        alertId: triageObjects.alertId,
+        aiSeverity: triageObjects.severity,
+        aiRoute: triageObjects.route,
+        analystConfirmed: triageObjects.analystConfirmed,
+        analystSeverityOverride: triageObjects.analystSeverityOverride,
+        analystRouteOverride: triageObjects.analystRouteOverride,
+        analystNotes: triageObjects.analystNotes,
+        analystUserId: triageObjects.analystUserId,
+        feedbackAt: triageObjects.feedbackAt,
+        ruleId: triageObjects.ruleId,
+        ruleDescription: triageObjects.ruleDescription,
+      }).from(triageObjects)
+        .where(sql`feedbackAt IS NOT NULL`)
+        .orderBy(desc(triageObjects.feedbackAt))
+        .limit(20);
+
+      return {
+        coverage: {
+          total: coverage?.total ?? 0,
+          withFeedback: coverage?.withFeedback ?? 0,
+          confirmed: coverage?.confirmed ?? 0,
+          rejected: coverage?.rejected ?? 0,
+          severityOverridden: coverage?.severityOverridden ?? 0,
+          routeOverridden: coverage?.routeOverridden ?? 0,
+          withNotes: coverage?.withNotes ?? 0,
+          coverageRate: coverage?.total ? ((coverage.withFeedback ?? 0) / coverage.total) * 100 : 0,
+          confirmationRate: coverage?.withFeedback ? ((coverage.confirmed ?? 0) / coverage.withFeedback) * 100 : 0,
+        },
+        severityOverrides,
+        routeOverrides,
+        bySeverity,
+        byAnalyst,
+        recentFeedback,
+      };
+    }),
+
   // ═══════════════════════════════════════════════════════════════════════════
   // AUTO-TRIAGE ON WALTER QUEUE INTAKE
   // ═══════════════════════════════════════════════════════════════════════════
@@ -554,52 +655,12 @@ export const pipelineRouter = router({
       return listLivingCases(input);
     }),
 
-  /** Update a recommended action's state (approve, reject, defer). */
-  updateActionState: protectedProcedure
-    .input(z.object({
-      caseId: z.number().int(),
-      actionIndex: z.number().int().min(0),
-      newState: z.enum(["approved", "rejected", "deferred"]),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error("Database not available");
-
-      const [row] = await db
-        .select()
-        .from(livingCaseState)
-        .where(eq(livingCaseState.id, input.caseId))
-        .limit(1);
-
-      if (!row) return { success: false as const, error: "Living case not found" };
-
-      const caseData = row.caseData as any;
-      if (!caseData?.recommendedActions?.[input.actionIndex]) {
-        return { success: false as const, error: "Action not found at specified index" };
-      }
-
-      caseData.recommendedActions[input.actionIndex].state = input.newState;
-      caseData.recommendedActions[input.actionIndex].decidedBy = `user:${ctx.user.id}`;
-      caseData.recommendedActions[input.actionIndex].decidedAt = new Date().toISOString();
-      caseData.lastUpdatedAt = new Date().toISOString();
-      caseData.lastUpdatedBy = "analyst_manual";
-
-      await db
-        .update(livingCaseState)
-        .set({
-          caseData,
-          pendingActionCount: caseData.recommendedActions.filter(
-            (a: any) => a.state === "proposed"
-          ).length,
-          approvalRequiredCount: caseData.recommendedActions.filter(
-            (a: any) => a.requiresApproval && a.state === "proposed"
-          ).length,
-          lastUpdatedBy: "analyst_manual",
-        })
-        .where(eq(livingCaseState.id, input.caseId));
-
-      return { success: true as const, caseId: input.caseId };
-    }),
+  /**
+   * @deprecated — REMOVED. Use responseActions.approve / .reject / .defer instead.
+   * Action state is managed exclusively in the response_actions table.
+   * The old endpoint mutated caseData JSON directly (split-brain).
+   * See: Direction 1 of SOC code review.
+   */
 
   /** Record a completed investigative pivot on a living case. */
   recordPivot: protectedProcedure
@@ -1018,6 +1079,273 @@ export const pipelineRouter = router({
   // ═══════════════════════════════════════════════════════════════════════════
   // REPORT GENERATION
   // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Replay a failed or partial pipeline run from the first failed stage.
+   * Re-uses artifacts from completed stages (triage ID, correlation ID) and
+   * re-runs only the stages that failed or were not reached.
+   */
+  replayPipelineRun: protectedProcedure
+    .input(z.object({
+      runId: z.string(),
+      fromStage: z.enum(["triage", "correlation", "hypothesis"]).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      // 1. Fetch the original run
+      const [originalRun] = await db
+        .select()
+        .from(pipelineRuns)
+        .where(eq(pipelineRuns.runId, input.runId))
+        .limit(1);
+
+      if (!originalRun) {
+        throw new Error(`Pipeline run '${input.runId}' not found`);
+      }
+
+      if (originalRun.status === "running") {
+        throw new Error("Cannot replay a currently running pipeline");
+      }
+
+      // 2. Determine which stage to start from
+      const stageOrder = ["triage", "correlation", "hypothesis"] as const;
+      let startStage = input.fromStage;
+
+      if (!startStage) {
+        // Auto-detect: find the first failed stage
+        if (originalRun.triageStatus === "failed") startStage = "triage";
+        else if (originalRun.correlationStatus === "failed") startStage = "correlation";
+        else if (originalRun.hypothesisStatus === "failed") startStage = "hypothesis";
+        else if (originalRun.responseActionsStatus === "failed") startStage = "hypothesis"; // re-run hypothesis to re-materialize
+        else {
+          throw new Error("No failed stage found — pipeline completed successfully");
+        }
+      }
+
+      // 3. Validate we have the prerequisites for the starting stage
+      const startIdx = stageOrder.indexOf(startStage);
+      if (startStage === "correlation" && !originalRun.triageId) {
+        throw new Error("Cannot replay from correlation — no triage ID from original run");
+      }
+      if (startStage === "hypothesis" && !originalRun.correlationId) {
+        throw new Error("Cannot replay from hypothesis — no correlation ID from original run");
+      }
+
+      // 4. Create a new pipeline run record for the replay
+      const replayRunId = `replay-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      const startTime = Date.now();
+
+      const [replayRow] = await db.insert(pipelineRuns).values({
+        runId: replayRunId,
+        queueItemId: originalRun.queueItemId,
+        alertId: originalRun.alertId,
+        currentStage: startStage,
+        status: "running",
+        triggeredBy: `user:${ctx.user.id}`,
+        // Carry forward completed stages
+        triageId: startIdx > 0 ? originalRun.triageId : null,
+        triageStatus: startIdx > 0 ? "completed" : "pending",
+        triageLatencyMs: startIdx > 0 ? originalRun.triageLatencyMs : null,
+        correlationId: startIdx > 1 ? originalRun.correlationId : null,
+        correlationStatus: startIdx > 1 ? "completed" : (startIdx > 0 ? "pending" : "pending"),
+        correlationLatencyMs: startIdx > 1 ? originalRun.correlationLatencyMs : null,
+      }).$returningId();
+
+      const result: {
+        replayRunId: string;
+        originalRunId: string;
+        startedFromStage: string;
+        stages: {
+          triage: { status: string; triageId?: string; latencyMs?: number; error?: string; reused?: boolean };
+          correlation: { status: string; correlationId?: string; latencyMs?: number; error?: string; reused?: boolean };
+          hypothesis: { status: string; caseId?: number; sessionId?: number; latencyMs?: number; error?: string };
+          responseActions: { status: string; count?: number; actionIds?: string[]; error?: string };
+        };
+        totalLatencyMs: number;
+        status: string;
+      } = {
+        replayRunId,
+        originalRunId: input.runId,
+        startedFromStage: startStage,
+        stages: {
+          triage: startIdx > 0
+            ? { status: "completed", triageId: originalRun.triageId ?? undefined, reused: true }
+            : { status: "pending" },
+          correlation: startIdx > 1
+            ? { status: "completed", correlationId: originalRun.correlationId ?? undefined, reused: true }
+            : { status: "pending" },
+          hypothesis: { status: "pending" },
+          responseActions: { status: "pending" },
+        },
+        totalLatencyMs: 0,
+        status: "running",
+      };
+
+      let currentTriageId = originalRun.triageId;
+      let currentCorrelationId = originalRun.correlationId;
+
+      // ── Stage 1: Triage (if needed) ─────────────────────────────────────
+      if (startIdx <= 0) {
+        try {
+          // We need the original raw alert — fetch from queue or triage
+          let rawAlert: Record<string, unknown> | null = null;
+
+          if (originalRun.queueItemId) {
+            const [qItem] = await db.select().from(alertQueue).where(eq(alertQueue.id, originalRun.queueItemId)).limit(1);
+            rawAlert = qItem?.rawJson as Record<string, unknown> | null;
+          }
+
+          if (!rawAlert && originalRun.triageId) {
+            // Fetch the triage object and extract raw alert from triageData
+            const [triageRow] = await db.select().from(triageObjects).where(eq(triageObjects.triageId, originalRun.triageId)).limit(1);
+            const triageData = triageRow?.triageData as any;
+            rawAlert = triageData?.rawAlert as Record<string, unknown> | null;
+          }
+
+          if (!rawAlert) {
+            throw new Error("Cannot replay triage — original raw alert not found");
+          }
+
+          await db.update(pipelineRuns)
+            .set({ currentStage: "triage", triageStatus: "running" })
+            .where(eq(pipelineRuns.id, replayRow.id));
+
+          const triageResult = await runTriageAgent({
+            rawAlert,
+            userId: ctx.user.id,
+            alertQueueItemId: originalRun.queueItemId ?? undefined,
+          });
+
+          if (!triageResult.success || !triageResult.triageId) {
+            throw new Error(triageResult.error ?? "Triage failed");
+          }
+
+          currentTriageId = triageResult.triageId;
+          result.stages.triage = {
+            status: "completed",
+            triageId: triageResult.triageId,
+            latencyMs: triageResult.latencyMs,
+          };
+
+          await db.update(pipelineRuns).set({
+            triageId: triageResult.triageId,
+            triageStatus: "completed",
+            triageLatencyMs: triageResult.latencyMs,
+            currentStage: "correlation",
+          }).where(eq(pipelineRuns.id, replayRow.id));
+        } catch (err) {
+          result.stages.triage = { status: "failed", error: (err as Error).message };
+          result.status = "partial";
+          await db.update(pipelineRuns).set({
+            triageStatus: "failed",
+            status: "partial",
+            error: (err as Error).message,
+            totalLatencyMs: Date.now() - startTime,
+            completedAt: new Date(),
+          }).where(eq(pipelineRuns.id, replayRow.id));
+          result.totalLatencyMs = Date.now() - startTime;
+          return result;
+        }
+      }
+
+      // ── Stage 2: Correlation (if needed) ────────────────────────────────
+      if (startIdx <= 1) {
+        try {
+          if (!currentTriageId) throw new Error("No triage ID available for correlation");
+
+          await db.update(pipelineRuns)
+            .set({ correlationStatus: "running", currentStage: "correlation" })
+            .where(eq(pipelineRuns.id, replayRow.id));
+
+          const corrResult = await runCorrelationAgent({
+            triageId: currentTriageId,
+          });
+
+          currentCorrelationId = corrResult.correlationId;
+          result.stages.correlation = {
+            status: "completed",
+            correlationId: corrResult.correlationId,
+            latencyMs: corrResult.latencyMs,
+          };
+
+          await db.update(pipelineRuns).set({
+            correlationId: corrResult.correlationId,
+            correlationStatus: "completed",
+            correlationLatencyMs: corrResult.latencyMs,
+            currentStage: "hypothesis",
+          }).where(eq(pipelineRuns.id, replayRow.id));
+        } catch (err) {
+          result.stages.correlation = { status: "failed", error: (err as Error).message };
+          result.status = "partial";
+          await db.update(pipelineRuns).set({
+            correlationStatus: "failed",
+            status: "partial",
+            error: (err as Error).message,
+            totalLatencyMs: Date.now() - startTime,
+            completedAt: new Date(),
+          }).where(eq(pipelineRuns.id, replayRow.id));
+          result.totalLatencyMs = Date.now() - startTime;
+          return result;
+        }
+      }
+
+      // ── Stage 3: Hypothesis + Response Actions ──────────────────────────
+      try {
+        if (!currentCorrelationId) throw new Error("No correlation ID available for hypothesis");
+
+        await db.update(pipelineRuns)
+          .set({ hypothesisStatus: "running", currentStage: "hypothesis" })
+          .where(eq(pipelineRuns.id, replayRow.id));
+
+        const hypoResult = await runHypothesisAgent({
+          correlationId: currentCorrelationId,
+        });
+
+        result.stages.hypothesis = {
+          status: "completed",
+          caseId: hypoResult.caseId,
+          sessionId: hypoResult.sessionId,
+          latencyMs: hypoResult.latencyMs,
+        };
+
+        const actionIds = hypoResult.materializedActionIds ?? [];
+        result.stages.responseActions = {
+          status: actionIds.length > 0 ? "completed" : "skipped",
+          count: actionIds.length,
+          actionIds,
+        };
+
+        await db.update(pipelineRuns).set({
+          livingCaseId: hypoResult.caseId,
+          hypothesisStatus: "completed",
+          hypothesisLatencyMs: hypoResult.latencyMs,
+          responseActionsCount: actionIds.length,
+          responseActionsStatus: actionIds.length > 0 ? "completed" : "skipped",
+          currentStage: "completed",
+          status: "completed",
+          totalLatencyMs: Date.now() - startTime,
+          completedAt: new Date(),
+        }).where(eq(pipelineRuns.id, replayRow.id));
+      } catch (err) {
+        result.stages.hypothesis = { status: "failed", error: (err as Error).message };
+        result.status = "partial";
+        await db.update(pipelineRuns).set({
+          hypothesisStatus: "failed",
+          status: "partial",
+          error: (err as Error).message,
+          totalLatencyMs: Date.now() - startTime,
+          completedAt: new Date(),
+        }).where(eq(pipelineRuns.id, replayRow.id));
+        result.totalLatencyMs = Date.now() - startTime;
+        return result;
+      }
+
+      result.totalLatencyMs = Date.now() - startTime;
+      result.status = "completed";
+      return result;
+    }),
 
   /** Generate a structured report from a Living Case. */
   generateCaseReport: protectedProcedure

@@ -456,6 +456,12 @@ export interface LivingCaseObject {
     action: string;
     /** Category */
     category: "immediate" | "next" | "optional";
+    /** Urgency level for prioritization */
+    urgency?: "immediate" | "high" | "medium" | "low";
+    /** Target entity type (e.g., host, user, ip, hash, rule) */
+    targetType?: string;
+    /** Target entity value (e.g., specific IP, hostname, user) */
+    targetValue?: string;
     /** Does this require human approval? */
     requiresApproval: boolean;
     /** Evidence that supports this recommendation */

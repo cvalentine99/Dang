@@ -49,11 +49,13 @@ import {
   Database,
   Settings,
   Gauge,
+  ScanSearch,
   Inbox,
   Zap,
   Workflow,
   Lightbulb,
   ShieldAlert,
+  BarChart3,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -152,6 +154,8 @@ const menuItems = [
   { icon: Workflow, label: "Triage Pipeline", path: "/triage", group: "Intelligence" },
   { icon: Lightbulb, label: "Living Cases", path: "/living-cases", group: "Intelligence" },
   { icon: ShieldAlert, label: "Response Actions", path: "/response-actions", group: "Intelligence" },
+  { icon: ScanSearch, label: "Pipeline Inspector", path: "/pipeline-inspector", group: "Intelligence" },
+  { icon: BarChart3, label: "Feedback Analytics", path: "/feedback-analytics", group: "Intelligence" },
   { icon: Gauge, label: "Token Usage", path: "/admin/token-usage", group: "Admin" },
   { icon: UserCog, label: "User Management", path: "/admin/users", group: "Admin" },
   { icon: Settings, label: "Connection Settings", path: "/admin/settings", group: "Admin" },
