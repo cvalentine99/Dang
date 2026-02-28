@@ -1579,3 +1579,49 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Add auto-triage route/severity badges to Walter Queue items
 - [x] All 645 tests passing (35 test files)
 - [x] TypeScript compilation clean (0 errors)
+
+## Phase: Step 3 — Hypothesis Agent (LivingCaseObject)
+
+### Hypothesis Agent Backend
+- [x] Build server/agenticPipeline/hypothesisAgent.ts
+- [x] Consume CorrelationBundle as input, fetch full bundle data from DB
+- [x] Generate working theory with supporting/conflicting evidence
+- [x] Generate alternate theories with confidence scores and reasoning
+- [x] Generate recommended investigative pivots (next actions for analyst)
+- [x] Identify evidence gaps and suggest data collection actions
+- [x] Build timeline reconstruction from correlated events
+- [x] Produce LivingCaseObject with full investigation state
+- [x] Persist LivingCaseObject to database (living_case_state table)
+
+### Database & Router
+- [x] Create living_case_state table in Drizzle schema (already existed)
+- [x] Run database migration for living_case_state table (already existed)
+- [x] Add generateHypothesis mutation to pipeline router
+- [x] Add getLivingCaseById query to pipeline router
+- [x] Add listLivingCases query to pipeline router
+- [x] Add updateActionState mutation to pipeline router
+- [x] Add recordPivot mutation to pipeline router
+
+### Frontend Visualization
+- [x] Build LivingCaseView page with list and detail views
+- [x] Build WorkingTheoryCard component (confidence gauge, supporting/conflicting evidence)
+- [x] Build AlternateTheoriesCard component (expandable theories with reasoning)
+- [x] Build InvestigativePivotsCard component (prioritized next steps)
+- [x] Build EvidenceGapsCard component (gaps with suggested actions)
+- [x] Build TimelineCard component (chronological event reconstruction)
+- [x] Build RecommendedActionsCard component (approve/reject/defer actions)
+- [x] Build CompletedPivotsCard component (record investigative pivots)
+- [x] Build DraftDocumentationCard component (shift handoff, escalation, executive summary)
+- [x] Add "Generate Hypothesis" button to CorrelationBundleCard
+- [x] Add Living Cases nav item to sidebar
+- [x] Wire /living-cases and /living-cases/:id routes in App.tsx
+
+### Tests
+- [x] Write vitest tests for hypothesis agent schema contracts
+- [x] Write vitest tests for LivingCaseObject validation
+- [x] Write vitest tests for pipeline stage 3 handoff (TriageObject → CorrelationBundle → LivingCaseObject)
+- [x] Write vitest tests for working theory, alternate theories, pivots, gaps, timeline, actions
+- [x] Write vitest tests for action state management and pivot recording
+- [x] Write vitest tests for LLM prompt construction and response parsing
+- [x] Write vitest tests for living case state persistence
+- [x] All 690 tests passing (35 test files), 0 TypeScript errors

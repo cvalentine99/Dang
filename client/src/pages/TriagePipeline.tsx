@@ -40,6 +40,7 @@ import {
   ThumbsDown,
   GitBranch,
   MessageSquare,
+  Lightbulb,
 } from "lucide-react";
 
 // ── Severity & Route Colors ──────────────────────────────────────────────────
@@ -154,6 +155,21 @@ function TriageStatsPanel() {
 function CorrelationBundleCard({ bundle }: { bundle: any }) {
   const [showDetails, setShowDetails] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
+  const [, navigate] = useLocation();
+
+  const hypothesisMutation = trpc.pipeline.generateHypothesis.useMutation({
+    onSuccess: (result: any) => {
+      if (result.success) {
+        toast.success("Hypothesis generated", {
+          description: `Living Case #${result.caseId} created (Session #${result.sessionId})`,
+        });
+        navigate(`/living-cases/${result.caseId}`);
+      } else {
+        toast.error("Hypothesis generation failed", { description: result.error });
+      }
+    },
+    onError: (err: any) => toast.error("Hypothesis error", { description: err.message }),
+  });
 
   if (!bundle || !bundle.found) {
     return (
@@ -444,6 +460,27 @@ function CorrelationBundleCard({ bundle }: { bundle: any }) {
                   ))}
                 </div>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Generate Hypothesis Button */}
+        {corr.status === "completed" && (
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={() => hypothesisMutation.mutate({ correlationId: corr.correlationId })}
+              disabled={hypothesisMutation.isPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-violet-500/15 to-cyan-500/15 border border-violet-500/25 text-violet-300 text-xs font-medium hover:from-violet-500/25 hover:to-cyan-500/25 transition-all disabled:opacity-50"
+            >
+              {hypothesisMutation.isPending ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Lightbulb className="w-3 h-3" />
+              )}
+              Generate Hypothesis
+            </button>
+            {hypothesisMutation.isPending && (
+              <span className="text-[10px] text-muted-foreground/40 animate-pulse">Running hypothesis agent...</span>
             )}
           </div>
         )}

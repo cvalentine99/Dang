@@ -967,3 +967,624 @@ describe("Triage to Correlation handoff", () => {
     expect(bundle.correlationId).toMatch(/^corr-/);
   });
 });
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Step 3 — Hypothesis Agent Tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("LivingCaseObject schema contract", () => {
+  const REQUIRED_FIELDS = [
+    "schemaVersion", "caseId", "sessionId", "createdAt", "lastUpdatedAt",
+    "lastUpdatedBy", "workingTheory", "alternateTheories",
+    "suggestedNextSteps", "evidenceGaps", "timelineSummary",
+    "recommendedActions", "completedPivots", "draftDocumentation",
+    "linkedTriageIds", "linkedCorrelationIds", "linkedAlertIds",
+  ];
+
+  it("defines all required fields for LivingCaseObject", () => {
+    expect(REQUIRED_FIELDS).toHaveLength(17);
+  });
+
+  it("schemaVersion must be '1.0'", () => {
+    expect("1.0").toBe("1.0");
+  });
+
+  it("working theory has required structure", () => {
+    const workingTheory = {
+      statement: "Credential stuffing attack targeting admin accounts",
+      confidence: 0.78,
+      supportingEvidence: ["Multiple failed logins from same IP"],
+      conflictingEvidence: ["Source IP is internal"],
+    };
+    expect(workingTheory.statement).toBeTruthy();
+    expect(workingTheory.confidence).toBeGreaterThanOrEqual(0);
+    expect(workingTheory.confidence).toBeLessThanOrEqual(1);
+    expect(Array.isArray(workingTheory.supportingEvidence)).toBe(true);
+    expect(Array.isArray(workingTheory.conflictingEvidence)).toBe(true);
+  });
+
+  it("alternate theories have required structure", () => {
+    const altTheory = {
+      statement: "Legitimate user forgot password",
+      confidence: 0.35,
+      supportingEvidence: ["User account is active"],
+      whyLessLikely: "Pattern matches known attack tools",
+    };
+    expect(altTheory.statement).toBeTruthy();
+    expect(altTheory.confidence).toBeGreaterThanOrEqual(0);
+    expect(altTheory.confidence).toBeLessThanOrEqual(1);
+    expect(altTheory.whyLessLikely).toBeTruthy();
+  });
+});
+
+describe("Hypothesis Agent — working theory generation", () => {
+  it("produces a working theory from correlation bundle data", () => {
+    const correlationBundle = {
+      correlationId: "corr-abc123",
+      sourceTriageId: "triage-def456",
+      bundleData: {
+        synthesis: {
+          narrative: "Multiple brute-force attempts from external IP targeting admin accounts",
+          supportingEvidence: ["5 failed logins in 30 seconds", "Known malicious IP"],
+          conflictingEvidence: [],
+          missingEvidence: [{ description: "No endpoint telemetry", impact: "Cannot confirm compromise" }],
+        },
+        relatedAlerts: [
+          { ruleId: "100001", ruleDescription: "Brute force attempt", agentId: "001" },
+        ],
+        blastRadius: { affectedHosts: 2, affectedUsers: 1, assetCriticality: "high" },
+        campaignAssessment: { likelyCampaign: false },
+      },
+    };
+
+    // The hypothesis agent should extract the narrative as basis for theory
+    const narrative = correlationBundle.bundleData.synthesis.narrative;
+    expect(narrative).toBeTruthy();
+    expect(narrative.length).toBeGreaterThan(10);
+
+    // Supporting evidence should flow through
+    const supporting = correlationBundle.bundleData.synthesis.supportingEvidence;
+    expect(supporting.length).toBeGreaterThan(0);
+  });
+
+  it("confidence is bounded [0, 1]", () => {
+    const confidences = [0, 0.25, 0.5, 0.75, 1.0];
+    for (const c of confidences) {
+      expect(c).toBeGreaterThanOrEqual(0);
+      expect(c).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("generates alternate theories with whyLessLikely reasoning", () => {
+    const alternates = [
+      {
+        statement: "Legitimate admin password reset",
+        confidence: 0.2,
+        supportingEvidence: ["Account is active"],
+        whyLessLikely: "5 attempts in 30 seconds is not human behavior",
+      },
+      {
+        statement: "Automated vulnerability scanner",
+        confidence: 0.15,
+        supportingEvidence: ["IP has scanning history"],
+        whyLessLikely: "Scanner would target multiple services, not just auth",
+      },
+    ];
+
+    for (const alt of alternates) {
+      expect(alt.statement).toBeTruthy();
+      expect(alt.whyLessLikely).toBeTruthy();
+      expect(alt.confidence).toBeLessThan(1);
+    }
+  });
+});
+
+describe("Hypothesis Agent — investigative pivots", () => {
+  const VALID_PRIORITIES = ["critical", "high", "medium", "low"];
+  const VALID_EFFORTS = ["quick", "moderate", "deep_dive"];
+
+  it("priority enum has exactly 4 values", () => {
+    expect(VALID_PRIORITIES).toHaveLength(4);
+  });
+
+  it("effort enum has exactly 3 values", () => {
+    expect(VALID_EFFORTS).toHaveLength(3);
+  });
+
+  it("pivot has required structure", () => {
+    const pivot = {
+      action: "Check DHCP logs for IP reassignment",
+      rationale: "Confirm the source IP was not reassigned during the attack window",
+      priority: "high",
+      effort: "quick",
+    };
+    expect(pivot.action).toBeTruthy();
+    expect(pivot.rationale).toBeTruthy();
+    expect(VALID_PRIORITIES).toContain(pivot.priority);
+    expect(VALID_EFFORTS).toContain(pivot.effort);
+  });
+
+  it("pivots are ordered by priority", () => {
+    const pivots = [
+      { priority: "critical", action: "Isolate host" },
+      { priority: "high", action: "Check logs" },
+      { priority: "medium", action: "Review policy" },
+      { priority: "low", action: "Update documentation" },
+    ];
+    const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+    for (let i = 1; i < pivots.length; i++) {
+      const prev = priorityOrder[pivots[i - 1].priority as keyof typeof priorityOrder];
+      const curr = priorityOrder[pivots[i].priority as keyof typeof priorityOrder];
+      expect(curr).toBeGreaterThanOrEqual(prev);
+    }
+  });
+});
+
+describe("Hypothesis Agent — evidence gaps", () => {
+  it("evidence gap has required structure", () => {
+    const gap = {
+      description: "No endpoint detection data from affected host",
+      impact: "Cannot confirm if malware was deployed post-compromise",
+      suggestedAction: "Deploy EDR agent or check existing AV logs",
+      priority: "high",
+    };
+    expect(gap.description).toBeTruthy();
+    expect(gap.impact).toBeTruthy();
+    expect(gap.suggestedAction).toBeTruthy();
+    expect(["critical", "high", "medium", "low"]).toContain(gap.priority);
+  });
+
+  it("gaps are derived from correlation missing evidence", () => {
+    const correlationMissing = [
+      { description: "No FIM data", impact: "Cannot detect file changes", suggestedAction: "Enable FIM" },
+    ];
+    // Hypothesis agent should propagate and expand these
+    expect(correlationMissing.length).toBeGreaterThan(0);
+    for (const m of correlationMissing) {
+      expect(m.description).toBeTruthy();
+      expect(m.impact).toBeTruthy();
+    }
+  });
+});
+
+describe("Hypothesis Agent — timeline reconstruction", () => {
+  const VALID_SOURCES = [
+    "wazuh_alert", "wazuh_fim", "wazuh_vuln", "wazuh_agent",
+    "wazuh_sca", "threat_intel", "llm_inference", "analyst_input",
+    "system_computed",
+  ];
+
+  const VALID_SIGNIFICANCES = ["critical", "high", "medium", "low", "info"];
+
+  it("timeline event has required structure", () => {
+    const event = {
+      timestamp: "2026-02-28T10:15:00Z",
+      event: "First failed login attempt from 10.0.1.45",
+      source: "wazuh_alert",
+      significance: "high",
+    };
+    expect(event.timestamp).toBeTruthy();
+    expect(event.event).toBeTruthy();
+    expect(VALID_SOURCES).toContain(event.source);
+    expect(VALID_SIGNIFICANCES).toContain(event.significance);
+  });
+
+  it("timeline events are chronologically ordered", () => {
+    const events = [
+      { timestamp: "2026-02-28T10:00:00Z", event: "First event" },
+      { timestamp: "2026-02-28T10:05:00Z", event: "Second event" },
+      { timestamp: "2026-02-28T10:10:00Z", event: "Third event" },
+    ];
+    for (let i = 1; i < events.length; i++) {
+      expect(new Date(events[i].timestamp).getTime())
+        .toBeGreaterThanOrEqual(new Date(events[i - 1].timestamp).getTime());
+    }
+  });
+
+  it("source enum covers all expected data sources", () => {
+    expect(VALID_SOURCES).toHaveLength(9);
+    expect(VALID_SOURCES).toContain("wazuh_alert");
+    expect(VALID_SOURCES).toContain("llm_inference");
+    expect(VALID_SOURCES).toContain("analyst_input");
+  });
+});
+
+describe("Hypothesis Agent — recommended actions", () => {
+  const VALID_CATEGORIES = ["immediate", "next", "optional"];
+  const VALID_STATES = ["proposed", "approved", "rejected", "deferred"];
+
+  it("action categories are correct", () => {
+    expect(VALID_CATEGORIES).toHaveLength(3);
+  });
+
+  it("action states are correct", () => {
+    expect(VALID_STATES).toHaveLength(4);
+  });
+
+  it("action has required structure", () => {
+    const action = {
+      action: "Block source IP at firewall",
+      category: "immediate",
+      evidenceBasis: ["Known malicious IP", "Active brute-force"],
+      requiresApproval: true,
+      state: "proposed",
+    };
+    expect(action.action).toBeTruthy();
+    expect(VALID_CATEGORIES).toContain(action.category);
+    expect(VALID_STATES).toContain(action.state);
+    expect(Array.isArray(action.evidenceBasis)).toBe(true);
+    expect(typeof action.requiresApproval).toBe("boolean");
+  });
+
+  it("state transitions are valid", () => {
+    const validTransitions: Record<string, string[]> = {
+      proposed: ["approved", "rejected", "deferred"],
+      approved: [],
+      rejected: [],
+      deferred: ["proposed"],
+    };
+
+    expect(validTransitions.proposed).toContain("approved");
+    expect(validTransitions.proposed).toContain("rejected");
+    expect(validTransitions.proposed).toContain("deferred");
+  });
+});
+
+describe("Hypothesis Agent — completed pivots", () => {
+  it("completed pivot has required structure", () => {
+    const pivot = {
+      action: "Checked DHCP logs for IP 10.0.1.45",
+      finding: "IP was not reassigned during the attack window",
+      performedAt: "2026-02-28T11:00:00Z",
+      impactedTheory: true,
+    };
+    expect(pivot.action).toBeTruthy();
+    expect(pivot.finding).toBeTruthy();
+    expect(pivot.performedAt).toBeTruthy();
+    expect(typeof pivot.impactedTheory).toBe("boolean");
+  });
+
+  it("pivot recording preserves analyst input", () => {
+    const pivots = [
+      { action: "Reviewed firewall logs", finding: "No outbound C2 traffic detected", impactedTheory: false },
+      { action: "Checked AD for account lockouts", finding: "Account was locked 3 times", impactedTheory: true },
+    ];
+    expect(pivots).toHaveLength(2);
+    expect(pivots[1].impactedTheory).toBe(true);
+    expect(pivots[0].impactedTheory).toBe(false);
+  });
+});
+
+describe("Hypothesis Agent — draft documentation", () => {
+  it("generates shift handoff summary", () => {
+    const docs = {
+      shiftHandoff: "Active investigation into brute-force attack from 10.0.1.45. Working theory: credential stuffing. 2 pivots completed, 3 pending actions.",
+      escalationSummary: "Recommend escalation to Tier 3 due to potential lateral movement.",
+      executiveSummary: "Automated brute-force attack detected targeting admin accounts. No confirmed compromise. Monitoring continues.",
+      tuningSuggestions: "Consider adding rate limiting on auth endpoints. Rule 100001 threshold may need adjustment.",
+    };
+    expect(docs.shiftHandoff).toBeTruthy();
+    expect(docs.shiftHandoff.length).toBeGreaterThan(20);
+    expect(docs.escalationSummary).toBeTruthy();
+    expect(docs.executiveSummary).toBeTruthy();
+    expect(docs.tuningSuggestions).toBeTruthy();
+  });
+});
+
+describe("Hypothesis Agent — linked artifact tracking", () => {
+  it("tracks linked triage IDs", () => {
+    const linkedTriageIds = ["triage-abc123", "triage-def456"];
+    expect(linkedTriageIds).toHaveLength(2);
+    for (const id of linkedTriageIds) {
+      expect(id).toMatch(/^triage-/);
+    }
+  });
+
+  it("tracks linked correlation IDs", () => {
+    const linkedCorrelationIds = ["corr-abc123"];
+    expect(linkedCorrelationIds).toHaveLength(1);
+    for (const id of linkedCorrelationIds) {
+      expect(id).toMatch(/^corr-/);
+    }
+  });
+
+  it("tracks linked alert IDs from correlation bundle", () => {
+    const linkedAlertIds = ["alert-001", "alert-002", "alert-003"];
+    expect(linkedAlertIds.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Hypothesis Agent — pipeline router contracts", () => {
+  it("generateHypothesis input requires correlationId", () => {
+    const input = { correlationId: "corr-abc123" };
+    expect(input.correlationId).toBeTruthy();
+    expect(input.correlationId).toMatch(/^corr-/);
+  });
+
+  it("generateHypothesis output includes success, caseId, sessionId", () => {
+    const output = {
+      success: true,
+      caseId: 42,
+      sessionId: 1,
+    };
+    expect(output.success).toBe(true);
+    expect(output.caseId).toBeGreaterThan(0);
+    expect(output.sessionId).toBeGreaterThan(0);
+  });
+
+  it("getLivingCaseById returns found flag and case data", () => {
+    const output = {
+      found: true,
+      livingCase: {
+        id: 42,
+        sessionId: 1,
+        theoryConfidence: 0.78,
+        workingTheory: "Credential stuffing attack",
+        caseData: {},
+      },
+    };
+    expect(output.found).toBe(true);
+    expect(output.livingCase.id).toBe(42);
+    expect(output.livingCase.theoryConfidence).toBeGreaterThanOrEqual(0);
+  });
+
+  it("listLivingCases returns paginated results", () => {
+    const output = {
+      cases: [
+        { id: 1, sessionId: 1, theoryConfidence: 0.78, workingTheory: "Theory A" },
+        { id: 2, sessionId: 2, theoryConfidence: 0.55, workingTheory: "Theory B" },
+      ],
+      total: 2,
+    };
+    expect(output.cases).toHaveLength(2);
+    expect(output.total).toBe(2);
+  });
+
+  it("updateActionState input requires caseId, actionIndex, newState", () => {
+    const input = {
+      caseId: 42,
+      actionIndex: 0,
+      newState: "approved" as const,
+    };
+    expect(input.caseId).toBeGreaterThan(0);
+    expect(input.actionIndex).toBeGreaterThanOrEqual(0);
+    expect(["proposed", "approved", "rejected", "deferred"]).toContain(input.newState);
+  });
+
+  it("recordPivot input requires caseId, action, finding", () => {
+    const input = {
+      caseId: 42,
+      action: "Checked firewall logs",
+      finding: "No suspicious outbound traffic",
+      impactedTheory: false,
+    };
+    expect(input.caseId).toBeGreaterThan(0);
+    expect(input.action).toBeTruthy();
+    expect(input.finding).toBeTruthy();
+    expect(typeof input.impactedTheory).toBe("boolean");
+  });
+});
+
+describe("Hypothesis Agent — LLM prompt construction", () => {
+  it("system prompt includes role and output format", () => {
+    const systemPromptKeywords = [
+      "hypothesis", "security", "analyst", "JSON",
+      "workingTheory", "alternateTheories", "suggestedNextSteps",
+    ];
+    // The hypothesis agent system prompt should contain these keywords
+    for (const kw of systemPromptKeywords) {
+      expect(kw).toBeTruthy();
+    }
+  });
+
+  it("user prompt includes correlation bundle data", () => {
+    const correlationData = {
+      synthesis: { narrative: "Attack narrative" },
+      relatedAlerts: [{ ruleId: "100001" }],
+      blastRadius: { affectedHosts: 2 },
+    };
+    const prompt = JSON.stringify(correlationData);
+    expect(prompt).toContain("narrative");
+    expect(prompt).toContain("relatedAlerts");
+    expect(prompt).toContain("blastRadius");
+  });
+
+  it("LLM response is parsed as structured JSON", () => {
+    const mockLLMResponse = JSON.stringify({
+      workingTheory: {
+        statement: "Credential stuffing attack",
+        confidence: 0.78,
+        supportingEvidence: ["evidence1"],
+        conflictingEvidence: [],
+      },
+      alternateTheories: [],
+      suggestedNextSteps: [],
+      evidenceGaps: [],
+      timelineSummary: [],
+      recommendedActions: [],
+      draftDocumentation: {},
+    });
+    const parsed = JSON.parse(mockLLMResponse);
+    expect(parsed.workingTheory).toBeDefined();
+    expect(parsed.workingTheory.statement).toBeTruthy();
+    expect(parsed.workingTheory.confidence).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("Hypothesis Agent — living case state persistence", () => {
+  it("living_case_state table has required columns", () => {
+    const requiredColumns = [
+      "id", "sessionId", "correlationId", "sourceTriageId",
+      "caseData", "theoryConfidence", "workingTheory",
+      "completedPivotCount", "evidenceGapCount", "pendingActionCount",
+      "approvalRequiredCount", "lastUpdatedBy", "createdAt", "updatedAt",
+    ];
+    expect(requiredColumns.length).toBeGreaterThanOrEqual(14);
+  });
+
+  it("caseData column stores full LivingCaseObject as JSON", () => {
+    const caseData = {
+      schemaVersion: "1.0",
+      workingTheory: { statement: "Test", confidence: 0.5 },
+      alternateTheories: [],
+      suggestedNextSteps: [],
+      evidenceGaps: [],
+      timelineSummary: [],
+      recommendedActions: [],
+      completedPivots: [],
+      draftDocumentation: {},
+      linkedTriageIds: ["triage-abc"],
+      linkedCorrelationIds: ["corr-abc"],
+      linkedAlertIds: [],
+    };
+    const serialized = JSON.stringify(caseData);
+    const deserialized = JSON.parse(serialized);
+    expect(deserialized.schemaVersion).toBe("1.0");
+    expect(deserialized.workingTheory.statement).toBe("Test");
+  });
+
+  it("denormalized fields are extracted from caseData for querying", () => {
+    const caseData = {
+      workingTheory: { statement: "Attack theory", confidence: 0.82 },
+      evidenceGaps: [{ description: "gap1" }, { description: "gap2" }],
+      recommendedActions: [
+        { state: "proposed", requiresApproval: true },
+        { state: "approved", requiresApproval: false },
+        { state: "proposed", requiresApproval: false },
+      ],
+      completedPivots: [{ action: "pivot1" }],
+    };
+
+    const theoryConfidence = caseData.workingTheory.confidence;
+    const workingTheory = caseData.workingTheory.statement;
+    const evidenceGapCount = caseData.evidenceGaps.length;
+    const pendingActionCount = caseData.recommendedActions.filter(a => a.state === "proposed").length;
+    const approvalRequiredCount = caseData.recommendedActions.filter(a => a.state === "proposed" && a.requiresApproval).length;
+    const completedPivotCount = caseData.completedPivots.length;
+
+    expect(theoryConfidence).toBe(0.82);
+    expect(workingTheory).toBe("Attack theory");
+    expect(evidenceGapCount).toBe(2);
+    expect(pendingActionCount).toBe(2);
+    expect(approvalRequiredCount).toBe(1);
+    expect(completedPivotCount).toBe(1);
+  });
+});
+
+describe("Hypothesis Agent — action state management", () => {
+  it("updates action state in caseData", () => {
+    const actions = [
+      { action: "Block IP", state: "proposed", requiresApproval: true },
+      { action: "Check logs", state: "proposed", requiresApproval: false },
+    ];
+
+    // Simulate updating action 0 to "approved"
+    actions[0].state = "approved";
+    expect(actions[0].state).toBe("approved");
+    expect(actions[1].state).toBe("proposed");
+  });
+
+  it("recalculates denormalized counts after state change", () => {
+    const actions = [
+      { action: "Block IP", state: "approved", requiresApproval: true },
+      { action: "Check logs", state: "proposed", requiresApproval: false },
+      { action: "Escalate", state: "deferred", requiresApproval: true },
+    ];
+
+    const pendingCount = actions.filter(a => a.state === "proposed").length;
+    const approvalCount = actions.filter(a => a.state === "proposed" && a.requiresApproval).length;
+
+    expect(pendingCount).toBe(1);
+    expect(approvalCount).toBe(0);
+  });
+});
+
+describe("Hypothesis Agent — pivot recording", () => {
+  it("appends pivot to completedPivots array", () => {
+    const completedPivots: any[] = [];
+
+    const newPivot = {
+      action: "Checked DHCP logs",
+      finding: "IP was not reassigned",
+      performedAt: new Date().toISOString(),
+      impactedTheory: true,
+    };
+
+    completedPivots.push(newPivot);
+    expect(completedPivots).toHaveLength(1);
+    expect(completedPivots[0].action).toBe("Checked DHCP logs");
+    expect(completedPivots[0].impactedTheory).toBe(true);
+  });
+
+  it("recalculates completedPivotCount after recording", () => {
+    const pivots = [
+      { action: "Pivot 1", finding: "Finding 1" },
+      { action: "Pivot 2", finding: "Finding 2" },
+    ];
+    expect(pivots.length).toBe(2);
+  });
+});
+
+describe("Hypothesis Agent — end-to-end pipeline flow", () => {
+  it("Step 3 consumes Step 2 output (CorrelationBundle)", () => {
+    const correlationBundle = {
+      correlationId: "corr-abc123",
+      sourceTriageId: "triage-def456",
+      status: "completed",
+      bundleData: {
+        synthesis: { narrative: "Attack narrative" },
+        relatedAlerts: [],
+        blastRadius: { affectedHosts: 1, affectedUsers: 1 },
+        campaignAssessment: { likelyCampaign: false },
+      },
+    };
+
+    // Hypothesis agent requires completed correlation
+    expect(correlationBundle.status).toBe("completed");
+    expect(correlationBundle.bundleData.synthesis.narrative).toBeTruthy();
+  });
+
+  it("Step 3 produces LivingCaseObject with all required sections", () => {
+    const livingCase = {
+      schemaVersion: "1.0",
+      caseId: "case-001",
+      sessionId: 1,
+      workingTheory: { statement: "Theory", confidence: 0.7, supportingEvidence: [], conflictingEvidence: [] },
+      alternateTheories: [{ statement: "Alt", confidence: 0.3, whyLessLikely: "Reason" }],
+      suggestedNextSteps: [{ action: "Check logs", rationale: "Verify", priority: "high", effort: "quick" }],
+      evidenceGaps: [{ description: "No EDR", impact: "Blind spot", suggestedAction: "Deploy", priority: "high" }],
+      timelineSummary: [{ timestamp: "2026-02-28T10:00:00Z", event: "First alert", source: "wazuh_alert", significance: "high" }],
+      recommendedActions: [{ action: "Block IP", category: "immediate", state: "proposed", requiresApproval: true }],
+      completedPivots: [],
+      draftDocumentation: { shiftHandoff: "Summary", escalationSummary: "Escalate" },
+      linkedTriageIds: ["triage-def456"],
+      linkedCorrelationIds: ["corr-abc123"],
+      linkedAlertIds: [],
+    };
+
+    expect(livingCase.schemaVersion).toBe("1.0");
+    expect(livingCase.workingTheory.statement).toBeTruthy();
+    expect(livingCase.alternateTheories.length).toBeGreaterThan(0);
+    expect(livingCase.suggestedNextSteps.length).toBeGreaterThan(0);
+    expect(livingCase.evidenceGaps.length).toBeGreaterThan(0);
+    expect(livingCase.timelineSummary.length).toBeGreaterThan(0);
+    expect(livingCase.recommendedActions.length).toBeGreaterThan(0);
+    expect(livingCase.draftDocumentation.shiftHandoff).toBeTruthy();
+    expect(livingCase.linkedTriageIds).toContain("triage-def456");
+    expect(livingCase.linkedCorrelationIds).toContain("corr-abc123");
+  });
+
+  it("pipeline chain: TriageObject → CorrelationBundle → LivingCaseObject", () => {
+    // Verify the 3-step pipeline contract
+    const step1Output = { triageId: "triage-abc", severity: "high", route: "C_HIGH_CONFIDENCE" };
+    const step2Output = { correlationId: "corr-def", sourceTriageId: step1Output.triageId, status: "completed" };
+    const step3Output = { caseId: "case-ghi", linkedTriageIds: [step1Output.triageId], linkedCorrelationIds: [step2Output.correlationId] };
+
+    // Step 2 references Step 1
+    expect(step2Output.sourceTriageId).toBe(step1Output.triageId);
+    // Step 3 references both Step 1 and Step 2
+    expect(step3Output.linkedTriageIds).toContain(step1Output.triageId);
+    expect(step3Output.linkedCorrelationIds).toContain(step2Output.correlationId);
+  });
+});

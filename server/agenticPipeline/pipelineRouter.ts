@@ -28,8 +28,15 @@ import {
   getCorrelationByTriageId,
   listCorrelations,
 } from "./correlationAgent";
+import {
+  runHypothesisAgent,
+  getLivingCaseBySessionId,
+  getLivingCaseById,
+  listLivingCases,
+  getLivingCaseByCorrelationId,
+} from "./hypothesisAgent";
 import { getDb } from "../db";
-import { triageObjects, alertQueue, correlationBundles } from "../../drizzle/schema";
+import { triageObjects, alertQueue, correlationBundles, livingCaseState } from "../../drizzle/schema";
 import { eq, desc, sql, and } from "drizzle-orm";
 
 export const pipelineRouter = router({
@@ -468,6 +475,176 @@ export const pipelineRouter = router({
         triageSummary,
       };
     }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HYPOTHESIS / LIVING CASE ENDPOINTS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /** Run the hypothesis agent on a completed correlation bundle. Produces a LivingCaseObject. */
+  generateHypothesis: protectedProcedure
+    .input(z.object({
+      correlationId: z.string().min(1),
+      /** Optional: merge into an existing investigation session */
+      existingSessionId: z.number().int().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const result = await runHypothesisAgent({
+          correlationId: input.correlationId,
+          existingSessionId: input.existingSessionId,
+        });
+
+        return {
+          success: true as const,
+          caseId: result.caseId,
+          sessionId: result.sessionId,
+          livingCase: result.livingCase,
+          latencyMs: result.latencyMs,
+          tokensUsed: result.tokensUsed,
+          isNewSession: result.isNewSession,
+        };
+      } catch (err) {
+        return {
+          success: false as const,
+          error: (err as Error).message,
+          latencyMs: 0,
+        };
+      }
+    }),
+
+  /** Get a living case by its database ID. */
+  getLivingCaseById: protectedProcedure
+    .input(z.object({ id: z.number().int() }))
+    .query(async ({ input }) => {
+      const row = await getLivingCaseById(input.id);
+      if (!row) return { found: false as const };
+      return { found: true as const, livingCase: row };
+    }),
+
+  /** Get a living case by its investigation session ID. */
+  getLivingCaseBySessionId: protectedProcedure
+    .input(z.object({ sessionId: z.number().int() }))
+    .query(async ({ input }) => {
+      const row = await getLivingCaseBySessionId(input.sessionId);
+      if (!row) return { found: false as const };
+      return { found: true as const, livingCase: row };
+    }),
+
+  /** Get a living case linked to a specific correlation bundle. */
+  getLivingCaseByCorrelationId: protectedProcedure
+    .input(z.object({ correlationId: z.string() }))
+    .query(async ({ input }) => {
+      const row = await getLivingCaseByCorrelationId(input.correlationId);
+      if (!row) return { found: false as const };
+      return { found: true as const, livingCase: row };
+    }),
+
+  /** List all living cases with pagination. */
+  listLivingCases: protectedProcedure
+    .input(z.object({
+      limit: z.number().int().min(1).max(100).default(25),
+      offset: z.number().int().min(0).default(0),
+    }))
+    .query(async ({ input }) => {
+      return listLivingCases(input);
+    }),
+
+  /** Update a recommended action's state (approve, reject, defer). */
+  updateActionState: protectedProcedure
+    .input(z.object({
+      caseId: z.number().int(),
+      actionIndex: z.number().int().min(0),
+      newState: z.enum(["approved", "rejected", "deferred"]),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const [row] = await db
+        .select()
+        .from(livingCaseState)
+        .where(eq(livingCaseState.id, input.caseId))
+        .limit(1);
+
+      if (!row) return { success: false as const, error: "Living case not found" };
+
+      const caseData = row.caseData as any;
+      if (!caseData?.recommendedActions?.[input.actionIndex]) {
+        return { success: false as const, error: "Action not found at specified index" };
+      }
+
+      caseData.recommendedActions[input.actionIndex].state = input.newState;
+      caseData.recommendedActions[input.actionIndex].decidedBy = `user:${ctx.user.id}`;
+      caseData.recommendedActions[input.actionIndex].decidedAt = new Date().toISOString();
+      caseData.lastUpdatedAt = new Date().toISOString();
+      caseData.lastUpdatedBy = "analyst_manual";
+
+      await db
+        .update(livingCaseState)
+        .set({
+          caseData,
+          pendingActionCount: caseData.recommendedActions.filter(
+            (a: any) => a.state === "proposed"
+          ).length,
+          approvalRequiredCount: caseData.recommendedActions.filter(
+            (a: any) => a.requiresApproval && a.state === "proposed"
+          ).length,
+          lastUpdatedBy: "analyst_manual",
+        })
+        .where(eq(livingCaseState.id, input.caseId));
+
+      return { success: true as const, caseId: input.caseId };
+    }),
+
+  /** Record a completed investigative pivot on a living case. */
+  recordPivot: protectedProcedure
+    .input(z.object({
+      caseId: z.number().int(),
+      action: z.string().min(1).max(1000),
+      finding: z.string().min(1).max(4000),
+      impactedTheory: z.boolean(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const [row] = await db
+        .select()
+        .from(livingCaseState)
+        .where(eq(livingCaseState.id, input.caseId))
+        .limit(1);
+
+      if (!row) return { success: false as const, error: "Living case not found" };
+
+      const caseData = row.caseData as any;
+      if (!caseData.completedPivots) caseData.completedPivots = [];
+
+      caseData.completedPivots.push({
+        action: input.action,
+        performedAt: new Date().toISOString(),
+        performedBy: `user:${ctx.user.id}`,
+        finding: input.finding,
+        impactedTheory: input.impactedTheory,
+      });
+
+      caseData.lastUpdatedAt = new Date().toISOString();
+      caseData.lastUpdatedBy = "analyst_manual";
+
+      await db
+        .update(livingCaseState)
+        .set({
+          caseData,
+          completedPivotCount: caseData.completedPivots.length,
+          lastUpdatedBy: "analyst_manual",
+        })
+        .where(eq(livingCaseState.id, input.caseId));
+
+      return { success: true as const, pivotCount: caseData.completedPivots.length };
+    }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AUTO-TRIAGE BULK OPERATIONS
+  // ═══════════════════════════════════════════════════════════════════════════
 
   /** Bulk auto-triage all pending queue items. */
   autoTriageAllPending: protectedProcedure
