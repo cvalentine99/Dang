@@ -1,0 +1,8 @@
+{
+  "query": "ALTER TABLE `config_baselines` ADD COLUMN `scheduleId` int NULL AFTER `userId`;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute ALTER TABLE `config_baselines` ADD COLUMN `scheduleId` int NULL AFTER `userId`;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1060 (42S21) at line 1: Duplicate column name 'scheduleId'"
+  ]
+}

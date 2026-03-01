@@ -6,6 +6,7 @@ import { wazuhRouter } from "./wazuh/wazuhRouter";
 import { hybridragRouter } from "./hybridrag/hybridragRouter";
 import { savedSearchesRouter } from "./savedSearches/savedSearchesRouter";
 import { baselinesRouter } from "./baselines/baselinesRouter";
+import { baselineSchedulesRouter } from "./baselines/baselineSchedulesRouter";
 import { indexerRouter } from "./indexer/indexerRouter";
 import { otxRouter } from "./otx/otxRouter";
 import { notesRouter } from "./notes/notesRouter";
@@ -48,6 +49,9 @@ export const appRouter = router({
 
   // Configuration baselines for drift detection
   baselines: baselinesRouter,
+
+  // Scheduled baseline auto-capture
+  baselineSchedules: baselineSchedulesRouter,
 
   // Wazuh Indexer (OpenSearch/Elasticsearch) — read-only queries
   indexer: indexerRouter,

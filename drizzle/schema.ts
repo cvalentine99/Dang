@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   int,
   bigint,
@@ -119,6 +120,8 @@ export const configBaselines = mysqlTable("config_baselines", {
   id: int("id").autoincrement().primaryKey(),
   /** User who created this baseline */
   userId: int("userId").notNull(),
+  /** If auto-captured, the schedule that triggered this baseline */
+  scheduleId: int("scheduleId"),
   /** Human-readable name for the baseline */
   name: varchar("name", { length: 256 }).notNull(),
   /** Optional description */
@@ -133,6 +136,45 @@ export const configBaselines = mysqlTable("config_baselines", {
 
 export type ConfigBaseline = typeof configBaselines.$inferSelect;
 export type InsertConfigBaseline = typeof configBaselines.$inferInsert;
+
+/**
+ * Scheduled baseline auto-capture — cron-like schedules that automatically
+ * snapshot agent configuration at defined intervals.
+ * Each execution creates a row in config_baselines with a scheduleId reference.
+ */
+export const BASELINE_FREQUENCIES = ["hourly", "every_6h", "every_12h", "daily", "weekly", "monthly"] as const;
+export type BaselineFrequency = (typeof BASELINE_FREQUENCIES)[number];
+
+export const baselineSchedules = mysqlTable("baseline_schedules", {
+  id: int("id").autoincrement().primaryKey(),
+  /** User who created this schedule */
+  userId: int("userId").notNull(),
+  /** Human-readable schedule name */
+  name: varchar("name", { length: 256 }).notNull(),
+  /** Agent IDs to capture (JSON array of strings) */
+  agentIds: json("agentIds").$type<string[]>().notNull(),
+  /** Capture frequency */
+  frequency: varchar("frequency", { length: 32 }).$type<BaselineFrequency>().notNull(),
+  /** Whether the schedule is active */
+  enabled: boolean("enabled").default(true).notNull(),
+  /** Last successful execution time */
+  lastRunAt: timestamp("lastRunAt"),
+  /** Next scheduled execution time */
+  nextRunAt: timestamp("nextRunAt").notNull(),
+  /** Max baselines to retain per schedule (older ones auto-pruned) */
+  retentionCount: int("retentionCount").default(10).notNull(),
+  /** Last error message if the most recent run failed */
+  lastError: text("lastError"),
+  /** Total successful runs */
+  successCount: int("successCount").default(0).notNull(),
+  /** Total failed runs */
+  failureCount: int("failureCount").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type BaselineSchedule = typeof baselineSchedules.$inferSelect;
+export type InsertBaselineSchedule = typeof baselineSchedules.$inferInsert;
 
 /**
  * Analyst Notes v2 — Enhanced note-taking system with entity linking.

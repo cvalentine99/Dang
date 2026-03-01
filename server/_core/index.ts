@@ -228,6 +228,14 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+
+    // Start the baseline auto-capture scheduler
+    try {
+      const { startBaselineScheduler } = require("../baselines/baselineSchedulerService");
+      startBaselineScheduler();
+    } catch (err) {
+      console.warn(`[BaselineScheduler] Failed to start: ${(err as Error).message}`);
+    }
   });
 }
 
