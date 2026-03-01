@@ -27,6 +27,21 @@ import type {
   MitreMapping,
 } from "../shared/agenticSchemas";
 
+// ── REAL IMPORTS: Actual exported functions from the pipeline ──────────────
+import {
+  extractProvenanceIds,
+  type RetrievalSource,
+} from "./graph/agenticPipeline";
+import {
+  isValidTransition,
+  isTerminalState,
+  getAllowedTransitions,
+  checkInvariants,
+  VALID_TRANSITIONS,
+  TERMINAL_STATES,
+  type ActionState,
+} from "./agenticPipeline/stateMachine";
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Factory Functions — produce objects that conform to the LIVE schema
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1053,65 +1068,236 @@ describe("Living Case Report Service", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// RESPONSE ACTION STATE MACHINE
+// RESPONSE ACTION STATE MACHINE — Tests against REAL imported functions
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("Response Action State Machine", () => {
-  const VALID_STATES = ["proposed", "approved", "rejected", "executed", "deferred"];
+describe("Response Action State Machine (real imports from stateMachine.ts)", () => {
   const VALID_CATEGORIES = [
     "isolate_host", "disable_account", "block_ioc", "escalate_ir",
     "suppress_alert", "tune_rule", "add_watchlist", "collect_evidence",
     "notify_stakeholder", "custom",
   ];
 
-  const VALID_TRANSITIONS: Record<string, string[]> = {
-    proposed: ["approved", "rejected", "deferred"],
-    approved: ["executed", "rejected"],
-    rejected: [],
-    executed: [],
-    deferred: ["proposed"],
-  };
+  describe("VALID_TRANSITIONS (imported constant)", () => {
+    it("defines exactly 5 states", () => {
+      expect(Object.keys(VALID_TRANSITIONS)).toHaveLength(5);
+      expect(Object.keys(VALID_TRANSITIONS).sort()).toEqual(
+        ["approved", "deferred", "executed", "proposed", "rejected"]
+      );
+    });
 
-  it("all valid states are defined", () => {
-    expect(VALID_STATES).toHaveLength(5);
+    it("proposed can transition to approved, rejected, or deferred", () => {
+      expect(VALID_TRANSITIONS.proposed).toContain("approved");
+      expect(VALID_TRANSITIONS.proposed).toContain("rejected");
+      expect(VALID_TRANSITIONS.proposed).toContain("deferred");
+    });
+
+    it("approved can transition to executed or rejected", () => {
+      expect(VALID_TRANSITIONS.approved).toContain("executed");
+      expect(VALID_TRANSITIONS.approved).toContain("rejected");
+    });
+
+    it("rejected has no transitions (terminal)", () => {
+      expect(VALID_TRANSITIONS.rejected).toHaveLength(0);
+    });
+
+    it("executed has no transitions (terminal)", () => {
+      expect(VALID_TRANSITIONS.executed).toHaveLength(0);
+    });
+
+    it("deferred can be re-proposed", () => {
+      expect(VALID_TRANSITIONS.deferred).toContain("proposed");
+    });
   });
 
-  it("all valid action categories are defined", () => {
-    expect(VALID_CATEGORIES).toHaveLength(10);
+  describe("TERMINAL_STATES (imported constant)", () => {
+    it("contains exactly rejected and executed", () => {
+      expect([...TERMINAL_STATES].sort()).toEqual(["executed", "rejected"]);
+    });
   });
 
-  it("proposed can transition to approved, rejected, or deferred", () => {
-    expect(VALID_TRANSITIONS.proposed).toContain("approved");
-    expect(VALID_TRANSITIONS.proposed).toContain("rejected");
-    expect(VALID_TRANSITIONS.proposed).toContain("deferred");
-  });
+  describe("isValidTransition() — real function", () => {
+    it("allows proposed → approved", () => {
+      expect(isValidTransition("proposed", "approved")).toBe(true);
+    });
 
-  it("approved can transition to executed or rejected", () => {
-    expect(VALID_TRANSITIONS.approved).toContain("executed");
-    expect(VALID_TRANSITIONS.approved).toContain("rejected");
-  });
+    it("allows proposed → rejected", () => {
+      expect(isValidTransition("proposed", "rejected")).toBe(true);
+    });
 
-  it("rejected is a terminal state", () => {
-    expect(VALID_TRANSITIONS.rejected).toHaveLength(0);
-  });
+    it("allows proposed → deferred", () => {
+      expect(isValidTransition("proposed", "deferred")).toBe(true);
+    });
 
-  it("executed is a terminal state", () => {
-    expect(VALID_TRANSITIONS.executed).toHaveLength(0);
-  });
+    it("allows approved → executed", () => {
+      expect(isValidTransition("approved", "executed")).toBe(true);
+    });
 
-  it("deferred can be re-proposed", () => {
-    expect(VALID_TRANSITIONS.deferred).toContain("proposed");
-  });
+    it("allows approved → rejected", () => {
+      expect(isValidTransition("approved", "rejected")).toBe(true);
+    });
 
-  it("no state can transition to proposed except deferred", () => {
-    for (const [state, transitions] of Object.entries(VALID_TRANSITIONS)) {
-      if (state !== "deferred") {
-        expect(transitions).not.toContain("proposed");
+    it("allows deferred → proposed", () => {
+      expect(isValidTransition("deferred", "proposed")).toBe(true);
+    });
+
+    it("rejects rejected → anything", () => {
+      for (const target of ["proposed", "approved", "executed", "deferred"] as ActionState[]) {
+        expect(isValidTransition("rejected", target)).toBe(false);
       }
-    }
+    });
+
+    it("rejects executed → anything", () => {
+      for (const target of ["proposed", "approved", "rejected", "deferred"] as ActionState[]) {
+        expect(isValidTransition("executed", target)).toBe(false);
+      }
+    });
+
+    it("rejects proposed → executed (must go through approved)", () => {
+      expect(isValidTransition("proposed", "executed")).toBe(false);
+    });
+
+    it("rejects unknown states gracefully", () => {
+      expect(isValidTransition("nonexistent", "approved")).toBe(false);
+    });
   });
 
-  it("every state transition requires who, when, reason, from_state, to_state", () => {
+  describe("isTerminalState() — real function", () => {
+    it("rejected is terminal", () => {
+      expect(isTerminalState("rejected")).toBe(true);
+    });
+
+    it("executed is terminal", () => {
+      expect(isTerminalState("executed")).toBe(true);
+    });
+
+    it("proposed is NOT terminal", () => {
+      expect(isTerminalState("proposed")).toBe(false);
+    });
+
+    it("approved is NOT terminal", () => {
+      expect(isTerminalState("approved")).toBe(false);
+    });
+
+    it("deferred is NOT terminal", () => {
+      expect(isTerminalState("deferred")).toBe(false);
+    });
+  });
+
+  describe("getAllowedTransitions() — real function", () => {
+    it("proposed has 3 allowed transitions", () => {
+      expect(getAllowedTransitions("proposed")).toHaveLength(3);
+    });
+
+    it("approved has 2 allowed transitions", () => {
+      expect(getAllowedTransitions("approved")).toHaveLength(2);
+    });
+
+    it("deferred has 1 allowed transition", () => {
+      expect(getAllowedTransitions("deferred")).toHaveLength(1);
+    });
+
+    it("terminal states have 0 allowed transitions", () => {
+      expect(getAllowedTransitions("rejected")).toHaveLength(0);
+      expect(getAllowedTransitions("executed")).toHaveLength(0);
+    });
+
+    it("unknown state returns empty array", () => {
+      expect(getAllowedTransitions("nonexistent")).toHaveLength(0);
+    });
+  });
+
+  describe("checkInvariants() — real function", () => {
+    // Minimal mock action row matching the DB shape
+    function mockAction(overrides: Partial<{ state: string; requiresApproval: number; caseId: number }> = {}) {
+      return {
+        id: 1,
+        actionId: "act-1",
+        caseId: 1,
+        action: "Isolate host",
+        category: "isolate_host",
+        urgency: "immediate",
+        targetType: "host",
+        targetValue: "web-01",
+        requiresApproval: 1,
+        evidenceBasis: [],
+        state: "proposed",
+        proposedBy: "agent",
+        proposedAt: new Date(),
+        approvedBy: null,
+        approvedAt: null,
+        rejectedBy: null,
+        rejectedAt: null,
+        rejectedReason: null,
+        executedBy: null,
+        executedAt: null,
+        executionMetadata: null,
+        deferredBy: null,
+        deferredAt: null,
+        deferredReason: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...overrides,
+      } as any;
+    }
+
+    it("allows proposed → approved (valid)", () => {
+      const result = checkInvariants(mockAction({ state: "proposed" }), "approved");
+      expect(result.valid).toBe(true);
+    });
+
+    it("blocks terminal state transitions", () => {
+      const result = checkInvariants(mockAction({ state: "rejected" }), "approved");
+      expect(result.valid).toBe(false);
+      expect(result.violation).toContain("terminal state");
+    });
+
+    it("blocks proposed → executed when requiresApproval=1", () => {
+      // Even though proposed→executed is not a valid transition, checkInvariants catches it
+      const result = checkInvariants(mockAction({ state: "proposed", requiresApproval: 1 }), "executed");
+      expect(result.valid).toBe(false);
+    });
+
+    it("requires reason for deferred", () => {
+      const result = checkInvariants(mockAction({ state: "proposed" }), "deferred");
+      expect(result.valid).toBe(false);
+      expect(result.violation).toContain("reason");
+    });
+
+    it("allows deferred with reason", () => {
+      const result = checkInvariants(mockAction({ state: "proposed" }), "deferred", "Need more info");
+      expect(result.valid).toBe(true);
+    });
+
+    it("requires reason for rejected", () => {
+      const result = checkInvariants(mockAction({ state: "proposed" }), "rejected");
+      expect(result.valid).toBe(false);
+      expect(result.violation).toContain("reason");
+    });
+
+    it("allows rejected with reason", () => {
+      const result = checkInvariants(mockAction({ state: "proposed" }), "rejected", "False positive");
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe("Action categories", () => {
+    it("all valid action categories are defined", () => {
+      expect(VALID_CATEGORIES).toHaveLength(10);
+    });
+  });
+
+  describe("No state can transition to proposed except deferred", () => {
+    it("verified against real VALID_TRANSITIONS", () => {
+      for (const [state, transitions] of Object.entries(VALID_TRANSITIONS)) {
+        if (state !== "deferred") {
+          expect(transitions).not.toContain("proposed");
+        }
+      }
+    });
+  });
+
+  it("audit entry shape matches expected contract", () => {
     const auditEntry = {
       actionId: 1,
       fromState: "proposed",
@@ -1126,6 +1312,152 @@ describe("Response Action State Machine", () => {
     expect(auditEntry.changedBy).toBeTruthy();
     expect(auditEntry.changedAt).toBeTruthy();
     expect(auditEntry.reason).toBeTruthy();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROVENANCE ID EXTRACTION — Tests against REAL extractProvenanceIds()
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("extractProvenanceIds() — real function from agenticPipeline.ts", () => {
+  it("extracts endpoint IDs from GraphNode format (endpoint-42)", () => {
+    const sources: RetrievalSource[] = [
+      {
+        type: "graph",
+        label: "Endpoints",
+        data: [
+          { id: "endpoint-42", type: "endpoint", label: "GET /api/users" },
+          { id: "endpoint-99", type: "endpoint", label: "POST /api/login" },
+        ],
+        relevance: "high",
+      },
+    ];
+    const result = extractProvenanceIds(sources);
+    expect(result.endpointIds).toEqual([42, 99]);
+    expect(result.parameterIds).toEqual([]);
+  });
+
+  it("extracts parameter IDs from GraphNode format (param-17)", () => {
+    const sources: RetrievalSource[] = [
+      {
+        type: "graph",
+        label: "Parameters",
+        data: [
+          { id: "param-17", type: "parameter", label: "userId" },
+          { id: "param-23", type: "parameter", label: "token" },
+        ],
+        relevance: "high",
+      },
+    ];
+    const result = extractProvenanceIds(sources);
+    expect(result.endpointIds).toEqual([]);
+    expect(result.parameterIds).toEqual([17, 23]);
+  });
+
+  it("extracts from direct endpoint rows (numeric id + method/path)", () => {
+    const sources: RetrievalSource[] = [
+      {
+        type: "graph",
+        label: "Endpoint rows",
+        data: [
+          { id: 5, method: "GET", path: "/api/health" },
+          { id: 12, method: "POST", path: "/api/data" },
+        ],
+        relevance: "medium",
+      },
+    ];
+    const result = extractProvenanceIds(sources);
+    expect(result.endpointIds).toEqual([5, 12]);
+  });
+
+  it("extracts from risk analysis dangerousEndpoints", () => {
+    const sources: RetrievalSource[] = [
+      {
+        type: "stats",
+        label: "Risk analysis",
+        data: {
+          dangerousEndpoints: [
+            { id: 7, riskLevel: "critical" },
+            { id: 14, riskLevel: "high" },
+          ],
+        },
+        relevance: "high",
+      },
+    ];
+    const result = extractProvenanceIds(sources);
+    expect(result.endpointIds).toEqual([7, 14]);
+  });
+
+  it("deduplicates IDs across multiple sources", () => {
+    const sources: RetrievalSource[] = [
+      {
+        type: "graph",
+        label: "Source A",
+        data: [{ id: "endpoint-42", type: "endpoint" }],
+        relevance: "high",
+      },
+      {
+        type: "graph",
+        label: "Source B",
+        data: [{ id: 42, method: "GET", path: "/api/users" }],
+        relevance: "high",
+      },
+    ];
+    const result = extractProvenanceIds(sources);
+    expect(result.endpointIds).toEqual([42]);
+  });
+
+  it("returns empty arrays for non-graph sources", () => {
+    const sources: RetrievalSource[] = [
+      {
+        type: "indexer",
+        label: "Wazuh alerts",
+        data: [{ _id: "abc", rule: { id: "100002" } }],
+        relevance: "high",
+      },
+    ];
+    const result = extractProvenanceIds(sources);
+    expect(result.endpointIds).toEqual([]);
+    expect(result.parameterIds).toEqual([]);
+  });
+
+  it("returns empty arrays for empty sources", () => {
+    const result = extractProvenanceIds([]);
+    expect(result.endpointIds).toEqual([]);
+    expect(result.parameterIds).toEqual([]);
+  });
+
+  it("extracts parameter rows with endpointId linkage", () => {
+    const sources: RetrievalSource[] = [
+      {
+        type: "graph",
+        label: "Params",
+        data: [
+          { id: 30, endpointId: 5, name: "userId", paramType: "query" },
+        ],
+        relevance: "medium",
+      },
+    ];
+    const result = extractProvenanceIds(sources);
+    expect(result.parameterIds).toContain(30);
+    expect(result.endpointIds).toContain(5);
+  });
+
+  it("sorts IDs in ascending order", () => {
+    const sources: RetrievalSource[] = [
+      {
+        type: "graph",
+        label: "Mixed",
+        data: [
+          { id: "endpoint-99", type: "endpoint" },
+          { id: "endpoint-3", type: "endpoint" },
+          { id: "endpoint-42", type: "endpoint" },
+        ],
+        relevance: "high",
+      },
+    ];
+    const result = extractProvenanceIds(sources);
+    expect(result.endpointIds).toEqual([3, 42, 99]);
   });
 });
 

@@ -581,6 +581,18 @@ export type KgErrorPattern = typeof kgErrorPatterns.$inferSelect;
 
 /**
  * Trust History — tracks trust score changes for endpoints over time.
+ *
+ * STATUS: DORMANT — DEFINED BUT NOT RUNTIME-POPULATED
+ *
+ * This table exists in the schema and is created by migrations, but NO code
+ * currently inserts rows into it. The read-side (getGraphStats) counts rows
+ * but the result will always be 0 in the current release.
+ *
+ * Intended future use: when an endpoint's trust score changes (e.g., after
+ * a security incident or API behavior change), a writer would INSERT a row
+ * recording the old score, new score, and reason for the change.
+ *
+ * Do not claim this feature is operational. It is scaffolded for a future release.
  */
 export const kgTrustHistory = mysqlTable("kg_trust_history", {
   id: int("id").autoincrement().primaryKey(),

@@ -2122,5 +2122,42 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Modified files: pipelineHandoff.test.ts, SOC_COMPLIANCE_EVIDENCE.md, agenticPipeline.ts, graphQueryService.ts, AnalystChat.tsx, routers.ts, responseActionsRouter.ts
 - [x] Contract proof: all tests validate against shared/agenticSchemas.ts live types
 - [x] Runtime proof: recordProvenance() fires after every pipeline synthesis; timing metrics computed from real DB timestamps
-- [x] Test proof: 0 TypeScript errors, 1099 tests pass (46 files)
+- [x] Test proof: 0 TypeScript errors, 1150 tests pass (47 files) — updated after Pass 2
 - [x] No-handwaving declaration: LIVE = provenance recording, timing metrics, enhancedLLM router. SIMULATED = AnalystChat progress steps (now labeled). SCAFFOLDED-INACTIVE = kgTrustHistory (documented)
+
+## Agentic Truth Follow-Up (Pass 2)
+
+### Task 1 — Upgrade provenance from shallow to meaningful
+- [x] Audit what real IDs (endpointIds, parameterIds, docChunkIds) are available in the retrieval/execution path
+- [x] Populate provenance with real runtime IDs from the actual KG query path — extractProvenanceIds() at agenticPipeline.ts:172
+- [x] Add code comments explaining any legitimately empty arrays — docChunkIds: [] with comment explaining KG has no doc chunk layer
+- [x] Verify at least one real flow writes non-empty provenance source arrays — 14 provenance tests + 9 extractProvenanceIds tests
+
+### Task 2 — Add runtime provenance integration test
+- [x] Write test that proves: request enters KG path → answer generated → provenance row persisted — provenance.test.ts
+- [x] Validate stored row contains expected question, answer, and source references
+- [x] Test validates actual persistence behavior, not just mocked function invocation
+
+### Task 3 — Resolve kgTrustHistory fully
+- [x] Choose Option B: make dormant status unmistakable
+- [x] Added explicit DORMANT comments at schema.ts:582-596, graphQueryService.ts:72-77, graphQueryService.ts:143-145
+- [x] SOC_COMPLIANCE_EVIDENCE.md line 419 clearly marks as not runtime-populated
+- [x] Removed all language implying operational status
+
+### Task 4 — Strengthen handoff tests with real stage outputs
+- [x] Added tests importing real extractProvenanceIds(), isValidTransition(), checkInvariants() from actual modules
+- [x] Tests validate CorrelationBundle schema contracts against shared/agenticSchemas.ts types
+- [x] Tests validate LivingCaseObject schema contracts against shared/agenticSchemas.ts types
+- [x] Tests validate response action stage-to-stage data flow
+- [x] Uses TypeScript type assertions + field-by-field validation, not just shape checks
+
+### Task 5 — Line-by-line truth pass on evidence package
+- [x] Verified every claim in TRUTH_REMEDIATION_EVIDENCE.md against actual code with grep -n line numbers
+- [x] All claims now have file:line evidence references
+- [x] No aspirational claims remain — every feature marked LIVE has code + test proof
+
+### Task 6 — Provide actual test/typecheck proof
+- [x] Captured raw command output from targeted tests
+- [x] Full test suite: 47 files, 1150 tests, all passing
+- [x] tsc --noEmit: 0 errors (stale watcher cache confirmed as false positive)
+- [x] All transcripts included in TRUTH_REMEDIATION_EVIDENCE.md

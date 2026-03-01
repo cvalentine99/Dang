@@ -156,6 +156,82 @@ function hashQuery(q: string): string {
   return Math.abs(hash).toString(36).padStart(8, "0");
 }
 
+/**
+ * Extract real KG node IDs from retrieval sources for provenance recording.
+ *
+ * Scans all graph-type RetrievalSource entries and extracts numeric IDs from:
+ * - GraphNode.id strings like "endpoint-42" → endpointId 42
+ * - GraphNode.id strings like "param-17" → parameterId 17
+ * - Direct endpoint rows from getEndpoints() which have .id (numeric)
+ * - Risk analysis rows from getRiskAnalysis() which have .id (numeric)
+ *
+ * Returns deduplicated arrays of real numeric IDs that were actually used
+ * in the retrieval path for this query. Empty arrays are truthful — they
+ * mean no nodes of that type were retrieved for this particular query.
+ */
+export function extractProvenanceIds(sources: RetrievalSource[]): {
+  endpointIds: number[];
+  parameterIds: number[];
+} {
+  const endpointIdSet = new Set<number>();
+  const parameterIdSet = new Set<number>();
+
+  for (const source of sources) {
+    if (source.type !== "graph" && source.type !== "stats") continue;
+    const data = source.data;
+    if (!data) continue;
+
+    // Handle arrays of GraphNode objects (from searchGraph, getEndpoints, etc.)
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        if (typeof item !== "object" || item === null) continue;
+        const record = item as Record<string, unknown>;
+
+        // GraphNode format: id is "endpoint-42", "param-17", etc.
+        if (typeof record.id === "string") {
+          const parts = record.id.split("-");
+          const numericId = parseInt(parts[parts.length - 1], 10);
+          if (!isNaN(numericId)) {
+            if (record.id.startsWith("endpoint-") || record.type === "endpoint") {
+              endpointIdSet.add(numericId);
+            } else if (record.id.startsWith("param-") || record.type === "parameter") {
+              parameterIdSet.add(numericId);
+            }
+          }
+        }
+
+        // Direct endpoint row format: { id: number, method: string, path: string, ... }
+        if (typeof record.id === "number" && ("method" in record || "path" in record || "riskLevel" in record)) {
+          endpointIdSet.add(record.id);
+        }
+
+        // Parameter rows with endpointId linkage
+        if (typeof record.id === "number" && "endpointId" in record && typeof record.endpointId === "number") {
+          parameterIdSet.add(record.id);
+          endpointIdSet.add(record.endpointId);
+        }
+      }
+    }
+
+    // Handle risk analysis object: { dangerousEndpoints: [{ id, ... }] }
+    if (typeof data === "object" && !Array.isArray(data)) {
+      const obj = data as Record<string, unknown>;
+      if (Array.isArray(obj.dangerousEndpoints)) {
+        for (const ep of obj.dangerousEndpoints) {
+          if (typeof ep === "object" && ep !== null && typeof (ep as Record<string, unknown>).id === "number") {
+            endpointIdSet.add((ep as Record<string, unknown>).id as number);
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    endpointIds: Array.from(endpointIdSet).sort((a, b) => a - b),
+    parameterIds: Array.from(parameterIdSet).sort((a, b) => a - b),
+  };
+}
+
 // ── Phase 1: Intent Analysis ────────────────────────────────────────────────
 
 async function analyzeIntent(query: string, conversationHistory: AnalystMessage[], steps: AgentStep[]): Promise<IntentAnalysis> {
@@ -1048,13 +1124,22 @@ export async function runAnalystPipeline(
 
   const totalDurationMs = Date.now() - pipelineStart;
 
+  // ── Extract real KG node IDs from retrieval sources for provenance ──
+  const provenanceIds = extractProvenanceIds(allSources);
+
   // ── Record Provenance (fire-and-forget, never blocks the response) ──
+  // endpointIds and parameterIds are extracted from actual graph retrieval results.
+  // docChunkIds is always [] because the current KG architecture has no document
+  // chunk layer — the 4 layers are: API Ontology, Operational Semantics, Schema
+  // Lineage, and Error/Failure. A future RAG integration could populate this field.
   recordProvenance({
     sessionId: hashQuery(query),
     question: query,
     answer: answer.slice(0, 4000), // truncate to avoid DB column overflow
     confidence: trustScore.toFixed(3),
-    endpointIds: [],  // graph layer doesn't expose numeric IDs; tracked via sources
+    endpointIds: provenanceIds.endpointIds,
+    parameterIds: provenanceIds.parameterIds,
+    docChunkIds: [], // No doc chunk layer in current KG architecture — genuinely empty
     warnings: [
       ...(safetyResult.status === "filtered" ? [`safety_filtered: ${safetyResult.filtered.join(", ")}`] : []),
       ...(errorSources.length > 0 ? [`retrieval_errors: ${errorSources.length}`] : []),
