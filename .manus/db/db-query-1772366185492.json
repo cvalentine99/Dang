@@ -1,0 +1,28 @@
+{
+  "query": "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('baseline_schedules', 'alert_queue', 'auto_queue_rules', 'response_actions', 'response_action_audit', 'pipeline_runs');",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('baseline_schedules', 'alert_queue', 'auto_queue_rules', 'response_actions', 'response_action_audit', 'pipeline_runs');",
+  "rows": [
+    {
+      "TABLE_NAME": "response_actions"
+    },
+    {
+      "TABLE_NAME": "response_action_audit"
+    },
+    {
+      "TABLE_NAME": "pipeline_runs"
+    },
+    {
+      "TABLE_NAME": "baseline_schedules"
+    },
+    {
+      "TABLE_NAME": "alert_queue"
+    },
+    {
+      "TABLE_NAME": "auto_queue_rules"
+    }
+  ],
+  "messages": [],
+  "stdout": "TABLE_NAME\nresponse_actions\nresponse_action_audit\npipeline_runs\nbaseline_schedules\nalert_queue\nauto_queue_rules\n",
+  "stderr": "",
+  "execution_time_ms": 62
+}

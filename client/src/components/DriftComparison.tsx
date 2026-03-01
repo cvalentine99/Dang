@@ -49,8 +49,19 @@ import {
   MinusCircle,
   ArrowUpDown,
   Loader2,
+  CalendarClock,
+  Play,
+  Pause,
+  RotateCw,
+  History,
+  Pencil,
+  ChevronDown,
+  ChevronUp,
+  Zap,
 } from "lucide-react";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
@@ -378,13 +389,22 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
   const [showDriftOnly, setShowDriftOnly] = useState(false);
 
   // Baseline state
-  const [viewMode, setViewMode] = useState<"live" | "baseline">("live");
+  const [viewMode, setViewMode] = useState<"live" | "baseline" | "schedules">("live");
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [baselineName, setBaselineName] = useState("");
   const [baselineDescription, setBaselineDescription] = useState("");
   const [activeBaselineId, setActiveBaselineId] = useState<number | null>(null);
   const [baselineCategoryFilter, setBaselineCategoryFilter] = useState<"all" | "packages" | "services" | "users">("all");
+
+  // Schedule management state
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<number | null>(null);
+  const [scheduleName, setScheduleName] = useState("");
+  const [scheduleFrequency, setScheduleFrequency] = useState<string>("daily");
+  const [scheduleRetention, setScheduleRetention] = useState(10);
+  const [scheduleAgentIds, setScheduleAgentIds] = useState<string[]>([]);
+  const [expandedScheduleId, setExpandedScheduleId] = useState<number | null>(null);
 
   // ── Real Wazuh API queries ──────────────────────────────────────────
   const agentsQ = trpc.wazuh.agents.useQuery(
@@ -499,6 +519,113 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
     },
     onError: (err) => toast.error(`Failed to save baseline: ${err.message}`),
   });
+  // ── Schedule queries & mutations ──────────────────────────────────
+  const schedulesQ = trpc.baselineSchedules.list.useQuery(undefined, {
+    staleTime: 15_000,
+  });
+  const scheduleHistoryQ = trpc.baselineSchedules.history.useQuery(
+    { scheduleId: expandedScheduleId!, limit: 20 },
+    { enabled: expandedScheduleId !== null }
+  );
+  const createScheduleMut = trpc.baselineSchedules.create.useMutation({
+    onSuccess: () => {
+      schedulesQ.refetch();
+      setShowScheduleDialog(false);
+      resetScheduleForm();
+      toast.success("Schedule created");
+    },
+    onError: (err) => toast.error(`Failed to create schedule: ${err.message}`),
+  });
+  const updateScheduleMut = trpc.baselineSchedules.update.useMutation({
+    onSuccess: () => {
+      schedulesQ.refetch();
+      setShowScheduleDialog(false);
+      resetScheduleForm();
+      toast.success("Schedule updated");
+    },
+    onError: (err) => toast.error(`Failed to update schedule: ${err.message}`),
+  });
+  const toggleScheduleMut = trpc.baselineSchedules.toggle.useMutation({
+    onSuccess: (data) => {
+      schedulesQ.refetch();
+      toast.success(data.enabled ? "Schedule enabled" : "Schedule paused");
+    },
+    onError: (err) => toast.error(`Failed to toggle: ${err.message}`),
+  });
+  const deleteScheduleMut = trpc.baselineSchedules.delete.useMutation({
+    onSuccess: () => {
+      schedulesQ.refetch();
+      if (expandedScheduleId) setExpandedScheduleId(null);
+      toast.success("Schedule deleted");
+    },
+    onError: (err) => toast.error(`Failed to delete: ${err.message}`),
+  });
+  const triggerNowMut = trpc.baselineSchedules.triggerNow.useMutation({
+    onSuccess: (data) => {
+      schedulesQ.refetch();
+      if (expandedScheduleId) scheduleHistoryQ.refetch();
+      if (data.success) {
+        toast.success(`Baseline captured (#${data.baselineId})`);
+      } else {
+        toast.error(`Capture failed: ${data.error}`);
+      }
+    },
+    onError: (err) => toast.error(`Trigger failed: ${err.message}`),
+  });
+
+  const resetScheduleForm = useCallback(() => {
+    setEditingScheduleId(null);
+    setScheduleName("");
+    setScheduleFrequency("daily");
+    setScheduleRetention(10);
+    setScheduleAgentIds([]);
+  }, []);
+
+  const openCreateSchedule = useCallback(() => {
+    resetScheduleForm();
+    // Pre-fill with currently selected agents
+    setScheduleAgentIds(selectedAgents);
+    setShowScheduleDialog(true);
+  }, [resetScheduleForm, selectedAgents]);
+
+  const openEditSchedule = useCallback((schedule: { id: number; name: string; frequency: string; retentionCount: number; agentIds: unknown }) => {
+    setEditingScheduleId(schedule.id);
+    setScheduleName(schedule.name);
+    setScheduleFrequency(schedule.frequency);
+    setScheduleRetention(schedule.retentionCount);
+    setScheduleAgentIds(schedule.agentIds as string[]);
+    setShowScheduleDialog(true);
+  }, []);
+
+  const handleSaveSchedule = useCallback(() => {
+    if (!scheduleName.trim() || scheduleAgentIds.length === 0) return;
+    if (editingScheduleId) {
+      updateScheduleMut.mutate({
+        id: editingScheduleId,
+        name: scheduleName.trim(),
+        frequency: scheduleFrequency,
+        retentionCount: scheduleRetention,
+        agentIds: scheduleAgentIds,
+      });
+    } else {
+      createScheduleMut.mutate({
+        name: scheduleName.trim(),
+        agentIds: scheduleAgentIds,
+        frequency: scheduleFrequency as "hourly" | "every_6h" | "every_12h" | "daily" | "weekly" | "monthly",
+        retentionCount: scheduleRetention,
+      });
+    }
+  }, [scheduleName, scheduleAgentIds, scheduleFrequency, scheduleRetention, editingScheduleId, createScheduleMut, updateScheduleMut]);
+
+  const frequencyLabels: Record<string, string> = {
+    hourly: "Every hour",
+    every_6h: "Every 6 hours",
+    every_12h: "Every 12 hours",
+    daily: "Daily",
+    weekly: "Weekly",
+    monthly: "Monthly",
+  };
+
   const deleteBaselineMut = trpc.baselines.delete.useMutation({
     onSuccess: () => {
       baselinesQ.refetch();
@@ -714,6 +841,22 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
           >
             <Shield className="h-3.5 w-3.5 inline-block mr-1.5 -mt-0.5" />
             Baseline Drift
+          </button>
+          <button
+            onClick={() => setViewMode("schedules")}
+            className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
+              viewMode === "schedules"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <CalendarClock className="h-3.5 w-3.5 inline-block mr-1.5 -mt-0.5" />
+            Schedules
+            {(schedulesQ.data?.schedules?.length ?? 0) > 0 && (
+              <Badge variant="outline" className="ml-1.5 h-4 px-1 text-[9px] border-primary/30 text-primary">
+                {schedulesQ.data!.schedules.length}
+              </Badge>
+            )}
           </button>
         </div>
 
@@ -1165,6 +1308,408 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
           </GlassPanel>
         </>
       )}
+
+      {/* ── SCHEDULES VIEW ──────────────────────────────────────────── */}
+      {viewMode === "schedules" && (
+        <>
+          {/* Schedule KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard
+              label="Total Schedules"
+              value={schedulesQ.data?.schedules?.length ?? 0}
+              icon={CalendarClock}
+              colorClass="text-primary"
+            />
+            <StatCard
+              label="Active"
+              value={schedulesQ.data?.schedules?.filter(s => s.enabled).length ?? 0}
+              icon={Play}
+              colorClass="text-[oklch(0.765_0.177_163.223)]"
+            />
+            <StatCard
+              label="Paused"
+              value={schedulesQ.data?.schedules?.filter(s => !s.enabled).length ?? 0}
+              icon={Pause}
+              colorClass="text-[oklch(0.795_0.184_86.047)]"
+            />
+            <StatCard
+              label="Total Captures"
+              value={schedulesQ.data?.schedules?.reduce((sum, s) => sum + (s.successCount ?? 0), 0) ?? 0}
+              icon={Shield}
+              colorClass="text-primary"
+            />
+          </div>
+
+          {/* Create schedule button */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 text-primary" />
+              Automated Baseline Schedules
+            </h3>
+            <Button
+              size="sm"
+              className="text-xs gap-1.5 bg-primary hover:bg-primary/90"
+              onClick={openCreateSchedule}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Schedule
+            </Button>
+          </div>
+
+          {/* Schedule list */}
+          {schedulesQ.isLoading ? (
+            <GlassPanel>
+              <div className="flex items-center justify-center gap-3 py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">Loading schedules…</span>
+              </div>
+            </GlassPanel>
+          ) : !schedulesQ.data?.schedules?.length ? (
+            <GlassPanel>
+              <div className="text-center py-12">
+                <CalendarClock className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-30" />
+                <p className="text-sm font-medium text-muted-foreground">No schedules configured</p>
+                <p className="text-xs text-muted-foreground mt-1">Create an automated schedule to periodically capture agent baselines.</p>
+                <Button
+                  size="sm"
+                  className="mt-4 text-xs gap-1.5 bg-primary hover:bg-primary/90"
+                  onClick={openCreateSchedule}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Create First Schedule
+                </Button>
+              </div>
+            </GlassPanel>
+          ) : (
+            <div className="space-y-3">
+              {schedulesQ.data.schedules.map((schedule) => {
+                const isExpanded = expandedScheduleId === schedule.id;
+                const isOverdue = schedule.enabled && schedule.nextRunAt && new Date(schedule.nextRunAt).getTime() < Date.now();
+                return (
+                  <GlassPanel key={schedule.id}>
+                    {/* Schedule header row */}
+                    <div className="flex items-center gap-4">
+                      {/* Toggle switch */}
+                      <Switch
+                        checked={!!schedule.enabled}
+                        onCheckedChange={() => toggleScheduleMut.mutate({ id: schedule.id })}
+                        disabled={toggleScheduleMut.isPending}
+                        className="data-[state=checked]:bg-[oklch(0.765_0.177_163.223)] data-[state=unchecked]:bg-secondary/50"
+                      />
+
+                      {/* Name + metadata */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-semibold text-foreground truncate">{schedule.name}</h4>
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] px-1.5 py-0 h-4 ${
+                              schedule.enabled
+                                ? "border-[oklch(0.765_0.177_163.223)]/40 text-[oklch(0.765_0.177_163.223)]"
+                                : "border-border/40 text-muted-foreground"
+                            }`}
+                          >
+                            {schedule.enabled ? "Active" : "Paused"}
+                          </Badge>
+                          {isOverdue && (
+                            <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4">
+                              Overdue
+                            </Badge>
+                          )}
+                          {schedule.lastError && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 gap-0.5">
+                                  <AlertTriangle className="h-2.5 w-2.5" /> Error
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs">
+                                {schedule.lastError}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 mt-1">
+                          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            <RotateCw className="h-3 w-3" />
+                            {frequencyLabels[schedule.frequency] ?? schedule.frequency}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {(schedule.agentIds as string[]).length} agent{(schedule.agentIds as string[]).length !== 1 ? "s" : ""}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {schedule.successCount ?? 0} captures
+                          </span>
+                          {schedule.nextRunAt && schedule.enabled && (
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              Next: {new Date(schedule.nextRunAt).toLocaleString()}
+                            </span>
+                          )}
+                          {schedule.lastRunAt && (
+                            <span className="text-[10px] text-muted-foreground">
+                              Last: {new Date(schedule.lastRunAt).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 w-7 p-0 border-border/40 bg-transparent hover:bg-primary/10 hover:text-primary"
+                              onClick={() => triggerNowMut.mutate({ id: schedule.id })}
+                              disabled={triggerNowMut.isPending}
+                            >
+                              {triggerNowMut.isPending ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Zap className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Capture Now</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 w-7 p-0 border-border/40 bg-transparent hover:bg-primary/10 hover:text-primary"
+                              onClick={() => openEditSchedule(schedule)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 w-7 p-0 border-border/40 bg-transparent hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40"
+                              onClick={() => deleteScheduleMut.mutate({ id: schedule.id })}
+                              disabled={deleteScheduleMut.isPending}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete</TooltipContent>
+                        </Tooltip>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                          onClick={() => setExpandedScheduleId(isExpanded ? null : schedule.id)}
+                        >
+                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Agent badges */}
+                    <div className="flex flex-wrap gap-1 mt-2 ml-14">
+                      {(schedule.agentIds as string[]).map((id) => (
+                        <Badge
+                          key={id}
+                          variant="outline"
+                          className="text-[9px] px-1.5 py-0 h-4 font-mono border-border/40"
+                        >
+                          {agentNameMap[id] ?? id}
+                        </Badge>
+                      ))}
+                    </div>
+
+                    {/* Expanded: Baseline history timeline */}
+                    {isExpanded && (
+                      <div className="mt-4 pt-4 border-t border-border/30 ml-14">
+                        <h5 className="text-xs font-medium text-foreground flex items-center gap-1.5 mb-3">
+                          <History className="h-3.5 w-3.5 text-primary" />
+                          Capture History
+                        </h5>
+                        {scheduleHistoryQ.isLoading ? (
+                          <div className="flex items-center gap-2 py-4">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            <span className="text-xs text-muted-foreground">Loading history…</span>
+                          </div>
+                        ) : !scheduleHistoryQ.data?.baselines?.length ? (
+                          <p className="text-xs text-muted-foreground py-4">No captures yet. Click the ⚡ button to trigger the first capture.</p>
+                        ) : (
+                          <div className="relative">
+                            {/* Timeline line */}
+                            <div className="absolute left-[7px] top-2 bottom-2 w-px bg-border/40" />
+                            <div className="space-y-3">
+                              {scheduleHistoryQ.data.baselines.map((bl, idx) => (
+                                <div key={bl.id} className="flex items-start gap-3 relative">
+                                  <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 mt-0.5 ${
+                                    idx === 0
+                                      ? "border-primary bg-primary/20"
+                                      : "border-border/60 bg-secondary/30"
+                                  }`} />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium text-foreground truncate">{bl.name}</span>
+                                      {idx === 0 && (
+                                        <Badge className="text-[8px] px-1 py-0 h-3.5 bg-primary/20 text-primary border-primary/30">
+                                          Latest
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-3 mt-0.5">
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {new Date(bl.createdAt).toLocaleString()}
+                                      </span>
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {(bl.agentIds as string[]).length} agents
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2 text-[10px] text-muted-foreground hover:text-primary"
+                                    onClick={() => {
+                                      setActiveBaselineId(bl.id);
+                                      setViewMode("baseline");
+                                    }}
+                                  >
+                                    View Drift
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </GlassPanel>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Create/Edit Schedule Dialog ─────────────────────────────────── */}
+      <Dialog open={showScheduleDialog} onOpenChange={(open) => { if (!open) resetScheduleForm(); setShowScheduleDialog(open); }}>
+        <DialogContent className="glass-panel border-border/40 sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-foreground">
+              <CalendarClock className="h-5 w-5 text-primary" />
+              {editingScheduleId ? "Edit Schedule" : "Create Baseline Schedule"}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {editingScheduleId
+                ? "Update the schedule configuration. Changes take effect on the next scheduled run."
+                : "Set up automated baseline captures at regular intervals. The scheduler will snapshot agent configuration and store it for drift comparison."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-xs font-medium text-foreground mb-1.5 block">Schedule Name</Label>
+              <Input
+                value={scheduleName}
+                onChange={(e) => setScheduleName(e.target.value)}
+                placeholder="e.g., Production servers — daily check"
+                className="bg-secondary/30 border-border/30 text-sm"
+                maxLength={256}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs font-medium text-foreground mb-1.5 block">Frequency</Label>
+                <Select value={scheduleFrequency} onValueChange={setScheduleFrequency}>
+                  <SelectTrigger className="bg-secondary/30 border-border/30 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hourly">Every hour</SelectItem>
+                    <SelectItem value="every_6h">Every 6 hours</SelectItem>
+                    <SelectItem value="every_12h">Every 12 hours</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-foreground mb-1.5 block">Retention (max baselines)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={scheduleRetention}
+                  onChange={(e) => setScheduleRetention(Math.max(1, Math.min(100, parseInt(e.target.value) || 10)))}
+                  className="bg-secondary/30 border-border/30 text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs font-medium text-foreground mb-1.5 block">Agents</Label>
+              <div className="rounded-lg bg-secondary/20 border border-border/20 p-3 max-h-[200px] overflow-y-auto">
+                {activeAgents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No active agents available</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {activeAgents.map((agent) => {
+                      const agentId = String(agent.id);
+                      const isSelected = scheduleAgentIds.includes(agentId);
+                      return (
+                        <label
+                          key={agentId}
+                          className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md cursor-pointer transition-colors ${
+                            isSelected ? "bg-primary/10 border border-primary/20" : "hover:bg-secondary/30 border border-transparent"
+                          }`}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              setScheduleAgentIds((prev) =>
+                                checked
+                                  ? [...prev, agentId]
+                                  : prev.filter((id) => id !== agentId)
+                              );
+                            }}
+                          />
+                          <span className="text-xs text-foreground">{String(agent.name ?? agent.id)}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono ml-auto">{agentId}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              {scheduleAgentIds.length > 0 && (
+                <p className="text-[10px] text-muted-foreground mt-1">{scheduleAgentIds.length} agent{scheduleAgentIds.length !== 1 ? "s" : ""} selected</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { resetScheduleForm(); setShowScheduleDialog(false); }}
+              className="border-border/40 bg-transparent"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSaveSchedule}
+              disabled={!scheduleName.trim() || scheduleAgentIds.length === 0 || createScheduleMut.isPending || updateScheduleMut.isPending}
+              className="bg-primary hover:bg-primary/90 gap-1.5"
+            >
+              <Save className="h-3.5 w-3.5" />
+              {(createScheduleMut.isPending || updateScheduleMut.isPending) ? "Saving…" : editingScheduleId ? "Update Schedule" : "Create Schedule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Save Baseline Dialog ─────────────────────────────────────── */}
       <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>

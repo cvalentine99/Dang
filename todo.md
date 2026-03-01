@@ -196,18 +196,19 @@
 - [x] Save checkpoint
 
 ## Phase 24: Fallback Sample Data (API shape-matched)
+> **Historical note:** `client/src/lib/mockData.ts` was created in this phase and deleted in Phase 57 (mock data replacement). All pages now use live Wazuh API / Indexer data with empty-array graceful fallback. No mock datasets remain in the codebase.
 
-- [x] Create shared mock data module (client/src/lib/mockData.ts)
-- [x] SOC Console: fallback agents, alerts, rules, manager status, MITRE tactics
-- [x] Agent Health: fallback agent list with OS, version, status, groups
-- [x] Alerts Timeline: fallback alert entries with timestamps, rule levels, descriptions
-- [x] Vulnerabilities: fallback CVE entries with CVSS scores, packages, severity
-- [x] MITRE ATT&CK: fallback tactics, techniques, groups, rule mappings
-- [x] Compliance: fallback SCA policies with scores, checks with pass/fail
-- [x] FIM: fallback syscheck files with hashes, events, permissions
-- [x] IT Hygiene: fallback packages, ports, processes, network interfaces
-- [x] Cluster Health: fallback daemon statuses, manager info, hourly stats, cluster nodes
-- [x] Each page uses mock as fallback, real API data when connected
+- [x] Create shared mock data module (client/src/lib/mockData.ts) — *deleted in Phase 57*
+- [x] SOC Console: fallback agents, alerts, rules, manager status, MITRE tactics — *now uses live API*
+- [x] Agent Health: fallback agent list with OS, version, status, groups — *now uses live API*
+- [x] Alerts Timeline: fallback alert entries with timestamps, rule levels, descriptions — *now uses Indexer*
+- [x] Vulnerabilities: fallback CVE entries with CVSS scores, packages, severity — *now uses Indexer*
+- [x] MITRE ATT&CK: fallback tactics, techniques, groups, rule mappings — *now uses Indexer*
+- [x] Compliance: fallback SCA policies with scores, checks with pass/fail — *now uses Indexer*
+- [x] FIM: fallback syscheck files with hashes, events, permissions — *now uses live API*
+- [x] IT Hygiene: fallback packages, ports, processes, network interfaces — *now uses live API*
+- [x] Cluster Health: fallback daemon statuses, manager info, hourly stats, cluster nodes — *now uses live API*
+- [x] Each page uses mock as fallback, real API data when connected — *pattern replaced: now empty-array fallback, no mock datasets*
 
 ## Phase 25: Threat Hunting Dashboard (New Page)
 
@@ -219,7 +220,7 @@
 - [x] Hunt history: In-session hunt log with timestamps and match counts
 - [x] Results: Expandable source cards with match counts and raw JSON viewer
 - [x] IOC Stats: Source distribution pie, severity distribution, data source coverage bars
-- [x] Fallback data: Uses mock data from shared module when Wazuh not connected
+- [x] Fallback data: Uses mock data from shared module when Wazuh not connected — *mock removed in Phase 57; now uses empty-array fallback*
 - [x] Add route (/hunting) and sidebar navigation entry under Detection group
 - [x] All 29 existing vitest tests still passing
 - [x] Save checkpoint
@@ -227,7 +228,7 @@
 ## Phase 26: SIEM Events Core Page
 
 - [x] Backend: Uses existing wazuh endpoints (manager logs, rules, agents) for unified event view
-- [x] Backend: Log sources computed from mock data and live event metadata
+- [x] Backend: Log sources computed from live event metadata — *mock data removed in Phase 57*
 - [x] Backend: Event correlation done client-side from normalized event data
 - [x] SIEM Events page: Unified event stream table with timestamp, agent, rule, level, description
 - [x] SIEM Events page: Log source filter sidebar with event counts per source
@@ -241,7 +242,7 @@
 - [x] SIEM Events page: Top rules bar chart with hit counts
 - [x] SIEM Events page: Agent filter and event counts per agent
 - [x] SIEM Events page: KPI row (Total Events, Critical, High, Medium, Low, Log Sources)
-- [x] Fallback data: MOCK_SIEM_EVENTS and MOCK_LOG_SOURCES with realistic data
+- [x] Fallback data: MOCK_SIEM_EVENTS and MOCK_LOG_SOURCES with realistic data — *mock removed in Phase 57; now uses live Indexer data with empty-array fallback*
 - [x] Sidebar: Added SIEM Events under Detection group
 - [x] Route wired in App.tsx at /siem
 - [x] All 29 vitest tests still passing
@@ -256,7 +257,7 @@
 - [x] Rule level distribution chart
 - [x] Rule group distribution chart
 - [x] Decoder type distribution chart
-- [x] Fallback mock data for rules and decoders
+- [x] Fallback mock data for rules and decoders — *mock removed in Phase 57; now uses live API with empty-array fallback*
 - [x] Route /rules and sidebar entry
 
 ### Related Events Correlation Panel (SIEM Events)
@@ -291,7 +292,7 @@
 - [x] KPI summary row with 8 stat cards (packages, ports, processes, extensions, services, running, users, interactive)
 - [x] Privilege summary panels for users and privileged groups
 - [x] Browser distribution and startup type distribution summaries
-- [x] Mock data fallback for all categories (browser extensions, services, users, groups)
+- [x] Mock data fallback for all categories (browser extensions, services, users, groups) — *mock removed in Phase 57; now uses live API with empty-array fallback*
 - [x] Backend endpoints: agentBrowserExtensions, agentServices, agentUsers, agentGroups2
 - [x] Write vitest tests (4 new tests, 48 total passing)
 - [x] Save checkpoint
@@ -309,7 +310,7 @@
 - [x] Color-coded drift indicators (present=green, absent=red, version/state mismatch=yellow)
 - [x] "Show drift only" filter checkbox
 - [x] Drift legend at bottom of comparison table
-- [x] Per-agent mock data variants for packages, services, and users (4 agents)
+- [x] Per-agent mock data variants for packages, services, and users (4 agents) — *mock removed in Phase 57; now uses live syscollector API with empty-array fallback*
 - [x] Lazy-loaded DriftComparison component for performance
 - [x] All 48 tests passing, TypeScript clean
 - [x] Save checkpoint
@@ -343,11 +344,11 @@
 - [x] Tests: 30 tests in `server/baselines/baselineSchedules.test.ts` — utilities, schema exports, router structure, service exports, frequency coverage, edge cases
 
 ### Frontend — OPEN
-- [ ] Frontend: Schedules tab in DriftComparison with schedule list
-- [ ] Frontend: Create schedule dialog (name, frequency, retention, agent selection)
-- [ ] Frontend: Toggle schedule on/off, delete, trigger now
-- [ ] Frontend: Schedule status badges (active/paused/overdue/errored)
-- [ ] Frontend: Baseline history timeline showing auto-captured snapshots
+- [x] Frontend: Schedules tab in DriftComparison with schedule list — Added as third view mode tab
+- [x] Frontend: Create schedule dialog (name, frequency, retention, agent selection) — Full dialog with agent checkbox grid, frequency dropdown, retention slider
+- [x] Frontend: Toggle schedule on/off, delete, trigger now — Switch toggles, delete with confirmation, Zap icon for triggerNow
+- [x] Frontend: Schedule status badges (active/paused/overdue/errored) — Color-coded status badges
+- [x] Frontend: Baseline history timeline showing auto-captured snapshots — Expandable per-schedule history with "View Drift" links
 
 ### Verification (Mandatory Format)
 
@@ -427,7 +428,7 @@
 ### Tests — STATUS: PARTIAL
 > `server/indexer/indexerRouter.test.ts` exists with 12 tests. No separate indexer client test file.
 - [x] Write vitest tests for indexer router endpoints — COMPLETE. 12 tests in `server/indexer/indexerRouter.test.ts`.
-- [ ] Write vitest tests for indexer client — OPEN. No `indexerClient.test.ts` file exists.
+- [x] Write vitest tests for indexer client — COMPLETE. `indexerClient.test.ts` has 37 tests across 8 describe blocks. 966 total tests pass.
 
 ### Verification (Mandatory Format)
 
@@ -1896,3 +1897,9 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Update Phase 32 language to distinguish graceful fallback from actual mock datasets — Already done in prior task
 - [x] Create fallback-truth note documenting per-page: live dependency, graceful fallback, actual mock support — Created `FALLBACK_TRUTH_TABLE.md` (14 pages audited, 0 mock datasets, 0 user-visible "Mock" labels)
 - [x] Review UI labels for fallback states — Confirmed: SourceBadge only shows "Indexer" and "Server API". No "Mock" label exists anywhere in the UI.
+
+## Task: baseline_schedules Migration + Phase 31 Frontend + indexerClient Tests + todo.md Cleanup
+- [x] Run baseline_schedules migration SQL to stop scheduler tick errors — Dropped old table (had `isActive`, `description`, `captureCount`, `retentionLimit` with enum frequency), recreated with correct schema (`enabled`, `retentionCount`, `successCount`, `failureCount`, `lastError` with varchar frequency). Query now succeeds.
+- [x] Build Phase 31 schedule management tab in DriftComparison (schedule list, create/edit dialog, toggle, capture now, baseline history) — Added "Schedules" as third view mode tab with full CRUD, toggle, triggerNow, history timeline, and KPI cards (1882 lines total)
+- [x] Write indexerClient.test.ts unit tests for OpenSearch proxy client — 37 tests across 8 describe blocks covering config, query builders, INDEX_PATTERNS, search/health/indexExists, sensitive field stripping, error handling. 966 total tests pass.
+- [x] Update stale todo.md Phase 24-29 entries with historical context notes about deleted mockData.ts — 7 entries updated with "deleted in Phase 57" and "now uses live API/Indexer" annotations

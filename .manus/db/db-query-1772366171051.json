@@ -1,0 +1,109 @@
+{
+  "query": "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME;",
+  "rows": [
+    {
+      "TABLE_NAME": "__drizzle_migrations"
+    },
+    {
+      "TABLE_NAME": "alert_queue"
+    },
+    {
+      "TABLE_NAME": "analyst_notes"
+    },
+    {
+      "TABLE_NAME": "analyst_notes_v2"
+    },
+    {
+      "TABLE_NAME": "auto_queue_rules"
+    },
+    {
+      "TABLE_NAME": "baseline_schedules"
+    },
+    {
+      "TABLE_NAME": "config_baselines"
+    },
+    {
+      "TABLE_NAME": "connection_settings"
+    },
+    {
+      "TABLE_NAME": "correlation_bundles"
+    },
+    {
+      "TABLE_NAME": "investigation_notes"
+    },
+    {
+      "TABLE_NAME": "investigation_sessions"
+    },
+    {
+      "TABLE_NAME": "kg_answer_provenance"
+    },
+    {
+      "TABLE_NAME": "kg_auth_methods"
+    },
+    {
+      "TABLE_NAME": "kg_endpoints"
+    },
+    {
+      "TABLE_NAME": "kg_error_patterns"
+    },
+    {
+      "TABLE_NAME": "kg_fields"
+    },
+    {
+      "TABLE_NAME": "kg_indices"
+    },
+    {
+      "TABLE_NAME": "kg_parameters"
+    },
+    {
+      "TABLE_NAME": "kg_resources"
+    },
+    {
+      "TABLE_NAME": "kg_responses"
+    },
+    {
+      "TABLE_NAME": "kg_sync_status"
+    },
+    {
+      "TABLE_NAME": "kg_trust_history"
+    },
+    {
+      "TABLE_NAME": "kg_use_cases"
+    },
+    {
+      "TABLE_NAME": "living_case_state"
+    },
+    {
+      "TABLE_NAME": "llm_usage"
+    },
+    {
+      "TABLE_NAME": "pipeline_runs"
+    },
+    {
+      "TABLE_NAME": "rag_sessions"
+    },
+    {
+      "TABLE_NAME": "response_action_audit"
+    },
+    {
+      "TABLE_NAME": "response_actions"
+    },
+    {
+      "TABLE_NAME": "saved_hunts"
+    },
+    {
+      "TABLE_NAME": "saved_searches"
+    },
+    {
+      "TABLE_NAME": "triage_objects"
+    },
+    {
+      "TABLE_NAME": "users"
+    }
+  ],
+  "messages": [],
+  "stdout": "TABLE_NAME\n__drizzle_migrations\nalert_queue\nanalyst_notes\nanalyst_notes_v2\nauto_queue_rules\nbaseline_schedules\nconfig_baselines\nconnection_settings\ncorrelation_bundles\ninvestigation_notes\ninvestigation_sessions\nkg_answer_provenance\nkg_auth_methods\nkg_endpoints\nkg_error_patterns\nkg_fields\nkg_indices\nkg_parameters\nkg_resources\nkg_responses\nkg_sync_status\nkg_trust_history\nkg_use_cases\nliving_case_state\nllm_usage\npipeline_runs\nrag_sessions\nresponse_action_audit\nresponse_actions\nsaved_hunts\nsaved_searches\ntriage_objects\nusers\n",
+  "stderr": "",
+  "execution_time_ms": 66
+}
