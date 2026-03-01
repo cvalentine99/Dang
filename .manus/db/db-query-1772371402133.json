@@ -1,0 +1,80 @@
+{
+  "query": "SELECT COLUMN_NAME, COLUMN_TYPE, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'baseline_schedules' ORDER BY ORDINAL_POSITION;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute SELECT COLUMN_NAME, COLUMN_TYPE, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'baseline_schedules' ORDER BY ORDINAL_POSITION;",
+  "rows": [
+    {
+      "COLUMN_NAME": "id",
+      "COLUMN_TYPE": "int(11)",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "userId",
+      "COLUMN_TYPE": "int(11)",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "name",
+      "COLUMN_TYPE": "varchar(256)",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "agentIds",
+      "COLUMN_TYPE": "json",
+      "DATA_TYPE": "json"
+    },
+    {
+      "COLUMN_NAME": "frequency",
+      "COLUMN_TYPE": "varchar(32)",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "enabled",
+      "COLUMN_TYPE": "tinyint(1)",
+      "DATA_TYPE": "tinyint"
+    },
+    {
+      "COLUMN_NAME": "lastRunAt",
+      "COLUMN_TYPE": "timestamp",
+      "DATA_TYPE": "timestamp"
+    },
+    {
+      "COLUMN_NAME": "nextRunAt",
+      "COLUMN_TYPE": "timestamp",
+      "DATA_TYPE": "timestamp"
+    },
+    {
+      "COLUMN_NAME": "retentionCount",
+      "COLUMN_TYPE": "int(11)",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "lastError",
+      "COLUMN_TYPE": "text",
+      "DATA_TYPE": "text"
+    },
+    {
+      "COLUMN_NAME": "successCount",
+      "COLUMN_TYPE": "int(11)",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "failureCount",
+      "COLUMN_TYPE": "int(11)",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "createdAt",
+      "COLUMN_TYPE": "timestamp",
+      "DATA_TYPE": "timestamp"
+    },
+    {
+      "COLUMN_NAME": "updatedAt",
+      "COLUMN_TYPE": "timestamp",
+      "DATA_TYPE": "timestamp"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\tCOLUMN_TYPE\tDATA_TYPE\nid\tint(11)\tint\nuserId\tint(11)\tint\nname\tvarchar(256)\tvarchar\nagentIds\tjson\tjson\nfrequency\tvarchar(32)\tvarchar\nenabled\ttinyint(1)\ttinyint\nlastRunAt\ttimestamp\ttimestamp\nnextRunAt\ttimestamp\ttimestamp\nretentionCount\tint(11)\tint\nlastError\ttext\ttext\nsuccessCount\tint(11)\tint\nfailureCount\tint(11)\tint\ncreatedAt\ttimestamp\ttimestamp\nupdatedAt\ttimestamp\ttimestamp\n",
+  "stderr": "",
+  "execution_time_ms": 59
+}

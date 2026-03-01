@@ -1903,3 +1903,14 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Build Phase 31 schedule management tab in DriftComparison (schedule list, create/edit dialog, toggle, capture now, baseline history) — Added "Schedules" as third view mode tab with full CRUD, toggle, triggerNow, history timeline, and KPI cards (1882 lines total)
 - [x] Write indexerClient.test.ts unit tests for OpenSearch proxy client — 37 tests across 8 describe blocks covering config, query builders, INDEX_PATTERNS, search/health/indexExists, sensitive field stripping, error handling. 966 total tests pass.
 - [x] Update stale todo.md Phase 24-29 entries with historical context notes about deleted mockData.ts — 7 entries updated with "deleted in Phase 57" and "now uses live API/Indexer" annotations
+
+## Pre-Deployment: API Contract Review
+- [x] Review response action lifecycle routes — PASS. All 7 mutations write to local DB only. State machine enforces valid transitions, terminal states, approval gates. No Wazuh execution.
+- [x] Review pipeline routes — PASS. All 10 mutations write to local DB + call LLM. Reads from Wazuh via `wazuhGet` during correlation but never writes back.
+- [x] Review living case / report retrieval routes — PASS. All queries are read-only from local DB.
+- [x] Review connection settings / runtime config routes — PASS. Admin-gated. `testConnection` only performs read-only health checks.
+- [x] Review baseline schedules routes — PASS. `triggerNow` reads from Wazuh, writes snapshot to local DB. No Wazuh write-back.
+- [x] Review indexer routes — PASS. All 18 procedures are read-only searches. `indexerClient.ts` only exports search/health/exists.
+- [x] Write api-contract-review.md — COMPLETE. 254 procedures audited across 19 routers. Deploy gate: PASS. 6 observations documented (O-1 through O-6).
+- [x] Fixed DriftComparison.tsx TypeScript error (scheduleFrequency type narrowed from `string` to union type) — `tsc --noEmit` EXIT: 0
+- [x] Confirmed baseline_schedules tick errors stopped after table recreation + server restart (no new errors after 13:19 restart)

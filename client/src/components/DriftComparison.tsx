@@ -401,7 +401,7 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<number | null>(null);
   const [scheduleName, setScheduleName] = useState("");
-  const [scheduleFrequency, setScheduleFrequency] = useState<string>("daily");
+  const [scheduleFrequency, setScheduleFrequency] = useState<"hourly" | "every_6h" | "every_12h" | "daily" | "weekly" | "monthly">("daily");
   const [scheduleRetention, setScheduleRetention] = useState(10);
   const [scheduleAgentIds, setScheduleAgentIds] = useState<string[]>([]);
   const [expandedScheduleId, setExpandedScheduleId] = useState<number | null>(null);
@@ -591,7 +591,7 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
   const openEditSchedule = useCallback((schedule: { id: number; name: string; frequency: string; retentionCount: number; agentIds: unknown }) => {
     setEditingScheduleId(schedule.id);
     setScheduleName(schedule.name);
-    setScheduleFrequency(schedule.frequency);
+    setScheduleFrequency(schedule.frequency as typeof scheduleFrequency);
     setScheduleRetention(schedule.retentionCount);
     setScheduleAgentIds(schedule.agentIds as string[]);
     setShowScheduleDialog(true);
@@ -611,7 +611,7 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
       createScheduleMut.mutate({
         name: scheduleName.trim(),
         agentIds: scheduleAgentIds,
-        frequency: scheduleFrequency as "hourly" | "every_6h" | "every_12h" | "daily" | "weekly" | "monthly",
+        frequency: scheduleFrequency,
         retentionCount: scheduleRetention,
       });
     }
@@ -1623,7 +1623,7 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs font-medium text-foreground mb-1.5 block">Frequency</Label>
-                <Select value={scheduleFrequency} onValueChange={setScheduleFrequency}>
+                <Select value={scheduleFrequency} onValueChange={(v) => setScheduleFrequency(v as typeof scheduleFrequency)}>
                   <SelectTrigger className="bg-secondary/30 border-border/30 text-sm">
                     <SelectValue />
                   </SelectTrigger>
