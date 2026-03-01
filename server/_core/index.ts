@@ -6,6 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { startBaselineScheduler } from "../baselines/baselineSchedulerService";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -231,7 +232,6 @@ async function startServer() {
 
     // Start the baseline auto-capture scheduler
     try {
-      const { startBaselineScheduler } = require("../baselines/baselineSchedulerService");
       startBaselineScheduler();
     } catch (err) {
       console.warn(`[BaselineScheduler] Failed to start: ${(err as Error).message}`);
