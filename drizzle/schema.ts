@@ -295,6 +295,94 @@ export type DriftAnomaly = typeof driftAnomalies.$inferSelect;
 export type InsertDriftAnomaly = typeof driftAnomalies.$inferInsert;
 
 /**
+ * Drift Notification History — Audit trail for all drift and anomaly notifications.
+ * Tracks delivery status, retry attempts, and notification content.
+ */
+export const driftNotificationHistory = mysqlTable("drift_notification_history", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Type of notification: drift_threshold or anomaly */
+  notificationType: mysqlEnum("notificationType", ["drift_threshold", "anomaly"]).notNull(),
+  /** Related schedule */
+  scheduleId: int("scheduleId").notNull(),
+  /** Related drift snapshot (if applicable) */
+  snapshotId: int("snapshotId"),
+  /** Related anomaly (if applicable) */
+  anomalyId: int("anomalyId"),
+  /** User who owns the schedule */
+  userId: int("userId").notNull(),
+  /** Severity level */
+  severity: mysqlEnum("severity", ["critical", "high", "medium", "info"]).notNull(),
+  /** Notification title */
+  title: varchar("title", { length: 512 }).notNull(),
+  /** Notification content (markdown) */
+  content: text("content").notNull(),
+  /** Delivery status */
+  deliveryStatus: mysqlEnum("deliveryStatus", ["sent", "failed", "retrying", "suppressed"]).default("sent").notNull(),
+  /** Error message if delivery failed */
+  errorMessage: text("errorMessage"),
+  /** Number of retry attempts */
+  retryCount: int("retryCount").default(0).notNull(),
+  /** Max retries allowed */
+  maxRetries: int("maxRetries").default(3).notNull(),
+  /** Next retry timestamp */
+  nextRetryAt: timestamp("nextRetryAt"),
+  /** Last retry timestamp */
+  lastRetryAt: timestamp("lastRetryAt"),
+  /** Schedule name at time of notification (denormalized) */
+  scheduleName: varchar("scheduleName", { length: 256 }).default("").notNull(),
+  /** Drift percentage at time of notification */
+  driftPercent: float("driftPercent"),
+  /** Agent IDs involved */
+  agentIds: json("agentIds").$type<string[]>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ([
+  index("notif_history_userId_idx").on(table.userId),
+  index("notif_history_scheduleId_idx").on(table.scheduleId),
+  index("notif_history_status_idx").on(table.deliveryStatus),
+  index("notif_history_type_idx").on(table.notificationType),
+  index("notif_history_createdAt_idx").on(table.createdAt),
+  index("notif_history_nextRetry_idx").on(table.nextRetryAt),
+]));
+
+export type DriftNotificationHistory = typeof driftNotificationHistory.$inferSelect;
+export type InsertDriftNotificationHistory = typeof driftNotificationHistory.$inferInsert;
+
+/**
+ * Anomaly Suppression Rules — Allows analysts to suppress anomaly alerts
+ * for specific schedules and severity levels during maintenance windows.
+ */
+export const anomalySuppressionRules = mysqlTable("anomaly_suppression_rules", {
+  id: int("id").autoincrement().primaryKey(),
+  /** User who created the rule */
+  userId: int("userId").notNull(),
+  /** Schedule to suppress (null = all schedules) */
+  scheduleId: int("scheduleId"),
+  /** Minimum severity to suppress: suppress this level and below */
+  severityFilter: mysqlEnum("severityFilter", ["critical", "high", "medium", "all"]).default("medium").notNull(),
+  /** Duration in hours for the suppression window */
+  durationHours: int("durationHours").notNull(),
+  /** Reason for suppression (analyst note) */
+  reason: text("reason").notNull(),
+  /** Whether the rule is currently active */
+  active: boolean("active").default(true).notNull(),
+  /** When the rule expires */
+  expiresAt: timestamp("expiresAt").notNull(),
+  /** Count of anomalies suppressed by this rule */
+  suppressedCount: int("suppressedCount").default(0).notNull(),
+  /** Schedule name at time of creation (denormalized) */
+  scheduleName: varchar("scheduleName", { length: 256 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ([
+  index("suppression_userId_idx").on(table.userId),
+  index("suppression_scheduleId_idx").on(table.scheduleId),
+  index("suppression_active_idx").on(table.active),
+  index("suppression_expiresAt_idx").on(table.expiresAt),
+]));
+
+export type AnomalySuppressionRule = typeof anomalySuppressionRules.$inferSelect;
+export type InsertAnomalySuppressionRule = typeof anomalySuppressionRules.$inferInsert;
+
+/**
  * Analyst Notes v2 — Enhanced note-taking system with entity linking.
  * Supports annotating alerts, agents, CVEs, rules, and free-form notes.
  * Local-only: never written back to Wazuh.

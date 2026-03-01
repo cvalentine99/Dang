@@ -12,6 +12,7 @@
  */
 
 import { notifyOwner } from "../_core/notification";
+import { recordNotification } from "./notificationHistory";
 import type { BaselineSchedule, ConfigBaseline } from "../../drizzle/schema";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -216,19 +217,38 @@ export async function checkDriftAndNotify(
     }
   }
 
+  const title = `⚠️ Configuration Drift Alert: ${schedule.name} (${driftResult.driftPercent}%)`;
+  const content = lines.join("\n");
+  let notified = false;
+  let errorMessage: string | undefined;
+
   try {
-    await notifyOwner({
-      title: `⚠️ Configuration Drift Alert: ${schedule.name} (${driftResult.driftPercent}%)`,
-      content: lines.join("\n"),
-    });
+    await notifyOwner({ title, content });
+    notified = true;
     console.log(
       `[BaselineScheduler] Drift notification sent for schedule "${schedule.name}": ${driftResult.driftPercent}% exceeds threshold ${schedule.driftThreshold}%`
     );
-    return { notified: true, driftResult };
   } catch (err) {
+    errorMessage = (err as Error).message;
     console.warn(
-      `[BaselineScheduler] Failed to send drift notification for schedule "${schedule.name}": ${(err as Error).message}`
+      `[BaselineScheduler] Failed to send drift notification for schedule "${schedule.name}": ${errorMessage}`
     );
-    return { notified: false, driftResult };
   }
+
+  // Record in notification history for audit trail
+  await recordNotification({
+    notificationType: "drift_threshold",
+    scheduleId: schedule.id,
+    userId: schedule.userId,
+    severity: "info",
+    title,
+    content,
+    deliveryStatus: notified ? "sent" : "failed",
+    errorMessage,
+    scheduleName: schedule.name,
+    driftPercent: driftResult.driftPercent,
+    agentIds: schedule.agentIds as string[],
+  });
+
+  return { notified, driftResult };
 }

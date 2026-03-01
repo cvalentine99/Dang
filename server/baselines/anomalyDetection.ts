@@ -27,6 +27,8 @@ import {
   type DriftSnapshot,
 } from "../../drizzle/schema";
 import { notifyOwner } from "../_core/notification";
+import { checkSuppression } from "./suppressionRules";
+import { recordNotification } from "./notificationHistory";
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
@@ -214,11 +216,18 @@ export async function detectAndRecordAnomaly(
 
   // Persist the anomaly
   let notified = false;
-  try {
-    // Send notification
-    const severity = result.severity ?? "medium";
-    const severityEmoji = severity === "critical" ? "🔴" : severity === "high" ? "🟠" : "🟡";
+  const severity = result.severity ?? "medium";
 
+  try {
+    // ── Check suppression rules before notifying ────────────────────────
+    const suppression = await checkSuppression(
+      snapshot.userId,
+      snapshot.scheduleId,
+      severity
+    );
+
+    // Build notification content regardless (for history recording)
+    const severityEmoji = severity === "critical" ? "🔴" : severity === "high" ? "🟠" : "🟡";
     const notificationLines = [
       `${severityEmoji} **${severity.toUpperCase()} Drift Anomaly Detected**`,
       "",
@@ -254,19 +263,29 @@ export async function detectAndRecordAnomaly(
       notificationLines.push("", `Agents: ${agentIds.join(", ")}`);
     }
 
-    try {
-      await notifyOwner({
-        title: `${severityEmoji} Drift Anomaly: ${scheduleName} — ${snapshot.driftPercent}% (${result.zScore}σ)`,
-        content: notificationLines.join("\n"),
-      });
-      notified = true;
-    } catch (notifyErr) {
-      console.warn(
-        `[AnomalyDetection] Failed to send notification: ${(notifyErr as Error).message}`
+    const title = `${severityEmoji} Drift Anomaly: ${scheduleName} — ${snapshot.driftPercent}% (${result.zScore}σ)`;
+    const content = notificationLines.join("\n");
+    let errorMessage: string | undefined;
+
+    // Only send notification if not suppressed
+    if (suppression.suppressed) {
+      console.log(
+        `[AnomalyDetection] Anomaly suppressed by rule #${suppression.ruleId}: ${suppression.reason}`
       );
+    } else {
+      try {
+        await notifyOwner({ title, content });
+        notified = true;
+      } catch (notifyErr) {
+        errorMessage = (notifyErr as Error).message;
+        console.warn(
+          `[AnomalyDetection] Failed to send notification: ${errorMessage}`
+        );
+      }
     }
 
-    const insertResult = await db.insert(driftAnomalies).values({
+    // Record in notification history for audit trail
+    const anomalyInsertResult = await db.insert(driftAnomalies).values({
       snapshotId: snapshot.id,
       scheduleId: snapshot.scheduleId,
       userId: snapshot.userId,
@@ -277,17 +296,35 @@ export async function detectAndRecordAnomaly(
       sigmaThreshold,
       severity,
       scheduleName,
-      agentIds: (snapshot.agentIds as string[]) || [],
+      agentIds: agentIds,
       byCategory: snapshot.byCategory as any,
       topDriftItems: (snapshot.topDriftItems as any) || [],
       notificationSent: notified,
     });
 
-    const anomalyId = Number(insertResult[0].insertId);
+    const anomalyId = Number(anomalyInsertResult[0].insertId);
+
+    // Record notification history
+    await recordNotification({
+      notificationType: "anomaly",
+      scheduleId: snapshot.scheduleId,
+      snapshotId: snapshot.id,
+      anomalyId,
+      userId: snapshot.userId,
+      severity,
+      title,
+      content,
+      deliveryStatus: suppression.suppressed ? "suppressed" : (notified ? "sent" : "failed"),
+      errorMessage,
+      scheduleName,
+      driftPercent: snapshot.driftPercent,
+      agentIds,
+    });
 
     console.log(
       `[AnomalyDetection] Anomaly #${anomalyId} recorded for schedule "${scheduleName}": ` +
-        `${snapshot.driftPercent}% drift (z=${result.zScore}, severity=${severity})`
+        `${snapshot.driftPercent}% drift (z=${result.zScore}, severity=${severity})` +
+        (suppression.suppressed ? " [SUPPRESSED]" : "")
     );
 
     return { checked: true, isAnomaly: true, anomalyId, notified, result };

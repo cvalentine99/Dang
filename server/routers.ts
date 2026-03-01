@@ -23,6 +23,9 @@ import { pipelineRouter } from "./agenticPipeline/pipelineRouter";
 import { responseActionsRouter } from "./agenticPipeline/responseActionsRouter";
 import { driftAnalyticsRouter } from "./baselines/driftAnalyticsRouter";
 import { anomalyRouter } from "./baselines/anomalyRouter";
+import { notificationHistoryRouter } from "./baselines/notificationHistoryRouter";
+import { suppressionRouter } from "./baselines/suppressionRouter";
+import { exportRouter } from "./baselines/exportRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -101,6 +104,15 @@ export const appRouter = router({
 
   // Drift Anomaly Detection — statistical outlier flagging
   anomalies: anomalyRouter,
+
+  // Drift Notification History — audit trail for all drift/anomaly notifications
+  notificationHistory: notificationHistoryRouter,
+
+  // Anomaly Suppression Rules — maintenance window alert muting
+  suppression: suppressionRouter,
+
+  // Drift Report Export — CSV/PDF export for compliance reporting
+  export: exportRouter,
 });
 
 export type AppRouter = typeof appRouter;

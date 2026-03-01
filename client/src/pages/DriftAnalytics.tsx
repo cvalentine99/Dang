@@ -54,6 +54,15 @@ import {
   TriangleAlert,
   CheckCircle2,
   Sigma,
+  Download,
+  FileText,
+  History,
+  ShieldOff,
+  Plus,
+  Trash2,
+  RotateCcw,
+  PauseCircle,
+  PlayCircle,
 } from "lucide-react";
 
 // ─── Amethyst Nexus palette ─────────────────────────────────────────────────
@@ -363,6 +372,61 @@ export default function DriftAnalytics() {
     { enabled: selectedAnomalyId !== null, refetchOnWindowFocus: false }
   );
 
+  // ── Tab state ──────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<"analytics" | "notifications" | "suppression">("analytics");
+
+  // ── Notification History queries ───────────────────────────────────────────
+  const notifHistoryQ = trpc.notificationHistory.list.useQuery(
+    { days, limit: 100 },
+    { enabled: activeTab === "notifications", refetchOnWindowFocus: false }
+  );
+  const notifStatsQ = trpc.notificationHistory.stats.useQuery(
+    { days },
+    { enabled: activeTab === "notifications", refetchOnWindowFocus: false }
+  );
+  const retryMutation = trpc.notificationHistory.retry.useMutation({
+    onSuccess: () => { notifHistoryQ.refetch(); notifStatsQ.refetch(); },
+  });
+
+  // ── Suppression Rules queries ─────────────────────────────────────────────
+  const suppressionListQ = trpc.suppression.list.useQuery(
+    undefined,
+    { enabled: activeTab === "suppression", refetchOnWindowFocus: false }
+  );
+  const createSuppressionMut = trpc.suppression.create.useMutation({
+    onSuccess: () => { suppressionListQ.refetch(); setShowCreateRule(false); },
+  });
+  const deactivateSuppressionMut = trpc.suppression.deactivate.useMutation({
+    onSuccess: () => suppressionListQ.refetch(),
+  });
+  const deleteSuppressionMut = trpc.suppression.delete.useMutation({
+    onSuccess: () => suppressionListQ.refetch(),
+  });
+  const [showCreateRule, setShowCreateRule] = useState(false);
+  const [newRule, setNewRule] = useState({
+    scheduleId: null as number | null,
+    severityFilter: "all" as "critical" | "high" | "medium" | "all",
+    durationHours: 24,
+    reason: "",
+  });
+
+  // ── Export queries (lazy) ─────────────────────────────────────────────────
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportingType, setExportingType] = useState<string | null>(null);
+  const utils = trpc.useUtils();
+
+  const downloadCsv = useCallback((csv: string, filename: string) => {
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExportingType(null);
+    setShowExportMenu(false);
+  }, []);
+
   // ─── Derived data ──────────────────────────────────────────────────────
   const trendData = useMemo(() => {
     if (!trendQuery.data?.points.length) return [];
@@ -517,9 +581,86 @@ export default function DriftAnalytics() {
               </div>
             )}
           </div>
+          {/* Export button */}
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition-colors hover:bg-white/5"
+              style={{ borderColor: BORDER, color: MUTED }}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </button>
+            {showExportMenu && (
+              <div
+                className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border p-1.5 shadow-xl backdrop-blur-md"
+                style={{ background: CARD_BG, borderColor: BORDER }}
+              >
+                {[
+                  { key: "drift", label: "Drift Trend CSV", icon: TrendingUp },
+                  { key: "anomaly", label: "Anomaly History CSV", icon: TriangleAlert },
+                  { key: "volatility", label: "Agent Volatility CSV", icon: Server },
+                  { key: "notifications", label: "Notification Log CSV", icon: Bell },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    disabled={exportingType !== null}
+                    onClick={async () => {
+                      setExportingType(item.key);
+                      try {
+                        if (item.key === "drift") {
+                          const res = await utils.export.driftTrend.fetch({ days, scheduleId: selectedScheduleId });
+                          downloadCsv(res.csv, res.filename);
+                        } else if (item.key === "anomaly") {
+                          const res = await utils.export.anomalyHistory.fetch({ days, scheduleId: selectedScheduleId });
+                          downloadCsv(res.csv, res.filename);
+                        } else if (item.key === "volatility") {
+                          const res = await utils.export.agentVolatility.fetch({ days });
+                          downloadCsv(res.csv, res.filename);
+                        } else if (item.key === "notifications") {
+                          const res = await utils.export.notificationHistory.fetch({ days });
+                          downloadCsv(res.csv, res.filename);
+                        }
+                      } catch { setExportingType(null); }
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs transition-colors hover:bg-white/5"
+                    style={{ color: exportingType === item.key ? CYAN : "oklch(0.85 0.01 286)" }}
+                  >
+                    <item.icon className="h-3.5 w-3.5" style={{ color: MUTED }} />
+                    {exportingType === item.key ? "Exporting..." : item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Tab Bar */}
+      <div className="mb-6 flex items-center gap-1 rounded-lg border p-1" style={{ borderColor: BORDER, background: CARD_BG }}>
+        {([
+          { key: "analytics" as const, label: "Analytics", icon: BarChart3 },
+          { key: "notifications" as const, label: "Notification History", icon: History },
+          { key: "suppression" as const, label: "Suppression Rules", icon: ShieldOff },
+        ]).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className="flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-colors"
+            style={{
+              background: activeTab === tab.key ? `${PURPLE}30` : "transparent",
+              color: activeTab === tab.key ? "oklch(0.93 0.005 286)" : MUTED,
+            }}
+          >
+            <tab.icon className="h-3.5 w-3.5" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ═══════════════════ ANALYTICS TAB ═══════════════════ */}
+      {activeTab === "analytics" && (
+      <>
       {/* KPI Row */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <KpiCard icon={Layers} label="Drift Snapshots" value={kpis.totalCaptures} sub={`${kpis.scheduleCount} schedules`} color={PURPLE} />
@@ -1076,7 +1217,335 @@ export default function DriftAnalytics() {
         </div>
       )}
 
-      {/* ── Anomaly Detail Slide-over ─────────────────────────────── */}
+       </>
+      )}
+
+      {/* ═══════════════════ NOTIFICATION HISTORY TAB ═══════════════════ */}
+      {activeTab === "notifications" && (
+        <div className="space-y-5">
+          {/* Notification KPIs */}
+          {notifStatsQ.data && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              <KpiCard icon={Bell} label="Total Sent" value={notifStatsQ.data.sent} sub="notifications" color={GREEN} />
+              <KpiCard icon={AlertTriangle} label="Failed" value={notifStatsQ.data.failed} sub="delivery errors" color={RED} />
+              <KpiCard icon={ShieldOff} label="Suppressed" value={notifStatsQ.data.suppressed} sub="by rules" color={AMBER} />
+              <KpiCard icon={TriangleAlert} label="Anomaly Alerts" value={notifStatsQ.data.byType.anomaly} sub="anomaly type" color={VIOLET} />
+              <KpiCard icon={TrendingUp} label="Drift Alerts" value={notifStatsQ.data.byType.drift_threshold} sub="threshold type" color={CYAN} />
+              <KpiCard icon={RotateCcw} label="Retrying" value={notifStatsQ.data.retrying} sub="pending retry" color={PURPLE} />
+            </div>
+          )}
+
+          {/* Notification History Table */}
+          <GlassPanel title="Notification History" icon={History}>
+            <div className="px-5 pb-5">
+              {notifHistoryQ.isLoading ? (
+                <div className="flex h-48 items-center justify-center">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: PURPLE }} />
+                </div>
+              ) : (notifHistoryQ.data?.notifications.length ?? 0) === 0 ? (
+                <div className="flex h-48 flex-col items-center justify-center text-center">
+                  <History className="mb-3 h-10 w-10" style={{ color: PURPLE_DIM }} />
+                  <p className="text-sm" style={{ color: MUTED }}>No notifications sent in the selected time range.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr style={{ color: MUTED }}>
+                        <th className="pb-2 text-left font-medium">Time</th>
+                        <th className="pb-2 text-left font-medium">Type</th>
+                        <th className="pb-2 text-left font-medium">Schedule</th>
+                        <th className="pb-2 text-center font-medium">Severity</th>
+                        <th className="pb-2 text-center font-medium">Status</th>
+                        <th className="pb-2 text-right font-medium">Drift %</th>
+                        <th className="pb-2 text-right font-medium">Retries</th>
+                        <th className="pb-2 text-center font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {notifHistoryQ.data!.notifications.map((n) => {
+                        const statusColor = n.deliveryStatus === "sent" ? GREEN : n.deliveryStatus === "failed" ? RED : n.deliveryStatus === "suppressed" ? AMBER : CYAN;
+                        const sevColor = n.severity === "critical" ? RED : n.severity === "high" ? "oklch(0.705 0.191 22.216)" : n.severity === "medium" ? AMBER : CYAN;
+                        return (
+                          <tr key={n.id} className="border-t" style={{ borderColor: "oklch(0.25 0.02 286 / 20%)" }}>
+                            <td className="py-2.5 pr-3 font-mono text-[10px]" style={{ color: MUTED }}>
+                              {formatDateTime(n.timestamp)}
+                            </td>
+                            <td className="py-2.5 pr-3">
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                                style={{ background: n.notificationType === "anomaly" ? `${VIOLET}20` : `${CYAN}20`, color: n.notificationType === "anomaly" ? VIOLET : CYAN }}
+                              >
+                                {n.notificationType === "anomaly" ? <TriangleAlert className="h-2.5 w-2.5" /> : <TrendingUp className="h-2.5 w-2.5" />}
+                                {n.notificationType}
+                              </span>
+                            </td>
+                            <td className="py-2.5 pr-3 text-xs" style={{ color: "oklch(0.85 0.01 286)" }}>
+                              {n.scheduleName || "—"}
+                            </td>
+                            <td className="py-2.5 text-center">
+                              <span
+                                className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
+                                style={{ background: `${sevColor}20`, color: sevColor }}
+                              >
+                                {n.severity}
+                              </span>
+                            </td>
+                            <td className="py-2.5 text-center">
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                                style={{ background: `${statusColor}15`, color: statusColor }}
+                              >
+                                {n.deliveryStatus === "sent" && <CheckCircle2 className="h-2.5 w-2.5" />}
+                                {n.deliveryStatus === "failed" && <AlertTriangle className="h-2.5 w-2.5" />}
+                                {n.deliveryStatus === "suppressed" && <ShieldOff className="h-2.5 w-2.5" />}
+                                {n.deliveryStatus}
+                              </span>
+                            </td>
+                            <td className="py-2.5 pr-3 text-right font-mono" style={{ color: "oklch(0.85 0.01 286)" }}>
+                              {n.driftPercent != null ? formatPct(n.driftPercent) : "—"}
+                            </td>
+                            <td className="py-2.5 pr-3 text-right font-mono" style={{ color: MUTED }}>
+                              {n.retryCount}
+                            </td>
+                            <td className="py-2.5 text-center">
+                              {n.deliveryStatus === "failed" && (
+                                <button
+                                  onClick={() => retryMutation.mutate({ id: n.id })}
+                                  disabled={retryMutation.isPending}
+                                  className="rounded p-1 transition-colors hover:bg-white/10"
+                                  title="Retry notification"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" style={{ color: CYAN }} />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </GlassPanel>
+        </div>
+      )}
+
+      {/* ═══════════════════ SUPPRESSION RULES TAB ═══════════════════ */}
+      {activeTab === "suppression" && (
+        <div className="space-y-5">
+          {/* Header with Create button */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-display text-lg font-semibold" style={{ color: "oklch(0.9 0.005 286)" }}>Suppression Rules</h2>
+              <p className="text-xs" style={{ color: MUTED }}>Mute anomaly alerts during maintenance windows or known-noisy periods</p>
+            </div>
+            <button
+              onClick={() => setShowCreateRule(true)}
+              className="flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-medium transition-colors hover:bg-white/5"
+              style={{ borderColor: PURPLE, color: PURPLE }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Create Rule
+            </button>
+          </div>
+
+          {/* Create Rule Form */}
+          {showCreateRule && (
+            <GlassPanel title="New Suppression Rule" icon={ShieldOff}>
+              <div className="px-5 pb-5 space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {/* Schedule selector */}
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: MUTED }}>Target Schedule</label>
+                    <select
+                      value={newRule.scheduleId ?? ""}
+                      onChange={(e) => setNewRule({ ...newRule, scheduleId: e.target.value ? Number(e.target.value) : null })}
+                      className="w-full rounded-lg border px-3 py-2 text-xs"
+                      style={{ background: "oklch(0.12 0.02 286)", borderColor: BORDER, color: "oklch(0.85 0.01 286)" }}
+                    >
+                      <option value="">All Schedules</option>
+                      {(summaryQuery.data?.schedules || []).map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Severity filter */}
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: MUTED }}>Suppress Severity</label>
+                    <select
+                      value={newRule.severityFilter}
+                      onChange={(e) => setNewRule({ ...newRule, severityFilter: e.target.value as any })}
+                      className="w-full rounded-lg border px-3 py-2 text-xs"
+                      style={{ background: "oklch(0.12 0.02 286)", borderColor: BORDER, color: "oklch(0.85 0.01 286)" }}
+                    >
+                      <option value="all">All Severities</option>
+                      <option value="critical">Critical & below</option>
+                      <option value="high">High & below</option>
+                      <option value="medium">Medium only</option>
+                    </select>
+                  </div>
+
+                  {/* Duration */}
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: MUTED }}>Duration (hours)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={720}
+                      value={newRule.durationHours}
+                      onChange={(e) => setNewRule({ ...newRule, durationHours: Math.max(1, Math.min(720, Number(e.target.value))) })}
+                      className="w-full rounded-lg border px-3 py-2 text-xs"
+                      style={{ background: "oklch(0.12 0.02 286)", borderColor: BORDER, color: "oklch(0.85 0.01 286)" }}
+                    />
+                    <div className="mt-1 flex gap-2">
+                      {[1, 4, 8, 24, 72, 168].map((h) => (
+                        <button
+                          key={h}
+                          onClick={() => setNewRule({ ...newRule, durationHours: h })}
+                          className="rounded px-2 py-0.5 text-[10px] transition-colors hover:bg-white/10"
+                          style={{ color: newRule.durationHours === h ? CYAN : MUTED, background: newRule.durationHours === h ? `${CYAN}15` : "transparent" }}
+                        >
+                          {h < 24 ? `${h}h` : `${h / 24}d`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Reason */}
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: MUTED }}>Reason</label>
+                    <input
+                      type="text"
+                      value={newRule.reason}
+                      onChange={(e) => setNewRule({ ...newRule, reason: e.target.value })}
+                      placeholder="e.g., Scheduled maintenance window"
+                      className="w-full rounded-lg border px-3 py-2 text-xs"
+                      style={{ background: "oklch(0.12 0.02 286)", borderColor: BORDER, color: "oklch(0.85 0.01 286)" }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      if (!newRule.reason.trim()) return;
+                      createSuppressionMut.mutate(newRule);
+                    }}
+                    disabled={!newRule.reason.trim() || createSuppressionMut.isPending}
+                    className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-medium transition-colors disabled:opacity-50"
+                    style={{ background: PURPLE, color: "oklch(0.98 0.005 285)" }}
+                  >
+                    {createSuppressionMut.isPending ? "Creating..." : "Create Rule"}
+                  </button>
+                  <button
+                    onClick={() => setShowCreateRule(false)}
+                    className="rounded-lg border px-4 py-2 text-xs transition-colors hover:bg-white/5"
+                    style={{ borderColor: BORDER, color: MUTED }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </GlassPanel>
+          )}
+
+          {/* Rules List */}
+          <GlassPanel title="Active & Expired Rules" icon={Shield}>
+            <div className="px-5 pb-5">
+              {suppressionListQ.isLoading ? (
+                <div className="flex h-48 items-center justify-center">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: PURPLE }} />
+                </div>
+              ) : (suppressionListQ.data?.rules.length ?? 0) === 0 ? (
+                <div className="flex h-48 flex-col items-center justify-center text-center">
+                  <ShieldOff className="mb-3 h-10 w-10" style={{ color: PURPLE_DIM }} />
+                  <p className="text-sm" style={{ color: MUTED }}>No suppression rules configured.</p>
+                  <p className="text-xs mt-1" style={{ color: MUTED }}>Create a rule to mute anomaly alerts during maintenance windows.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {suppressionListQ.data!.rules.map((rule) => {
+                    const isActive = rule.active && !rule.isExpired;
+                    const sevColor = rule.severityFilter === "critical" ? RED : rule.severityFilter === "high" ? "oklch(0.705 0.191 22.216)" : rule.severityFilter === "medium" ? AMBER : VIOLET;
+                    return (
+                      <div
+                        key={rule.id}
+                        className="flex items-center gap-4 rounded-lg border px-4 py-3"
+                        style={{ borderColor: isActive ? `${PURPLE}40` : BORDER, background: isActive ? "oklch(0.16 0.025 286)" : "oklch(0.13 0.015 286)" }}
+                      >
+                        {/* Status icon */}
+                        <div className="shrink-0">
+                          {isActive ? (
+                            <PauseCircle className="h-5 w-5" style={{ color: AMBER }} />
+                          ) : (
+                            <PlayCircle className="h-5 w-5" style={{ color: MUTED }} />
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-semibold" style={{ color: isActive ? "oklch(0.9 0.005 286)" : MUTED }}>
+                              {rule.scheduleName || "All Schedules"}
+                            </span>
+                            <span
+                              className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"
+                              style={{ background: `${sevColor}20`, color: sevColor }}
+                            >
+                              {rule.severityFilter === "all" ? "all severities" : `≤ ${rule.severityFilter}`}
+                            </span>
+                            <span
+                              className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                              style={{ background: isActive ? `${GREEN}15` : `${RED}15`, color: isActive ? GREEN : RED }}
+                            >
+                              {isActive ? "Active" : rule.isExpired ? "Expired" : "Deactivated"}
+                            </span>
+                          </div>
+                          <div className="text-xs" style={{ color: MUTED }}>
+                            {rule.reason}
+                          </div>
+                          <div className="flex items-center gap-4 mt-1 text-[10px] font-mono" style={{ color: MUTED }}>
+                            <span>Duration: {rule.durationHours}h</span>
+                            <span>Expires: {new Date(rule.expiresAtTs).toLocaleString()}</span>
+                            <span>Suppressed: {rule.suppressedCount} alerts</span>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isActive && (
+                            <button
+                              onClick={() => deactivateSuppressionMut.mutate({ id: rule.id })}
+                              className="rounded p-1.5 transition-colors hover:bg-white/10"
+                              title="Deactivate rule"
+                              disabled={deactivateSuppressionMut.isPending}
+                            >
+                              <PauseCircle className="h-4 w-4" style={{ color: AMBER }} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteSuppressionMut.mutate({ id: rule.id })}
+                            className="rounded p-1.5 transition-colors hover:bg-white/10"
+                            title="Delete rule"
+                            disabled={deleteSuppressionMut.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" style={{ color: RED }} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </GlassPanel>
+        </div>
+      )}
+
+      {/* ── Anomaly Detail Slide-over ───────────────────────────── */}
       {selectedAnomalyId !== null && (
         <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setSelectedAnomalyId(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />

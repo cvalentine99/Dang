@@ -2021,3 +2021,60 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Write vitest tests for anomaly router endpoints — 2 tests: router shape validation, endpoint enumeration
 - [x] Verify 0 TypeScript errors — Confirmed 0 errors (fresh tsc --noEmit)
 - [x] Save checkpoint — 1034 total tests pass
+
+## CSV/PDF Export for Drift Reports
+
+### Backend
+- [x] Create export endpoint for drift trend data (CSV format) — exportRouter.driftTrend with date range + schedule filtering
+- [x] Create export endpoint for anomaly history (CSV format) — exportRouter.anomalyHistory with severity, schedule, date filters
+- [x] Create export endpoint for agent volatility rankings (CSV format) — exportRouter.agentVolatility
+- [x] Create export endpoint for notification history (CSV format) — exportRouter.notificationHistory
+- [x] Create full report endpoint combining all drift data — exportRouter.fullReport (summary + all CSVs)
+- [x] Add date range and schedule filtering to all export endpoints — All endpoints accept days + scheduleId
+
+### Frontend
+- [x] Add export dropdown to Drift Analytics header — 4 export options: Drift Trend, Anomaly History, Agent Volatility, Notification Log
+- [x] Export triggers CSV download via browser blob URL
+- [x] Show exporting state on active download button
+
+## Drift Notification History
+
+### Backend
+- [x] Create drift_notification_history table — Schema with notificationType, scheduleId, snapshotId, anomalyId, severity, title, content, deliveryStatus, retryCount, maxRetries, nextRetryAt, lastRetryAt, errorMessage, suppressionRuleId, scheduleName, driftPercent, zScore, metadata JSON
+- [x] Run migration SQL — Applied via webdev_execute_sql with indexes on userId, scheduleId, deliveryStatus, createdAt
+- [x] Update drift threshold notification flow — driftDetection.ts now calls recordNotification() after every notifyOwner attempt
+- [x] Update anomaly notification flow — anomalyDetection.ts now calls recordNotification() and records suppressed notifications
+- [x] Add retry logic for failed notifications — retryNotification() in notificationHistory.ts with exponential backoff
+- [x] Add notification history query endpoints — notificationHistoryRouter with stats, list (filtered/paginated), retry
+
+### Frontend
+- [x] Add Notification History tab in Drift Analytics page — Tab bar with Analytics / Notification History / Suppression Rules
+- [x] Show notification delivery status — Color-coded badges (sent=green, failed=red, suppressed=amber, retrying=cyan)
+- [x] Add retry button for failed notifications — RotateCcw icon button on failed rows
+- [x] Add notification stats KPIs — 6 KPI cards: Sent, Failed, Suppressed, Anomaly Alerts, Drift Alerts, Retrying
+
+## Anomaly Suppression Rules
+
+### Backend
+- [x] Create anomaly_suppression_rules table — Schema with scheduleId, severityFilter, durationHours, reason, active, expiresAt, suppressedCount, userId, createdAt
+- [x] Run migration SQL — Applied via webdev_execute_sql with indexes on userId, active, expiresAt
+- [x] Build suppression evaluation engine — suppressionRules.ts with isSeveritySuppressed(), checkSuppression(), expireRules()
+- [x] Wire suppression check into anomaly detection flow — anomalyDetection.ts calls checkSuppression() before sending notifications
+- [x] Add CRUD endpoints — suppressionRouter with list, create, deactivate, delete
+
+### Frontend
+- [x] Add Suppression Rules management tab — Full tab with create form + rules list
+- [x] Create suppression rule dialog — Schedule selector, severity filter, duration (with quick presets), reason field
+- [x] Show active/expired rules with status badges — Active (green), Expired (red), Deactivated (red) badges
+- [x] Deactivate and delete actions on each rule — PauseCircle and Trash2 icon buttons
+
+### Testing & QA
+- [x] Write vitest tests for notification history router — 4 tests: router shape, stats/list/retry procedure types
+- [x] Write vitest tests for notification history service — 3 tests: recordNotification, retryNotification exports
+- [x] Write vitest tests for suppression rule service — 4 tests: checkSuppression, isSeveritySuppressed, expireRules exports + severity hierarchy evaluation (12 assertions)
+- [x] Write vitest tests for suppression router — 5 tests: router shape, list/create/deactivate/delete procedure types
+- [x] Write vitest tests for export router — 6 tests: router shape (5 procedures), all procedure types
+- [x] Write vitest tests for appRouter integration — 14 tests: all new procedures accessible
+- [x] Write CSV format validation tests — 3 tests: escaping, headers, data rows
+- [x] Verify 0 TypeScript errors — Confirmed 0 errors (fresh tsc --noEmit)
+- [x] Save checkpoint — 1072 total tests pass
