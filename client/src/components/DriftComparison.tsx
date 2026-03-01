@@ -58,6 +58,7 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
+  Bell,
 } from "lucide-react";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Switch } from "@/components/ui/switch";
@@ -403,6 +404,8 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
   const [scheduleName, setScheduleName] = useState("");
   const [scheduleFrequency, setScheduleFrequency] = useState<"hourly" | "every_6h" | "every_12h" | "daily" | "weekly" | "monthly">("daily");
   const [scheduleRetention, setScheduleRetention] = useState(10);
+  const [scheduleDriftThreshold, setScheduleDriftThreshold] = useState(0);
+  const [scheduleNotifyOnDrift, setScheduleNotifyOnDrift] = useState(false);
   const [scheduleAgentIds, setScheduleAgentIds] = useState<string[]>([]);
   const [expandedScheduleId, setExpandedScheduleId] = useState<number | null>(null);
 
@@ -578,6 +581,8 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
     setScheduleName("");
     setScheduleFrequency("daily");
     setScheduleRetention(10);
+    setScheduleDriftThreshold(0);
+    setScheduleNotifyOnDrift(false);
     setScheduleAgentIds([]);
   }, []);
 
@@ -588,11 +593,13 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
     setShowScheduleDialog(true);
   }, [resetScheduleForm, selectedAgents]);
 
-  const openEditSchedule = useCallback((schedule: { id: number; name: string; frequency: string; retentionCount: number; agentIds: unknown }) => {
+  const openEditSchedule = useCallback((schedule: { id: number; name: string; frequency: string; retentionCount: number; driftThreshold: number; notifyOnDrift: boolean; agentIds: unknown }) => {
     setEditingScheduleId(schedule.id);
     setScheduleName(schedule.name);
     setScheduleFrequency(schedule.frequency as typeof scheduleFrequency);
     setScheduleRetention(schedule.retentionCount);
+    setScheduleDriftThreshold(schedule.driftThreshold);
+    setScheduleNotifyOnDrift(schedule.notifyOnDrift);
     setScheduleAgentIds(schedule.agentIds as string[]);
     setShowScheduleDialog(true);
   }, []);
@@ -605,6 +612,8 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
         name: scheduleName.trim(),
         frequency: scheduleFrequency,
         retentionCount: scheduleRetention,
+        driftThreshold: scheduleDriftThreshold,
+        notifyOnDrift: scheduleNotifyOnDrift,
         agentIds: scheduleAgentIds,
       });
     } else {
@@ -613,9 +622,11 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
         agentIds: scheduleAgentIds,
         frequency: scheduleFrequency,
         retentionCount: scheduleRetention,
+        driftThreshold: scheduleDriftThreshold,
+        notifyOnDrift: scheduleNotifyOnDrift,
       });
     }
-  }, [scheduleName, scheduleAgentIds, scheduleFrequency, scheduleRetention, editingScheduleId, createScheduleMut, updateScheduleMut]);
+  }, [scheduleName, scheduleAgentIds, scheduleFrequency, scheduleRetention, scheduleDriftThreshold, scheduleNotifyOnDrift, editingScheduleId, createScheduleMut, updateScheduleMut]);
 
   const frequencyLabels: Record<string, string> = {
     hourly: "Every hour",
@@ -1451,6 +1462,12 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
                               Last: {new Date(schedule.lastRunAt).toLocaleString()}
                             </span>
                           )}
+                          {schedule.notifyOnDrift && schedule.driftThreshold > 0 && (
+                            <span className="text-[10px] text-amber-400 flex items-center gap-1 font-medium">
+                              <Bell className="h-3 w-3" />
+                              Drift &gt;{schedule.driftThreshold}%
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -1647,6 +1664,31 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
                   onChange={(e) => setScheduleRetention(Math.max(1, Math.min(100, parseInt(e.target.value) || 10)))}
                   className="bg-secondary/30 border-border/30 text-sm"
                 />
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-foreground mb-1.5 block">Drift Threshold (%)</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={scheduleDriftThreshold}
+                    onChange={(e) => setScheduleDriftThreshold(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                    className="bg-secondary/30 border-border/30 text-sm w-20"
+                  />
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={scheduleNotifyOnDrift}
+                      onCheckedChange={(checked) => setScheduleNotifyOnDrift(!!checked)}
+                    />
+                    <span className="text-xs text-foreground">Notify on drift</span>
+                  </label>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {scheduleDriftThreshold === 0
+                    ? "Disabled — no drift alerts will be sent"
+                    : `Alert when drift exceeds ${scheduleDriftThreshold}% of total items`}
+                </p>
               </div>
             </div>
             <div>

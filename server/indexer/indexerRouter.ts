@@ -1,12 +1,12 @@
 /**
  * Wazuh Indexer tRPC Router — read-only queries against all 5 index patterns.
  *
- * All endpoints are GET-equivalent (POST /_search is read-only in Elasticsearch).
+ * All endpoints require authentication and are GET-equivalent (POST /_search is read-only in Elasticsearch).
  * No mutations, no index writes, no cluster management.
  */
 
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc";
+import { protectedProcedure, router } from "../_core/trpc";
 import {
   isIndexerConfigured,
   getIndexerConfig,
@@ -57,7 +57,7 @@ async function safeSearch(
 // ═══════════════════════════════════════════════════════════════════════════════
 export const indexerRouter = router({
   // ── Status ─────────────────────────────────────────────────────────────────
-  status: publicProcedure.query(async () => {
+  status: protectedProcedure.query(async () => {
     const config = await getEffectiveIndexerConfig();
     if (!config) {
       return { configured: false, healthy: false, data: null };
@@ -71,7 +71,7 @@ export const indexerRouter = router({
   }),
 
   /** Check which index patterns exist */
-  indexStatus: publicProcedure.query(async () => {
+  indexStatus: protectedProcedure.query(async () => {
     const config = await getEffectiveIndexerConfig();
     if (!config) {
       return { configured: false, indices: {} };
@@ -92,7 +92,7 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Full-text alert search with filters */
-  alertsSearch: publicProcedure
+  alertsSearch: protectedProcedure
     .input(
       z.object({
         ...timeRangeSchema.shape,
@@ -148,7 +148,7 @@ export const indexerRouter = router({
     }),
 
   /** Alert severity distribution over time (date_histogram + terms on rule.level) */
-  alertsAggByLevel: publicProcedure
+  alertsAggByLevel: protectedProcedure
     .input(timeRangeSchema.extend({ interval: z.string().default("1h") }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -171,7 +171,7 @@ export const indexerRouter = router({
     }),
 
   /** Top agents by alert count (top talkers) */
-  alertsAggByAgent: publicProcedure
+  alertsAggByAgent: protectedProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(50).default(10) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -194,7 +194,7 @@ export const indexerRouter = router({
     }),
 
   /** MITRE ATT&CK tactic/technique distribution */
-  alertsAggByMitre: publicProcedure
+  alertsAggByMitre: protectedProcedure
     .input(timeRangeSchema.extend({ interval: z.string().default("1d") }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -223,7 +223,7 @@ export const indexerRouter = router({
     }),
 
   /** Top triggered rules */
-  alertsAggByRule: publicProcedure
+  alertsAggByRule: protectedProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(50).default(15) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -246,7 +246,7 @@ export const indexerRouter = router({
     }),
 
   /** Alert count timeline (date_histogram) */
-  alertsTimeline: publicProcedure
+  alertsTimeline: protectedProcedure
     .input(timeRangeSchema.extend({ interval: z.string().default("1h") }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -263,7 +263,7 @@ export const indexerRouter = router({
     }),
 
   /** Geographic distribution by GeoLocation.country_name */
-  alertsGeoAgg: publicProcedure
+  alertsGeoAgg: protectedProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(50).default(20) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -291,7 +291,7 @@ export const indexerRouter = router({
     }),
 
   /** GeoIP-enriched geographic distribution — resolves source IPs to coordinates */
-  alertsGeoEnriched: publicProcedure
+  alertsGeoEnriched: protectedProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(100).default(30) }))
     .query(async ({ input }) => {
       // First, get alerts with source IPs
@@ -418,7 +418,7 @@ export const indexerRouter = router({
     }),
 
   /** Compliance framework alert aggregation (PCI DSS, HIPAA, NIST, GDPR) */
-  alertsComplianceAgg: publicProcedure
+  alertsComplianceAgg: protectedProcedure
     .input(
       timeRangeSchema.extend({
         framework: z.enum(["pci_dss", "hipaa", "nist_800_53", "gdpr", "tsc"]),
@@ -461,7 +461,7 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Global vulnerability search across all agents */
-  vulnSearch: publicProcedure
+  vulnSearch: protectedProcedure
     .input(
       z.object({
         ...timeRangeSchema.shape,
@@ -505,7 +505,7 @@ export const indexerRouter = router({
     }),
 
   /** Vulnerability severity distribution */
-  vulnAggBySeverity: publicProcedure.query(async () => {
+  vulnAggBySeverity: protectedProcedure.query(async () => {
     return safeSearch(
       INDEX_PATTERNS.VULNERABILITIES,
       {
@@ -532,7 +532,7 @@ export const indexerRouter = router({
   }),
 
   /** Top vulnerable agents */
-  vulnAggByAgent: publicProcedure
+  vulnAggByAgent: protectedProcedure
     .input(z.object({ topN: z.number().int().min(1).max(50).default(10) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -556,7 +556,7 @@ export const indexerRouter = router({
     }),
 
   /** Most exploited packages */
-  vulnAggByPackage: publicProcedure
+  vulnAggByPackage: protectedProcedure
     .input(z.object({ topN: z.number().int().min(1).max(50).default(15) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -580,7 +580,7 @@ export const indexerRouter = router({
     }),
 
   /** Top CVEs across fleet */
-  vulnAggByCVE: publicProcedure
+  vulnAggByCVE: protectedProcedure
     .input(z.object({ topN: z.number().int().min(1).max(50).default(20) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -609,7 +609,7 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Agent connection state history */
-  monitoringAgentHistory: publicProcedure
+  monitoringAgentHistory: protectedProcedure
     .input(
       timeRangeSchema.extend({
         agentId: z.string().optional(),
@@ -658,7 +658,7 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Manager performance metrics over time */
-  statisticsPerformance: publicProcedure
+  statisticsPerformance: protectedProcedure
     .input(
       timeRangeSchema.extend({
         interval: z.string().default("1h"),
@@ -691,7 +691,7 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Raw event search for forensic investigation */
-  archivesSearch: publicProcedure
+  archivesSearch: protectedProcedure
     .input(
       z.object({
         ...timeRangeSchema.shape,

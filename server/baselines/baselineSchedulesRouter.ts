@@ -66,6 +66,8 @@ export const baselineSchedulesRouter = router({
         agentIds: z.array(z.string()).min(1).max(20),
         frequency: z.enum(BASELINE_FREQUENCIES),
         retentionCount: z.number().int().min(1).max(100).default(10),
+        driftThreshold: z.number().int().min(0).max(100).default(0),
+        notifyOnDrift: z.boolean().default(false),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -82,6 +84,8 @@ export const baselineSchedulesRouter = router({
         enabled: true,
         nextRunAt,
         retentionCount: input.retentionCount,
+        driftThreshold: input.driftThreshold,
+        notifyOnDrift: input.notifyOnDrift,
       });
 
       return { id: Number(result[0].insertId), success: true };
@@ -96,6 +100,8 @@ export const baselineSchedulesRouter = router({
         agentIds: z.array(z.string()).min(1).max(20).optional(),
         frequency: z.enum(BASELINE_FREQUENCIES).optional(),
         retentionCount: z.number().int().min(1).max(100).optional(),
+        driftThreshold: z.number().int().min(0).max(100).optional(),
+        notifyOnDrift: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -120,6 +126,8 @@ export const baselineSchedulesRouter = router({
       if (input.name !== undefined) updates.name = input.name;
       if (input.agentIds !== undefined) updates.agentIds = input.agentIds;
       if (input.retentionCount !== undefined) updates.retentionCount = input.retentionCount;
+      if (input.driftThreshold !== undefined) updates.driftThreshold = input.driftThreshold;
+      if (input.notifyOnDrift !== undefined) updates.notifyOnDrift = input.notifyOnDrift;
 
       // If frequency changed, recompute nextRunAt
       if (input.frequency !== undefined && input.frequency !== existing[0].frequency) {

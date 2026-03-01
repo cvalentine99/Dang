@@ -245,3 +245,32 @@ describe("indexer router", () => {
     });
   });
 });
+
+describe("indexer router auth gating", () => {
+  it("rejects unauthenticated access to indexer.status", async () => {
+    const unauthCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+    });
+    await expect(unauthCaller.indexer.status()).rejects.toThrow();
+  });
+
+  it("rejects unauthenticated access to indexer.alertsSearch", async () => {
+    const unauthCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+    });
+    await expect(unauthCaller.indexer.alertsSearch({ from: "now-1h", to: "now", size: 10 })).rejects.toThrow();
+  });
+
+  it("rejects unauthenticated access to indexer.vulnSearch", async () => {
+    const unauthCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+    });
+    await expect(unauthCaller.indexer.vulnSearch({ from: "now-7d", to: "now", size: 10 })).rejects.toThrow();
+  });
+});

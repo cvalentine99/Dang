@@ -211,3 +211,32 @@ describe("wazuh router", () => {
     expect(result).toHaveProperty("data");
   });
 });
+
+describe("wazuh router auth gating", () => {
+  it("rejects unauthenticated access to wazuh.status", async () => {
+    const unauthCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+    });
+    await expect(unauthCaller.wazuh.status()).rejects.toThrow();
+  });
+
+  it("rejects unauthenticated access to wazuh.agents", async () => {
+    const unauthCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+    });
+    await expect(unauthCaller.wazuh.agents({ limit: 10, offset: 0 })).rejects.toThrow();
+  });
+
+  it("rejects unauthenticated access to wazuh.managerInfo", async () => {
+    const unauthCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+    });
+    await expect(unauthCaller.wazuh.managerInfo()).rejects.toThrow();
+  });
+});

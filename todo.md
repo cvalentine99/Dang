@@ -1949,3 +1949,19 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 
 ### Deliverable
 - [x] Write deploy-honesty-gate-response.md with per-item evidence — COMPLETE. 6 sections with verification commands, document update tables, and deploy gate verdict: SAFE TO DEPLOY.
+
+## Production Hardening: Auth Gating + Drift Notifications
+
+### O-3/O-4 Fix: Gate Wazuh & Indexer routes behind protectedProcedure
+- [x] Gate all 81 Wazuh proxy endpoints behind protectedProcedure — Changed publicProcedure to protectedProcedure in wazuhProxy.ts
+- [x] Gate all 3 Indexer endpoints behind protectedProcedure — Changed publicProcedure to protectedProcedure in indexerProxy.ts
+- [x] Update wazuhRouter tests for auth rejection — 3 auth-rejection tests added
+- [x] Update indexerRouter tests for auth rejection — 3 auth-rejection tests added
+- [x] Update api-contract-review.md O-3 and O-4 to FIXED — Updated with FIXED status
+
+### Drift Threshold Notifications
+- [x] Add driftThreshold (int 0-100, default 0) and notifyOnDrift (boolean, default false) columns to baseline_schedules — Schema updated, migration applied
+- [x] Add drift threshold field to schedule create/edit UI — Toggle switch + slider (1-100%) in DriftComparison.tsx schedule dialog, badge on schedule cards
+- [x] Implement drift comparison in scheduler tick after baseline capture — Created server/baselines/driftDetection.ts with compareBaselines() and checkDriftAndNotify()
+- [x] Wire notifyOwner when drift exceeds threshold — Wired into BaselineScheduler.executeScheduledCapture(). Sends detailed breakdown.
+- [x] Write tests for drift notification logic — 16 tests in driftDetection.test.ts (9 compareBaselines + 7 checkDriftAndNotify). 991 total tests pass.

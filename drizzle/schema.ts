@@ -169,6 +169,10 @@ export const baselineSchedules = mysqlTable("baseline_schedules", {
   successCount: int("successCount").default(0).notNull(),
   /** Total failed runs */
   failureCount: int("failureCount").default(0).notNull(),
+  /** Drift threshold percentage (0 = disabled, 1-100 = notify when drift exceeds this %) */
+  driftThreshold: int("driftThreshold").default(0).notNull(),
+  /** Whether to send owner notification when drift exceeds threshold */
+  notifyOnDrift: boolean("notifyOnDrift").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

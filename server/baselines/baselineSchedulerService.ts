@@ -22,6 +22,7 @@ import {
 } from "../../drizzle/schema";
 import { computeNextRunAt } from "./scheduleUtils";
 import { wazuhGet, getEffectiveWazuhConfig } from "../wazuh/wazuhClient";
+import { checkDriftAndNotify } from "./driftDetection";
 
 /** Check interval in milliseconds (5 minutes) */
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
@@ -124,6 +125,40 @@ export async function executeScheduledCapture(
         successCount: sql`${baselineSchedules.successCount} + 1`,
       })
       .where(eq(baselineSchedules.id, schedule.id));
+
+    // ── Drift detection & notification ──────────────────────────────────
+    // If notifyOnDrift is enabled and a previous baseline exists for this
+    // schedule, compare the new snapshot against the previous one.
+    if (schedule.notifyOnDrift && schedule.driftThreshold > 0) {
+      try {
+        const previousBaselines = await db
+          .select()
+          .from(configBaselines)
+          .where(eq(configBaselines.scheduleId, schedule.id))
+          .orderBy(desc(configBaselines.createdAt))
+          .limit(2); // newest is the one we just inserted, second is the previous
+
+        // We need at least 2 baselines (current + previous) to compare
+        if (previousBaselines.length >= 2) {
+          const previousBaseline = previousBaselines[1]; // second newest
+          const { notified, driftResult } = await checkDriftAndNotify(
+            schedule,
+            previousBaseline,
+            snapshotData
+          );
+          if (notified) {
+            console.log(
+              `[BaselineScheduler] Drift alert sent for "${schedule.name}": ${driftResult.driftPercent}% drift (threshold: ${schedule.driftThreshold}%)`
+            );
+          }
+        }
+      } catch (driftErr) {
+        // Drift detection is best-effort — never block the capture
+        console.warn(
+          `[BaselineScheduler] Drift detection failed for schedule ${schedule.id}: ${(driftErr as Error).message}`
+        );
+      }
+    }
 
     // Prune old baselines beyond retention limit
     await pruneOldBaselines(db, schedule.id, schedule.retentionCount);
