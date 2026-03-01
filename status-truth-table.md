@@ -26,7 +26,7 @@
 | **Phase 16: Alerts Timeline** | Unchecked | **Complete** ✅ Code ✅ Tests ✅ Types | `client/src/pages/AlertsTimeline.tsx` (730 lines). Dense table, heatmap, rule distribution, detail panel, time range selector. | None |
 | **Phase 17–30: Features** | Complete | **Complete** ✅ Code ✅ Tests ✅ Types | Threat Hunting, Investigations, Knowledge Graph, Agent Detail, Fleet Compare, etc. | None |
 | **Phase 31: Scheduled Baseline Auto-Capture** | Was unchecked | **Partial** ✅ Code ✅ Tests (backend) | `drizzle/schema.ts` (baselineSchedules table), `server/baselines/baselineSchedulesRouter.ts` (8 procedures), `server/baselines/baselineSchedulerService.ts` (scheduler), `server/baselines/scheduleUtils.ts`, `server/_core/index.ts` (startup wiring), `server/routers.ts` (router wiring), `server/baselines/baselineSchedules.test.ts` (30 tests). | **Open:** Frontend schedule management UI (5 items: schedule list tab, create dialog, toggle/delete, status badges, history timeline). |
-| **Phase 32: Indexer Integration** | Partially unchecked | **Mostly Complete** ✅ Code ✅ Tests (partial) | Backend: `server/indexer/indexerClient.ts`, `server/indexer/indexerRouter.ts` (all 16 endpoints). Frontend: `Home.tsx` (54 indexer refs), `Vulnerabilities.tsx` (17 refs), `SiemEvents.tsx` (16 refs), `Compliance.tsx` (1 ref), `MitreAttack.tsx` (1 ref). Tests: `indexerRouter.test.ts` (12 tests). | **Open:** Mock indexer data files (for demo mode), compliance trend charts, MITRE time-series progression chart, indexer client unit tests. |
+| **Phase 32: Indexer Integration** | Partially unchecked | **Mostly Complete** ✅ Code ✅ Tests (partial) | Backend: `server/indexer/indexerClient.ts`, `server/indexer/indexerRouter.ts` (all 16 endpoints). Frontend: `Home.tsx` (54 indexer refs), `AlertsTimeline.tsx` (20+ indexer refs), `Vulnerabilities.tsx` (17 refs), `SiemEvents.tsx` (16 refs), `Compliance.tsx` (alertsComplianceAgg + timeline AreaChart), `MitreAttack.tsx` (alertsAggByMitre + Tactic Progression Timeline AreaChart). Tests: `indexerRouter.test.ts` (12 tests). | **Open:** Dedicated mock indexer data files for offline/demo mode, dedicated `indexerClient.test.ts` unit tests. Compliance trend charts and MITRE time-series chart are now confirmed implemented. |
 | **Phase 33–47: OTX, Splunk, LLM, KG, Agent Detail** | Complete | **Complete** ✅ Code ✅ Tests ✅ Types | All features implemented and tested. | None |
 | **Phase 48: Dependabot Fixes** | Complete | **Complete** ✅ Code ✅ Tests | `package.json` updated, 0 vulnerabilities. | None |
 | **Phase 49–51: KG Multi-Select, Lasso, Agent Drilldown** | Complete | **Complete** ✅ Code ✅ Tests ✅ Types | All features implemented. KG tests: 29 tests across 3 files. | None |
@@ -65,10 +65,10 @@
 ### Partially Open — Specific Gaps
 
 2. **Phase 32: Indexer — Remaining Items**
-   - Mock indexer data files for offline/demo mode (3 items)
-   - Compliance alert trend charts (1 item)
-   - MITRE time-series tactic progression chart (1 item)
-   - Indexer client unit tests (1 item)
+   - Dedicated mock indexer data files for offline/demo mode (3 items)
+   - Dedicated `indexerClient.test.ts` unit tests (1 item)
+   - ~~Compliance alert trend charts~~ — **Now confirmed implemented** (`Compliance.tsx` line 356, AreaChart from `alertsComplianceAgg` timeline buckets)
+   - ~~MITRE time-series tactic progression chart~~ — **Now confirmed implemented** (`MitreAttack.tsx` line 476, "Tactic Progression Timeline" AreaChart from `alertsAggByMitre` timeline aggregations)
 
 ### Environment-Blocked — Not Code Gaps
 

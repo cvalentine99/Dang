@@ -128,7 +128,7 @@ Server: `server/hunt/huntRouter.ts`, `server/graph/`, `server/alertQueue/`, `ser
 
 **Code Evidence:**
 - Backend: `server/indexer/indexerClient.ts`, `server/indexer/indexerRouter.ts` (16 endpoints)
-- Frontend: `client/src/pages/Home.tsx` (54 indexer refs), `Vulnerabilities.tsx` (17 refs), `SiemEvents.tsx` (16 refs), `Compliance.tsx` (1 ref), `MitreAttack.tsx` (1 ref)
+- Frontend: `client/src/pages/Home.tsx` (54 indexer refs), `AlertsTimeline.tsx` (20+ indexer refs incl. alertsSearch, alertsTimeline, alertsAggByLevel, alertsAggByRule, alertsAggByAgent), `Vulnerabilities.tsx` (17 refs), `SiemEvents.tsx` (16 refs), `Compliance.tsx` (alertsComplianceAgg + timeline AreaChart at line 356), `MitreAttack.tsx` (alertsAggByMitre + "Tactic Progression Timeline" AreaChart at line 476)
 
 **Test Evidence:**
 `server/indexer/indexerRouter.test.ts` (12 tests)
@@ -138,10 +138,12 @@ Server: `server/hunt/huntRouter.ts`, `server/graph/`, `server/alertQueue/`, `ser
 **Runtime Validation:** Not independently re-run. Requires live Wazuh Indexer (OpenSearch) instance.
 
 **Remaining Caveats:**
-1. No mock indexer data files for offline/demo mode
-2. Compliance alert trend charts not built
-3. MITRE time-series tactic progression chart not built
-4. No dedicated indexer client unit tests (only router-level tests exist)
+1. No dedicated mock indexer data files for offline/demo mode (graceful fallback behavior exists in several UI paths, but standalone fixture files do not)
+2. No dedicated `indexerClient.test.ts` unit tests (only router-level tests exist in `indexerRouter.test.ts`)
+
+**No Longer Open (corrected 2026-03-01):**
+- ~~Compliance alert trend charts~~ — Implemented: `Compliance.tsx` calls `alertsComplianceAgg`, parses `aggregations.timeline.buckets`, renders AreaChart (line 356)
+- ~~MITRE time-series tactic progression chart~~ — Implemented: `MitreAttack.tsx` calls `alertsAggByMitre`, parses timeline aggregations, builds per-tactic series, renders "Tactic Progression Timeline" AreaChart (line 476)
 
 ---
 

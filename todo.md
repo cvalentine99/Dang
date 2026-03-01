@@ -392,7 +392,7 @@
 - [x] archivesSearch: raw event search for forensic investigation
 
 ### Mock Data for Indexer — STATUS: OPEN
-> No standalone mock indexer data files exist. Frontend pages use live indexer queries or show empty states.
+> Graceful fallback behavior exists in several UI paths (empty states, server-source labels), but dedicated mock indexer datasets for offline/demo mode remain open. No standalone mock alert/vulnerability fixture files exist.
 - [ ] Create MOCK_INDEXER_ALERTS with realistic alert documents (for offline/demo mode)
 - [ ] Create MOCK_INDEXER_VULNS with vulnerability state documents (for offline/demo mode)
 - [ ] Create mock aggregation response shapes (for offline/demo mode)
@@ -418,11 +418,11 @@
 - [x] Time range picker for Indexer queries — COMPLETE.
 - [x] Real alert detail with full _source document — COMPLETE.
 
-### Frontend — Compliance & MITRE Upgrades — STATUS: PARTIAL
-> Compliance page has 1 indexer ref (`alertsComplianceAgg`). MITRE page has 1 ref (`alertsAggByMitre`). Basic integration exists but dedicated trend charts are not yet built.
+### Frontend — Compliance & MITRE Upgrades — STATUS: COMPLETE
+> Compliance page calls `alertsComplianceAgg`, parses `aggregations.timeline`, and renders an AreaChart for framework alert trends. MITRE page calls `alertsAggByMitre`, parses timeline aggregations, builds per-tactic time series, and renders a "Tactic Progression Timeline" AreaChart. `AlertsTimeline.tsx` also uses indexer-backed timeline logic extensively.
 - [x] Framework-specific alert filtering (PCI DSS, HIPAA, NIST, GDPR) — COMPLETE. `client/src/pages/Compliance.tsx` uses `alertsComplianceAgg`.
-- [ ] Compliance alert trend charts — OPEN. No time-series trend visualization for compliance alerts yet.
-- [ ] Time-series tactic progression chart from Indexer data — OPEN. MITRE page uses `alertsAggByMitre` for distribution but no time-series progression chart.
+- [x] Compliance alert trend charts — COMPLETE. `Compliance.tsx` parses `aggregations.timeline.buckets` and renders an AreaChart (line 356).
+- [x] Time-series tactic progression chart from Indexer data — COMPLETE. `MitreAttack.tsx` parses timeline aggregations from `alertsAggByMitre`, builds per-tactic series, and renders "Tactic Progression Timeline" AreaChart (line 476).
 
 ### Tests — STATUS: PARTIAL
 > `server/indexer/indexerRouter.test.ts` exists with 12 tests. No separate indexer client test file.
@@ -434,11 +434,11 @@
 | Field | Status |
 |-------|--------|
 | **Status** | Mostly Complete |
-| **Code Evidence** | `server/indexer/indexerClient.ts`, `server/indexer/indexerRouter.ts`, `client/src/pages/Home.tsx` (54 indexer refs), `Vulnerabilities.tsx` (17 refs), `SiemEvents.tsx` (16 refs), `Compliance.tsx` (1 ref), `MitreAttack.tsx` (1 ref) |
+| **Code Evidence** | `server/indexer/indexerClient.ts`, `server/indexer/indexerRouter.ts`, `client/src/pages/Home.tsx` (54 indexer refs), `AlertsTimeline.tsx` (20+ indexer refs), `Vulnerabilities.tsx` (17 refs), `SiemEvents.tsx` (16 refs), `Compliance.tsx` (alertsComplianceAgg + timeline AreaChart), `MitreAttack.tsx` (alertsAggByMitre + Tactic Progression Timeline AreaChart) |
 | **Test Evidence** | `server/indexer/indexerRouter.test.ts` (12 tests) |
 | **Type-Check** | 0 errors — fresh `npx tsc --noEmit` at 2026-02-28T19:30Z |
 | **Runtime Validation** | Not validated. Requires live Wazuh Indexer (OpenSearch) instance. |
-| **Remaining Caveats** | 4 items open: mock data files, compliance trend charts, MITRE time-series chart, indexer client tests. |
+| **Remaining Caveats** | 2 items open: dedicated mock indexer data files for offline/demo mode, dedicated `indexerClient.test.ts` unit tests. |
 
 ## Phase 33: OTX Threat Intelligence Feed
 - [x] Store OTX API key as server-side secret

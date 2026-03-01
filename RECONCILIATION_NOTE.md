@@ -85,11 +85,13 @@ All four documents now tell the same story:
 
 ### Phase 32: Indexer Integration — MOSTLY COMPLETE
 
-**Remaining (6 specific items):**
-1. Mock indexer data files for offline/demo mode (3 files)
-2. Compliance alert trend charts
-3. MITRE time-series tactic progression chart
-4. Indexer client unit tests
+**Remaining (2 specific items):**
+1. Dedicated mock indexer data files for offline/demo mode (3 fixture files)
+2. Dedicated `indexerClient.test.ts` unit tests
+
+**No longer open (corrected 2026-03-01):**
+- ~~Compliance alert trend charts~~ — Implemented in `Compliance.tsx` (AreaChart from `alertsComplianceAgg` timeline buckets)
+- ~~MITRE time-series tactic progression chart~~ — Implemented in `MitreAttack.tsx` ("Tactic Progression Timeline" AreaChart from `alertsAggByMitre`)
 
 ### Environment-Blocked (not code gaps)
 
