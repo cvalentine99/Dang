@@ -181,6 +181,54 @@ export type BaselineSchedule = typeof baselineSchedules.$inferSelect;
 export type InsertBaselineSchedule = typeof baselineSchedules.$inferInsert;
 
 /**
+ * Drift Snapshots — Persisted drift analysis results from baseline comparisons.
+ * Created after each scheduled baseline capture when a previous baseline exists.
+ * Powers the Drift Analytics dashboard with historical trend data.
+ */
+export const driftSnapshots = mysqlTable("drift_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Schedule that produced this drift snapshot */
+  scheduleId: int("scheduleId").notNull(),
+  /** User who owns the schedule */
+  userId: int("userId").notNull(),
+  /** ID of the new baseline (the "current" in the comparison) */
+  baselineId: int("baselineId").notNull(),
+  /** ID of the previous baseline used for comparison */
+  previousBaselineId: int("previousBaselineId").notNull(),
+  /** Overall drift percentage (0-100, 2 decimal places) */
+  driftPercent: float("driftPercent").default(0).notNull(),
+  /** Total number of changed items (added + removed + changed) */
+  driftCount: int("driftCount").default(0).notNull(),
+  /** Total items compared (max of previous, current) */
+  totalItems: int("totalItems").default(0).notNull(),
+  /** Per-category breakdown: { packages: { added, removed, changed }, services: {...}, users: {...} } */
+  byCategory: json("byCategory").$type<{
+    packages: { added: number; removed: number; changed: number };
+    services: { added: number; removed: number; changed: number };
+    users: { added: number; removed: number; changed: number };
+  }>().notNull(),
+  /** Per-agent drift counts: { "001": { driftCount, totalItems }, "002": {...} } */
+  byAgent: json("byAgent").$type<Record<string, { driftCount: number; totalItems: number }>>().notNull(),
+  /** Agent IDs included in this comparison */
+  agentIds: json("agentIds").$type<string[]>().notNull(),
+  /** Whether a notification was sent for this drift event */
+  notificationSent: boolean("notificationSent").default(false).notNull(),
+  /** Top drift items (max 20) for quick display without loading full baselines */
+  topDriftItems: json("topDriftItems").$type<Array<{
+    category: string;
+    agentId: string;
+    name: string;
+    changeType: string;
+    previousValue?: string;
+    currentValue?: string;
+  }>>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DriftSnapshot = typeof driftSnapshots.$inferSelect;
+export type InsertDriftSnapshot = typeof driftSnapshots.$inferInsert;
+
+/**
  * Analyst Notes v2 — Enhanced note-taking system with entity linking.
  * Supports annotating alerts, agents, CVEs, rules, and free-form notes.
  * Local-only: never written back to Wazuh.

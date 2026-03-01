@@ -21,6 +21,7 @@ import { autoQueueRouter } from "./alertQueue/autoQueueRouter";
 import { huntRouter } from "./hunt/huntRouter";
 import { pipelineRouter } from "./agenticPipeline/pipelineRouter";
 import { responseActionsRouter } from "./agenticPipeline/responseActionsRouter";
+import { driftAnalyticsRouter } from "./baselines/driftAnalyticsRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -93,6 +94,9 @@ export const appRouter = router({
 
   // Response Actions — first-class, structured, queryable, stateful, auditable
   responseActions: responseActionsRouter,
+
+  // Drift Analytics — read-only aggregated drift trend data
+  driftAnalytics: driftAnalyticsRouter,
 });
 
 export type AppRouter = typeof appRouter;

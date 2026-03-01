@@ -56,6 +56,7 @@ import {
   Lightbulb,
   ShieldAlert,
   BarChart3,
+  GitCompare,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -143,6 +144,7 @@ const menuItems = [
   { icon: ShieldCheck, label: "Compliance", path: "/compliance", group: "Posture" },
   { icon: FileSearch, label: "File Integrity", path: "/fim", group: "Posture" },
   { icon: Monitor, label: "IT Hygiene", path: "/hygiene", group: "Posture" },
+  { icon: GitCompare, label: "Drift Analytics", path: "/drift-analytics", group: "Posture" },
   { icon: Server, label: "Cluster Health", path: "/cluster", group: "System" },
   { icon: HeartPulse, label: "System Status", path: "/status", group: "System" },
   { icon: Brain, label: "Security Analyst", path: "/analyst", group: "Intelligence", hasQueueBadge: true },

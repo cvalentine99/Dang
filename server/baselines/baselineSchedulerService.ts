@@ -17,12 +17,13 @@ import { getDb } from "../db";
 import {
   baselineSchedules,
   configBaselines,
+  driftSnapshots,
   type BaselineSchedule,
   type BaselineFrequency,
 } from "../../drizzle/schema";
 import { computeNextRunAt } from "./scheduleUtils";
 import { wazuhGet, getEffectiveWazuhConfig } from "../wazuh/wazuhClient";
-import { checkDriftAndNotify } from "./driftDetection";
+import { checkDriftAndNotify, compareBaselines } from "./driftDetection";
 
 /** Check interval in milliseconds (5 minutes) */
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
@@ -126,38 +127,96 @@ export async function executeScheduledCapture(
       })
       .where(eq(baselineSchedules.id, schedule.id));
 
-    // ── Drift detection & notification ──────────────────────────────────
-    // If notifyOnDrift is enabled and a previous baseline exists for this
-    // schedule, compare the new snapshot against the previous one.
-    if (schedule.notifyOnDrift && schedule.driftThreshold > 0) {
-      try {
-        const previousBaselines = await db
-          .select()
-          .from(configBaselines)
-          .where(eq(configBaselines.scheduleId, schedule.id))
-          .orderBy(desc(configBaselines.createdAt))
-          .limit(2); // newest is the one we just inserted, second is the previous
+    // ── Drift detection, snapshot persistence & notification ────────────
+    // Always compare against previous baseline when one exists, to build
+    // the drift_snapshots history for the analytics dashboard.
+    try {
+      const recentBaselines = await db
+        .select()
+        .from(configBaselines)
+        .where(eq(configBaselines.scheduleId, schedule.id))
+        .orderBy(desc(configBaselines.createdAt))
+        .limit(2); // newest is the one we just inserted, second is the previous
 
-        // We need at least 2 baselines (current + previous) to compare
-        if (previousBaselines.length >= 2) {
-          const previousBaseline = previousBaselines[1]; // second newest
-          const { notified, driftResult } = await checkDriftAndNotify(
+      // We need at least 2 baselines (current + previous) to compare
+      if (recentBaselines.length >= 2) {
+        const currentBaseline = recentBaselines[0];
+        const previousBaseline = recentBaselines[1];
+        const driftResult = compareBaselines(
+          previousBaseline.snapshotData as Record<string, unknown>,
+          snapshotData
+        );
+
+        // Compute per-agent drift breakdown for analytics
+        const byAgent: Record<string, { driftCount: number; totalItems: number }> = {};
+        for (const item of driftResult.driftItems) {
+          if (!byAgent[item.agentId]) {
+            byAgent[item.agentId] = { driftCount: 0, totalItems: 0 };
+          }
+          byAgent[item.agentId].driftCount++;
+        }
+        // Count total items per agent from the current snapshot
+        for (const agentId of schedule.agentIds) {
+          if (!byAgent[agentId]) {
+            byAgent[agentId] = { driftCount: 0, totalItems: 0 };
+          }
+          const pkgs = (snapshotData.packages as Record<string, unknown[]>)?.[agentId];
+          const svcs = (snapshotData.services as Record<string, unknown[]>)?.[agentId];
+          const usrs = (snapshotData.users as Record<string, unknown[]>)?.[agentId];
+          byAgent[agentId].totalItems =
+            (Array.isArray(pkgs) ? pkgs.length : 0) +
+            (Array.isArray(svcs) ? svcs.length : 0) +
+            (Array.isArray(usrs) ? usrs.length : 0);
+        }
+
+        // Check notification threshold
+        let notificationSent = false;
+        if (schedule.notifyOnDrift && schedule.driftThreshold > 0) {
+          const { notified } = await checkDriftAndNotify(
             schedule,
             previousBaseline,
             snapshotData
           );
+          notificationSent = notified;
           if (notified) {
             console.log(
               `[BaselineScheduler] Drift alert sent for "${schedule.name}": ${driftResult.driftPercent}% drift (threshold: ${schedule.driftThreshold}%)`
             );
           }
         }
-      } catch (driftErr) {
-        // Drift detection is best-effort — never block the capture
-        console.warn(
-          `[BaselineScheduler] Drift detection failed for schedule ${schedule.id}: ${(driftErr as Error).message}`
+
+        // Persist drift snapshot for analytics
+        await db.insert(driftSnapshots).values({
+          scheduleId: schedule.id,
+          userId: schedule.userId,
+          baselineId: currentBaseline.id,
+          previousBaselineId: previousBaseline.id,
+          driftPercent: driftResult.driftPercent,
+          driftCount: driftResult.driftCount,
+          totalItems: driftResult.totalItems,
+          byCategory: driftResult.byCategory,
+          byAgent,
+          agentIds: schedule.agentIds,
+          notificationSent,
+          topDriftItems: driftResult.driftItems.slice(0, 20).map((item) => ({
+            category: item.category,
+            agentId: item.agentId,
+            name: item.name,
+            changeType: item.changeType,
+            previousValue: item.previousValue,
+            currentValue: item.currentValue,
+          })),
+        });
+
+        console.log(
+          `[BaselineScheduler] Drift snapshot saved for "${schedule.name}": ${driftResult.driftPercent}% (${driftResult.driftCount}/${driftResult.totalItems})`
         );
       }
+    } catch (driftErr) {
+      // Drift detection is best-effort — never block the capture
+      console.warn(
+        `[BaselineScheduler] Drift detection failed for schedule ${schedule.id}: ${(driftErr as Error).message}`
+      );
     }
 
     // Prune old baselines beyond retention limit

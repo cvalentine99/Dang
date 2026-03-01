@@ -39,6 +39,7 @@ import LivingCaseView from "./pages/LivingCaseView";
 import ResponseActions from "./pages/ResponseActions";
 import PipelineInspector from "./pages/PipelineInspector";
 import FeedbackAnalytics from "./pages/FeedbackAnalytics";
+import DriftAnalytics from "./pages/DriftAnalytics";
 
 function Router() {
   return (
@@ -85,6 +86,7 @@ function Router() {
               <Route path="/response-actions" component={ResponseActions} />
               <Route path="/pipeline-inspector" component={PipelineInspector} />
               <Route path="/feedback-analytics" component={FeedbackAnalytics} />
+              <Route path="/drift-analytics" component={DriftAnalytics} />
               <Route path="/404" component={NotFound} />
               <Route component={NotFound} />
             </Switch>

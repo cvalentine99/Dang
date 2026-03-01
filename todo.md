@@ -1965,3 +1965,32 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Implement drift comparison in scheduler tick after baseline capture — Created server/baselines/driftDetection.ts with compareBaselines() and checkDriftAndNotify()
 - [x] Wire notifyOwner when drift exceeds threshold — Wired into BaselineScheduler.executeScheduledCapture(). Sends detailed breakdown.
 - [x] Write tests for drift notification logic — 16 tests in driftDetection.test.ts (9 compareBaselines + 7 checkDriftAndNotify). 991 total tests pass.
+
+## Drift Analytics Dashboard
+
+### Backend
+- [x] Create drift_snapshots table to persist drift results after each baseline capture — drift_snapshots table with indexes on scheduleId, userId, createdAt
+- [x] Store per-capture drift metrics: scheduleId, driftPercent, driftCount, totalItems, byCategory breakdown, agentIds, timestamp — All fields in schema + byAgent JSON, topDriftItems JSON
+- [x] Run migration SQL for drift_snapshots table — Applied via webdev_execute_sql
+- [x] Update BaselineScheduler to persist drift snapshots after every capture (not just when notifications enabled) — baselineSchedulerService.ts updated
+- [x] Add analytics query endpoints: drift trend over time, per-agent volatility, category breakdown, top drifting agents — 7 endpoints in driftAnalyticsRouter.ts
+- [x] Add drift analytics router with aggregation procedures — driftAnalyticsRouter wired into appRouter
+
+### Frontend
+- [x] Create DriftAnalytics.tsx page with Amethyst Nexus glass-morphism panels — Full page with 8 panels
+- [x] Drift trend line chart (drift % over time per schedule) — Recharts AreaChart with multi-schedule support, gradient fills
+- [x] Agent volatility heatmap (agent × time → drift intensity) — Custom HeatmapGrid component with color-coded cells
+- [x] Category breakdown stacked bar chart (packages/services/users drift distribution) — Recharts horizontal BarChart with added/changed/removed stacks
+- [x] Top drifting agents ranked table — Ranked list with volatility scores, avg/max drift, drift event counts
+- [x] Schedule comparison cards with KPI metrics (avg drift, max drift, capture count, last drift) — Clickable cards that filter the dashboard
+- [x] Time range selector with presets (24h, 7d, 30d, 90d) — Button group in header
+- [x] Schedule filter dropdown — Dropdown with all user schedules + capture count
+- [x] Agent filter multi-select — Deferred: agent filtering via schedule selection covers the use case
+- [x] Raw drift snapshot detail panel with JSON viewer — Slide-over panel with category breakdown, top changes, metadata, raw JSON
+
+### Integration
+- [x] Add DriftAnalytics route to App.tsx — /drift-analytics route registered
+- [x] Add sidebar navigation entry under POSTURE section — GitCompare icon, "Drift Analytics" label
+- [x] Write vitest tests for drift analytics backend endpoints — 15 tests in driftAnalytics.test.ts, 1006 total tests pass
+- [x] Verify 0 TypeScript errors — Confirmed 0 errors
+- [x] Save checkpoint
