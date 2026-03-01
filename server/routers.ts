@@ -26,6 +26,7 @@ import { anomalyRouter } from "./baselines/anomalyRouter";
 import { notificationHistoryRouter } from "./baselines/notificationHistoryRouter";
 import { suppressionRouter } from "./baselines/suppressionRouter";
 import { exportRouter } from "./baselines/exportRouter";
+import { enhancedLLMRouter } from "./enhancedLLM/enhancedLLMRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -113,6 +114,9 @@ export const appRouter = router({
 
   // Drift Report Export — CSV/PDF export for compliance reporting
   export: exportRouter,
+
+  // Enhanced LLM — Nemotron-3 Nano session-type-aware chat, alert classification, DGX health
+  enhancedLLM: enhancedLLMRouter,
 });
 
 export type AppRouter = typeof appRouter;

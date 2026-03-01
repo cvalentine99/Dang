@@ -339,6 +339,8 @@ export const responseActionsRouter = router({
         byCategoryResult,
         byUrgencyResult,
         pendingApprovalResult,
+        avgApprovalResult,
+        avgExecutionResult,
       ] = await Promise.all([
         db.select({ total: count() }).from(responseActions),
         db
@@ -371,6 +373,18 @@ export const responseActionsRouter = router({
               eq(responseActions.requiresApproval, 1)
             )
           ),
+        // Compute avg time from proposed → approved (seconds)
+        db.select({
+          avgSeconds: sql<number>`AVG(TIMESTAMPDIFF(SECOND, ${responseActions.proposedAt}, ${responseActions.approvedAt}))`,
+        })
+          .from(responseActions)
+          .where(sql`${responseActions.approvedAt} IS NOT NULL`),
+        // Compute avg time from approved → executed (seconds)
+        db.select({
+          avgSeconds: sql<number>`AVG(TIMESTAMPDIFF(SECOND, ${responseActions.approvedAt}, ${responseActions.executedAt}))`,
+        })
+          .from(responseActions)
+          .where(sql`${responseActions.executedAt} IS NOT NULL AND ${responseActions.approvedAt} IS NOT NULL`),
       ]);
 
       const byState: Record<string, number> = {};
@@ -382,14 +396,18 @@ export const responseActionsRouter = router({
       const byUrgency: Record<string, number> = {};
       for (const row of byUrgencyResult) byUrgency[row.urgency] = row.count;
 
+      // Convert seconds to human-readable or null if no data
+      const rawApprovalSec = avgApprovalResult[0]?.avgSeconds ?? null;
+      const rawExecutionSec = avgExecutionResult[0]?.avgSeconds ?? null;
+
       return {
         total: totalResult[0]?.total ?? 0,
         byState,
         byCategory,
         byUrgency,
         pendingApproval: pendingApprovalResult[0]?.count ?? 0,
-        avgTimeToApproval: null, // TODO: compute from audit trail
-        avgTimeToExecution: null,
+        avgTimeToApproval: rawApprovalSec != null ? Math.round(rawApprovalSec) : null, // seconds, null if no approved actions yet
+        avgTimeToExecution: rawExecutionSec != null ? Math.round(rawExecutionSec) : null, // seconds, null if no executed actions yet
       };
     }),
 

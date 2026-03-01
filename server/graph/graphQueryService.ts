@@ -134,7 +134,7 @@ export async function getGraphStats(): Promise<KgStats> {
     indices: ix[0]?.count ?? 0,
     fields: fi[0]?.count ?? 0,
     errorPatterns: er[0]?.count ?? 0,
-    trustHistory: th[0]?.count ?? 0,
+    trustHistory: th[0]?.count ?? 0, // NOTE: table exists but is not yet populated — planned for trust-score-over-time tracking
     answerProvenance: ap[0]?.count ?? 0,
     byRiskLevel,
     byMethod,

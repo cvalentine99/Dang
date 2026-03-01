@@ -1,8 +1,8 @@
 # Dang! — SOC Workflow Compliance Evidence Report
 
-**Date:** 2026-02-28
-**Evaluator:** Automated compliance verification against prior audit snapshot
-**Test Suite:** 780 tests passing across 37 test files, 0 TypeScript errors
+**Date:** 2026-03-01 (truth-aligned revision)
+**Evaluator:** Manual truth remediation against live `shared/agenticSchemas.ts` contracts
+**Test Suite:** 1098 tests passing across 46 test files, 0 TypeScript errors
 
 ---
 
@@ -87,17 +87,30 @@ runFullPipeline: protectedProcedure
 
 **File:** `shared/agenticSchemas.ts` — `TriageObject` interface (lines 30-90)
 
-Contains all required fields:
-- `alertId` — alert identity
-- `alertFamily` — normalized alert family
-- `normalizedSeverity` — severity (critical/high/medium/low/info)
-- `entities: ExtractedEntity[]` — typed entities with confidence
-- `isDuplicate` / `deduplicationKey` — duplicate status
-- `triageDecision.route` — route recommendation (investigate/escalate/suppress/enrich/monitor)
-- `triageDecision.confidence` — confidence score
-- `mitreMapping` — MITRE ATT&CK technique mapping
-- `suggestedPriority` — case-link suggestion
-- `rawAlertRef` — preserves raw alert for forensic traceability
+Contains all required fields (verified against live schema 2026-03-01):
+- `triageId` — unique triage ID (string)
+- `triagedAt` — UTC ISO-8601 timestamp when triage was performed
+- `triagedBy` — who performed triage (`"triage_agent"` | `"analyst_manual"`)
+- `alertId` — original Wazuh alert ID
+- `ruleId`, `ruleDescription`, `ruleLevel` — Wazuh rule identity
+- `alertTimestamp` — alert timestamp from Wazuh
+- `agent` — agent object with `id`, `name`, `ip?`, `os?`, `groups?`
+- `alertFamily` — normalized alert type/family
+- `severity` — AI-assigned severity (`AgenticSeverity`: critical/high/medium/low/info)
+- `severityConfidence` — confidence in severity assignment (0.0–1.0)
+- `severityReasoning` — evidence-backed reasoning for severity
+- `entities: ExtractedEntity[]` — typed entities with `source: ProvenanceSource` and `confidence`
+- `mitreMapping: MitreMapping[]` — MITRE ATT&CK mappings with `techniqueId`, `techniqueName`, `tactic`, `confidence`, `source`
+- `dedup` — deduplication object with `isDuplicate`, `similarityScore`, `reasoning`
+- `route` — route recommendation (`TriageRoute`: `A_DUPLICATE_NOISY` | `B_LOW_CONFIDENCE` | `C_HIGH_CONFIDENCE` | `D_LIKELY_BENIGN`)
+- `routeReasoning` — why this route was chosen
+- `summary` — analyst-readable summary (2–4 sentences)
+- `keyEvidence: EvidenceItem[]` — key evidence with `id`, `label`, `type`, `source`, `data`, `collectedAt`
+- `uncertainties: Uncertainty[]` — things the triage agent doesn't know
+- `caseLink` — case link suggestion with `shouldLink`, `confidence`, `reasoning`
+- `rawAlert` — original raw alert JSON (preserved verbatim)
+
+> **Stale fields removed in this revision:** `normalizedSeverity` → `severity`, `isDuplicate`/`deduplicationKey` → `dedup` object, `triageDecision` → `route` + `routeReasoning`, `suggestedPriority` → removed (not in live schema), `rawAlertRef` → `rawAlert`
 
 ### Persistence
 
@@ -113,7 +126,7 @@ Contains all required fields:
 ### Test coverage
 
 **File:** `server/agenticPipeline.test.ts` — TriageObject contract tests
-**File:** `server/pipelineHandoff.test.ts` — Stage 1 handoff chain tests (6 tests)
+**File:** `server/pipelineHandoff.test.ts` — Stage 1 handoff chain tests (truth-aligned 2026-03-01, validates live schema field names)
 
 ---
 
@@ -125,16 +138,22 @@ Contains all required fields:
 
 **File:** `shared/agenticSchemas.ts` — `CorrelationBundle` interface
 
-Contains all required fields:
-- `evidencePack.relatedAlerts` — related alerts with shared entities
-- `evidencePack.hostVulnerabilities` — CVE data
-- `evidencePack.fimEvents` — file integrity monitoring events
-- `evidencePack.threatIntelMatches` — OTX threat intel (uses `ioc`/`iocType`, not `indicator`/`indicatorType`)
-- `evidencePack.priorInvestigations` — prior case links
-- `blastRadius` — affected hosts, users, asset criticality (uses `assetCriticality`, not `scope`)
-- `synthesis.missingEvidence` — missing evidence
-- `caseRecommendation` — merge/new-case recommendation with confidence
-- `campaignAssessment` — campaign grouping (uses `likelyCampaign`/`campaignLabel`, not `isCampaign`/`campaignName`)
+Contains all required fields (verified against live schema 2026-03-01):
+- `correlationId` — unique correlation ID (string)
+- `correlatedAt` — UTC ISO-8601 timestamp
+- `sourceTriageId` — source triage ID (string, not number)
+- `relatedAlerts` — **top-level field** (not nested in `evidencePack`), each with `alertId`, `ruleId`, `ruleDescription`, `ruleLevel`, `timestamp`, `agentId`, `linkedBy: ExtractedEntity`, `relevance`
+- `discoveredEntities: ExtractedEntity[]` — entities discovered during correlation
+- `vulnerabilityContext` — CVE data with `cveId`, `severity`, `name`, `affectedPackage?`, `relevance`
+- `fimContext` — FIM events with `path`, `event`, `timestamp`, `relevance`
+- `threatIntelMatches` — threat intel with `ioc`, `iocType`, `source`, `threatName?`, `confidence`
+- `priorInvestigations` — prior case links with `investigationId`, `title`, `status`, `linkReason`, `relevance`
+- `blastRadius` — `affectedHosts`, `affectedUsers`, `affectedAgentIds`, `assetCriticality`, `confidence`
+- `campaignAssessment` — `likelyCampaign`, `campaignLabel?`, `clusteredTechniques`, `confidence`, `reasoning`
+- `caseRecommendation` — `action` (`merge_existing`/`create_new`/`defer_to_analyst`), `confidence`, `reasoning`
+- `synthesis` — `narrative`, `supportingEvidence: EvidenceItem[]`, `conflictingEvidence: EvidenceItem[]`, `missingEvidence: Uncertainty[]`, `confidence`
+
+> **Stale fields removed in this revision:** `evidencePack.*` wrapper → all fields are top-level, `sharedEntities` → `linkedBy`, `riskScore` → `confidence`, `hostVulnerabilities` → `vulnerabilityContext`, `fimEvents` → `fimContext`
 
 ### Persistence
 
@@ -151,7 +170,7 @@ Contains all required fields:
 ### Test coverage
 
 **File:** `server/agenticPipeline.test.ts` — CorrelationBundle contract tests
-**File:** `server/pipelineHandoff.test.ts` — Stage 2 handoff chain tests (7 tests)
+**File:** `server/pipelineHandoff.test.ts` — Stage 2 handoff chain tests (truth-aligned 2026-03-01, validates live schema field names)
 
 ---
 
@@ -182,7 +201,7 @@ The hypothesis agent:
 ### Test coverage
 
 **File:** `server/agenticPipeline.test.ts` — Hypothesis agent contract tests
-**File:** `server/pipelineHandoff.test.ts` — Stage 3 handoff chain tests (9 tests)
+**File:** `server/pipelineHandoff.test.ts` — Stage 3 handoff chain tests (truth-aligned 2026-03-01, validates live schema field names)
 
 ---
 
@@ -385,7 +404,7 @@ The `assembleLivingCaseReportData()` function:
 
 ### Evidence/inference separation
 
-- `TriageObject` separates raw alert data (`rawAlertRef`) from triage inference (`triageDecision`)
+- `TriageObject` separates raw alert data (`rawAlert`) from triage inference (`severity`, `route`, `routeReasoning`)
 - `CorrelationBundle` separates evidence pack from synthesis narrative
 - `LivingCaseObject` separates supporting evidence from working theory
 
@@ -395,6 +414,9 @@ The `assembleLivingCaseReportData()` function:
 - `ProvenanceSource` type tracks where each piece of evidence came from
 - `Confidence` type (0.0-1.0) on all inferred values
 - Pipeline runs tracked with per-stage status and latency
+- `kgAnswerProvenance` table records every analyst pipeline query with question, answer, confidence, and warnings (wired 2026-03-01)
+
+> **Truth note (2026-03-01):** `kgTrustHistory` table exists in the schema and is counted in graph stats, but is **not yet populated at runtime**. It is a planned feature for tracking trust-score-over-time trends. The count will always be 0 until a writer is implemented. This is honestly documented here rather than claimed as functional.
 
 ---
 
@@ -409,7 +431,7 @@ The original audit asked for concrete proof of each claim. Here are the answers:
 | Show the migration for `LivingCaseObject` fields | `drizzle/schema.ts` — `livingCaseState` table |
 | Show the router endpoints that create/update those artifacts | `server/agenticPipeline/pipelineRouter.ts` — 20+ endpoints |
 | Show the UI that renders approval-gated actions | `client/src/pages/ResponseActions.tsx` — dedicated panel |
-| Show tests proving the handoff chain works end-to-end | `server/pipelineHandoff.test.ts` — 46 tests |
+| Show tests proving the handoff chain works end-to-end | `server/pipelineHandoff.test.ts` — truth-aligned contract tests (validated 2026-03-01) |
 
 ---
 
@@ -419,9 +441,9 @@ The original audit asked for concrete proof of each claim. Here are the answers:
 |---|---:|---|
 | `server/agenticPipeline.test.ts` | 45 | Triage, Correlation, Hypothesis agent contracts |
 | `server/responseActions.test.ts` | 44 | Response action state machine, audit trail, CRUD |
-| `server/pipelineHandoff.test.ts` | 46 | End-to-end handoff chain, report generation, state machine |
-| All other test files (34) | 645 | Wazuh API, indexer, graph, investigations, auth, etc. |
-| **Total** | **780** | **37 test files, 0 TypeScript errors** |
+| `server/pipelineHandoff.test.ts` | 56 | Truth-aligned contract tests: TriageObject, CorrelationBundle, LivingCaseObject, state machine, pipeline chain |
+| All other test files (44) | 1042 | Wazuh API, indexer, graph, investigations, auth, drift analytics, anomaly detection, etc. |
+| **Total** | **1098** | **46 test files, 0 TypeScript errors** |
 
 ---
 

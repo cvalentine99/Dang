@@ -2078,3 +2078,49 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Write CSV format validation tests — 3 tests: escaping, headers, data rows
 - [x] Verify 0 TypeScript errors — Confirmed 0 errors (fresh tsc --noEmit)
 - [x] Save checkpoint — 1072 total tests pass
+
+## Agentic Truth Remediation
+
+### Task 1 — Repair pipeline handoff tests
+- [x] Rewrite server/pipelineHandoff.test.ts to validate current schemas from shared/agenticSchemas.ts — Full rewrite: 26 tests validating TriageObject (13 fields), CorrelationBundle (10 fields), LivingCaseObject (8 fields), stage-to-stage contracts, enum values
+- [x] Remove all stale field names — receivedAt→triagedAt, normalizedSeverity→severity, deduplicationKey→dedup, triageDecision→route+routeReasoning, rawAlertRef→rawAlert, evidencePack→direct fields, riskScore→confidence
+- [x] Validate stage-to-stage contracts: Alert→TriageObject→CorrelationBundle→LivingCaseObject→response_actions — 6 contract tests
+- [x] Tests pass against actual running code — 1099 tests pass
+
+### Task 2 — Repair SOC_COMPLIANCE_EVIDENCE.md
+- [x] Update all schema claims to match actual current implementation — 9 edits applied
+- [x] Remove stale references — normalizedSeverity→severity, deduplicationKey→dedup, triageDecision→route+routeReasoning, rawAlertRef→rawAlert
+- [x] Replace with real current model fields from shared/agenticSchemas.ts
+- [x] Every field named in doc exists in live schema or DB model — Verified against agenticSchemas.ts
+
+### Task 3 — Wire provenance recording for real
+- [x] Hook recordProvenance() into actual runtime flow — Called in agenticPipeline.ts after synthesis, fire-and-forget with .catch()
+- [x] Include sessionId (queryHash), question, answer (truncated 4K), confidence (trustScore), warnings (safety filters + retrieval errors)
+- [x] endpointIds left as [] — graph layer doesn't expose numeric IDs; tracked via sources in provenance metadata
+
+### Task 4 — Decide kgTrustHistory truth status
+- [x] Audit: table exists, imported, counted in getGraphStats(), but NEVER WRITTEN TO at runtime
+- [x] Decision: Mark as planned/not-yet-populated — Added code comment in graphQueryService.ts and truth note in SOC_COMPLIANCE_EVIDENCE.md
+- [x] No ghost feature status — Honestly documented: "count will always be 0 until a writer is implemented"
+
+### Task 5 — Clean up AnalystChat truthfulness
+- [x] Label simulated agent steps as "ESTIMATED PROGRESS" / "ESTIMATING" instead of "LIVE"
+- [x] Added code comments: "These are NOT live telemetry from the server — they are client-side approximations"
+- [x] Real agent steps arrive in the response and replace simulated ones on completion
+
+### Task 6 — Resolve enhancedLLM truth gap
+- [x] enhancedLLMRouter was NOT mounted in routers.ts — confirmed via grep
+- [x] Mounted as `enhancedLLM: enhancedLLMRouter` in appRouter — 5 endpoints now accessible: chat, classifyAlert, dgxHealth, queueStats, sessionTypes
+
+### Task 7 — Finish response-action timing metrics
+- [x] Computed avgTimeToApproval from TIMESTAMPDIFF(SECOND, proposedAt, approvedAt) — returns seconds or null if no approved actions
+- [x] Computed avgTimeToExecution from TIMESTAMPDIFF(SECOND, approvedAt, executedAt) — returns seconds or null if no executed actions
+- [x] No silent fake completeness — null returned honestly when no data exists
+
+### Evidence Package
+- [x] Truth summary: 7 tasks completed, all stale fields fixed, provenance wired, ghost features documented, simulated UI labeled, dormant router mounted, null metrics computed
+- [x] Modified files: pipelineHandoff.test.ts, SOC_COMPLIANCE_EVIDENCE.md, agenticPipeline.ts, graphQueryService.ts, AnalystChat.tsx, routers.ts, responseActionsRouter.ts
+- [x] Contract proof: all tests validate against shared/agenticSchemas.ts live types
+- [x] Runtime proof: recordProvenance() fires after every pipeline synthesis; timing metrics computed from real DB timestamps
+- [x] Test proof: 0 TypeScript errors, 1099 tests pass (46 files)
+- [x] No-handwaving declaration: LIVE = provenance recording, timing metrics, enhancedLLM router. SIMULATED = AnalystChat progress steps (now labeled). SCAFFOLDED-INACTIVE = kgTrustHistory (documented)

@@ -18,7 +18,7 @@
  */
 
 import { invokeLLMWithFallback as invokeLLM } from "../llm/llmService";
-import { searchGraph, getGraphStats, getRiskAnalysis, getEndpoints, getResourceOverview, getUseCases, getErrorPatterns } from "./graphQueryService";
+import { searchGraph, getGraphStats, getRiskAnalysis, getEndpoints, getResourceOverview, getUseCases, getErrorPatterns, recordProvenance } from "./graphQueryService";
 import {
   getEffectiveIndexerConfig,
   indexerSearch,
@@ -1047,6 +1047,19 @@ export async function runAnalystPipeline(
   trustScore = Math.max(0, Math.min(1, trustScore));
 
   const totalDurationMs = Date.now() - pipelineStart;
+
+  // ── Record Provenance (fire-and-forget, never blocks the response) ──
+  recordProvenance({
+    sessionId: hashQuery(query),
+    question: query,
+    answer: answer.slice(0, 4000), // truncate to avoid DB column overflow
+    confidence: trustScore.toFixed(3),
+    endpointIds: [],  // graph layer doesn't expose numeric IDs; tracked via sources
+    warnings: [
+      ...(safetyResult.status === "filtered" ? [`safety_filtered: ${safetyResult.filtered.join(", ")}`] : []),
+      ...(errorSources.length > 0 ? [`retrieval_errors: ${errorSources.length}`] : []),
+    ],
+  }).catch(() => { /* provenance is best-effort — never fail the pipeline */ });
 
   // Final orchestrator step
   steps.push({

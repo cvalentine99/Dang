@@ -146,7 +146,7 @@ function AgentActivityConsole({
         {isLive && (
           <span className="flex items-center gap-1 ml-auto">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-[10px] text-green-400 font-mono">LIVE</span>
+            <span className="text-[10px] text-green-400 font-mono">ESTIMATING</span>
           </span>
         )}
         {isReplay && (
@@ -714,11 +714,11 @@ function LiveAnalysisConsole({ steps }: { steps: AgentStep[] }): React.JSX.Eleme
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400" />
               </span>
-              <span className="text-[10px] text-green-400 font-mono">LIVE</span>
+              <span className="text-[10px] text-green-400 font-mono">ESTIMATED PROGRESS</span>
             </span>
           </div>
 
-          {/* Agent Status Grid */}
+          {/* Agent Status Grid — estimated, not live telemetry */}
           <AgentStatusGrid steps={steps} />
 
           {/* Shimmer progress bar */}
@@ -878,7 +878,10 @@ export default function AnalystChat(): React.JSX.Element {
     return () => window.removeEventListener("analyst-suggestion", handler);
   }, [isAnalyzing, messages]);
 
-  // Simulate live agent steps while waiting for response
+  // Show estimated progress steps while waiting for the backend pipeline.
+  // These are NOT live telemetry from the server — they are client-side
+  // approximations of the pipeline stages to give the analyst visual feedback.
+  // Real agent steps arrive in the response and replace these on completion.
   useEffect(() => {
     if (!isAnalyzing) return;
 
