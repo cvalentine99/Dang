@@ -349,8 +349,16 @@
 - [ ] Frontend: Schedule status badges (active/paused/overdue/errored)
 - [ ] Frontend: Baseline history timeline showing auto-captured snapshots
 
-### Verification Note
-- Backend code exists and tests pass (929/929 as of checkpoint 51aa03d9). Runtime validation against a live Wazuh instance has not been freshly performed in this snapshot.
+### Verification (Mandatory Format)
+
+| Field | Status |
+|-------|--------|
+| **Status** | Partial — backend-complete, frontend-pending |
+| **Code Evidence** | `drizzle/schema.ts`, `server/baselines/baselineSchedulesRouter.ts` (278 lines), `server/baselines/baselineSchedulerService.ts` (278 lines), `server/baselines/scheduleUtils.ts` (48 lines), `server/_core/index.ts`, `server/routers.ts` |
+| **Test Evidence** | `server/baselines/baselineSchedules.test.ts` (278 lines, 30 tests) |
+| **Type-Check** | 0 errors — fresh `npx tsc --noEmit` at 2026-02-28T19:30Z |
+| **Runtime Validation** | Not validated. Scheduler tick requires live Wazuh syscollector endpoints. Sandbox cannot reach private IPs. |
+| **Remaining Caveats** | Frontend schedule management UI (5 items). E2E scheduler execution not validated. |
 
 ## Phase 32: Wazuh Indexer API Integration (Critical Gap)
 
@@ -420,6 +428,17 @@
 > `server/indexer/indexerRouter.test.ts` exists with 12 tests. No separate indexer client test file.
 - [x] Write vitest tests for indexer router endpoints — COMPLETE. 12 tests in `server/indexer/indexerRouter.test.ts`.
 - [ ] Write vitest tests for indexer client — OPEN. No `indexerClient.test.ts` file exists.
+
+### Verification (Mandatory Format)
+
+| Field | Status |
+|-------|--------|
+| **Status** | Mostly Complete |
+| **Code Evidence** | `server/indexer/indexerClient.ts`, `server/indexer/indexerRouter.ts`, `client/src/pages/Home.tsx` (54 indexer refs), `Vulnerabilities.tsx` (17 refs), `SiemEvents.tsx` (16 refs), `Compliance.tsx` (1 ref), `MitreAttack.tsx` (1 ref) |
+| **Test Evidence** | `server/indexer/indexerRouter.test.ts` (12 tests) |
+| **Type-Check** | 0 errors — fresh `npx tsc --noEmit` at 2026-02-28T19:30Z |
+| **Runtime Validation** | Not validated. Requires live Wazuh Indexer (OpenSearch) instance. |
+| **Remaining Caveats** | 4 items open: mock data files, compliance trend charts, MITRE time-series chart, indexer client tests. |
 
 ## Phase 33: OTX Threat Intelligence Feed
 - [x] Store OTX API key as server-side secret
@@ -820,7 +839,16 @@
 - [x] Wire Indexer client to use runtime config with env fallback — COMPLETE. `server/indexer/indexerClient.ts:104` imports `getEffectiveIndexerConfig`.
 - [x] Write vitest tests for connection settings CRUD and access control — COMPLETE. 15 tests in `server/admin/connectionSettings.test.ts`.
 - [x] Verify TypeScript compiles clean — COMPLETE. 0 TS errors (verified 2026-02-28).
-- Verification: Code-complete + test-covered. Runtime validation requires a live Wazuh instance to confirm end-to-end config override flow.
+### Verification (Mandatory Format)
+
+| Field | Status |
+|-------|--------|
+| **Status** | Complete |
+| **Code Evidence** | `server/admin/encryptionService.ts` (60 lines), `server/admin/connectionSettingsService.ts` (273 lines), `server/admin/connectionSettingsRouter.ts` (226 lines), `client/src/pages/AdminSettings.tsx` (456 lines), `server/wazuh/wazuhClient.ts` (3 `getEffectiveWazuhConfig` refs), `server/indexer/indexerClient.ts` (3 `getEffectiveIndexerConfig` refs) |
+| **Test Evidence** | `server/admin/connectionSettings.test.ts` (265 lines, 15 tests) |
+| **Type-Check** | 0 errors — fresh `npx tsc --noEmit` at 2026-02-28T19:30Z |
+| **Runtime Validation** | Not validated. DB override → Wazuh reconnection flow requires live Wazuh instance. Sandbox cannot reach private IPs. |
+| **Remaining Caveats** | E2E flow (save credentials → Wazuh client reconnects) not runtime-validated. Encryption at rest implemented (AES-256-GCM). |
 
 ## Phase 53: Fix Data Integration — Real API Only
 
@@ -962,8 +990,16 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Fix frontend rendering crash on /rules page — COMPLETE. `client/src/pages/RulesetExplorer.tsx` (1034 lines) applies defensive normalization at lines 162–200: `Number()`, `String()`, `Array.isArray()` guards, `??` fallbacks on every field. No `.length` calls on potentially undefined arrays.
 - [x] Debug exact field shape mismatch causing the crash with real Wazuh responses — COMPLETE. Root cause: API returns `null`/`undefined` for optional fields like `mitre`, `pci_dss`, `gdpr`, `hipaa`. Fix: every field is coerced through type-safe normalization before rendering.
 - [x] Add error boundary to catch and display render errors gracefully — COMPLETE. `client/src/components/ErrorBoundary.tsx` wraps all routes in `App.tsx`.
-- Evidence: `client/src/pages/RulesetExplorer.tsx` (lines 162–200), `client/src/components/ErrorBoundary.tsx`, `client/src/App.tsx` (lines 5, 53, 91, 100, 115).
-- Verification: Code-complete + test-covered (Phase 58 tests). Runtime validation requires a live Wazuh instance returning rules with missing optional fields.
+### Verification (Mandatory Format)
+
+| Field | Status |
+|-------|--------|
+| **Status** | Complete |
+| **Code Evidence** | `client/src/pages/RulesetExplorer.tsx` (1034 lines, 33 normalization guards), `client/src/components/ErrorBoundary.tsx` (185 lines), `client/src/App.tsx` (5 ErrorBoundary refs), `server/wazuh/wazuhRouter.ts` (14 rules/decoders refs) |
+| **Test Evidence** | Covered by `server/wazuh/wazuhRouter.test.ts` (rules endpoint tests) |
+| **Type-Check** | 0 errors — fresh `npx tsc --noEmit` at 2026-02-28T19:30Z |
+| **Runtime Validation** | Not validated. Normalization handles known field shapes. Unusual Wazuh rule configurations not tested against live API. |
+| **Remaining Caveats** | If Wazuh returns completely unexpected data structures, normalization produces empty strings rather than crash (intended fail-safe). |
 
 - [x] Rename "SecondSight Analyst" to "Walter" on the Security Analyst page
 
@@ -1824,3 +1860,21 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 ## Phase 31 Implementation Notes (cross-reference)
 > Canonical status is at **Phase 31** above (line ~333). This section is retained for implementation log history only.
 > Status: **PARTIAL** — backend-complete, frontend-pending. See Phase 31 header for authoritative checklist.
+
+## Phase: Verification Discipline (Project Rule)
+
+- [x] Create verification-status.md with per-phase structured verification (code/test/type-check/runtime/caveats) — COMPLETE. `verification-status.md` created with 20+ phase entries.
+- [x] Perform targeted high-risk reconciliation on: Phase 31, response action lifecycle, living case reporting, connection settings, /rules page — COMPLETE. `high-risk-reconciliation.md` created with shell-verified evidence tables for all 5 subsystems.
+- [x] Update major phase summaries in todo.md to use new verification format — COMPLETE. Phases 31, 32, 52, 59 now have mandatory verification tables.
+- [x] Establish mandatory check-in format: Status / Code Evidence / Test Evidence / Runtime Evidence / Remaining Caveats — COMPLETE. Format documented and applied.
+
+### Verification (Mandatory Format)
+
+| Field | Status |
+|-------|--------|
+| **Status** | Complete |
+| **Code Evidence** | `verification-status.md`, `high-risk-reconciliation.md`, `RECONCILIATION_NOTE.md`, updated verification tables in `todo.md` (Phases 31, 32, 52, 59) |
+| **Test Evidence** | N/A (documentation phase) |
+| **Type-Check** | 0 errors — fresh `npx tsc --noEmit` at 2026-02-28T19:30Z |
+| **Runtime Validation** | N/A (documentation phase) |
+| **Remaining Caveats** | None. Verification discipline is now established as a project rule. |
