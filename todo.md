@@ -330,19 +330,27 @@
 - [x] Write vitest tests for baseline CRUD (14 tests, 62 total passing)
 - [x] Save checkpoint
 
-## Phase 31: Scheduled Baseline Auto-Capture — STATUS: OPEN
-> No implementation exists. No `baseline_schedules` table in schema, no scheduler service, no frontend schedule UI.
-> This is genuinely unbuilt work.
+## Phase 31: Scheduled Baseline Auto-Capture — STATUS: PARTIAL (backend-complete, frontend-pending)
+> Backend is fully implemented: schema, CRUD router, scheduler service, startup wiring, and tests.
+> Frontend schedule management UI has not been built yet.
 
-- [ ] Database table: baseline_schedules (id, userId, name, agentIds, frequency, enabled, lastRunAt, nextRunAt, retentionCount, createdAt)
-- [ ] Backend: Schedule CRUD (create, list, toggle, delete, triggerNow)
-- [ ] Backend: BaselineScheduler service with interval-based execution
+### Backend — COMPLETE
+- [x] Database table: `baseline_schedules` in `drizzle/schema.ts` + SQL applied. `scheduleId` column added to `config_baselines`.
+- [x] Backend: Schedule CRUD router — 8 procedures (list, get, create, update, toggle, delete, triggerNow, history) in `server/baselines/baselineSchedulesRouter.ts`
+- [x] Backend: BaselineSchedulerService with 5-min interval tick in `server/baselines/baselineSchedulerService.ts`
+- [x] Startup wiring: `server/_core/index.ts` calls `startBaselineScheduler()` on boot with 30s warmup
+- [x] Router wiring: `baselineSchedules` added to `server/routers.ts`
+- [x] Tests: 30 tests in `server/baselines/baselineSchedules.test.ts` — utilities, schema exports, router structure, service exports, frequency coverage, edge cases
+
+### Frontend — OPEN
 - [ ] Frontend: Schedules tab in DriftComparison with schedule list
 - [ ] Frontend: Create schedule dialog (name, frequency, retention, agent selection)
 - [ ] Frontend: Toggle schedule on/off, delete, trigger now
-- [ ] Frontend: Schedule status badges (active/paused/overdue)
+- [ ] Frontend: Schedule status badges (active/paused/overdue/errored)
 - [ ] Frontend: Baseline history timeline showing auto-captured snapshots
-- [ ] Write vitest tests for schedule CRUD
+
+### Verification Note
+- Backend code exists and tests pass (929/929 as of checkpoint 51aa03d9). Runtime validation against a live Wazuh instance has not been freshly performed in this snapshot.
 
 ## Phase 32: Wazuh Indexer API Integration (Critical Gap)
 
@@ -1813,32 +1821,6 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Write tests proving counters match response_actions table state after transitions — 23 tests in counterDrift.test.ts
 - [x] All 902 tests passing across 40 test files, 0 TypeScript errors
 
-## Phase 31 Implementation: Scheduled Baseline Auto-Capture
-
-### Backend — Database Schema
-- [x] Create baseline_schedules table (id, userId, name, agentIds JSON, frequency enum, enabled, lastRunAt, nextRunAt, retentionCount, createdAt, updatedAt) — `drizzle/schema.ts` + SQL applied
-- [x] Generate and apply migration SQL — `baseline_schedules` table created, `scheduleId` column added to `config_baselines`
-
-### Backend — Schedule CRUD Router
-- [x] createSchedule: create new baseline schedule with validation — `server/baselines/baselineSchedulesRouter.ts`
-- [x] listSchedules: list all schedules for current user with status — `list` procedure
-- [x] updateSchedule: update schedule name, frequency, agents, retention — `update` procedure with nextRunAt recompute on frequency change
-- [x] toggleSchedule: enable/disable a schedule — `toggle` procedure, re-enables recompute nextRunAt
-- [x] deleteSchedule: hard delete with baseline unlinking — `delete` procedure, unlinks baselines before deleting
-- [x] triggerNow: manually trigger immediate baseline capture — `triggerNow` procedure delegates to `executeScheduledCapture`
-- [x] getScheduleHistory: get baseline captures triggered by a specific schedule — `history` procedure
-
-### Backend — Scheduler Service
-- [x] BaselineSchedulerService: interval-based check for due schedules — `server/baselines/baselineSchedulerService.ts` (5-min interval)
-- [x] Execute baseline capture using existing baseline infrastructure — fetches syscollector packages/services/users per agent
-- [x] Update lastRunAt and compute nextRunAt after execution — via `computeNextRunAt()` from `scheduleUtils.ts`
-- [x] Respect retentionCount: auto-prune old baselines beyond retention limit — `pruneOldBaselines()` deletes oldest beyond limit
-- [x] Error handling: mark schedule as errored if capture fails, don't block other schedules — `lastError` column, per-agent failure tolerance
-- [x] Wire scheduler into server startup — `server/_core/index.ts` calls `startBaselineScheduler()` on boot with 30s warmup
-
-### Tests
-- [x] Schedule CRUD tests (create, list, update, toggle, delete) — router structure verified in `baselineSchedules.test.ts`
-- [x] Scheduler service logic tests (due detection, nextRunAt computation, retention pruning) — 30 tests covering all utilities, frequencies, edge cases
-- [x] triggerNow tests — procedure existence verified
-- [x] Access control tests (user can only see own schedules) — all procedures use `protectedProcedure` with `ctx.user.id` filter
-- [x] All 929 tests passing across 41 test files, 0 TypeScript errors
+## Phase 31 Implementation Notes (cross-reference)
+> Canonical status is at **Phase 31** above (line ~333). This section is retained for implementation log history only.
+> Status: **PARTIAL** — backend-complete, frontend-pending. See Phase 31 header for authoritative checklist.
