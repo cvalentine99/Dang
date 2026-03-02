@@ -192,12 +192,13 @@ export default function MitreAttack() {
   const { indexerTacticAlerts, indexerTimeline, indexerTopTechniques, totalMitreAlerts } = useMemo(() => {
     if (indexerHealthy && mitreAggQ.data) {
       const raw = mitreAggQ.data as Record<string, unknown>;
-      const aggs = raw.aggregations as Record<string, unknown> | undefined;
+      const esData = raw.data as Record<string, unknown> | undefined;
+      const aggs = esData?.aggregations as Record<string, unknown> | undefined;
       if (aggs) {
         const tacticBuckets = ((aggs.tactics as Record<string, unknown>)?.buckets ?? []) as Array<{ key: string; doc_count: number }>;
         const techBuckets = ((aggs.techniques as Record<string, unknown>)?.buckets ?? []) as Array<{ key: string; doc_count: number }>;
         const timelineBuckets = ((aggs.timeline as Record<string, unknown>)?.buckets ?? []) as Array<{ key_as_string: string; doc_count: number; tactics?: { buckets: Array<{ key: string; doc_count: number }> } }>;
-        const totalHits = ((raw.hits as Record<string, unknown>)?.total as Record<string, unknown>)?.value as number ?? 0;
+        const totalHits = ((esData?.hits as Record<string, unknown>)?.total as Record<string, unknown>)?.value as number ?? 0;
 
         const tacticAlerts = tacticBuckets.map(b => ({ tactic: b.key, alerts: b.doc_count, delta: 0 }));
         const topTechniques = techBuckets.slice(0, 10).map(b => ({ id: b.key, name: b.key, tactic: "", alerts: b.doc_count }));

@@ -2309,3 +2309,14 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Add database service container for test suite (MySQL 8.0 with migrations)
 - [x] Add contract-audit job with 5 automated security checks
 - [ ] Push workflow to GitHub — requires user action (GitHub App lacks `workflows` permission)
+
+## Investigation: alert_queue INSERT failure
+
+- [ ] Investigate "Send to Walter" button INSERT failure on Alerts Timeline page
+
+## Bug Fix: SIEM Events page not displaying data
+
+- [x] Fix safeSearch() response shape mismatch in SiemEvents.tsx (data.data.hits.hits vs data.hits.hits)
+- [x] Fix same mismatch in Compliance.tsx and MitreAttack.tsx
+- [x] Audit all other pages — Home, AlertsTimeline, Vulnerabilities, AgentDetail, AgentCompare already correct
+- [x] Write 4 new safeSearch envelope tests to prevent regression (1209 tests passing)

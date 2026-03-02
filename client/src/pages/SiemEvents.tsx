@@ -169,7 +169,8 @@ export default function SiemEvents() {
   // ─── Data ────────────────────────────────────────────────────────────────
   const events: SiemEvent[] = useMemo(() => {
     if (!alertsSearchQ.data) return [];
-    const hits = ((alertsSearchQ.data as Record<string, unknown>)?.hits as Record<string, unknown>)?.hits as Array<{ _source: Record<string, unknown> }> ?? [];
+    const safeData = (alertsSearchQ.data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+    const hits = (safeData?.hits as Record<string, unknown>)?.hits as Array<{ _source: Record<string, unknown> }> ?? [];
     return hits.map((h) => {
       const s = h._source;
       const agent = (s.agent ?? {}) as Record<string, unknown>;

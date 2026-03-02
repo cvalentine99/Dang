@@ -1,0 +1,146 @@
+{
+  "query": "SHOW COLUMNS FROM alert_queue;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute SHOW COLUMNS FROM alert_queue;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "alertId",
+      "Type": "varchar(128)",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ruleId",
+      "Type": "varchar(32)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ruleDescription",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ruleLevel",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "agentId",
+      "Type": "varchar(16)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "agentName",
+      "Type": "varchar(128)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "alertTimestamp",
+      "Type": "varchar(64)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "rawJson",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "status",
+      "Type": "enum('queued','processing','completed','failed','dismissed')",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": "queued",
+      "Extra": ""
+    },
+    {
+      "Field": "triageResult",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "queuedBy",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "queuedAt",
+      "Type": "timestamp",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "processedAt",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "completedAt",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "pipelineTriageId",
+      "Type": "varchar(64)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "autoTriageStatus",
+      "Type": "varchar(20)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "pending",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\nalertId\tvarchar(128)\tNO\tMUL\tNULL\t\nruleId\tvarchar(32)\tNO\t\tNULL\t\nruleDescription\ttext\tYES\t\tNULL\t\nruleLevel\tint\tNO\t\t0\t\nagentId\tvarchar(16)\tYES\t\tNULL\t\nagentName\tvarchar(128)\tYES\t\tNULL\t\nalertTimestamp\tvarchar(64)\tYES\t\tNULL\t\nrawJson\tjson\tYES\t\tNULL\t\nstatus\tenum('queued','processing','completed','failed','dismissed')\tNO\tMUL\tqueued\t\ntriageResult\tjson\tYES\t\tNULL\t\nqueuedBy\tint\tYES\t\tNULL\t\nqueuedAt\ttimestamp\tNO\tMUL\tCURRENT_TIMESTAMP\t\nprocessedAt\ttimestamp\tYES\t\tNULL\t\ncompletedAt\ttimestamp\tYES\t\tNULL\t\npipelineTriageId\tvarchar(64)\tYES\t\tNULL\t\nautoTriageStatus\tvarchar(20)\tYES\t\tpending\t\n",
+  "stderr": "",
+  "execution_time_ms": 49
+}

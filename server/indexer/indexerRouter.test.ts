@@ -246,6 +246,65 @@ describe("indexer router", () => {
   });
 });
 
+describe("safeSearch response envelope", () => {
+  let caller: ReturnType<typeof appRouter.createCaller>;
+
+  beforeEach(() => {
+    caller = appRouter.createCaller(createTestContext());
+  });
+
+  it("alertsSearch wraps ES response in { configured, data } envelope", async () => {
+    const result = await caller.indexer.alertsSearch({
+      from: "now-1h",
+      to: "now",
+      size: 10,
+    });
+    // safeSearch returns { configured: bool, data: <ES response> }
+    expect(result).toHaveProperty("configured");
+    expect(result).toHaveProperty("data");
+    // The ES response is nested under .data, NOT at the top level
+    expect(result).not.toHaveProperty("hits");
+    expect(result).not.toHaveProperty("aggregations");
+    // The actual ES data is under .data
+    const esData = (result as Record<string, unknown>).data as Record<string, unknown>;
+    expect(esData).toHaveProperty("hits");
+    expect(esData.hits).toHaveProperty("hits");
+  });
+
+  it("alertsAggByLevel wraps ES response in { configured, data } envelope", async () => {
+    const result = await caller.indexer.alertsAggByLevel({
+      from: "now-1h",
+      to: "now",
+    });
+    expect(result).toHaveProperty("configured");
+    expect(result).toHaveProperty("data");
+    expect(result).not.toHaveProperty("aggregations");
+    const esData = (result as Record<string, unknown>).data as Record<string, unknown>;
+    expect(esData).toHaveProperty("aggregations");
+  });
+
+  it("alertsAggByMitre wraps ES response in { configured, data } envelope", async () => {
+    const result = await caller.indexer.alertsAggByMitre({
+      from: "now-1h",
+      to: "now",
+    });
+    expect(result).toHaveProperty("configured");
+    expect(result).toHaveProperty("data");
+    expect(result).not.toHaveProperty("aggregations");
+  });
+
+  it("vulnSearch wraps ES response in { configured, data } envelope", async () => {
+    const result = await caller.indexer.vulnSearch({
+      from: "now-7d",
+      to: "now",
+      size: 10,
+    });
+    expect(result).toHaveProperty("configured");
+    expect(result).toHaveProperty("data");
+    expect(result).not.toHaveProperty("hits");
+  });
+});
+
 describe("indexer router auth gating", () => {
   it("rejects unauthenticated access to indexer.status", async () => {
     const unauthCaller = appRouter.createCaller({
