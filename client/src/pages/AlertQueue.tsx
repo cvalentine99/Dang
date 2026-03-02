@@ -2,8 +2,9 @@
  * Alert Queue — 10-deep FIFO queue for alerts awaiting Walter analysis.
  *
  * Analysts queue alerts from the Alerts Timeline, then click "Analyze" to
- * trigger Walter's full agentic pipeline on demand. Results are displayed
- * inline with the queue item.
+ * trigger the UNIFIED structured triage pipeline. Results create triageObjects
+ * rows that feed into /triage → correlation → hypothesis → /living-cases.
+ * Legacy inline triageResult rendering is preserved for backward compatibility.
  */
 
 import { trpc } from "@/lib/trpc";
@@ -173,7 +174,7 @@ function QueueItemCard({
   const [showRaw, setShowRaw] = useState(false);
   const [, navigate] = useLocation();
 
-  // Auto-triage mutation
+  // Auto-triage mutation (kept for backward compatibility — both buttons now use the same pipeline)
   const autoTriageMutation = trpc.pipeline.autoTriageQueueItem.useMutation({
     onSuccess: (result) => {
       if (result.success) {
@@ -301,34 +302,22 @@ function QueueItemCard({
           )}
           {item.status === "queued" && (
             <>
-              {/* Pipeline triage button */}
+              {/* Unified Analyze button — now calls the structured triage pipeline */}
               {!item.pipelineTriageId && item.autoTriageStatus !== "running" && (
                 <button
-                  onClick={() => autoTriageMutation.mutate({ queueItemId: item.id })}
-                  disabled={autoTriageMutation.isPending}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-300 text-xs font-medium hover:bg-violet-500/20 transition-all disabled:opacity-50"
+                  onClick={() => onAnalyze(item.id)}
+                  disabled={isProcessing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-medium hover:bg-purple-500/25 transition-all disabled:opacity-50"
                   title="Run structured triage pipeline"
                 >
-                  {autoTriageMutation.isPending ? (
+                  {isProcessing ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <Sparkles className="h-3.5 w-3.5" />
                   )}
-                  AI Triage
+                  Analyze
                 </button>
               )}
-              <button
-                onClick={() => onAnalyze(item.id)}
-                disabled={isProcessing}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-medium hover:bg-purple-500/25 transition-all disabled:opacity-50"
-              >
-                {isProcessing ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Play className="h-3.5 w-3.5" />
-                )}
-                Analyze
-              </button>
               <button
                 onClick={() => onDismiss(item.id)}
                 className="p-1.5 rounded-lg border border-white/10 text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all"
@@ -472,10 +461,22 @@ export default function AlertQueue() {
 
   const processMutation = trpc.alertQueue.process.useMutation({
     onMutate: ({ id }) => setProcessingId(id),
-    onSuccess: () => {
-      toast.success("Walter analysis complete", {
-        description: "Expand the queue item to view the triage report",
-      });
+    onSuccess: (result) => {
+      if (result.success && result.triageId) {
+        toast.success("Structured triage complete", {
+          description: `Triage ID: ${result.triageId} — view on Triage Pipeline page`,
+          action: {
+            label: "View Triage",
+            onClick: () => navigate("/triage"),
+          },
+        });
+      } else if (result.success && result.alreadyTriaged) {
+        toast.info("Already triaged", {
+          description: `Triage ID: ${result.triageId}`,
+        });
+      } else {
+        toast.error("Triage failed", { description: (result as any).error ?? "Unknown error" });
+      }
       utils.alertQueue.list.invalidate();
       utils.alertQueue.count.invalidate();
     },
@@ -589,7 +590,7 @@ export default function AlertQueue() {
             <div>
               <h1 className="text-lg font-display font-bold text-foreground">Walter Queue</h1>
               <p className="text-xs text-muted-foreground">
-                {activeCount}/10 alerts queued · Sorted by severity (critical first) · Click "Analyze" to trigger Walter's pipeline
+                {activeCount}/10 alerts queued · Sorted by severity (critical first) · Click "Analyze" to run structured triage pipeline
               </p>
             </div>
           </div>

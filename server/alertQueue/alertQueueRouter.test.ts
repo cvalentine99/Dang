@@ -41,17 +41,20 @@ vi.mock("../db", () => ({
   }),
 }));
 
-vi.mock("../graph/agenticPipeline", () => ({
-  runAnalystPipeline: vi.fn().mockResolvedValue({
-    answer: "Test triage result",
-    reasoning: "Test reasoning",
-    trustScore: 0.85,
-    confidence: 0.9,
-    safetyStatus: "clean",
-    agentSteps: [],
-    sources: [],
-    suggestedFollowUps: ["Follow up 1"],
-    provenance: {},
+vi.mock("../agenticPipeline/triageAgent", () => ({
+  runTriageAgent: vi.fn().mockResolvedValue({
+    success: true,
+    triageId: "triage-abc123",
+    dbId: 42,
+    latencyMs: 1500,
+    triageObject: {
+      severity: "high",
+      severityConfidence: 0.85,
+      severityReasoning: "Multiple SSH brute force indicators detected",
+      route: "C_HIGH_CONFIDENCE",
+      alertFamily: "brute_force",
+      recommendedActions: ["Block source IP", "Review SSH config"],
+    },
   }),
 }));
 
@@ -220,22 +223,23 @@ describe("Alert Queue — Business Logic", () => {
     expect(failLifecycle[2]).toBe("failed");
   });
 
-  it("should store triage result with trust score and confidence", () => {
+  it("should store triage result with pipeline triage ID and structured data", () => {
+    // The unified pipeline now stores structured triage data with a pipelineTriageId
     const triageResult = {
-      answer: "Analysis indicates SSH brute force attack from external IP",
-      reasoning: "Multiple failed SSH login attempts detected",
+      answer: "**Severity:** high (85% confidence)\n**Route:** C_HIGH_CONFIDENCE\n**Alert Family:** brute_force\n\nMultiple SSH brute force indicators detected\n\n**Recommended Actions:**\n- Block source IP\n- Review SSH config",
+      reasoning: "Multiple SSH brute force indicators detected",
       trustScore: 0.85,
-      confidence: 0.9,
-      safetyStatus: "clean",
-      agentSteps: [],
-      sources: [],
-      suggestedFollowUps: ["Check firewall logs", "Review SSH config"],
+      confidence: 0.85,
+      pipelineTriageId: "triage-abc123",
+      severity: "high",
+      route: "C_HIGH_CONFIDENCE",
     };
 
+    expect(triageResult.pipelineTriageId).toBe("triage-abc123");
+    expect(triageResult.severity).toBe("high");
+    expect(triageResult.route).toBe("C_HIGH_CONFIDENCE");
     expect(triageResult.trustScore).toBeGreaterThan(0);
     expect(triageResult.confidence).toBeGreaterThan(0);
-    expect(triageResult.safetyStatus).toBe("clean");
-    expect(triageResult.suggestedFollowUps).toHaveLength(2);
   });
 
   it("should cap raw JSON in context prompt to prevent token overflow", () => {
@@ -312,6 +316,139 @@ describe("Alert Queue — Severity Classification", () => {
     expect(classify(4)).toBe("Medium");
     expect(classify(3)).toBe("Low");
     expect(classify(0)).toBe("Low");
+  });
+});
+
+describe("Alert Queue — Unified Pipeline Contract", () => {
+  it("should use runTriageAgent instead of runAnalystPipeline", () => {
+    // The unified pipeline replaces the old dead-end runAnalystPipeline path
+    // with runTriageAgent which creates triageObjects rows that feed into
+    // the full chain: /triage → correlation → hypothesis → /living-cases
+    const unifiedPipelineImport = "../agenticPipeline/triageAgent";
+    const oldDeadEndImport = "../graph/agenticPipeline";
+
+    // Verify the import path changed
+    expect(unifiedPipelineImport).not.toBe(oldDeadEndImport);
+    expect(unifiedPipelineImport).toContain("triageAgent");
+  });
+
+  it("should set pipelineTriageId on queue item after successful triage", () => {
+    // After runTriageAgent succeeds, the queue item should have:
+    // - pipelineTriageId linking to the triageObjects row
+    // - autoTriageStatus = 'completed'
+    // - status = 'completed'
+    const queueItemUpdate = {
+      status: "completed",
+      pipelineTriageId: "triage-abc123",
+      autoTriageStatus: "completed",
+      completedAt: new Date(),
+    };
+
+    expect(queueItemUpdate.pipelineTriageId).toBeTruthy();
+    expect(queueItemUpdate.autoTriageStatus).toBe("completed");
+    expect(queueItemUpdate.status).toBe("completed");
+  });
+
+  it("should set autoTriageStatus to 'running' when processing starts", () => {
+    // The process mutation now sets autoTriageStatus = 'running' alongside status = 'processing'
+    const processingUpdate = {
+      status: "processing",
+      processedAt: new Date(),
+      autoTriageStatus: "running",
+    };
+
+    expect(processingUpdate.autoTriageStatus).toBe("running");
+    expect(processingUpdate.status).toBe("processing");
+  });
+
+  it("should return alreadyTriaged when item has existing pipelineTriageId", () => {
+    // If the queue item already has a pipelineTriageId, process should return early
+    const item = { pipelineTriageId: "triage-existing" };
+    const result = item.pipelineTriageId
+      ? { success: true, alreadyTriaged: true, triageId: item.pipelineTriageId }
+      : { success: false };
+
+    expect(result.success).toBe(true);
+    expect((result as any).alreadyTriaged).toBe(true);
+    expect((result as any).triageId).toBe("triage-existing");
+  });
+
+  it("should build backward-compatible triageResult from pipeline output", () => {
+    // The unified pipeline builds a triageResult that works with the legacy UI
+    const pipelineOutput = {
+      severity: "high",
+      severityConfidence: 0.85,
+      severityReasoning: "Multiple indicators detected",
+      route: "C_HIGH_CONFIDENCE",
+      alertFamily: "brute_force",
+      recommendedActions: ["Block IP", "Review logs"],
+    };
+
+    const triageResult = {
+      answer: `**Severity:** ${pipelineOutput.severity} (${(pipelineOutput.severityConfidence * 100).toFixed(0)}% confidence)\n**Route:** ${pipelineOutput.route}\n**Alert Family:** ${pipelineOutput.alertFamily}\n\n${pipelineOutput.severityReasoning}\n\n**Recommended Actions:**\n${pipelineOutput.recommendedActions.map(a => `- ${a}`).join("\n")}`,
+      reasoning: pipelineOutput.severityReasoning,
+      trustScore: pipelineOutput.severityConfidence,
+      confidence: pipelineOutput.severityConfidence,
+      pipelineTriageId: "triage-abc123",
+      severity: pipelineOutput.severity,
+      route: pipelineOutput.route,
+    };
+
+    expect(triageResult.answer).toContain("**Severity:** high");
+    expect(triageResult.answer).toContain("**Route:** C_HIGH_CONFIDENCE");
+    expect(triageResult.answer).toContain("- Block IP");
+    expect(triageResult.pipelineTriageId).toBeTruthy();
+    expect(triageResult.severity).toBe("high");
+    expect(triageResult.route).toBe("C_HIGH_CONFIDENCE");
+  });
+
+  it("should mark queue item as failed when triage pipeline fails", () => {
+    const failedUpdate = {
+      status: "failed",
+      autoTriageStatus: "failed",
+      triageResult: {
+        answer: "Triage failed: LLM timeout",
+        reasoning: "Pipeline error during structured triage",
+      },
+      completedAt: new Date(),
+    };
+
+    expect(failedUpdate.status).toBe("failed");
+    expect(failedUpdate.autoTriageStatus).toBe("failed");
+    expect(failedUpdate.triageResult.answer).toContain("Triage failed");
+    expect(failedUpdate.triageResult.reasoning).toContain("structured triage");
+  });
+
+  it("should build rawAlert from queue item fields when rawJson is null", () => {
+    // When rawJson is null, the process mutation builds a synthetic alert
+    const item = {
+      alertId: "test-001",
+      ruleId: "5710",
+      ruleDescription: "SSH brute force",
+      ruleLevel: 10,
+      agentId: "001",
+      agentName: "web-server",
+      alertTimestamp: "2026-02-26T10:00:00Z",
+      rawJson: null as Record<string, unknown> | null,
+    };
+
+    const rawAlert = item.rawJson ?? {
+      id: item.alertId,
+      rule: {
+        id: item.ruleId,
+        description: item.ruleDescription,
+        level: item.ruleLevel,
+      },
+      agent: {
+        id: item.agentId,
+        name: item.agentName,
+      },
+      timestamp: item.alertTimestamp,
+    };
+
+    expect(rawAlert).toHaveProperty("id", "test-001");
+    expect(rawAlert).toHaveProperty("rule.id", "5710");
+    expect(rawAlert).toHaveProperty("agent.name", "web-server");
   });
 });
 

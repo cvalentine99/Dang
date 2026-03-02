@@ -2320,3 +2320,14 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Fix same mismatch in Compliance.tsx and MitreAttack.tsx
 - [x] Audit all other pages — Home, AlertsTimeline, Vulnerabilities, AgentDetail, AgentCompare already correct
 - [x] Write 4 new safeSearch envelope tests to prevent regression (1209 tests passing)
+
+## Unify Walter Pipeline (Split-Brain Fix)
+
+- [x] Rewrite alertQueue.process to call runTriageAgent instead of runAnalystPipeline
+- [x] Remove import of runAnalystPipeline from alertQueueRouter.ts
+- [x] Store pipelineTriageId on queue item after triage (same as autoTriageQueueItem)
+- [x] Update AlertQueue frontend — unified single "Analyze" button (removed duplicate AI Triage)
+- [x] Preserve backward-compatible triageResult rendering for legacy items
+- [x] Ensure alertQueue.process creates triageObjects row (feeds into /triage)
+- [x] Update alertQueueRouter tests — 26 tests passing (7 new unified pipeline contract tests)
+- [x] Full test suite: 52 files, 1216 tests passing

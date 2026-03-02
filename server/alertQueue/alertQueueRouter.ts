@@ -1,11 +1,15 @@
 /**
  * Alert Queue Router — tRPC procedures for the 10-deep alert-to-Walter queue.
  *
+ * UNIFIED PIPELINE: All processing now flows through the structured pipeline
+ * (runTriageAgent → correlateFromTriage → generateHypothesis) instead of the
+ * old runAnalystPipeline dead-end path.
+ *
  * Provides:
  * - list: Get all queued/completed items (ordered by severity desc within status groups)
  * - enqueue: Add an alert to the queue (max 10, lowest-severity evicted)
  * - remove: Remove/dismiss an item from the queue
- * - process: Trigger Walter analysis on a queued item (human-initiated)
+ * - process: Trigger structured triage pipeline on a queued item (human-initiated)
  * - getTriageResult: Get the triage result for a completed item
  * - count: Get the current queue depth
  */
@@ -16,7 +20,7 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { alertQueue } from "../../drizzle/schema";
 import { eq, desc, asc, sql, and, inArray, gte } from "drizzle-orm";
-import { runAnalystPipeline, type AnalystMessage } from "../graph/agenticPipeline";
+import { runTriageAgent } from "../agenticPipeline/triageAgent";
 
 const MAX_QUEUE_DEPTH = 10;
 
@@ -171,13 +175,18 @@ export const alertQueueRouter = router({
     }),
 
   /**
-   * Process a queued alert — triggers Walter's agentic pipeline.
-   * This is human-initiated: analyst clicks the queue item to start analysis.
-   * Returns the full triage result.
+   * Process a queued alert — triggers the UNIFIED structured triage pipeline.
+   * This is human-initiated: analyst clicks "Analyze" on a queue item.
+   *
+   * UNIFIED PIPELINE: Now calls runTriageAgent() which creates a triageObjects
+   * row and links it back via pipelineTriageId. This feeds into the full chain:
+   * /triage → correlateFromTriage → generateHypothesis → /living-cases
+   *
+   * The old runAnalystPipeline() dead-end path has been removed.
    */
   process: protectedProcedure
     .input(z.object({ id: z.number().int() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
@@ -191,51 +200,113 @@ export const alertQueueRouter = router({
       if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "Queue item not found" });
       if (item.status !== "queued") throw new TRPCError({ code: "BAD_REQUEST", message: `Cannot process item with status: ${item.status}` });
 
+      // Check if already triaged via the pipeline
+      if (item.pipelineTriageId) {
+        return {
+          success: true,
+          alreadyTriaged: true,
+          triageId: item.pipelineTriageId,
+          triageResult: item.triageResult,
+        };
+      }
+
       // Mark as processing
       await db
         .update(alertQueue)
-        .set({ status: "processing", processedAt: new Date() })
+        .set({
+          status: "processing",
+          processedAt: new Date(),
+          autoTriageStatus: "running",
+        })
         .where(eq(alertQueue.id, input.id));
 
-      // Build the context prompt for Walter
-      const alertContext = buildAlertContextPrompt(item);
+      // Build the raw alert from queue item (same pattern as autoTriageQueueItem)
+      const rawAlert = item.rawJson ?? {
+        id: item.alertId,
+        rule: {
+          id: item.ruleId,
+          description: item.ruleDescription,
+          level: item.ruleLevel,
+        },
+        agent: {
+          id: item.agentId,
+          name: item.agentName,
+        },
+        timestamp: item.alertTimestamp,
+      };
 
       try {
-        // Run Walter's agentic pipeline with the alert context
-        const result = await runAnalystPipeline(alertContext, []);
+        // Run the UNIFIED triage agent — creates a triageObjects row
+        const result = await runTriageAgent({
+          rawAlert,
+          userId: ctx.user.id,
+          alertQueueItemId: item.id,
+        });
 
-        // Store the triage result
-        const triageResult = {
-          answer: result.answer,
-          reasoning: result.reasoning,
-          trustScore: result.trustScore,
-          confidence: result.confidence,
-          safetyStatus: result.safetyStatus,
-          agentSteps: result.agentSteps as unknown as Array<Record<string, unknown>>,
-          sources: result.sources as unknown as Array<Record<string, unknown>>,
-          suggestedFollowUps: result.suggestedFollowUps,
-          provenance: result.provenance as unknown as Record<string, unknown>,
-        };
+        if (result.success && result.triageId) {
+          // Build a summary triageResult for backward compatibility
+          // (legacy UI rendering of inline triage data)
+          const triageResult = {
+            answer: result.triageObject
+              ? `**Severity:** ${result.triageObject.severity} (${((result.triageObject.severityConfidence ?? 0) * 100).toFixed(0)}% confidence)\n**Route:** ${result.triageObject.route}\n**Alert Family:** ${result.triageObject.alertFamily}\n\n${result.triageObject.severityReasoning ?? ""}\n\n**Recommended Actions:**\n${(result.triageObject.recommendedActions ?? []).map((a: string) => `- ${a}`).join("\n")}`
+              : "Triage completed — view details on the Triage Pipeline page.",
+            reasoning: result.triageObject?.severityReasoning ?? "Triage completed via unified pipeline",
+            trustScore: result.triageObject?.severityConfidence ?? null,
+            confidence: result.triageObject?.severityConfidence ?? null,
+            // Link to the structured pipeline
+            pipelineTriageId: result.triageId,
+            severity: result.triageObject?.severity ?? null,
+            route: result.triageObject?.route ?? null,
+          };
 
-        await db
-          .update(alertQueue)
-          .set({
-            status: "completed",
+          // Update queue item with triage link + backward-compatible result
+          await db
+            .update(alertQueue)
+            .set({
+              status: "completed",
+              pipelineTriageId: result.triageId,
+              autoTriageStatus: "completed",
+              triageResult,
+              completedAt: new Date(),
+            })
+            .where(eq(alertQueue.id, input.id));
+
+          return {
+            success: true,
+            triageId: result.triageId,
             triageResult,
-            completedAt: new Date(),
-          })
-          .where(eq(alertQueue.id, input.id));
+            latencyMs: result.latencyMs,
+          };
+        } else {
+          // Triage failed
+          await db
+            .update(alertQueue)
+            .set({
+              status: "failed",
+              autoTriageStatus: "failed",
+              triageResult: {
+                answer: `Triage failed: ${result.error ?? "Unknown error"}`,
+                reasoning: "Pipeline error during structured triage",
+              },
+              completedAt: new Date(),
+            })
+            .where(eq(alertQueue.id, input.id));
 
-        return { success: true, triageResult };
+          return {
+            success: false,
+            error: result.error ?? "Triage pipeline failed",
+          };
+        }
       } catch (err) {
         // Mark as failed
         await db
           .update(alertQueue)
           .set({
             status: "failed",
+            autoTriageStatus: "failed",
             triageResult: {
               answer: `Analysis failed: ${(err as Error).message}`,
-              reasoning: "Pipeline error during alert triage",
+              reasoning: "Pipeline error during structured triage",
             },
             completedAt: new Date(),
           })
@@ -318,67 +389,3 @@ export const alertQueueRouter = router({
     return { success: true };
   }),
 });
-
-/**
- * Build a rich context prompt from the alert data for Walter's pipeline.
- */
-function buildAlertContextPrompt(item: {
-  alertId: string;
-  ruleId: string;
-  ruleDescription: string | null;
-  ruleLevel: number;
-  agentId: string | null;
-  agentName: string | null;
-  alertTimestamp: string | null;
-  rawJson: Record<string, unknown> | null;
-}): string {
-  const parts: string[] = [
-    `Triage the following Wazuh alert and provide a comprehensive security analysis:`,
-    ``,
-    `**Alert ID:** ${item.alertId}`,
-    `**Rule ID:** ${item.ruleId}`,
-    `**Rule Description:** ${item.ruleDescription ?? "Unknown"}`,
-    `**Severity Level:** ${item.ruleLevel}/15`,
-    `**Agent:** ${item.agentId ?? "Unknown"} (${item.agentName ?? "Unknown"})`,
-    `**Timestamp:** ${item.alertTimestamp ?? "Unknown"}`,
-  ];
-
-  if (item.rawJson) {
-    const rule = item.rawJson.rule as Record<string, unknown> | undefined;
-    const data = item.rawJson.data as Record<string, unknown> | undefined;
-    const mitre = (rule?.mitre as Record<string, unknown>) ?? {};
-
-    if (mitre.id) {
-      parts.push(`**MITRE ATT&CK:** ${Array.isArray(mitre.id) ? mitre.id.join(", ") : mitre.id}`);
-    }
-    if (mitre.tactic) {
-      parts.push(`**Tactics:** ${Array.isArray(mitre.tactic) ? mitre.tactic.join(", ") : mitre.tactic}`);
-    }
-    if (data?.srcip) {
-      parts.push(`**Source IP:** ${data.srcip}`);
-    }
-    if (data?.dstip) {
-      parts.push(`**Destination IP:** ${data.dstip}`);
-    }
-    if (rule?.groups) {
-      parts.push(`**Rule Groups:** ${Array.isArray(rule.groups) ? rule.groups.join(", ") : rule.groups}`);
-    }
-
-    parts.push(``);
-    parts.push(`**Full Alert JSON:**`);
-    parts.push("```json");
-    parts.push(JSON.stringify(item.rawJson, null, 2).slice(0, 4000)); // Cap at 4K chars
-    parts.push("```");
-  }
-
-  parts.push(``);
-  parts.push(`Please provide:`);
-  parts.push(`1. Severity assessment and risk classification`);
-  parts.push(`2. MITRE ATT&CK technique analysis (if applicable)`);
-  parts.push(`3. Potential impact and affected assets`);
-  parts.push(`4. Recommended investigation steps`);
-  parts.push(`5. Related indicators of compromise (IOCs)`);
-  parts.push(`6. Suggested remediation actions`);
-
-  return parts.join("\n");
-}
