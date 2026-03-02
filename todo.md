@@ -2362,3 +2362,13 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Fix 6 — Wazuh Client: remove `"key"` from STRIP_FIELDS in wazuhClient.ts
 - [x] Fix 7 — IT Hygiene: flatten nested Wazuh fields for Extensions & Services + ServiceStateBadge systemd states
 - [x] Fix 8 — IT Hygiene: flatten nested Wazuh fields for Users & Groups (colon-separated users → array)
+
+## Visual Improvements — 2026-03-02
+
+- [x] Top Talkers: enhanced with ranked horizontal bar chart, rank medals, proportional bars, glow effects
+- [x] Fleet Status: replaced pie chart with 4 compact stat cards (Active, Disconnected, Never Connected, Pending)
+- [x] Compliance: upgraded with animated SVG score gauges, gradient framework cards, polished tables
+- [x] Threat Intel: added staleTime (5m/15m), gcTime (30m), keepPreviousData for smooth pagination
+- [x] Threat Intel: enhanced PulseCards with threat-level borders, MITRE badges, adversary tags, IOC stats
+- [x] Threat Intel: enhanced IOC Lookup with threat assessment banner, validation section
+- [x] Threat Intel: added loading skeletons, retry buttons, background update indicators

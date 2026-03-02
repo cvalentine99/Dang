@@ -20,12 +20,13 @@ import {
 import {
   ShieldCheck, ShieldAlert, CheckCircle2, XCircle, MinusCircle,
   Search, Layers, ChevronLeft, ChevronRight, Database, Activity,
-  AlertTriangle, Clock,
+  AlertTriangle, Clock, TrendingUp, BarChart3, Eye,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area,
+  RadialBarChart, RadialBar,
 } from "recharts";
 
 const COLORS = {
@@ -38,12 +39,19 @@ const COLORS = {
   orange: "oklch(0.705 0.191 22.216)",
 };
 
+const SEVERITY_COLORS: Record<string, string> = {
+  Critical: COLORS.red,
+  High: COLORS.orange,
+  Medium: COLORS.yellow,
+  Low: COLORS.green,
+};
+
 const FRAMEWORKS = [
-  { id: "pci_dss", label: "PCI DSS", icon: "\uD83D\uDCB3", indexerField: "pci_dss" },
-  { id: "nist_800_53", label: "NIST 800-53", icon: "\uD83C\uDFDB\uFE0F", indexerField: "nist_800_53" },
-  { id: "hipaa", label: "HIPAA", icon: "\uD83C\uDFE5", indexerField: "hipaa" },
-  { id: "gdpr", label: "GDPR", icon: "\uD83C\uDDEA\uD83C\uDDFA", indexerField: "gdpr" },
-  { id: "tsc", label: "TSC", icon: "\uD83D\uDCCB", indexerField: "tsc" },
+  { id: "pci_dss", label: "PCI DSS", icon: "💳", indexerField: "pci_dss", desc: "Payment Card Industry" },
+  { id: "nist_800_53", label: "NIST 800-53", icon: "🏛️", indexerField: "nist_800_53", desc: "Federal Information Systems" },
+  { id: "hipaa", label: "HIPAA", icon: "🏥", indexerField: "hipaa", desc: "Health Information Privacy" },
+  { id: "gdpr", label: "GDPR", icon: "🇪🇺", indexerField: "gdpr", desc: "EU Data Protection" },
+  { id: "tsc", label: "TSC", icon: "📋", indexerField: "tsc", desc: "Trust Services Criteria" },
 ];
 
 const TIME_RANGES = [
@@ -61,26 +69,37 @@ function SourceBadge({ source }: { source: "indexer" | "server" }) {
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="glass-panel p-3 text-xs border border-glass-border">
-      <p className="text-muted-foreground mb-1">{label}</p>
-      {payload.map((p, i) => <p key={i} style={{ color: p.color }} className="font-medium">{p.name}: {p.value?.toLocaleString()}</p>)}
+    <div className="bg-popover/95 backdrop-blur-md border border-border/40 rounded-lg px-3 py-2 shadow-xl">
+      {label ? <p className="text-[10px] text-muted-foreground mb-1 font-mono">{label}</p> : null}
+      {payload.map((p, i) => <p key={i} className="text-xs font-medium" style={{ color: p.color }}>{p.name}: <span className="font-bold">{typeof p.value === "number" ? p.value.toLocaleString() : p.value}</span></p>)}
     </div>
   );
 }
 
-function ScoreGauge({ score, label }: { score: number; label: string }) {
+/* ── Enhanced ScoreGauge with animated ring and glow ── */
+function ScoreGauge({ score, label, size = "md" }: { score: number; label: string; size?: "sm" | "md" | "lg" }) {
   const circumference = 2 * Math.PI * 40;
   const offset = circumference - (score / 100) * circumference;
   const color = score >= 80 ? COLORS.green : score >= 60 ? COLORS.yellow : COLORS.red;
+  const glowColor = score >= 80 ? "oklch(0.765 0.177 163.223 / 30%)" : score >= 60 ? "oklch(0.795 0.184 86.047 / 30%)" : "oklch(0.637 0.237 25.331 / 30%)";
+  const dim = size === "sm" ? 80 : size === "lg" ? 120 : 100;
+  const scale = dim / 100;
   return (
-    <div className="flex flex-col items-center">
-      <svg width="100" height="100" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="40" fill="none" stroke="oklch(0.3 0.04 286 / 20%)" strokeWidth="8" />
-        <circle cx="50" cy="50" r="40" fill="none" stroke={color} strokeWidth="8" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} transform="rotate(-90 50 50)" className="transition-all duration-1000" />
-        <text x="50" y="46" textAnchor="middle" fill="oklch(0.93 0.005 286)" fontSize="18" fontWeight="bold">{score}%</text>
-        <text x="50" y="62" textAnchor="middle" fill="oklch(0.65 0.02 286)" fontSize="8">SCORE</text>
-      </svg>
-      <span className="text-xs font-medium text-muted-foreground mt-1 text-center max-w-[100px] truncate">{label}</span>
+    <div className="flex flex-col items-center group">
+      <div className="relative">
+        <svg width={dim} height={dim} viewBox="0 0 100 100" className="drop-shadow-sm">
+          {/* Background track */}
+          <circle cx="50" cy="50" r="40" fill="none" stroke="oklch(0.3 0.04 286 / 15%)" strokeWidth="7" />
+          {/* Glow ring */}
+          <circle cx="50" cy="50" r="40" fill="none" stroke={glowColor} strokeWidth="12" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} transform="rotate(-90 50 50)" className="transition-all duration-1000 ease-out" style={{ filter: `blur(4px)` }} />
+          {/* Main ring */}
+          <circle cx="50" cy="50" r="40" fill="none" stroke={color} strokeWidth="7" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} transform="rotate(-90 50 50)" className="transition-all duration-1000 ease-out" />
+          {/* Score text */}
+          <text x="50" y="44" textAnchor="middle" fill="oklch(0.93 0.005 286)" fontSize={18 * scale} fontWeight="bold" className="font-display">{score}%</text>
+          <text x="50" y="60" textAnchor="middle" fill="oklch(0.55 0.02 286)" fontSize={8 * scale} className="uppercase tracking-wider">Score</text>
+        </svg>
+      </div>
+      <span className="text-xs font-medium text-muted-foreground mt-1.5 text-center max-w-[110px] truncate group-hover:text-foreground transition-colors">{label}</span>
     </div>
   );
 }
@@ -90,7 +109,23 @@ function extractItems(raw: unknown): Array<Record<string, unknown>> {
   return (d?.affected_items as Array<Record<string, unknown>>) ?? [];
 }
 
-
+/* ── Compliance Posture Meter (compact radial) ── */
+function PostureMeter({ score }: { score: number }) {
+  const data = [{ name: "score", value: score, fill: score >= 80 ? COLORS.green : score >= 60 ? COLORS.yellow : COLORS.red }];
+  return (
+    <div className="relative w-[140px] h-[80px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <RadialBarChart cx="50%" cy="100%" innerRadius="60%" outerRadius="100%" startAngle={180} endAngle={0} data={data} barSize={10}>
+          <RadialBar background={{ fill: "oklch(0.3 0.04 286 / 15%)" }} dataKey="value" cornerRadius={5} />
+        </RadialBarChart>
+      </ResponsiveContainer>
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
+        <p className="text-lg font-display font-bold text-foreground leading-none">{score}%</p>
+        <p className="text-[9px] text-muted-foreground">Posture</p>
+      </div>
+    </div>
+  );
+}
 
 export default function Compliance() {
   const utils = trpc.useUtils();
@@ -100,6 +135,7 @@ export default function Compliance() {
   const [checkFilter, setCheckFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [expandedCheck, setExpandedCheck] = useState<string | null>(null);
   const pageSize = 50;
 
   // Indexer-specific state
@@ -148,7 +184,6 @@ export default function Compliance() {
   // ── Checks (real or fallback) ─────────────────────────────────────────
   const checks = useMemo(() => {
     if (isConnected && checksQ.data) return extractItems(checksQ.data);
-
     return [];
   }, [checksQ.data, isConnected, selectedPolicy]);
 
@@ -199,7 +234,6 @@ export default function Compliance() {
           level: b.key >= 12 ? "Critical" : b.key >= 8 ? "High" : b.key >= 4 ? "Medium" : "Low",
           count: b.doc_count,
         }));
-        // Merge same severity levels
         const severityMap = new Map<string, number>();
         bySeverity.forEach(s => severityMap.set(s.level, (severityMap.get(s.level) ?? 0) + s.count));
         const mergedSeverity = Array.from(severityMap.entries()).map(([level, count]) => ({ level, count }));
@@ -212,6 +246,9 @@ export default function Compliance() {
 
   const currentFw = FRAMEWORKS.find(f => f.id === selectedFramework) ?? FRAMEWORKS[0];
   const isLoading = statusQ.isLoading;
+
+  // ── Pass/Fail ratio for policies ──
+  const passRate = totalPass + totalFail > 0 ? Math.round((totalPass / (totalPass + totalFail)) * 100) : 0;
 
   return (
     <WazuhGuard>
@@ -229,6 +266,7 @@ export default function Compliance() {
           />
         )}
 
+        {/* ── KPI Row ── */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {isLoading ? <StatCardSkeleton count={5} /> : (<>
           <StatCard label="Avg Score" value={`${avgScore}%`} icon={ShieldCheck} colorClass={avgScore >= 80 ? "text-threat-low" : avgScore >= 60 ? "text-threat-medium" : "text-threat-critical"} />
@@ -253,61 +291,115 @@ export default function Compliance() {
           <TabsContent value="overview" className="space-y-4 mt-4">
             {isLoading ? (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                <ChartSkeleton variant="pie" height={200} title="Policy Scores" className="lg:col-span-5" />
-                <ChartSkeleton variant="pie" height={200} title="Check Results" className="lg:col-span-3" />
-                <ChartSkeleton variant="bar" height={200} title="Score by Policy" className="lg:col-span-4" />
+                <ChartSkeleton variant="pie" height={240} title="Policy Scores" className="lg:col-span-5" />
+                <ChartSkeleton variant="pie" height={240} title="Check Results" className="lg:col-span-3" />
+                <ChartSkeleton variant="bar" height={240} title="Score by Policy" className="lg:col-span-4" />
               </div>
             ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              {/* Policy Scores — enhanced with posture meter */}
               <GlassPanel className="lg:col-span-5">
-                <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Policy Scores</h3>
-                <div className="flex flex-wrap justify-center gap-4">
-                  {policies.slice(0, 6).map((p, i) => <ScoreGauge key={i} score={Number(p.score ?? 0)} label={String(p.name ?? "").slice(0, 20)} />)}
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Policy Scores</h3>
+                  <PostureMeter score={avgScore} />
+                </div>
+                <div className="flex flex-wrap justify-center gap-5">
+                  {policies.slice(0, 6).map((p, i) => <ScoreGauge key={i} score={Number(p.score ?? 0)} label={String(p.name ?? "").slice(0, 25)} />)}
                 </div>
               </GlassPanel>
 
+              {/* Check Results — enhanced donut */}
               <GlassPanel className="lg:col-span-3">
                 <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Check Results</h3>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={resultPie} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value" stroke="none">
-                      {resultPie.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                    </Pie>
-                    <ReTooltip content={<ChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.65 0.02 286)" }} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="relative">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie data={resultPie} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={4} dataKey="value" stroke="none" animationDuration={800}>
+                        {resultPie.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                      </Pie>
+                      <ReTooltip content={<ChartTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {/* Center label */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="text-center">
+                      <p className="text-xl font-display font-bold text-foreground">{passRate}%</p>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Pass Rate</p>
+                    </div>
+                  </div>
+                </div>
+                {/* Legend below */}
+                <div className="flex justify-center gap-4 mt-2">
+                  {resultPie.map((entry, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                      <span className="text-[10px] text-muted-foreground">{entry.name} ({entry.value})</span>
+                    </div>
+                  ))}
+                </div>
               </GlassPanel>
 
+              {/* Score by Policy — enhanced bar chart */}
               <GlassPanel className="lg:col-span-4">
-                <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-primary" /> Score by Policy</h3>
-                <ResponsiveContainer width="100%" height={200}>
+                <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" /> Score by Policy</h3>
+                <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={policyScoreData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
+                    <defs>
+                      <linearGradient id="scoreBarGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor={COLORS.purple} stopOpacity={0.6} />
+                        <stop offset="100%" stopColor={COLORS.purple} stopOpacity={1} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 15%)" horizontal={false} />
                     <XAxis type="number" domain={[0, 100]} tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
                     <YAxis type="category" dataKey="name" width={120} tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
                     <ReTooltip content={<ChartTooltip />} />
-                    <Bar dataKey="score" fill={COLORS.purple} name="Score %" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="score" fill="url(#scoreBarGrad)" name="Score %" radius={[0, 6, 6, 0]} animationDuration={800} />
                   </BarChart>
                 </ResponsiveContainer>
               </GlassPanel>
             </div>
             )}
 
+            {/* ── Regulatory Frameworks — enhanced cards ── */}
             <GlassPanel>
               <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Regulatory Frameworks</h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 {FRAMEWORKS.map(fw => {
                   const matchingPolicy = policies.find(p => String(p.policy_id ?? "").toLowerCase().includes(fw.id.replace(/_/g, "")) || String(p.name ?? "").toLowerCase().includes(fw.id.replace(/_/g, " ")));
                   const score = matchingPolicy ? Number(matchingPolicy.score ?? 0) : null;
+                  const borderColor = score !== null ? (score >= 80 ? "border-threat-low/30 hover:border-threat-low/60" : score >= 60 ? "border-yellow-500/30 hover:border-yellow-500/60" : "border-threat-critical/30 hover:border-threat-critical/60") : "border-border/20 hover:border-border/40";
                   return (
-                    <button key={fw.id} onClick={() => { setSelectedFramework(fw.id as typeof selectedFramework); setActiveTab("framework-alerts"); }} className="bg-secondary/20 rounded-lg p-4 border border-border/20 text-center hover:border-primary/30 hover:bg-primary/5 transition-all cursor-pointer">
-                      <span className="text-2xl">{fw.icon}</span>
-                      <p className="text-xs font-medium text-foreground mt-2">{fw.label}</p>
-                      {score !== null ? (
-                        <p className={`text-lg font-bold mt-1 ${score >= 80 ? "text-threat-low" : score >= 60 ? "text-threat-medium" : "text-threat-critical"}`}>{score}%</p>
-                      ) : <p className="text-xs text-muted-foreground mt-1">No policy</p>}
-                      <p className="text-[10px] text-muted-foreground mt-1">{complianceData.total?.toLocaleString() ?? 0} alerts</p>
+                    <button key={fw.id} onClick={() => { setSelectedFramework(fw.id as typeof selectedFramework); setActiveTab("framework-alerts"); }}
+                      className={`group relative overflow-hidden rounded-xl p-5 border-2 ${borderColor} bg-secondary/10 hover:bg-secondary/20 transition-all duration-300 cursor-pointer text-left`}>
+                      {/* Subtle gradient overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <div className="relative">
+                        <div className="flex items-start justify-between">
+                          <span className="text-3xl">{fw.icon}</span>
+                          {score !== null && (
+                            <div className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${score >= 80 ? "bg-threat-low/10 text-threat-low" : score >= 60 ? "bg-yellow-500/10 text-yellow-400" : "bg-threat-critical/10 text-threat-critical"}`}>
+                              {score >= 80 ? "Good" : score >= 60 ? "Fair" : "At Risk"}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm font-semibold text-foreground mt-3">{fw.label}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{fw.desc}</p>
+                        {score !== null ? (
+                          <div className="mt-3">
+                            <div className="flex items-end gap-1">
+                              <span className={`text-2xl font-display font-bold ${score >= 80 ? "text-threat-low" : score >= 60 ? "text-yellow-400" : "text-threat-critical"}`}>{score}</span>
+                              <span className="text-xs text-muted-foreground mb-1">%</span>
+                            </div>
+                            <div className="mt-2 h-1.5 bg-secondary/40 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${score}%`, backgroundColor: score >= 80 ? COLORS.green : score >= 60 ? COLORS.yellow : COLORS.red }} />
+                            </div>
+                          </div>
+                        ) : <p className="text-xs text-muted-foreground mt-3 italic">No policy</p>}
+                        <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
+                          <Activity className="h-3 w-3" /> {complianceData.total?.toLocaleString() ?? 0} alerts
+                        </p>
+                      </div>
                     </button>
                   );
                 })}
@@ -351,9 +443,9 @@ export default function Compliance() {
               {/* Alert Timeline */}
               <GlassPanel className="lg:col-span-8">
                 <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-primary" /> {currentFw.label} Alert Timeline
+                  <TrendingUp className="h-4 w-4 text-primary" /> {currentFw.label} Alert Timeline
                 </h3>
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={240}>
                   <AreaChart data={complianceData.timeline}>
                     <defs>
                       <linearGradient id="compAreaGrad" x1="0" y1="0" x2="0" y2="1">
@@ -361,38 +453,54 @@ export default function Compliance() {
                         <stop offset="95%" stopColor={COLORS.purple} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 15%)" />
                     <XAxis dataKey="time" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
                     <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
                     <ReTooltip content={<ChartTooltip />} />
-                    <Area type="monotone" dataKey="count" stroke={COLORS.purple} fill="url(#compAreaGrad)" name="Alerts" strokeWidth={2} />
+                    <Area type="monotone" dataKey="count" stroke={COLORS.purple} fill="url(#compAreaGrad)" name="Alerts" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: COLORS.purple, stroke: "oklch(0.15 0.02 286)", strokeWidth: 2 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </GlassPanel>
 
-              {/* Severity Distribution */}
+              {/* Severity Distribution — enhanced */}
               <GlassPanel className="lg:col-span-4">
                 <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-primary" /> Severity Distribution
                 </h3>
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie data={complianceData.bySeverity.map(s => ({
-                      name: s.level, value: s.count,
-                      fill: s.level === "Critical" ? COLORS.red : s.level === "High" ? COLORS.orange : s.level === "Medium" ? COLORS.yellow : COLORS.green,
-                    }))} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={3} dataKey="value" stroke="none">
-                      {complianceData.bySeverity.map((s, i) => (
-                        <Cell key={i} fill={s.level === "Critical" ? COLORS.red : s.level === "High" ? COLORS.orange : s.level === "Medium" ? COLORS.yellow : COLORS.green} />
-                      ))}
-                    </Pie>
-                    <ReTooltip content={<ChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 10, color: "oklch(0.65 0.02 286)" }} />
-                  </PieChart>
-                </ResponsiveContainer>
+                {complianceData.bySeverity.length > 0 ? (
+                  <div className="space-y-3 mt-2">
+                    {complianceData.bySeverity.sort((a, b) => {
+                      const order = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+                      return (order[a.level as keyof typeof order] ?? 4) - (order[b.level as keyof typeof order] ?? 4);
+                    }).map((s, i) => {
+                      const pct = complianceData.total > 0 ? (s.count / complianceData.total) * 100 : 0;
+                      const color = SEVERITY_COLORS[s.level] ?? COLORS.gray;
+                      return (
+                        <div key={i} className="group">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                              <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+                              <span className="text-xs font-medium text-foreground">{s.level}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono font-bold text-foreground">{s.count.toLocaleString()}</span>
+                              <span className="text-[10px] text-muted-foreground">({pct.toFixed(1)}%)</span>
+                            </div>
+                          </div>
+                          <div className="h-2 bg-secondary/30 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground">No severity data available</div>
+                )}
               </GlassPanel>
             </div>
 
-            {/* Top Controls Table */}
+            {/* Top Controls Table — enhanced */}
             <GlassPanel>
               <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
                 <Layers className="h-4 w-4 text-primary" /> Top {currentFw.label} Controls by Alert Count
@@ -404,26 +512,33 @@ export default function Compliance() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border/30">
-                      <th className="text-left py-2 px-3 text-muted-foreground font-medium w-8">#</th>
-                      <th className="text-left py-2 px-3 text-muted-foreground font-medium">Control</th>
-                      <th className="text-left py-2 px-3 text-muted-foreground font-medium">Alert Count</th>
-                      <th className="text-left py-2 px-3 text-muted-foreground font-medium w-1/2">Distribution</th>
+                      <th className="text-left py-2.5 px-3 text-muted-foreground font-medium w-8">#</th>
+                      <th className="text-left py-2.5 px-3 text-muted-foreground font-medium">Control</th>
+                      <th className="text-left py-2.5 px-3 text-muted-foreground font-medium">Alert Count</th>
+                      <th className="text-left py-2.5 px-3 text-muted-foreground font-medium w-1/2">Distribution</th>
                     </tr>
                   </thead>
                   <tbody>
                     {complianceData.byControl.map((c, i) => {
                       const pct = complianceData.total > 0 ? (c.count / complianceData.total) * 100 : 0;
+                      const isTop3 = i < 3;
                       return (
-                        <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
-                          <td className="py-2.5 px-3 text-muted-foreground">{i + 1}</td>
+                        <tr key={i} className={`border-b border-border/10 hover:bg-secondary/20 transition-colors ${isTop3 ? "bg-primary/[0.02]" : ""}`}>
+                          <td className="py-2.5 px-3">
+                            {isTop3 ? (
+                              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">{i + 1}</span>
+                            ) : (
+                              <span className="text-muted-foreground">{i + 1}</span>
+                            )}
+                          </td>
                           <td className="py-2.5 px-3 font-mono text-primary font-medium">{c.control}</td>
-                          <td className="py-2.5 px-3 text-foreground font-medium">{c.count.toLocaleString()}</td>
+                          <td className="py-2.5 px-3 text-foreground font-bold">{c.count.toLocaleString()}</td>
                           <td className="py-2.5 px-3">
                             <div className="flex items-center gap-2">
-                              <div className="flex-1 h-2 bg-secondary/40 rounded-full overflow-hidden">
-                                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: COLORS.purple }} />
+                              <div className="flex-1 h-2 bg-secondary/30 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${COLORS.purple}80, ${COLORS.purple})` }} />
                               </div>
-                              <span className="text-[10px] text-muted-foreground w-10 text-right">{pct.toFixed(1)}%</span>
+                              <span className="text-[10px] text-muted-foreground w-12 text-right font-mono">{pct.toFixed(1)}%</span>
                             </div>
                           </td>
                         </tr>
@@ -436,7 +551,7 @@ export default function Compliance() {
             </GlassPanel>
           </TabsContent>
 
-          {/* ── Policies Tab ─────────────────────────────────────────────── */}
+          {/* ── Policies Tab — enhanced cards ─────────────────────────────── */}
           <TabsContent value="policies" className="space-y-4 mt-4">
             <GlassPanel className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <div className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /><span className="text-sm font-medium text-muted-foreground">Target Agent:</span></div>
@@ -455,22 +570,47 @@ export default function Compliance() {
                 {policies.map((p, i) => {
                   const score = Number(p.score ?? 0);
                   const policyId = String(p.policy_id ?? "");
+                  const passCount = Number(p.pass ?? 0);
+                  const failCount = Number(p.fail ?? 0);
+                  const naCount = Number(p.not_applicable ?? p.invalid ?? 0);
+                  const totalC = passCount + failCount + naCount;
+                  const borderColor = score >= 80 ? "border-threat-low/30" : score >= 60 ? "border-yellow-500/30" : "border-threat-critical/30";
                   return (
-                    <div key={i} className={`bg-secondary/20 rounded-lg p-4 border transition-all cursor-pointer ${selectedPolicy === policyId ? "border-primary/50 bg-primary/5" : "border-border/20 hover:border-border/40"}`} onClick={() => { setSelectedPolicy(policyId); setActiveTab("checks"); setPage(0); }}>
+                    <div key={i}
+                      className={`group relative rounded-xl p-5 border-2 transition-all duration-300 cursor-pointer ${selectedPolicy === policyId ? `${borderColor} bg-primary/5 shadow-lg shadow-primary/5` : "border-border/20 hover:border-border/40 bg-secondary/10 hover:bg-secondary/20"}`}
+                      onClick={() => { setSelectedPolicy(policyId); setActiveTab("checks"); setPage(0); }}>
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{String(p.name ?? "")}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-foreground truncate">{String(p.name ?? "")}</p>
+                            <Eye className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
                           <p className="text-[10px] font-mono text-muted-foreground mt-0.5">{policyId}</p>
-                          {typeof p.description === "string" ? <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{p.description}</p> : null}
+                          {typeof p.description === "string" ? <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.description}</p> : null}
                         </div>
-                        <div className="flex items-center gap-4 ml-4">
-                          <div className="text-center"><p className="text-xs text-muted-foreground">Pass</p><p className="text-sm font-bold text-threat-low">{String(p.pass ?? 0)}</p></div>
-                          <div className="text-center"><p className="text-xs text-muted-foreground">Fail</p><p className="text-sm font-bold text-threat-critical">{String(p.fail ?? 0)}</p></div>
-                          <div className="text-center"><p className="text-xs text-muted-foreground">Score</p><p className={`text-lg font-bold ${score >= 80 ? "text-threat-low" : score >= 60 ? "text-threat-medium" : "text-threat-critical"}`}>{score}%</p></div>
+                        <div className="flex items-center gap-6 ml-6">
+                          <div className="text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Pass</p>
+                            <p className="text-base font-display font-bold text-threat-low">{passCount}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Fail</p>
+                            <p className="text-base font-display font-bold text-threat-critical">{failCount}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">N/A</p>
+                            <p className="text-base font-display font-bold text-muted-foreground">{naCount}</p>
+                          </div>
+                          <ScoreGauge score={score} label="" size="sm" />
                         </div>
                       </div>
-                      <div className="mt-3 h-1.5 bg-secondary/40 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${score}%`, backgroundColor: score >= 80 ? COLORS.green : score >= 60 ? COLORS.yellow : COLORS.red }} />
+                      {/* Stacked progress bar */}
+                      <div className="mt-4 h-2 bg-secondary/30 rounded-full overflow-hidden flex">
+                        {totalC > 0 && <>
+                          <div className="h-full transition-all duration-700" style={{ width: `${(passCount / totalC) * 100}%`, backgroundColor: COLORS.green }} />
+                          <div className="h-full transition-all duration-700" style={{ width: `${(failCount / totalC) * 100}%`, backgroundColor: COLORS.red }} />
+                          <div className="h-full transition-all duration-700" style={{ width: `${(naCount / totalC) * 100}%`, backgroundColor: COLORS.gray }} />
+                        </>}
                       </div>
                     </div>
                   );
@@ -479,7 +619,7 @@ export default function Compliance() {
             </GlassPanel>
           </TabsContent>
 
-          {/* ── Checks Tab ───────────────────────────────────────────────── */}
+          {/* ── Checks Tab — enhanced with expandable rows ───────────────── */}
           <TabsContent value="checks" className="space-y-4 mt-4">
             <GlassPanel>
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
@@ -515,7 +655,10 @@ export default function Compliance() {
               </div>
 
               {!selectedPolicy ? (
-                <div className="text-center text-sm text-muted-foreground py-12">Select a policy from the Policies tab to view checks</div>
+                <div className="text-center text-sm text-muted-foreground py-12">
+                  <ShieldCheck className="h-8 w-8 mx-auto mb-3 text-muted-foreground/40" />
+                  Select a policy from the Policies tab to view checks
+                </div>
               ) : (
                 <>
                   {checksQ.isLoading ? (
@@ -524,22 +667,34 @@ export default function Compliance() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead><tr className="border-b border-border/30">
-                        {["ID", "Result", "Title", "Rationale", "Remediation", "Compliance"].map(h => <th key={h} className="text-left py-2 px-3 text-muted-foreground font-medium">{h}</th>)}
+                        {["ID", "Result", "Title", "Rationale", "Remediation", "Compliance"].map(h =>
+                          <th key={h} className="text-left py-2.5 px-3 text-muted-foreground font-medium text-[11px] uppercase tracking-wider">{h}</th>
+                        )}
                       </tr></thead>
                       <tbody>
                         {pagedChecks.map((c, i) => {
                           const result = String(c.result ?? "").toLowerCase();
+                          const checkId = String(c.id ?? `check-${i}`);
+                          const isExpanded = expandedCheck === checkId;
                           return (
-                            <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
-                              <td className="py-2 px-3 font-mono text-primary">{String(c.id ?? "")}</td>
-                              <td className="py-2 px-3"><ThreatBadge level={result === "passed" ? "low" : result === "failed" ? "critical" : "info"} /></td>
-                              <td className="py-2 px-3 text-foreground max-w-[300px]">{String(c.title ?? "\u2014")}</td>
-                              <td className="py-2 px-3 text-muted-foreground max-w-[200px] truncate">{String(c.rationale ?? "\u2014")}</td>
-                              <td className="py-2 px-3 text-muted-foreground max-w-[200px] truncate">{String(c.remediation ?? "\u2014")}</td>
-                              <td className="py-2 px-3 text-muted-foreground max-w-[150px] truncate">
+                            <tr key={i}
+                              className={`border-b border-border/10 cursor-pointer transition-colors ${isExpanded ? "bg-primary/5" : "hover:bg-secondary/20"} ${result === "failed" ? "border-l-2 border-l-threat-critical/40" : result === "passed" ? "border-l-2 border-l-threat-low/20" : "border-l-2 border-l-transparent"}`}
+                              onClick={() => setExpandedCheck(isExpanded ? null : checkId)}>
+                              <td className="py-2.5 px-3 font-mono text-primary font-medium">{checkId}</td>
+                              <td className="py-2.5 px-3"><ThreatBadge level={result === "passed" ? "low" : result === "failed" ? "critical" : "info"} /></td>
+                              <td className="py-2.5 px-3 text-foreground max-w-[300px]">
+                                <span className={isExpanded ? "" : "line-clamp-1"}>{String(c.title ?? "—")}</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-muted-foreground max-w-[200px]">
+                                <span className={isExpanded ? "" : "truncate block"}>{String(c.rationale ?? "—")}</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-muted-foreground max-w-[200px]">
+                                <span className={isExpanded ? "text-yellow-400/80" : "truncate block"}>{String(c.remediation ?? "—")}</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-muted-foreground max-w-[150px]">
                                 {c.compliance ? (c.compliance as Array<Record<string, unknown>>).map((comp, j) => (
-                                  <span key={j} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary mr-1">{String(comp.key ?? "")}: {String(comp.value ?? "")}</span>
-                                )) : "\u2014"}
+                                  <span key={j} className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary mr-1 mb-0.5">{String(comp.key ?? "")}: {String(comp.value ?? "")}</span>
+                                )) : "—"}
                               </td>
                             </tr>
                           );

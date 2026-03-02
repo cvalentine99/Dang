@@ -559,7 +559,10 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <ChartSkeleton variant="bar" height={210} title="Events Per Second" className="lg:col-span-3" />
             <ChartSkeleton variant="area" height={210} title="Threat Trends — Last 24h" className="lg:col-span-6" />
-            <ChartSkeleton variant="pie" height={210} title="Fleet Status" className="lg:col-span-3" />
+            <div className="lg:col-span-3 space-y-3">
+              <div className="h-5" />
+              {[1,2,3,4].map(i => <ChartSkeleton key={i} variant="bar" height={48} title="" />)}
+            </div>
           </div>
         ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -606,21 +609,59 @@ export default function Home() {
             </ResponsiveContainer>
           </GlassPanel>
 
-          <GlassPanel className="lg:col-span-3">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Fleet Status</h3>
+          <div className="lg:col-span-3 flex flex-col gap-3">
+            <div className="flex items-center gap-2 px-1">
+              <Users className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-medium text-muted-foreground">Fleet Status</h3>
               <SourceBadge source="server" />
             </div>
-            <ResponsiveContainer width="100%" height={210}>
-              <PieChart>
-                <Pie data={agentPieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value" stroke="none">
-                  {agentPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Pie>
-                <ReTooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 10, color: "oklch(0.65 0.02 286)" }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </GlassPanel>
+            <GlassPanel className="!py-3 !px-4">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-threat-low/15 border border-threat-low/25 flex items-center justify-center shrink-0">
+                  <Activity className="h-4 w-4 text-threat-low" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-lg font-display font-bold text-foreground leading-none">{agentData.active}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Active</p>
+                </div>
+                <div className="h-1.5 w-1.5 rounded-full bg-threat-low animate-pulse" />
+              </div>
+            </GlassPanel>
+            <GlassPanel className="!py-3 !px-4">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-threat-high/15 border border-threat-high/25 flex items-center justify-center shrink-0">
+                  <WifiOff className="h-4 w-4 text-threat-high" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-lg font-display font-bold text-foreground leading-none">{agentData.disconnected}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Disconnected</p>
+                </div>
+                {agentData.disconnected > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-threat-high/10 border border-threat-high/20 text-threat-high font-medium">Attention</span>}
+              </div>
+            </GlassPanel>
+            <GlassPanel className="!py-3 !px-4">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-yellow-500/15 border border-yellow-500/25 flex items-center justify-center shrink-0">
+                  <Clock className="h-4 w-4 text-yellow-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-lg font-display font-bold text-foreground leading-none">{agentData.never}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Never Connected</p>
+                </div>
+              </div>
+            </GlassPanel>
+            <GlassPanel className="!py-3 !px-4">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-info-cyan/15 border border-info-cyan/25 flex items-center justify-center shrink-0">
+                  <Wifi className="h-4 w-4 text-info-cyan" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-lg font-display font-bold text-foreground leading-none">{agentData.pending}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Pending</p>
+                </div>
+              </div>
+            </GlassPanel>
+          </div>
         </div>
         )}
 
@@ -641,28 +682,45 @@ export default function Home() {
                 <SourceBadge source={topTalkersSource} />
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={topTalkersData.slice(0, 8)} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2} dataKey="count" nameKey="agentName" stroke="none">
-                  {topTalkersData.slice(0, 8).map((_, i) => <Cell key={i} fill={TOP_TALKER_COLORS[i % TOP_TALKER_COLORS.length]} />)}
-                </Pie>
-                <ReTooltip content={<ChartTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="space-y-1 mt-2 max-h-[100px] overflow-y-auto">
-              {topTalkersData.slice(0, 5).map((t, i) => (
-                <div key={t.agentId} className="flex items-center justify-between py-1 px-2 rounded bg-secondary/20">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: TOP_TALKER_COLORS[i] }} />
-                    <span className="text-[10px] text-foreground truncate max-w-[120px]">{t.agentName}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-muted-foreground">{t.count.toLocaleString()}</span>
-                    <ThreatBadge level={threatLevelFromNumber(Math.round(t.avgLevel))} />
-                  </div>
-                </div>
-              ))}
-            </div>
+            {topTalkersData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[320px] text-muted-foreground">
+                <Flame className="h-8 w-8 mb-2 opacity-30" />
+                <p className="text-xs">No agent alert data available</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {topTalkersData.slice(0, 8).map((t, i) => {
+                  const maxCount = topTalkersData[0]?.count ?? 1;
+                  const pct = Math.max((t.count / maxCount) * 100, 4);
+                  const barColor = TOP_TALKER_COLORS[i % TOP_TALKER_COLORS.length];
+                  const rankBg = i === 0 ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" : i === 1 ? "bg-slate-300/10 text-slate-300 border-slate-400/20" : i === 2 ? "bg-amber-700/15 text-amber-600 border-amber-700/25" : "bg-secondary/30 text-muted-foreground border-border/20";
+                  return (
+                    <div key={t.agentId} className="group relative rounded-lg border border-border/20 bg-secondary/10 hover:bg-secondary/25 hover:border-primary/20 transition-all duration-200 cursor-pointer px-3 py-2" onClick={() => setLocation(`/agents/${t.agentId}`)}>
+                      <div className="flex items-center gap-3">
+                        {/* Rank badge */}
+                        <span className={`shrink-0 h-6 w-6 rounded-md border flex items-center justify-center text-[10px] font-bold font-mono ${rankBg}`}>
+                          {i + 1}
+                        </span>
+                        {/* Agent info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-medium text-foreground truncate">{t.agentName}</span>
+                            <span className="text-[9px] font-mono text-muted-foreground">#{t.agentId}</span>
+                            <ThreatBadge level={threatLevelFromNumber(Math.round(t.avgLevel))} />
+                          </div>
+                          {/* Proportional bar */}
+                          <div className="h-1.5 w-full rounded-full bg-secondary/40 overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${pct}%`, backgroundColor: barColor, boxShadow: `0 0 8px ${barColor}50` }} />
+                          </div>
+                        </div>
+                        {/* Count */}
+                        <span className="shrink-0 text-xs font-mono font-semibold text-foreground tabular-nums">{t.count.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </GlassPanel>
 
           <GlassPanel className="lg:col-span-4 !p-0 overflow-hidden">
