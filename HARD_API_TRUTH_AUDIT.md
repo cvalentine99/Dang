@@ -288,7 +288,7 @@ The core API surface is well-structured. Wazuh integration follows a clean proxy
 | ~~Low~~ | ~~SOC_COMPLIANCE_EVIDENCE.md test count is stale~~ — **FIXED**: updated to 1195/51 | §6.3 |
 | ~~Low~~ | ~~No host allowlist on `connectionSettings.testConnection`~~ — **FIXED**: RFC 1918 allowlist with metadata/loopback/public IP blocking | §5.2 |
 | **Low** | Some routers throw raw `Error` instead of `TRPCError` | §5.5 |
-| **Low** | `AIChatBox.tsx` references non-existent `trpc.ai.chat` router | §2.1 |
+| ~~Low~~ | ~~`AIChatBox.tsx` references non-existent `trpc.ai.chat` router~~ — **FIXED**: replaced with `trpc.hybridrag.query` | §2.1 |
 
 ### What is honestly not proven
 

@@ -2259,3 +2259,9 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Fix all other dead imports across the codebase — only real fix: added `import { sdk } from "./sdk"` to server/_core/index.ts
 - [x] Verify tsc --noEmit shows 0 errors after fixes — EXIT 0, confirmed twice
 - [x] Run full test suite to confirm nothing is broken — 51 files, 1195 tests passing
+
+## Dead Reference Cleanup
+
+- [x] Remove dead trpc.ai.chat reference from AIChatBox.tsx — replaced with trpc.hybridrag.query in JSDoc example
+- [x] Remove dead trpc.ai.chat reference from ComponentShowcase.tsx — replaced with trpc.hybridrag.query in demo string
+- [x] Verify no other orphaned trpc.ai references exist — grep confirms 0 matches

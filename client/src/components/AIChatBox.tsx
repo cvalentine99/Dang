@@ -76,17 +76,17 @@ export type AIChatBoxProps = {
  *     { role: "system", content: "You are a helpful assistant." }
  *   ]);
  *
- *   const chatMutation = trpc.ai.chat.useMutation({
+ *   // Wire up your own tRPC chat mutation, e.g.:
+ *   // const chatMutation = trpc.yourRouter.chat.useMutation({ ... });
+ *   const chatMutation = trpc.hybridrag.query.useMutation({
  *     onSuccess: (response) => {
- *       // Assuming your tRPC endpoint returns the AI response as a string
  *       setMessages(prev => [...prev, {
  *         role: "assistant",
- *         content: response
+ *         content: response.answer
  *       }]);
  *     },
  *     onError: (error) => {
  *       console.error("Chat error:", error);
- *       // Optionally show error message to user
  *     }
  *   });
  *
