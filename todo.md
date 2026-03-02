@@ -2301,3 +2301,10 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Audit response consistency — 73 mutations, all return values, consistent patterns
 - [x] Run full test suite — 52 files, 1205 tests passing
 - [x] Write API_CONTRACT_AUDIT.md deliverable
+
+## GitHub Actions CI Workflow
+
+- [ ] Create .github/workflows/ci.yml with pnpm test and tsc --noEmit
+- [ ] Configure proper Node.js and pnpm versions
+- [ ] Add database service container for test suite
+- [ ] Push workflow to GitHub repository
