@@ -27,6 +27,7 @@ import { notificationHistoryRouter } from "./baselines/notificationHistoryRouter
 import { suppressionRouter } from "./baselines/suppressionRouter";
 import { exportRouter } from "./baselines/exportRouter";
 import { enhancedLLMRouter } from "./enhancedLLM/enhancedLLMRouter";
+import { readinessRouter } from "./agenticReadiness/readinessRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -82,13 +83,13 @@ export const appRouter = router({
   // LLM health monitoring and token usage tracking
   llm: llmRouter,
 
-  // Alert-to-Walter queue (10-deep, human-initiated analysis)
+  // Alert queue (10-deep, human-initiated structured triage)
   alertQueue: alertQueueRouter,
 
   // Splunk ES Mission Control — HEC ticket creation
   splunk: splunkRouter,
 
-  // Auto-queue rules — automatic alert-to-Walter routing
+  // Auto-queue rules — automatic alert routing
   autoQueue: autoQueueRouter,
 
   // Threat Hunting — server-side multi-source IOC correlation
@@ -117,6 +118,9 @@ export const appRouter = router({
 
   // Enhanced LLM — Nemotron-3 Nano session-type-aware chat, alert classification, DGX health
   enhancedLLM: enhancedLLMRouter,
+
+  // Agentic Readiness — pre-flight dependency and workflow status
+  readiness: readinessRouter,
 });
 
 export type AppRouter = typeof appRouter;

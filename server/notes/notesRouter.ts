@@ -6,6 +6,7 @@
  * Protected procedures require authentication (userId from ctx.user).
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { eq, desc, and, like, or, sql } from "drizzle-orm";
@@ -31,8 +32,7 @@ export const notesRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { notes: [], total: 0 };
+      const db = await requireDb();
 
       const conditions = [eq(analystNotesV2.userId, ctx.user.id)];
 
@@ -83,8 +83,7 @@ export const notesRouter = router({
   getById: protectedProcedure
     .input(z.object({ id: z.number().int() }))
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return null;
+      const db = await requireDb();
       const result = await db
         .select()
         .from(analystNotesV2)
@@ -102,8 +101,7 @@ export const notesRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return [];
+      const db = await requireDb();
       return db
         .select()
         .from(analystNotesV2)
@@ -119,8 +117,7 @@ export const notesRouter = router({
 
   /** Count notes per entity type for badge indicators */
   entityCounts: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    if (!db) return { alert: 0, agent: 0, cve: 0, rule: 0, general: 0 };
+    const db = await requireDb();
     const result = await db
       .select({
         entityType: analystNotesV2.entityType,

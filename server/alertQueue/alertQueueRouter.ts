@@ -1,24 +1,27 @@
 /**
- * Alert Queue Router — tRPC procedures for the 10-deep alert-to-Walter queue.
+ * Alert Queue Router — tRPC procedures for the 10-deep alert queue.
  *
- * UNIFIED PIPELINE: All processing now flows through the structured pipeline
- * (runTriageAgent → correlateFromTriage → generateHypothesis) instead of the
- * old runAnalystPipeline dead-end path.
+ * Queue processing runs TRIAGE ONLY via runTriageAgent(). It creates a
+ * triageObjects row and a pipelineRuns row (status: "partial"). Downstream
+ * stages (correlation, hypothesis, response actions) are NOT triggered here —
+ * they must be invoked separately from the Triage Pipeline page or via
+ * runFullPipeline.
  *
  * Provides:
  * - list: Get all queued/completed items (ordered by severity desc within status groups)
  * - enqueue: Add an alert to the queue (max 10, lowest-severity evicted)
  * - remove: Remove/dismiss an item from the queue
- * - process: Trigger structured triage pipeline on a queued item (human-initiated)
+ * - process: Trigger triage-only on a queued item (human-initiated, creates pipelineRuns row)
  * - getTriageResult: Get the triage result for a completed item
  * - count: Get the current queue depth
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
-import { alertQueue } from "../../drizzle/schema";
+import { alertQueue, pipelineRuns } from "../../drizzle/schema";
 import { eq, desc, asc, sql, and, inArray, gte } from "drizzle-orm";
 import { runTriageAgent } from "../agenticPipeline/triageAgent";
 
@@ -29,8 +32,7 @@ export const alertQueueRouter = router({
    * List all queue items. Returns queued items first, then completed/failed.
    */
   list: protectedProcedure.query(async () => {
-    const db = await getDb();
-    if (!db) return { items: [], total: 0 };
+    const db = await requireDb();
 
     const items = await db
       .select()
@@ -57,8 +59,7 @@ export const alertQueueRouter = router({
    * Get current queue depth (queued + processing items only).
    */
   count: protectedProcedure.query(async () => {
-    const db = await getDb();
-    if (!db) return { count: 0 };
+    const db = await requireDb();
 
     const [result] = await db
       .select({ count: sql<number>`COUNT(*)` })
@@ -69,7 +70,7 @@ export const alertQueueRouter = router({
   }),
 
   /**
-   * Enqueue an alert for Walter analysis.
+   * Enqueue an alert for structured triage.
    * Max 10 items — lowest-severity queued item is evicted (dismissed) when full.
    * Prevents duplicate alertId from being queued.
    * Priority: higher ruleLevel = higher priority in the queue.
@@ -154,7 +155,7 @@ export const alertQueueRouter = router({
         queuedBy: ctx.user?.id ?? null,
       });
 
-      return { success: true, message: "Alert queued for Walter analysis", id: result.insertId };
+      return { success: true, message: "Alert queued for structured triage", id: result.insertId };
     }),
 
   /**
@@ -175,14 +176,18 @@ export const alertQueueRouter = router({
     }),
 
   /**
-   * Process a queued alert — triggers the UNIFIED structured triage pipeline.
-   * This is human-initiated: analyst clicks "Analyze" on a queue item.
+   * Process a queued alert — runs structured triage only.
+   * This is human-initiated: analyst clicks "Structured Triage" on a queue item.
    *
-   * UNIFIED PIPELINE: Now calls runTriageAgent() which creates a triageObjects
-   * row and links it back via pipelineTriageId. This feeds into the full chain:
-   * /triage → correlateFromTriage → generateHypothesis → /living-cases
+   * What this does:
+   *   1. Calls runTriageAgent() → creates a triageObjects row
+   *   2. Links the triage back to this queue item via pipelineTriageId
+   *   3. Inserts a pipelineRuns row so the Pipeline Inspector can see it
    *
-   * The old runAnalystPipeline() dead-end path has been removed.
+   * What this does NOT do:
+   *   - Correlation, hypothesis, or living case creation
+   *   - Those are triggered separately from the Triage Pipeline page
+   *     or via runFullPipeline()
    */
   process: protectedProcedure
     .input(z.object({ id: z.number().int() }))
@@ -248,16 +253,35 @@ export const alertQueueRouter = router({
           // (legacy UI rendering of inline triage data)
           const triageResult = {
             answer: result.triageObject
-              ? `**Severity:** ${result.triageObject.severity} (${((result.triageObject.severityConfidence ?? 0) * 100).toFixed(0)}% confidence)\n**Route:** ${result.triageObject.route}\n**Alert Family:** ${result.triageObject.alertFamily}\n\n${result.triageObject.severityReasoning ?? ""}\n\n**Recommended Actions:**\n${(result.triageObject.recommendedActions ?? []).map((a: string) => `- ${a}`).join("\n")}`
+              ? `**Severity:** ${result.triageObject.severity} (${((result.triageObject.severityConfidence ?? 0) * 100).toFixed(0)}% confidence)\n**Route:** ${result.triageObject.route}\n**Alert Family:** ${result.triageObject.alertFamily}\n\n${result.triageObject.severityReasoning ?? ""}\n\n**Recommended Actions:**\n${((result.triageObject as unknown as Record<string, unknown>).recommendedActions as string[] ?? []).map((a: string) => `- ${a}`).join("\n")}`
               : "Triage completed — view details on the Triage Pipeline page.",
             reasoning: result.triageObject?.severityReasoning ?? "Triage completed via unified pipeline",
-            trustScore: result.triageObject?.severityConfidence ?? null,
-            confidence: result.triageObject?.severityConfidence ?? null,
+            trustScore: result.triageObject?.severityConfidence ?? undefined,
+            confidence: result.triageObject?.severityConfidence ?? undefined,
             // Link to the structured pipeline
             pipelineTriageId: result.triageId,
-            severity: result.triageObject?.severity ?? null,
-            route: result.triageObject?.route ?? null,
+            severity: result.triageObject?.severity ?? undefined,
+            route: result.triageObject?.route ?? undefined,
           };
+
+          // Insert a pipelineRuns row so Pipeline Inspector can see this triage
+          const runId = `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+          await db.insert(pipelineRuns).values({
+            runId,
+            queueItemId: item.id,
+            alertId: item.alertId,
+            currentStage: "triage",
+            status: "partial",
+            triageId: result.triageId,
+            triageStatus: "completed",
+            triageLatencyMs: result.latencyMs ?? null,
+            correlationStatus: "pending",
+            hypothesisStatus: "pending",
+            responseActionsStatus: "pending",
+            triggeredBy: ctx.user.name ?? ctx.user.openId ?? "queue",
+            startedAt: new Date(),
+            completedAt: new Date(),
+          });
 
           // Update queue item with triage link + backward-compatible result
           await db
@@ -278,7 +302,24 @@ export const alertQueueRouter = router({
             latencyMs: result.latencyMs,
           };
         } else {
-          // Triage failed
+          // Triage failed — still insert a pipelineRuns row so the failure is visible
+          const failRunId = `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+          await db.insert(pipelineRuns).values({
+            runId: failRunId,
+            queueItemId: item.id,
+            alertId: item.alertId,
+            currentStage: "failed",
+            status: "failed",
+            triageStatus: "failed",
+            correlationStatus: "pending",
+            hypothesisStatus: "pending",
+            responseActionsStatus: "pending",
+            triggeredBy: ctx.user.name ?? ctx.user.openId ?? "queue",
+            error: result.error ?? "Triage pipeline failed",
+            startedAt: new Date(),
+            completedAt: new Date(),
+          });
+
           await db
             .update(alertQueue)
             .set({
@@ -322,8 +363,7 @@ export const alertQueueRouter = router({
   getTriageResult: protectedProcedure
     .input(z.object({ id: z.number().int() }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return null;
+      const db = await requireDb();
 
       const [item] = await db
         .select()
@@ -345,8 +385,7 @@ export const alertQueueRouter = router({
       since: z.string(),
     }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { alerts: [] };
+      const db = await requireDb();
 
       const sinceDate = new Date(input.since);
 

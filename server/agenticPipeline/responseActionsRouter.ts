@@ -19,6 +19,7 @@
  *   Queries:   getById, getByCase, listAll, stats, auditTrail
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { eq, and, desc, sql, count } from "drizzle-orm";
@@ -215,8 +216,7 @@ export const responseActionsRouter = router({
   getById: protectedProcedure
     .input(z.object({ actionId: z.string().min(1) }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { found: false as const };
+      const db = await requireDb();
 
       const [action] = await db
         .select()
@@ -235,8 +235,7 @@ export const responseActionsRouter = router({
       state: z.enum(RESPONSE_ACTION_STATES as unknown as [string, ...string[]]).optional(),
     }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { actions: [] };
+      const db = await requireDb();
 
       const conditions = [eq(responseActions.caseId, input.caseId)];
       if (input.state) {
@@ -267,8 +266,7 @@ export const responseActionsRouter = router({
       caseId: z.number().int().optional(),
     }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { actions: [], total: 0 };
+      const db = await requireDb();
 
       const conditions: ReturnType<typeof eq>[] = [];
       if (input.state) conditions.push(eq(responseActions.state, input.state as any));
@@ -305,8 +303,7 @@ export const responseActionsRouter = router({
   // ── Pending Approval Queue ─────────────────────────────────────────────────
   pendingApproval: protectedProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return { actions: [], total: 0 };
+      const db = await requireDb();
 
       const actions = await db
         .select()
@@ -328,11 +325,7 @@ export const responseActionsRouter = router({
   // ── Statistics ─────────────────────────────────────────────────────────────
   stats: protectedProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return {
-        total: 0, byState: {}, byCategory: {}, byUrgency: {},
-        pendingApproval: 0, avgTimeToApproval: null, avgTimeToExecution: null,
-      };
+      const db = await requireDb();
 
       const [
         totalResult,
@@ -418,8 +411,7 @@ export const responseActionsRouter = router({
       actionId: z.string().min(1),
     }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { entries: [] };
+      const db = await requireDb();
 
       const entries = await db
         .select()
@@ -437,8 +429,7 @@ export const responseActionsRouter = router({
       offset: z.number().int().min(0).default(0),
     }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { entries: [], total: 0 };
+      const db = await requireDb();
 
       const [entries, totalResult] = await Promise.all([
         db

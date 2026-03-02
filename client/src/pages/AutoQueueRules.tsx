@@ -1,8 +1,8 @@
 /**
- * Auto-Queue Rules — admin page for configuring automatic alert-to-Walter routing.
+ * Auto-Queue Rules — admin page for configuring automatic alert-to-queue routing.
  *
  * Rules define conditions (severity threshold, rule IDs, agent patterns, MITRE techniques)
- * that automatically enqueue matching Wazuh alerts for Walter analysis.
+ * that automatically enqueue matching Wazuh alerts for structured triage.
  *
  * Features:
  * - CRUD for auto-queue rules
@@ -296,7 +296,7 @@ export default function AutoQueueRules() {
                 Auto-Queue Rules
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Automatically route matching Wazuh alerts to Walter for analysis
+                Automatically route matching Wazuh alerts to the queue for structured triage
               </p>
             </div>
           </div>
@@ -401,7 +401,7 @@ export default function AutoQueueRules() {
             </div>
             <h3 className="text-lg font-display font-medium text-foreground mb-2">No Auto-Queue Rules</h3>
             <p className="text-sm text-muted-foreground max-w-md">
-              Create rules to automatically route matching Wazuh alerts to Walter for analysis.
+              Create rules to automatically route matching Wazuh alerts to the queue for structured triage.
               Rules can match by severity level, rule ID, agent name, or MITRE technique.
             </p>
             <button

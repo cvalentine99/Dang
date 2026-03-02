@@ -1,10 +1,12 @@
 /**
- * Alert Queue — 10-deep FIFO queue for alerts awaiting Walter analysis.
+ * Alert Queue — 10-deep FIFO queue for alerts awaiting structured triage.
  *
- * Analysts queue alerts from the Alerts Timeline, then click "Analyze" to
- * trigger the UNIFIED structured triage pipeline. Results create triageObjects
- * rows that feed into /triage → correlation → hypothesis → /living-cases.
- * Legacy inline triageResult rendering is preserved for backward compatibility.
+ * Two workflow paths:
+ *   1. "Structured Triage" (primary) — runs triage-only via runTriageAgent(),
+ *      creates triageObjects + pipelineRuns rows. Downstream stages (correlation,
+ *      hypothesis) must be triggered separately.
+ *   2. "Ad-hoc Analysis" (secondary) — opens Walter for conversational analysis.
+ *      Does NOT create pipeline artifacts. Results are not persisted.
  */
 
 import { trpc } from "@/lib/trpc";
@@ -12,6 +14,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
+import { ReadinessBanner } from "@/components/shared/ReadinessBanner";
+import { useAgenticReadiness } from "@/hooks/useAgenticReadiness";
 import {
   Brain,
   AlertTriangle,
@@ -148,6 +152,8 @@ function QueueItemCard({
   onDismiss,
   isProcessing,
   elapsedSeconds = 0,
+  canRunStructuredPipeline = true,
+  canRunAdHoc = true,
 }: {
   item: {
     id: number;
@@ -171,6 +177,8 @@ function QueueItemCard({
   onDismiss: (id: number) => void;
   isProcessing: boolean;
   elapsedSeconds?: number;
+  canRunStructuredPipeline?: boolean;
+  canRunAdHoc?: boolean;
 }) {
   const elapsedDisplay = elapsedSeconds;
   const [expanded, setExpanded] = useState(false);
@@ -228,8 +236,8 @@ function QueueItemCard({
     },
   });
 
-  const handleAnalyzeInWalter = () => {
-    // Navigate to Walter with the alert context pre-loaded
+  const handleAdHocAnalysis = () => {
+    // Navigate to Walter for ad-hoc conversational analysis (not persisted to pipeline)
     const alertSummary = `Triage alert ${item.alertId}: Rule ${item.ruleId} (Level ${item.ruleLevel}) - ${item.ruleDescription ?? "Unknown"} on agent ${item.agentId ?? "unknown"} (${item.agentName ?? "unknown"})`;
     navigate(`/analyst?q=${encodeURIComponent(alertSummary)}`);
   };
@@ -305,7 +313,7 @@ function QueueItemCard({
           )}
           {item.status === "queued" && (
             <>
-              {/* Unified Analyze button — now calls the structured triage pipeline */}
+              {/* Structured Triage button — runs triage-only, creates triageObjects + pipelineRuns */}
               {!item.pipelineTriageId && item.autoTriageStatus !== "running" && (
                 isProcessing ? (
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.15)] animate-pulse-subtle">
@@ -318,11 +326,16 @@ function QueueItemCard({
                 ) : (
                   <button
                     onClick={() => onAnalyze(item.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-medium hover:bg-purple-500/25 hover:shadow-[0_0_10px_rgba(168,85,247,0.15)] transition-all"
-                    title="Run structured triage pipeline"
+                    disabled={!canRunStructuredPipeline}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      canRunStructuredPipeline
+                        ? "bg-purple-500/15 border border-purple-500/30 text-purple-300 hover:bg-purple-500/25 hover:shadow-[0_0_10px_rgba(168,85,247,0.15)]"
+                        : "bg-white/5 border border-white/10 text-muted-foreground/50 cursor-not-allowed"
+                    }`}
+                    title={canRunStructuredPipeline ? "Run structured triage pipeline" : "Pipeline blocked — check readiness banner for details"}
                   >
                     <Sparkles className="h-3.5 w-3.5" />
-                    Analyze
+                    Structured Triage
                   </button>
                 )
               )}
@@ -368,11 +381,17 @@ function QueueItemCard({
                 </button>
               )}
               <button
-                onClick={handleAnalyzeInWalter}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-medium hover:bg-cyan-500/20 transition-all"
+                onClick={handleAdHocAnalysis}
+                disabled={!canRunAdHoc}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  canRunAdHoc
+                    ? "bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 hover:bg-cyan-500/20"
+                    : "bg-white/5 border border-white/10 text-muted-foreground/50 cursor-not-allowed"
+                }`}
+                title={canRunAdHoc ? "Open ad-hoc conversational analysis (not persisted to pipeline)" : "Ad-hoc analyst blocked — check readiness banner"}
               >
                 <ArrowRight className="h-3.5 w-3.5" />
-                Open in Walter
+                Ad-hoc Analysis
               </button>
             </div>
           )}
@@ -414,7 +433,7 @@ function QueueItemCard({
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-purple-400" />
-                <span className="text-xs font-medium text-foreground">Walter's Triage Report</span>
+                <span className="text-xs font-medium text-foreground">Structured Triage Report</span>
                 {triage.trustScore != null && (
                   <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full border ${
                     triage.trustScore >= 0.7 ? "text-green-400 bg-green-500/10 border-green-500/20" :
@@ -480,6 +499,7 @@ function QueueItemCard({
 // Main page
 export default function AlertQueue() {
   const utils = trpc.useUtils();
+  const { canRunStructuredPipeline, structuredPipelineBlocked, canRunAdHoc, adHocBlocked } = useAgenticReadiness();
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -637,9 +657,9 @@ export default function AlertQueue() {
               <Inbox className="w-5 h-5 text-purple-400" />
             </div>
             <div>
-              <h1 className="text-lg font-display font-bold text-foreground">Walter Queue</h1>
+              <h1 className="text-lg font-display font-bold text-foreground">Alert Queue</h1>
               <p className="text-xs text-muted-foreground">
-                {activeCount}/10 alerts queued · Sorted by severity (critical first) · Click "Analyze" to run structured triage pipeline
+                {activeCount}/10 alerts queued · Sorted by severity (critical first) · Click "Structured Triage" to create pipeline artifacts
               </p>
             </div>
           </div>
@@ -754,6 +774,8 @@ export default function AlertQueue() {
       {/* Queue content */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         <div className="max-w-5xl mx-auto space-y-6">
+          {/* Readiness banner — shows when agentic workflows are degraded or blocked */}
+          <ReadinessBanner />
           {/* Empty state */}
           {items.length === 0 && !listQuery.isLoading && (
             <div className="flex flex-col items-center justify-center py-20">
@@ -762,7 +784,7 @@ export default function AlertQueue() {
               </div>
               <h3 className="text-lg font-display font-semibold text-foreground mb-1">No Alerts Queued</h3>
               <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
-                Send alerts to Walter from the Alerts Timeline using the <Brain className="inline h-3 w-3 text-purple-400" /> button on each alert row.
+                Send alerts to the queue from the Alerts Timeline using the <Brain className="inline h-3 w-3 text-purple-400" /> button on each alert row.
               </p>
               <button
                 onClick={() => navigate("/alerts")}
@@ -799,6 +821,8 @@ export default function AlertQueue() {
                     onDismiss={handleDismiss}
                     isProcessing={processingId === item.id || processMutation.isPending}
                     elapsedSeconds={processingId === item.id ? elapsedSeconds : 0}
+                    canRunStructuredPipeline={canRunStructuredPipeline}
+                    canRunAdHoc={canRunAdHoc}
                   />
                 ))}
               </div>
@@ -821,6 +845,8 @@ export default function AlertQueue() {
                     onAnalyze={handleAnalyze}
                     onDismiss={handleDismiss}
                     isProcessing={false}
+                    canRunStructuredPipeline={canRunStructuredPipeline}
+                    canRunAdHoc={canRunAdHoc}
                   />
                 ))}
               </div>

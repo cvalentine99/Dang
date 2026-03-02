@@ -302,7 +302,7 @@ export default function DataPipeline(): React.JSX.Element {
         <div>
           <p className="text-xs text-blue-300">
             The extraction pipeline parses the Wazuh OpenAPI specification deterministically (no LLMs in ingestion)
-            and populates the 4-layer Knowledge Graph. This enables Walter to query structured API metadata with
+            and populates the Knowledge Graph. This enables the analyst tools to query structured API metadata with
             trust scoring and safety rails.
           </p>
           <p className="text-[10px] text-muted-foreground mt-1">

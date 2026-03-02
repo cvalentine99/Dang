@@ -7,6 +7,7 @@
  * - retry: Manually retry a failed notification
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
@@ -92,8 +93,7 @@ export const notificationHistoryRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { notifications: [], total: 0 };
+      const db = await requireDb();
 
       const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
 

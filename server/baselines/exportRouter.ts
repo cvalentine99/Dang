@@ -10,6 +10,7 @@
  * All exports are server-side generated and returned as downloadable content.
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { eq, desc, and, gte } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -55,8 +56,7 @@ export const exportRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { csv: "", filename: "drift-trend.csv" };
+      const db = await requireDb();
 
       const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
       const conditions = [
@@ -138,8 +138,7 @@ export const exportRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { csv: "", filename: "anomaly-history.csv" };
+      const db = await requireDb();
 
       const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
       const conditions = [
@@ -201,8 +200,7 @@ export const exportRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { csv: "", filename: "agent-volatility.csv" };
+      const db = await requireDb();
 
       const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
 
@@ -283,8 +281,7 @@ export const exportRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { csv: "", filename: "notification-history.csv" };
+      const db = await requireDb();
 
       const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
 

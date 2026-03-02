@@ -5,6 +5,7 @@
  * for reuse across sessions.
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { eq, desc, and } from "drizzle-orm";
@@ -21,8 +22,7 @@ export const savedSearchesRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { searches: [] };
+      const db = await requireDb();
 
       const conditions = [eq(savedSearches.userId, ctx.user.id)];
       if (input.searchType) {

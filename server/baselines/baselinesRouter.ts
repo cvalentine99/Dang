@@ -6,6 +6,7 @@
  * baselines are local snapshots only.
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { eq, desc, and } from "drizzle-orm";
@@ -16,8 +17,7 @@ import { configBaselines } from "../../drizzle/schema";
 export const baselinesRouter = router({
   /** List baselines for the current user */
   list: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    if (!db) return { baselines: [] };
+    const db = await requireDb();
 
     const results = await db
       .select({

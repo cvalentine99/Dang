@@ -1,5 +1,5 @@
 /**
- * QueueNotifier — Global notification component for Walter Queue alerts.
+ * QueueNotifier — Global notification component for Alert Queue alerts.
  *
  * Mounted inside DashboardLayout so it runs on every page. Polls the
  * alertQueue.recentAlerts endpoint every 10s to detect newly queued alerts.
@@ -223,7 +223,7 @@ function showCriticalToast(alert: {
             className="mt-1 flex items-center gap-1 text-[11px] font-medium text-red-300 hover:text-red-200 transition-colors"
           >
             <Inbox className="h-3 w-3" />
-            View in Walter Queue →
+            View in Alert Queue →
           </button>
         </div>
       ),
@@ -260,7 +260,7 @@ function showHighToast(alert: {
             className="mt-1 flex items-center gap-1 text-[11px] font-medium text-orange-300 hover:text-orange-200 transition-colors"
           >
             <Inbox className="h-3 w-3" />
-            View in Walter Queue →
+            View in Alert Queue →
           </button>
         </div>
       ),
@@ -499,7 +499,7 @@ export function QueueNotifier() {
               /* Settings view */
               <div className="p-4 space-y-1">
                 <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
-                  Get notified when alerts enter the Walter Queue. Sounds respect the global mute toggle.
+                  Get notified when alerts enter the Alert Queue. Sounds respect the global mute toggle.
                 </p>
 
                 {/* Critical toggle */}
@@ -571,7 +571,7 @@ export function QueueNotifier() {
                 <div className="mt-3 pt-2 border-t border-white/5">
                   <p className="text-[9px] text-muted-foreground">
                     {SoundEngine.isMuted()
-                      ? "🔇 Sounds muted — toggle in Walter chat"
+                      ? "🔇 Sounds muted — toggle in analyst settings"
                       : "🔊 Sounds enabled"}
                   </p>
                 </div>
@@ -582,7 +582,7 @@ export function QueueNotifier() {
                 <Bell className="h-8 w-8 text-muted-foreground/20 mb-3" />
                 <p className="text-xs text-muted-foreground">No notifications yet</p>
                 <p className="text-[10px] text-muted-foreground/60 mt-1">
-                  Alerts queued for Walter will appear here
+                  Alerts queued for structured triage will appear here
                 </p>
               </div>
             ) : (
@@ -648,7 +648,7 @@ export function QueueNotifier() {
                 }}
                 className="w-full text-center text-[11px] text-primary hover:text-primary/80 font-medium transition-colors"
               >
-                View Walter Queue →
+                View Alert Queue →
               </button>
             </div>
           )}

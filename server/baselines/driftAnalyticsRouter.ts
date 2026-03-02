@@ -8,6 +8,7 @@
  * by the BaselineScheduler after each baseline capture.
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
@@ -33,8 +34,7 @@ export const driftAnalyticsRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { points: [] };
+      const db = await requireDb();
 
       const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
 
@@ -103,8 +103,7 @@ export const driftAnalyticsRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { agents: [] };
+      const db = await requireDb();
 
       const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
 
@@ -243,8 +242,7 @@ export const driftAnalyticsRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { schedules: [] };
+      const db = await requireDb();
 
       const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
 
@@ -339,8 +337,7 @@ export const driftAnalyticsRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { events: [] };
+      const db = await requireDb();
 
       const conditions = [eq(driftSnapshots.userId, ctx.user.id)];
 
@@ -392,8 +389,7 @@ export const driftAnalyticsRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { grid: [], agents: [], buckets: [] };
+      const db = await requireDb();
 
       const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
 

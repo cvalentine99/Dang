@@ -69,7 +69,7 @@ import { Button } from "./ui/button";
  * Polls every 30s. Green = online, Red = offline, Amber = disabled.
  */
 /**
- * Alert Queue Badge — shows the number of alerts waiting for Walter analysis.
+ * Alert Queue Badge — shows the number of alerts waiting for structured triage.
  * Clickable to navigate to the queue page.
  */
 function AlertQueueBadge() {
@@ -89,7 +89,7 @@ function AlertQueueBadge() {
         navigate("/alert-queue");
       }}
       className="ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[10px] font-mono hover:bg-purple-500/30 transition-all"
-      title={`${count} alert${count !== 1 ? "s" : ""} queued for Walter`}
+      title={`${count} alert${count !== 1 ? "s" : ""} queued for structured triage`}
     >
       <Inbox className="h-2.5 w-2.5" />
       <span>{count}</span>
@@ -190,7 +190,7 @@ const menuItems = [
   { icon: Network, label: "Knowledge Graph", path: "/graph", group: "Intelligence" },
   { icon: FolderSearch, label: "Investigations", path: "/investigations", group: "Intelligence" },
   { icon: Database, label: "Data Pipeline", path: "/pipeline", group: "Intelligence" },
-  { icon: Inbox, label: "Walter Queue", path: "/alert-queue", group: "Intelligence" },
+  { icon: Inbox, label: "Alert Queue", path: "/alert-queue", group: "Intelligence" },
   { icon: Zap, label: "Auto-Queue Rules", path: "/auto-queue-rules", group: "Intelligence" },
   { icon: Workflow, label: "Triage Pipeline", path: "/triage", group: "Intelligence" },
   { icon: Lightbulb, label: "Living Cases", path: "/living-cases", group: "Intelligence" },

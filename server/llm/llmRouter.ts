@@ -8,6 +8,7 @@
  * - recentCalls: Paginated list of recent LLM invocations
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { desc, sql, and, gte } from "drizzle-orm";
 import { publicProcedure, router } from "../_core/trpc";
@@ -150,8 +151,7 @@ export const llmRouter = router({
       })
     )
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return [];
+      const db = await requireDb();
 
       const now = new Date();
       let cutoff: Date;
@@ -197,8 +197,7 @@ export const llmRouter = router({
       })
     )
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { calls: [], total: 0 };
+      const db = await requireDb();
 
       const [calls, countResult] = await Promise.all([
         db

@@ -8,6 +8,7 @@
  * Read-only with respect to Wazuh — captures are local snapshots only.
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -24,8 +25,7 @@ import { computeNextRunAt } from "./scheduleUtils";
 export const baselineSchedulesRouter = router({
   /** List all schedules for the current user */
   list: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    if (!db) return { schedules: [] };
+    const db = await requireDb();
 
     const results = await db
       .select()
@@ -252,8 +252,7 @@ export const baselineSchedulesRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { baselines: [] };
+      const db = await requireDb();
 
       // Verify ownership of the schedule
       const schedule = await db

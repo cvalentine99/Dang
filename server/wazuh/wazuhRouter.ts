@@ -84,7 +84,8 @@ export const wazuhRouter = router({
       const data = await proxyGet("/manager/info");
       return { configured: true, data };
     } catch (err) {
-      return { configured: true, data: null, error: (err as Error).message };
+      const { extractWazuhErrorDetail } = await import("./wazuhClient");
+      return { configured: true, data: null, error: extractWazuhErrorDetail(err) };
     }
   }),
 

@@ -269,6 +269,7 @@ export default function ITHygiene() {
           version: (ext as any).package?.version ?? ext.version ?? "—",
           description: (ext as any).package?.description ?? ext.description ?? "—",
           browser: (ext as any).browser?.name ?? ext.browser ?? "—",
+          path: (ext as any).path ?? "—",
         })),
       };
     }
@@ -286,6 +287,9 @@ export default function ITHygiene() {
           state: (svc as any).service?.state ?? (svc as any).service?.sub_state ?? svc.state ?? "—",
           enabled: (svc as any).service?.enabled ?? svc.enabled ?? "—",
           pid: (svc as any).process?.pid ?? svc.pid ?? "—",
+          display_name: (svc as any).service?.display_name ?? (svc as any).display_name ?? "—",
+          start_type: (svc as any).service?.start_type ?? (svc as any).start_type ?? "—",
+          description: (svc as any).service?.description ?? (svc as any).description ?? "—",
         })),
       };
     }
@@ -304,6 +308,7 @@ export default function ITHygiene() {
           gid: (item as any).user?.group_id ?? item.gid ?? "—",
           home: (item as any).user?.home ?? item.home ?? "—",
           shell: (item as any).user?.shell ?? item.shell ?? "—",
+          last_login: (item as any).user?.last_login ?? (item as any).last_login ?? null,
         })),
       };
     }

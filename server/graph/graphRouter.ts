@@ -10,6 +10,7 @@
  * - Answer provenance & trust auditing
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
@@ -194,8 +195,7 @@ export const graphRouter = router({
       offset: z.number().min(0).default(0),
     }).optional())
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { sessions: [], total: 0 };
+      const db = await requireDb();
 
       const conditions = [eq(investigationSessions.userId, ctx.user.id)];
       if (input?.status) {
@@ -347,8 +347,7 @@ export const graphRouter = router({
   investigationsByAgent: protectedProcedure
     .input(z.object({ agentId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { sessions: [] };
+      const db = await requireDb();
 
       // Fetch all user investigations and filter by evidence containing the agentId
       const allSessions = await db.select()

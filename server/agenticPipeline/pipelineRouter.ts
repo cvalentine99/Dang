@@ -14,6 +14,7 @@
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -277,8 +278,7 @@ export const pipelineRouter = router({
   getFeedback: protectedProcedure
     .input(z.object({ triageId: z.string() }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { found: false as const };
+      const db = await requireDb();
 
       const [row] = await db
         .select({
@@ -313,8 +313,7 @@ export const pipelineRouter = router({
   /** Get feedback statistics — how many triages confirmed, overridden, etc. */
   feedbackStats: protectedProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return { total: 0, confirmed: 0, overridden: 0, pending: 0 };
+      const db = await requireDb();
 
       const [stats] = await db
         .select({
@@ -341,8 +340,7 @@ export const pipelineRouter = router({
    */
   feedbackAnalytics: protectedProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return null;
+      const db = await requireDb();
 
       // 1. Overall feedback coverage
       const [coverage] = await db.select({
@@ -542,8 +540,7 @@ export const pipelineRouter = router({
   getAutoTriageStatus: protectedProcedure
     .input(z.object({ queueItemId: z.number().int() }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { found: false as const };
+      const db = await requireDb();
 
       const [item] = await db
         .select({
@@ -1015,8 +1012,7 @@ export const pipelineRouter = router({
   getPipelineRun: protectedProcedure
     .input(z.object({ runId: z.string() }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return null;
+      const db = await requireDb();
       const [row] = await db
         .select()
         .from(pipelineRuns)
@@ -1033,8 +1029,7 @@ export const pipelineRouter = router({
       status: z.enum(["running", "completed", "failed", "partial"]).optional(),
     }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { runs: [], total: 0 };
+      const db = await requireDb();
 
       const conditions = input.status
         ? [eq(pipelineRuns.status, input.status)]
@@ -1062,8 +1057,7 @@ export const pipelineRouter = router({
   /** Pipeline run stats. */
   pipelineRunStats: protectedProcedure
     .query(async () => {
-      const db = await getDb();
-      if (!db) return null;
+      const db = await requireDb();
 
       const [stats] = await db.select({
         total: sql<number>`COUNT(*)`,
@@ -1357,8 +1351,7 @@ export const pipelineRouter = router({
   getPipelineArtifacts: protectedProcedure
     .input(z.object({ runId: z.string() }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return null;
+      const db = await requireDb();
 
       // 1. Fetch the pipeline run
       const [run] = await db

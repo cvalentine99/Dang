@@ -2393,3 +2393,18 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Fix docker-entrypoint.sh fragile URL parsing — replace sed with Node.js URL parser
 - [x] Add .env template warnings about literal values (no shell expansion)
 - [x] Fix deploy.sh to validate .env values
+
+## Agentic Workflow Truth Remediation — All 8 Tasks
+
+- [x] Task 1+7: Workflow identity — "Structured Triage" / "Ad-hoc Analysis" labels across AlertQueue, DashboardLayout, QueueNotifier, AlertsTimeline, TriagePipeline, PipelineInspector, AutoQueueRules
+- [x] Task 2: Readiness contract — readinessService.ts + readinessRouter.ts (checks DB, LLM, Wazuh Manager, Wazuh Indexer, Graph Context)
+- [x] Task 2 (client): useAgenticReadiness hook + ReadinessBanner component wired into AlertQueue with button gating
+- [x] Task 3: Wazuh failure truth — extractWazuhErrorDetail() in wazuhClient.ts, structured error in wazuhRouter.status
+- [x] Task 4: Dependency failure truth — requireDb() guard in dbGuard.ts, replaced 53 fake-empty returns across 17 router files
+- [x] Task 5: Pipeline inspector visibility — alertQueue.process now inserts pipelineRuns row (status: "partial", triggeredBy: "queue")
+- [x] Task 6: Analyst Chat honest labeling — "Ad-hoc Security Analyst — Conversational Only — Not Persisted"
+- [x] Task 7: Router comments fixed — removed "UNIFIED PIPELINE" swaggering, honest "triage-only" language
+- [x] Task 8: Truth tests — 23 tests in workflowTruth.test.ts covering all 8 remediation tasks
+- [x] Bonus: Fixed 9 ITHygiene.tsx TypeScript errors (pre-existing type narrowing issues)
+- [x] Bonus: Zero TypeScript errors across entire codebase
+- [x] All 1,239 tests passing across 53 test files

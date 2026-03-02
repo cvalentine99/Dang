@@ -153,7 +153,7 @@ export default function PipelineInspector() {
         <GlassPanel className="p-8 text-center">
           <Activity className="w-8 h-8 text-muted-foreground/20 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground/40">No pipeline runs found.</p>
-          <p className="text-xs text-muted-foreground/25 mt-1">Pipeline runs are created when alerts enter the Walter Queue with auto-triage enabled.</p>
+          <p className="text-xs text-muted-foreground/25 mt-1">Pipeline runs are created when alerts are processed via Structured Triage from the Alert Queue.</p>
         </GlassPanel>
       ) : (
         <div className="space-y-3">

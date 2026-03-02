@@ -759,10 +759,13 @@ function WelcomeScreen(): React.JSX.Element {
       </div>
       <h2 className="text-2xl font-display font-bold text-foreground mb-2">Walter</h2>
       <p className="text-muted-foreground text-sm text-center max-w-lg mb-2">
-        Policy-Constrained Reasoning Engine with 4-Layer Knowledge Graph
+        Ad-hoc Security Analyst — Conversational Only
       </p>
-      <p className="text-muted-foreground text-xs text-center max-w-lg mb-8 opacity-60">
+      <p className="text-muted-foreground text-xs text-center max-w-lg mb-1 opacity-60">
         Trust scoring · Safety rails · Provenance tracking · Read-only by design
+      </p>
+      <p className="text-amber-400/70 text-[11px] text-center max-w-lg mb-8 font-medium">
+        ⚠ Results are not persisted to the pipeline. For structured triage, use the Alert Queue.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-w-5xl w-full">
@@ -780,7 +783,7 @@ function WelcomeScreen(): React.JSX.Element {
       <div className="mt-8 flex items-center gap-4 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <Database className="w-3 h-3 text-purple-400" />
-          <span>4-Layer KG</span>
+          <span>Knowledge Graph</span>
         </div>
         <div className="w-1 h-1 rounded-full bg-white/20" />
         <div className="flex items-center gap-1.5">
@@ -888,7 +891,7 @@ export default function AnalystChat(): React.JSX.Element {
     const simulatedSteps: AgentStep[] = [
       { agent: "orchestrator", phase: 1, action: "Analyzing query intent", detail: "Classifying query and extracting entities...", status: "running", timestamp: Date.now() },
       { agent: "orchestrator", phase: 1, action: "Intent classified", detail: "Selecting retrieval strategy...", status: "complete", timestamp: Date.now(), durationMs: 800 },
-      { agent: "graph_retriever", phase: 2, action: "Querying Knowledge Graph", detail: "Traversing 4-layer API ontology...", status: "running", timestamp: Date.now() },
+      { agent: "graph_retriever", phase: 2, action: "Querying Knowledge Graph", detail: "Traversing knowledge graph...", status: "running", timestamp: Date.now() },
       { agent: "indexer_retriever", phase: 3, action: "Searching Wazuh Indexer", detail: "Querying wazuh-alerts-* and wazuh-states-vulnerabilities-*...", status: "running", timestamp: Date.now() },
       { agent: "graph_retriever", phase: 2, action: "Graph retrieval complete", detail: "Retrieved data from KG layers...", status: "complete", timestamp: Date.now(), durationMs: 1200 },
       { agent: "indexer_retriever", phase: 3, action: "Indexer search complete", detail: "Retrieved alerts and events...", status: "complete", timestamp: Date.now(), durationMs: 1500 },
@@ -1027,7 +1030,7 @@ export default function AnalystChat(): React.JSX.Element {
             </div>
             <div>
               <h1 className="text-lg font-display font-bold text-foreground">Walter</h1>
-              <p className="text-xs text-muted-foreground">Policy-Constrained Reasoning Engine · 4-Layer KG</p>
+              <p className="text-xs text-muted-foreground">Ad-hoc Analysis · Conversational Only · Not Persisted</p>
             </div>
           </div>
           <div className="flex items-center gap-3">

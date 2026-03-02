@@ -88,15 +88,15 @@ function extractItems(raw: unknown): Array<Record<string, unknown>> {
 }
 
 /**
- * Send to Walter button — queues an alert for Walter's agentic analysis.
+ * Send to Queue button — queues an alert for structured triage.
  * Shows on each alert row in the table.
  */
-function SendToWalterButton({ alert }: { alert: Record<string, unknown> }) {
+function SendToQueueButton({ alert }: { alert: Record<string, unknown> }) {
   const utils = trpc.useUtils();
   const enqueueMutation = trpc.alertQueue.enqueue.useMutation({
     onSuccess: (result) => {
       if (result.success) {
-        toast.success("Alert queued for Walter", {
+        toast.success("Alert queued for triage", {
           description: "Click the queue badge in the sidebar to start analysis",
         });
         utils.alertQueue.count.invalidate();
@@ -132,10 +132,10 @@ function SendToWalterButton({ alert }: { alert: Record<string, unknown> }) {
       onClick={handleClick}
       disabled={enqueueMutation.isPending}
       className="group flex items-center gap-1 px-1.5 py-0.5 rounded border border-purple-500/20 bg-purple-500/5 text-purple-300 hover:bg-purple-500/15 hover:border-purple-500/40 transition-all disabled:opacity-50"
-      title="Send to Walter for analysis"
+      title="Send to Alert Queue for structured triage"
     >
       <Brain className={`h-3 w-3 ${enqueueMutation.isPending ? "animate-spin" : "group-hover:animate-pulse"}`} />
-      <span className="text-[9px] font-medium hidden xl:inline">Walter</span>
+      <span className="text-[9px] font-medium hidden xl:inline">Queue</span>
     </button>
   );
 }
@@ -581,7 +581,7 @@ export default function AlertsTimeline() {
                         <Eye className="h-3 w-3 text-muted-foreground hover:text-primary transition-colors" />
                       </td>
                       <td className="py-1.5 px-2">
-                        <SendToWalterButton alert={a} />
+                        <SendToQueueButton alert={a} />
                       </td>
                     </tr>
                   );

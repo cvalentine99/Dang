@@ -1,6 +1,6 @@
 /**
  * Auto-Queue Rules Router — configurable rules that automatically send matching
- * Wazuh alerts to Walter's queue without manual analyst intervention.
+ * Wazuh alerts to the Alert Queue for structured triage without manual analyst intervention.
  *
  * Rules are evaluated on a configurable polling interval (default: 60s).
  * The poller queries the Wazuh Indexer for recent alerts and checks them
@@ -9,6 +9,7 @@
  * Feature-gated: CRUD requires admin role. Polling is server-side only.
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
@@ -128,8 +129,7 @@ function matchesRule(alert: WazuhAlert, rule: AutoQueueRule): boolean {
  * Returns true if the rule can still auto-queue (under limit).
  */
 async function checkRateLimit(rule: AutoQueueRule): Promise<boolean> {
-  const db = await getDb();
-  if (!db) return false;
+  const db = await requireDb();
 
   const now = new Date();
   const hourStart = rule.currentHourStart;
@@ -165,8 +165,7 @@ async function pollAndEnqueue(): Promise<{ matched: number; queued: number; skip
   const result = { matched: 0, queued: 0, skipped: 0, errors: [] as string[] };
 
   try {
-    const db = await getDb();
-    if (!db) return result;
+    const db = await requireDb();
 
     // Get all enabled rules
     const rules = await db
@@ -310,8 +309,7 @@ function stopPolling(): void {
  * Check if any rules are enabled and start/stop polling accordingly.
  */
 async function syncPollingState(): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
+  const db = await requireDb();
 
   const [result] = await db
     .select({ count: sql<number>`COUNT(*)` })
@@ -337,8 +335,7 @@ export const autoQueueRouter = router({
    * List all auto-queue rules.
    */
   list: protectedProcedure.query(async () => {
-    const db = await getDb();
-    if (!db) return { rules: [], pollingActive: false };
+    const db = await requireDb();
 
     const rules = await db
       .select()

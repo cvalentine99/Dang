@@ -39,8 +39,33 @@
  * - Fail closed on auth/network errors
  */
 
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, AxiosError } from "axios";
 import https from "https";
+
+/**
+ * Extract meaningful error detail from Axios errors instead of losing
+ * the actual failure reason (ECONNREFUSED, ETIMEDOUT, 401, 403, TLS, etc.).
+ */
+export function extractWazuhErrorDetail(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const ae = err as AxiosError;
+    if (ae.response) {
+      const status = ae.response.status;
+      const body = typeof ae.response.data === "object" && ae.response.data !== null
+        ? JSON.stringify(ae.response.data).slice(0, 200)
+        : String(ae.response.data ?? "").slice(0, 200);
+      return `HTTP ${status} from ${ae.config?.url ?? "unknown"} — ${body}`;
+    }
+    if (ae.code === "ECONNREFUSED") return `Connection refused at ${ae.config?.baseURL ?? "unknown"} — is Wazuh Manager running?`;
+    if (ae.code === "ETIMEDOUT" || ae.code === "ECONNABORTED") return `Connection timed out to ${ae.config?.baseURL ?? "unknown"} — network issue or firewall`;
+    if (ae.code === "ENOTFOUND") return `DNS resolution failed for ${ae.config?.baseURL ?? "unknown"} — check hostname`;
+    if (ae.code === "CERT_HAS_EXPIRED" || ae.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE") return `TLS certificate error: ${ae.code}`;
+    if (ae.code) return `Network error ${ae.code}: ${ae.message}`;
+    return ae.message || "Unknown Axios error";
+  }
+  const msg = (err as Error)?.message;
+  return msg || "Unknown error (no message)";
+}
 
 // ── Token state ───────────────────────────────────────────────────────────────
 // We store the JWT and its expiration from the Wazuh API response.
@@ -269,7 +294,7 @@ export async function wazuhGet(
   try {
     token = await getToken(baseURL, config.user, config.pass);
   } catch (err) {
-    throw new Error(`Wazuh auth error: ${(err as Error).message}`);
+    throw new Error(`Wazuh auth error: ${extractWazuhErrorDetail(err)}`);
   }
 
   const instance = createAxiosInstance(baseURL);

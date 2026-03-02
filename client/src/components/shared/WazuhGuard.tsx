@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { Shield, AlertTriangle, Wifi, WifiOff } from "lucide-react";
+import { Wifi, WifiOff } from "lucide-react";
 import { ReactNode } from "react";
 
 interface WazuhGuardProps {
@@ -7,8 +7,15 @@ interface WazuhGuardProps {
 }
 
 /**
- * No longer blocks content. Shows an inline connection banner at the top
- * and always renders children. Pages handle their own empty states.
+ * WazuhGuard — shows an inline connection banner with structured error detail.
+ *
+ * Connection truth:
+ *   - configured: Wazuh host/user/pass are set (env or DB override)
+ *   - connected: configured AND the /manager/info probe returned data
+ *   - errorDetail: when configured but NOT connected, the structured reason
+ *     (e.g., "Connection refused at https://192.168.50.158:55000 — is Wazuh Manager running?")
+ *
+ * Always renders children — pages handle their own empty states.
  */
 export function WazuhGuard({ children }: WazuhGuardProps) {
   const { data, isLoading } = trpc.wazuh.status.useQuery(undefined, {
@@ -16,7 +23,11 @@ export function WazuhGuard({ children }: WazuhGuardProps) {
     staleTime: 60_000,
   });
 
-  const isConnected = data?.configured === true && data?.data != null;
+  // Structured connection truth — no muddy logic
+  const isConfigured = data?.configured === true;
+  const hasData = data?.data != null;
+  const isConnected = isConfigured && hasData;
+  const errorDetail = (data as Record<string, unknown>)?.error as string | undefined;
 
   return (
     <div className="space-y-4">
@@ -38,9 +49,9 @@ export function WazuhGuard({ children }: WazuhGuardProps) {
               <WifiOff className="h-3.5 w-3.5" />
               <span>Wazuh API Not Connected</span>
               <span className="text-muted-foreground ml-1">
-                {!data?.configured
+                {!isConfigured
                   ? "— Set WAZUH_HOST, WAZUH_USER, WAZUH_PASS in Secrets"
-                  : `— ${(data as Record<string, unknown>)?.error ?? "Connection failed"}`}
+                  : `— ${errorDetail ?? "Connection failed (no detail available)"}`}
               </span>
             </>
           )}
@@ -55,16 +66,20 @@ export function WazuhGuard({ children }: WazuhGuardProps) {
 
 /**
  * Hook to check Wazuh connection status without blocking.
+ * Returns structured errorDetail instead of generic messages.
  */
 export function useWazuhStatus() {
   const { data, isLoading } = trpc.wazuh.status.useQuery(undefined, {
     retry: 1,
     staleTime: 60_000,
   });
+  const isConfigured = data?.configured === true;
+  const hasData = data?.data != null;
+  const errorDetail = (data as Record<string, unknown>)?.error as string | undefined;
   return {
     isLoading,
-    isConfigured: data?.configured === true,
-    isConnected: data?.configured === true && data?.data != null,
-    error: (data as Record<string, unknown>)?.error as string | undefined,
+    isConfigured,
+    isConnected: isConfigured && hasData,
+    errorDetail,
   };
 }

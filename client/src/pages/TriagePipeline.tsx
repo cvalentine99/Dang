@@ -1028,7 +1028,7 @@ export default function TriagePipeline() {
           <h3 className="text-lg font-[Space_Grotesk] text-foreground/60 mb-2">No Triage Objects Yet</h3>
           <p className="text-sm text-muted-foreground/40 max-w-md mx-auto">
             Triage objects are created when alerts are processed through the agentic pipeline.
-            Use the "AI Triage" button on any alert, or send alerts from the Walter Queue.
+            Use the "Structured Triage" button on any alert, or send alerts from the Alert Queue.
           </p>
         </GlassPanel>
       ) : (

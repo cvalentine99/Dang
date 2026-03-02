@@ -8,6 +8,7 @@
  * - delete: Permanently delete a rule
  */
 
+import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { eq, desc, and } from "drizzle-orm";
@@ -26,8 +27,7 @@ export const suppressionRouter = router({
       }).optional()
     )
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) return { rules: [] };
+      const db = await requireDb();
 
       const conditions = [eq(anomalySuppressionRules.userId, ctx.user.id)];
       if (input?.activeOnly) {
