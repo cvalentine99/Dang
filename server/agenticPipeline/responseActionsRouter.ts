@@ -20,6 +20,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -67,7 +68,7 @@ export const responseActionsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database not available");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       const actionId = `ra-${nanoid(12)}`;
       const proposedBy = input.proposedByAgent ?? `user:${ctx.user.id}`;

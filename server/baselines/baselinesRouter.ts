@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { eq, desc, and } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -40,7 +41,7 @@ export const baselinesRouter = router({
     .input(z.object({ id: z.number().int() }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const results = await db
         .select()
@@ -53,7 +54,7 @@ export const baselinesRouter = router({
         )
         .limit(1);
 
-      if (!results.length) throw new Error("Baseline not found");
+      if (!results.length) throw new TRPCError({ code: "NOT_FOUND", message: "Baseline not found" });
       return { baseline: results[0] };
     }),
 
@@ -69,7 +70,7 @@ export const baselinesRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const result = await db.insert(configBaselines).values({
         userId: ctx.user.id,
@@ -87,7 +88,7 @@ export const baselinesRouter = router({
     .input(z.object({ id: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const existing = await db
         .select()
@@ -100,7 +101,7 @@ export const baselinesRouter = router({
         )
         .limit(1);
 
-      if (!existing.length) throw new Error("Baseline not found");
+      if (!existing.length) throw new TRPCError({ code: "NOT_FOUND", message: "Baseline not found" });
 
       await db
         .delete(configBaselines)

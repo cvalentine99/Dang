@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getWazuhConfig, isWazuhConfigured, wazuhGet, getEffectiveWazuhConfig, isWazuhEffectivelyConfigured } from "./wazuhClient";
 
@@ -22,7 +23,7 @@ const agentIdSchema = z.string().regex(/^\d{3,}$/, "Invalid agent ID format");
 // ── Helper: wrap with config check (uses DB override → env fallback) ─────────
 async function proxyGet(path: string, params?: Record<string, string | number | boolean | undefined>, group?: string) {
   const config = await getEffectiveWazuhConfig();
-  if (!config) throw new Error("Wazuh is not configured. Set connection settings in Admin > Connection Settings or via environment variables.");
+  if (!config) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Wazuh is not configured. Set connection settings in Admin > Connection Settings or via environment variables." });
   return wazuhGet(config, { path, params, rateLimitGroup: group });
 }
 

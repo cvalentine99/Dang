@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { eq, desc, and } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -63,7 +64,7 @@ export const suppressionRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       // Resolve schedule name if a specific schedule is targeted
       let scheduleName: string | null = null;
@@ -79,7 +80,7 @@ export const suppressionRouter = router({
           )
           .limit(1);
 
-        if (!schedule) throw new Error("Schedule not found");
+        if (!schedule) throw new TRPCError({ code: "NOT_FOUND", message: "Schedule not found" });
         scheduleName = schedule.name;
       }
 
@@ -105,7 +106,7 @@ export const suppressionRouter = router({
     .input(z.object({ id: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const [rule] = await db
         .select({ id: anomalySuppressionRules.id, userId: anomalySuppressionRules.userId })
@@ -114,7 +115,7 @@ export const suppressionRouter = router({
         .limit(1);
 
       if (!rule || rule.userId !== ctx.user.id) {
-        throw new Error("Rule not found");
+        throw new TRPCError({ code: "NOT_FOUND", message: "Rule not found" });
       }
 
       await db
@@ -132,7 +133,7 @@ export const suppressionRouter = router({
     .input(z.object({ id: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const [rule] = await db
         .select({ id: anomalySuppressionRules.id, userId: anomalySuppressionRules.userId })
@@ -141,7 +142,7 @@ export const suppressionRouter = router({
         .limit(1);
 
       if (!rule || rule.userId !== ctx.user.id) {
-        throw new Error("Rule not found");
+        throw new TRPCError({ code: "NOT_FOUND", message: "Rule not found" });
       }
 
       await db

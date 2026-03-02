@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -149,7 +150,7 @@ export const anomalyRouter = router({
     .input(z.object({ id: z.number().int() }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const results = await db
         .select()
@@ -162,7 +163,7 @@ export const anomalyRouter = router({
         )
         .limit(1);
 
-      if (!results.length) throw new Error("Anomaly not found");
+      if (!results.length) throw new TRPCError({ code: "NOT_FOUND", message: "Anomaly not found" });
 
       const a = results[0];
       return {
@@ -186,7 +187,7 @@ export const anomalyRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       // Verify ownership
       const existing = await db
@@ -196,7 +197,7 @@ export const anomalyRouter = router({
         .limit(1);
 
       if (!existing.length || existing[0].userId !== ctx.user.id) {
-        throw new Error("Anomaly not found");
+        throw new TRPCError({ code: "NOT_FOUND", message: "Anomaly not found" });
       }
 
       await db
@@ -222,7 +223,7 @@ export const anomalyRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const conditions = [
         eq(driftAnomalies.userId, ctx.user.id),

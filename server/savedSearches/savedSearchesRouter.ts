@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { eq, desc, and } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -50,7 +51,7 @@ export const savedSearchesRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const result = await db.insert(savedSearches).values({
         userId: ctx.user.id,
@@ -75,7 +76,7 @@ export const savedSearchesRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       // Verify ownership
       const existing = await db
@@ -84,7 +85,7 @@ export const savedSearchesRouter = router({
         .where(and(eq(savedSearches.id, input.id), eq(savedSearches.userId, ctx.user.id)))
         .limit(1);
 
-      if (!existing.length) throw new Error("Saved search not found");
+      if (!existing.length) throw new TRPCError({ code: "NOT_FOUND", message: "Saved search not found" });
 
       const updates: Record<string, unknown> = {};
       if (input.name !== undefined) updates.name = input.name;
@@ -106,7 +107,7 @@ export const savedSearchesRouter = router({
     .input(z.object({ id: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       // Verify ownership
       const existing = await db
@@ -115,7 +116,7 @@ export const savedSearchesRouter = router({
         .where(and(eq(savedSearches.id, input.id), eq(savedSearches.userId, ctx.user.id)))
         .limit(1);
 
-      if (!existing.length) throw new Error("Saved search not found");
+      if (!existing.length) throw new TRPCError({ code: "NOT_FOUND", message: "Saved search not found" });
 
       await db.delete(savedSearches).where(eq(savedSearches.id, input.id));
       return { success: true };

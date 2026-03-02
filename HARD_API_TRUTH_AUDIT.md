@@ -287,7 +287,7 @@ The core API surface is well-structured. Wazuh integration follows a clean proxy
 | ~~Medium~~ | ~~`enhancedLLM.queueStats.priorityCounts` always returns zeros~~ — **FIXED**: real per-priority tracking in PriorityQueue class + lifetime stats | §4.3 |
 | ~~Low~~ | ~~SOC_COMPLIANCE_EVIDENCE.md test count is stale~~ — **FIXED**: updated to 1195/51 | §6.3 |
 | ~~Low~~ | ~~No host allowlist on `connectionSettings.testConnection`~~ — **FIXED**: RFC 1918 allowlist with metadata/loopback/public IP blocking | §5.2 |
-| **Low** | Some routers throw raw `Error` instead of `TRPCError` | §5.5 |
+| ~~Low~~ | ~~Some routers throw raw `Error` instead of `TRPCError`~~ — **FIXED**: all 81 raw Error throws converted to TRPCError across 16 router files (28 NOT_FOUND, 60 INTERNAL_SERVER_ERROR, 8 BAD_REQUEST, 5 PRECONDITION_FAILED, 7 FORBIDDEN) | §5.5 |
 | ~~Low~~ | ~~`AIChatBox.tsx` references non-existent `trpc.ai.chat` router~~ — **FIXED**: replaced with `trpc.hybridrag.query` | §2.1 |
 
 ### What is honestly not proven

@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { eq, desc, and } from "drizzle-orm";
 import axios from "axios";
 import { nanoid } from "nanoid";
@@ -281,7 +282,7 @@ export const hybridragRouter = router({
       )
       .mutation(async ({ input }) => {
         const db = await getDb();
-        if (!db) throw new Error("Database unavailable");
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
         const result = await db.insert(analystNotes).values({
           title: input.title,
@@ -310,7 +311,7 @@ export const hybridragRouter = router({
       )
       .mutation(async ({ input }) => {
         const db = await getDb();
-        if (!db) throw new Error("Database unavailable");
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
         const updates: Partial<typeof analystNotes.$inferInsert> = {};
         if (input.title !== undefined) updates.title = input.title;
@@ -327,7 +328,7 @@ export const hybridragRouter = router({
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ input }) => {
         const db = await getDb();
-        if (!db) throw new Error("Database unavailable");
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
         await db.delete(analystNotes).where(eq(analystNotes.id, input.id));
         return { success: true };
       }),

@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import { alertQueue } from "../../drizzle/schema";
@@ -82,7 +83,7 @@ export const alertQueueRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database not available");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       // Check for duplicate (same alertId already queued/processing)
       const [existing] = await db
@@ -159,7 +160,7 @@ export const alertQueueRouter = router({
     .input(z.object({ id: z.number().int() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database not available");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       await db
         .update(alertQueue)
@@ -178,7 +179,7 @@ export const alertQueueRouter = router({
     .input(z.object({ id: z.number().int() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database not available");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       // Get the queue item
       const [item] = await db
@@ -187,8 +188,8 @@ export const alertQueueRouter = router({
         .where(eq(alertQueue.id, input.id))
         .limit(1);
 
-      if (!item) throw new Error("Queue item not found");
-      if (item.status !== "queued") throw new Error(`Cannot process item with status: ${item.status}`);
+      if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "Queue item not found" });
+      if (item.status !== "queued") throw new TRPCError({ code: "BAD_REQUEST", message: `Cannot process item with status: ${item.status}` });
 
       // Mark as processing
       await db
@@ -308,7 +309,7 @@ export const alertQueueRouter = router({
    */
   clearHistory: protectedProcedure.mutation(async () => {
     const db = await getDb();
-    if (!db) throw new Error("Database not available");
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
     await db
       .delete(alertQueue)

@@ -15,6 +15,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import {
   runTriageAgent,
@@ -221,7 +222,7 @@ export const pipelineRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database not available");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       // Find the triage object
       const [row] = await db
@@ -445,7 +446,7 @@ export const pipelineRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database not available");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       // Get the queue item
       const [item] = await db
@@ -672,7 +673,7 @@ export const pipelineRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database not available");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       const [row] = await db
         .select()
@@ -716,7 +717,7 @@ export const pipelineRouter = router({
   autoTriageAllPending: protectedProcedure
     .mutation(async ({ ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database not available");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       // Get all queued items without a triage
       const pendingItems = await db
@@ -831,7 +832,7 @@ export const pipelineRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database not available");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       const runId = `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
       const alertId = String(input.rawAlert.id ?? input.rawAlert.alertId ?? "unknown");
@@ -882,7 +883,7 @@ export const pipelineRouter = router({
         });
 
         if (!triageResult.success || !triageResult.triageId) {
-          throw new Error(triageResult.error ?? "Triage failed");
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: triageResult.error ?? "Triage failed" });
         }
 
         result.stages.triage = {
@@ -1092,7 +1093,7 @@ export const pipelineRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database not available");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       // 1. Fetch the original run
       const [originalRun] = await db
@@ -1102,11 +1103,11 @@ export const pipelineRouter = router({
         .limit(1);
 
       if (!originalRun) {
-        throw new Error(`Pipeline run '${input.runId}' not found`);
+        throw new TRPCError({ code: "NOT_FOUND", message: `Pipeline run '${input.runId}' not found` });
       }
 
       if (originalRun.status === "running") {
-        throw new Error("Cannot replay a currently running pipeline");
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot replay a currently running pipeline" });
       }
 
       // 2. Determine which stage to start from
@@ -1120,17 +1121,17 @@ export const pipelineRouter = router({
         else if (originalRun.hypothesisStatus === "failed") startStage = "hypothesis";
         else if (originalRun.responseActionsStatus === "failed") startStage = "hypothesis"; // re-run hypothesis to re-materialize
         else {
-          throw new Error("No failed stage found — pipeline completed successfully");
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No failed stage found — pipeline completed successfully" });
         }
       }
 
       // 3. Validate we have the prerequisites for the starting stage
       const startIdx = stageOrder.indexOf(startStage);
       if (startStage === "correlation" && !originalRun.triageId) {
-        throw new Error("Cannot replay from correlation — no triage ID from original run");
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot replay from correlation — no triage ID from original run" });
       }
       if (startStage === "hypothesis" && !originalRun.correlationId) {
-        throw new Error("Cannot replay from hypothesis — no correlation ID from original run");
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot replay from hypothesis — no correlation ID from original run" });
       }
 
       // 4. Create a new pipeline run record for the replay
@@ -1205,7 +1206,7 @@ export const pipelineRouter = router({
           }
 
           if (!rawAlert) {
-            throw new Error("Cannot replay triage — original raw alert not found");
+            throw new TRPCError({ code: "NOT_FOUND", message: "Cannot replay triage — original raw alert not found" });
           }
 
           await db.update(pipelineRuns)
@@ -1219,7 +1220,7 @@ export const pipelineRouter = router({
           });
 
           if (!triageResult.success || !triageResult.triageId) {
-            throw new Error(triageResult.error ?? "Triage failed");
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: triageResult.error ?? "Triage failed" });
           }
 
           currentTriageId = triageResult.triageId;
@@ -1253,7 +1254,7 @@ export const pipelineRouter = router({
       // ── Stage 2: Correlation (if needed) ────────────────────────────────
       if (startIdx <= 1) {
         try {
-          if (!currentTriageId) throw new Error("No triage ID available for correlation");
+          if (!currentTriageId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No triage ID available for correlation" });
 
           await db.update(pipelineRuns)
             .set({ correlationStatus: "running", currentStage: "correlation" })
@@ -1293,7 +1294,7 @@ export const pipelineRouter = router({
 
       // ── Stage 3: Hypothesis + Response Actions ──────────────────────────
       try {
-        if (!currentCorrelationId) throw new Error("No correlation ID available for hypothesis");
+        if (!currentCorrelationId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No correlation ID available for hypothesis" });
 
         await db.update(pipelineRuns)
           .set({ hypothesisStatus: "running", currentStage: "hypothesis" })

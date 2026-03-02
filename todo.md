@@ -2265,3 +2265,11 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Remove dead trpc.ai.chat reference from AIChatBox.tsx — replaced with trpc.hybridrag.query in JSDoc example
 - [x] Remove dead trpc.ai.chat reference from ComponentShowcase.tsx — replaced with trpc.hybridrag.query in demo string
 - [x] Verify no other orphaned trpc.ai references exist — grep confirms 0 matches
+
+## Raw Error → TRPCError Conversion
+
+- [x] Audit all raw `throw new Error()` in router files — 81 found across 16 files
+- [x] Audit all raw `throw new Error()` in service files called by routers — all in router files, none in services
+- [x] Convert each to `throw new TRPCError()` with appropriate code — 81 converted (28 NOT_FOUND, 60 INTERNAL_SERVER_ERROR, 8 BAD_REQUEST, 5 PRECONDITION_FAILED, 7 FORBIDDEN)
+- [x] Ensure TRPCError is imported in every affected file — all 16 files confirmed
+- [x] Run full test suite to confirm no regressions — 51 files, 1195 tests passing

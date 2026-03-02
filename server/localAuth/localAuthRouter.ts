@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { publicProcedure, router } from "../_core/trpc";
 import {
   isLocalAuthMode,
@@ -45,9 +46,7 @@ export const localAuthRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       if (!isLocalAuthMode()) {
-        throw new Error(
-          "Registration is currently disabled."
-        );
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Registration is currently disabled." });
       }
 
       const result = await registerLocalUser(input);
@@ -85,7 +84,7 @@ export const localAuthRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       if (!isLocalAuthMode()) {
-        throw new Error("Login is currently disabled.");
+        throw new TRPCError({ code: "FORBIDDEN", message: "Login is currently disabled." });
       }
 
       const result = await loginLocalUser(input);

@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -41,7 +42,7 @@ export const baselineSchedulesRouter = router({
     .input(z.object({ id: z.number().int() }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const results = await db
         .select()
@@ -54,7 +55,7 @@ export const baselineSchedulesRouter = router({
         )
         .limit(1);
 
-      if (!results.length) throw new Error("Schedule not found");
+      if (!results.length) throw new TRPCError({ code: "NOT_FOUND", message: "Schedule not found" });
       return { schedule: results[0] };
     }),
 
@@ -72,7 +73,7 @@ export const baselineSchedulesRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const nextRunAt = computeNextRunAt(input.frequency as BaselineFrequency);
 
@@ -106,7 +107,7 @@ export const baselineSchedulesRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       // Verify ownership
       const existing = await db
@@ -120,7 +121,7 @@ export const baselineSchedulesRouter = router({
         )
         .limit(1);
 
-      if (!existing.length) throw new Error("Schedule not found");
+      if (!existing.length) throw new TRPCError({ code: "NOT_FOUND", message: "Schedule not found" });
 
       const updates: Record<string, unknown> = {};
       if (input.name !== undefined) updates.name = input.name;
@@ -150,7 +151,7 @@ export const baselineSchedulesRouter = router({
     .input(z.object({ id: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const existing = await db
         .select()
@@ -163,7 +164,7 @@ export const baselineSchedulesRouter = router({
         )
         .limit(1);
 
-      if (!existing.length) throw new Error("Schedule not found");
+      if (!existing.length) throw new TRPCError({ code: "NOT_FOUND", message: "Schedule not found" });
 
       const newEnabled = !existing[0].enabled;
       const updates: Record<string, unknown> = { enabled: newEnabled };
@@ -187,7 +188,7 @@ export const baselineSchedulesRouter = router({
     .input(z.object({ id: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const existing = await db
         .select()
@@ -200,7 +201,7 @@ export const baselineSchedulesRouter = router({
         )
         .limit(1);
 
-      if (!existing.length) throw new Error("Schedule not found");
+      if (!existing.length) throw new TRPCError({ code: "NOT_FOUND", message: "Schedule not found" });
 
       // Unlink baselines created by this schedule (don't delete them)
       await db
@@ -220,7 +221,7 @@ export const baselineSchedulesRouter = router({
     .input(z.object({ id: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const existing = await db
         .select()
@@ -233,7 +234,7 @@ export const baselineSchedulesRouter = router({
         )
         .limit(1);
 
-      if (!existing.length) throw new Error("Schedule not found");
+      if (!existing.length) throw new TRPCError({ code: "NOT_FOUND", message: "Schedule not found" });
 
       // Import and execute the capture
       const { executeScheduledCapture } = await import("./baselineSchedulerService");
@@ -266,7 +267,7 @@ export const baselineSchedulesRouter = router({
         )
         .limit(1);
 
-      if (!schedule.length) throw new Error("Schedule not found");
+      if (!schedule.length) throw new TRPCError({ code: "NOT_FOUND", message: "Schedule not found" });
 
       const results = await db
         .select({

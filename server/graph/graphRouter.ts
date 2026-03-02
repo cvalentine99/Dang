@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { runFullSync, syncLayer, getSyncStatus } from "./etlService";
 import {
@@ -227,7 +228,7 @@ export const graphRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const result = await db.insert(investigationSessions).values({
         userId: ctx.user.id,
@@ -246,14 +247,14 @@ export const graphRouter = router({
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const sessions = await db.select()
         .from(investigationSessions)
         .where(and(eq(investigationSessions.id, input.id), eq(investigationSessions.userId, ctx.user.id)))
         .limit(1);
 
-      if (sessions.length === 0) throw new Error("Investigation not found");
+      if (sessions.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Investigation not found" });
 
       const notes = await db.select()
         .from(investigationNotes)
@@ -286,7 +287,7 @@ export const graphRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const updates: Record<string, unknown> = {};
       if (input.title !== undefined) updates.title = input.title;
@@ -311,14 +312,14 @@ export const graphRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const sessions = await db.select({ id: investigationSessions.id })
         .from(investigationSessions)
         .where(and(eq(investigationSessions.id, input.sessionId), eq(investigationSessions.userId, ctx.user.id)))
         .limit(1);
 
-      if (sessions.length === 0) throw new Error("Investigation not found");
+      if (sessions.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Investigation not found" });
 
       const result = await db.insert(investigationNotes).values({
         sessionId: input.sessionId,
@@ -334,7 +335,7 @@ export const graphRouter = router({
     .input(z.object({ noteId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("Database unavailable");
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       await db.delete(investigationNotes)
         .where(and(eq(investigationNotes.id, input.noteId), eq(investigationNotes.userId, ctx.user.id)));
@@ -383,7 +384,7 @@ export const graphRouter = router({
     .input(z.object({ sessionId: z.number() }))
     .query(async ({ ctx, input }) => {
       const data = await getInvestigationReportData(input.sessionId, ctx.user.id);
-      if (!data) throw new Error("Investigation not found");
+      if (!data) throw new TRPCError({ code: "NOT_FOUND", message: "Investigation not found" });
       return { markdown: generateMarkdownReport(data), title: data.title };
     }),
 
@@ -392,7 +393,7 @@ export const graphRouter = router({
     .input(z.object({ sessionId: z.number() }))
     .query(async ({ ctx, input }) => {
       const data = await getInvestigationReportData(input.sessionId, ctx.user.id);
-      if (!data) throw new Error("Investigation not found");
+      if (!data) throw new TRPCError({ code: "NOT_FOUND", message: "Investigation not found" });
       return { html: generateHtmlReport(data), title: data.title };
     }),
 });
