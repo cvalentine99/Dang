@@ -2331,3 +2331,7 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Ensure alertQueue.process creates triageObjects row (feeds into /triage)
 - [x] Update alertQueueRouter tests — 26 tests passing (7 new unified pipeline contract tests)
 - [x] Full test suite: 52 files, 1216 tests passing
+
+## Analyze Button Loading Indicator
+
+- [x] Improve loading feedback on Analyze button during triage pipeline execution

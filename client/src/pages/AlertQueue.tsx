@@ -8,7 +8,7 @@
  */
 
 import { trpc } from "@/lib/trpc";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -147,6 +147,7 @@ function QueueItemCard({
   onAnalyze,
   onDismiss,
   isProcessing,
+  elapsedSeconds = 0,
 }: {
   item: {
     id: number;
@@ -169,7 +170,9 @@ function QueueItemCard({
   onAnalyze: (id: number) => void;
   onDismiss: (id: number) => void;
   isProcessing: boolean;
+  elapsedSeconds?: number;
 }) {
+  const elapsedDisplay = elapsedSeconds;
   const [expanded, setExpanded] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [, navigate] = useLocation();
@@ -304,19 +307,24 @@ function QueueItemCard({
             <>
               {/* Unified Analyze button — now calls the structured triage pipeline */}
               {!item.pipelineTriageId && item.autoTriageStatus !== "running" && (
-                <button
-                  onClick={() => onAnalyze(item.id)}
-                  disabled={isProcessing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-medium hover:bg-purple-500/25 transition-all disabled:opacity-50"
-                  title="Run structured triage pipeline"
-                >
-                  {isProcessing ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
+                isProcessing ? (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.15)] animate-pulse-subtle">
+                    <Loader2 className="h-3.5 w-3.5 text-purple-300 animate-spin" />
+                    <span className="text-xs font-medium text-purple-200">Analyzing…</span>
+                    <span className="text-[10px] font-mono text-purple-400/70 tabular-nums">
+                      {elapsedDisplay}s
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => onAnalyze(item.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-medium hover:bg-purple-500/25 hover:shadow-[0_0_10px_rgba(168,85,247,0.15)] transition-all"
+                    title="Run structured triage pipeline"
+                  >
                     <Sparkles className="h-3.5 w-3.5" />
-                  )}
-                  Analyze
-                </button>
+                    Analyze
+                  </button>
+                )
               )}
               <button
                 onClick={() => onDismiss(item.id)}
@@ -368,12 +376,23 @@ function QueueItemCard({
       </div>
 
       {/* Processing indicator */}
-      {item.status === "processing" && (
-        <div className="px-4 pb-2">
-          <div className="h-1 rounded-full bg-white/5 overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-purple-500 via-cyan-500 to-amber-500 animate-shimmer-slide" style={{ width: "60%", backgroundSize: "200% 100%" }} />
+      {(item.status === "processing" || isProcessing) && (
+        <div className="px-4 pb-3 pt-1">
+          <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-full rounded-full bg-gradient-to-r from-purple-500 via-cyan-500 to-purple-500 animate-shimmer-slide" style={{ width: "80%", backgroundSize: "200% 100%" }} />
           </div>
-          <p className="text-[10px] text-cyan-400 font-mono mt-1 animate-pulse">Walter is analyzing this alert...</p>
+          <div className="flex items-center justify-between mt-1.5">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500" />
+              </span>
+              <p className="text-[10px] text-purple-300 font-mono">
+                {elapsedDisplay < 3 ? "Preparing triage pipeline…" : elapsedDisplay < 8 ? "Running structured triage agent…" : elapsedDisplay < 15 ? "Analyzing alert context & MITRE mapping…" : "Finalizing triage assessment…"}
+              </p>
+            </div>
+            <span className="text-[10px] font-mono text-purple-400/60 tabular-nums">{elapsedDisplay}s</span>
+          </div>
         </div>
       )}
 
@@ -452,7 +471,21 @@ function QueueItemCard({
 export default function AlertQueue() {
   const utils = trpc.useUtils();
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, navigate] = useLocation();
+
+  // Elapsed time ticker for the processing indicator
+  useEffect(() => {
+    if (!processingStartTime) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - processingStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [processingStartTime]);
 
   const listQuery = trpc.alertQueue.list.useQuery(undefined, {
     refetchInterval: 10_000,
@@ -460,7 +493,10 @@ export default function AlertQueue() {
   });
 
   const processMutation = trpc.alertQueue.process.useMutation({
-    onMutate: ({ id }) => setProcessingId(id),
+    onMutate: ({ id }) => {
+      setProcessingId(id);
+      setProcessingStartTime(Date.now());
+    },
     onSuccess: (result) => {
       if (result.success && result.triageId) {
         toast.success("Structured triage complete", {
@@ -483,7 +519,10 @@ export default function AlertQueue() {
     onError: (err) => {
       toast.error("Analysis failed", { description: err.message });
     },
-    onSettled: () => setProcessingId(null),
+    onSettled: () => {
+      setProcessingId(null);
+      setProcessingStartTime(null);
+    },
   });
 
   const dismissMutation = trpc.alertQueue.remove.useMutation({
@@ -749,6 +788,7 @@ export default function AlertQueue() {
                     onAnalyze={handleAnalyze}
                     onDismiss={handleDismiss}
                     isProcessing={processingId === item.id || processMutation.isPending}
+                    elapsedSeconds={processingId === item.id ? elapsedSeconds : 0}
                   />
                 ))}
               </div>

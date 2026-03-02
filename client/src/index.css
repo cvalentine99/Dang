@@ -291,6 +291,14 @@
     animation: shimmer-slide 2s linear infinite;
   }
 
+  @keyframes pulse-subtle {
+    0%, 100% { opacity: 1; box-shadow: 0 0 12px oklch(0.541 0.281 293 / 15%); }
+    50% { opacity: 0.85; box-shadow: 0 0 20px oklch(0.541 0.281 293 / 30%); }
+  }
+  .animate-pulse-subtle {
+    animation: pulse-subtle 2s ease-in-out infinite;
+  }
+
   @keyframes data-rain {
     0% { top: -10%; opacity: 0; }
     10% { opacity: 1; }
