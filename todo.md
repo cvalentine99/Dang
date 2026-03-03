@@ -2552,3 +2552,26 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] ITHygiene.tsx: 1614→484 lines, 11 sub-components in it-hygiene/ (715 lines total)
 - [x] All 1396 tests passing across 55 test files
 - [x] TypeScript compilation clean (0 errors)
+
+### AlertQueue Decomposition
+- [x] Extract QueueItemCard into alert-queue/QueueItemCard.tsx (382 lines)
+- [x] Extract TicketArtifactsPanel into alert-queue/TicketArtifactsPanel.tsx (175 lines)
+- [x] Extract QueueHeader with batch toolbar into alert-queue/QueueHeader.tsx (199 lines)
+- [x] Extract severity/status badges into alert-queue/Badges.tsx (115 lines)
+- [x] Create shared types file alert-queue/types.ts (34 lines)
+- [x] AlertQueue.tsx reduced from 1155 to 322 lines (72% reduction)
+- [x] All 1396 tests passing after decomposition
+
+### Storybook Setup
+- [x] Install and configure Storybook 8.6.14 for React + Vite + Tailwind 4
+- [x] Create stories for knowledge-graph sub-components (GraphLegend, StatsOverlay)
+- [x] Create stories for drift-analytics sub-components (HeatmapGrid, KpiCard, GlassPanel)
+- [x] Create stories for it-hygiene sub-components (ServiceStateBadge, ShellBadge, Pagination)
+- [x] Create stories for alert-queue sub-components (StatusBadge, TriageRouteBadge, TriageSeverityBadge)
+- [x] Storybook builds successfully (storybook-static output verified)
+
+### Lazy-Load Tab Sub-Components
+- [x] Lazy-load ITHygiene tab content (9 tabs: PackagesTab, PortsTab, ProcessesTab, NetworkTab, HotfixesTab, ExtensionsTab, ServicesTab, UsersTab, GroupsTab)
+- [x] Lazy-load DriftAnalytics tab content (SuppressionRulesTab, NotificationHistoryTab)
+- [x] Add LazyTabFallback Suspense skeleton for all lazy-loaded tabs
+- [x] All 1396 tests passing with lazy-loading enabled

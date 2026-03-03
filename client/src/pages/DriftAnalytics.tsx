@@ -12,7 +12,8 @@
  * 8. Drift snapshot detail panel
  */
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, lazy, Suspense } from "react";
+import { LazyTabFallback } from "@/components/shared/LazyTabFallback";
 import { trpc } from "@/lib/trpc";
 import {
   AreaChart,
@@ -60,6 +61,10 @@ import {
   ShieldOff,
 } from "lucide-react";
 
+// Lazy-loaded tab sub-components — only loaded when the tab is first activated
+const NotificationHistoryTab = lazy(() => import("./drift-analytics/NotificationHistoryTab").then(m => ({ default: m.NotificationHistoryTab })));
+const SuppressionRulesTab = lazy(() => import("./drift-analytics/SuppressionRulesTab").then(m => ({ default: m.SuppressionRulesTab })));
+
 import {
   GlassPanel,
   KpiCard,
@@ -67,8 +72,6 @@ import {
   HeatmapGrid,
   AnomalyDetailPanel,
   SnapshotDetailPanel,
-  NotificationHistoryTab,
-  SuppressionRulesTab,
   PURPLE,
   PURPLE_DIM,
   VIOLET,
@@ -991,22 +994,26 @@ export default function DriftAnalytics() {
 
       {/* ═══════════════════ NOTIFICATION HISTORY TAB ═══════════════════ */}
       {activeTab === "notifications" && (
-        <NotificationHistoryTab
-          notifStatsQ={notifStatsQ}
-          notifListQ={notifHistoryQ}
-          retryMutation={retryMutation}
-        />
+        <Suspense fallback={<LazyTabFallback />}>
+          <NotificationHistoryTab
+            notifStatsQ={notifStatsQ}
+            notifListQ={notifHistoryQ}
+            retryMutation={retryMutation}
+          />
+        </Suspense>
       )}
 
       {/* ═══════════════════ SUPPRESSION RULES TAB ═══════════════════ */}
       {activeTab === "suppression" && (
-        <SuppressionRulesTab
-          schedules={summaryQuery.data?.schedules.map((s) => ({ id: s.id, name: s.name })) || []}
-          suppressionListQ={suppressionListQ}
-          createSuppressionMut={createSuppressionMut}
-          deactivateSuppressionMut={deactivateSuppressionMut}
-          deleteSuppressionMut={deleteSuppressionMut}
-        />
+        <Suspense fallback={<LazyTabFallback />}>
+          <SuppressionRulesTab
+            schedules={summaryQuery.data?.schedules.map((s) => ({ id: s.id, name: s.name })) || []}
+            suppressionListQ={suppressionListQ}
+            createSuppressionMut={createSuppressionMut}
+            deactivateSuppressionMut={deactivateSuppressionMut}
+            deleteSuppressionMut={deleteSuppressionMut}
+          />
+        </Suspense>
       )}
 
       {/* ── Anomaly Detail Slide-over ───────────────────────────── */}

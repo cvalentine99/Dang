@@ -1238,10 +1238,14 @@ describe("ticketArtifactCountsByQueueItem endpoint", () => {
 
 describe("canRunTicketing readiness wiring in AlertQueue", () => {
   let alertQueueSrc: string;
+  let queueItemCardSrc: string;
+  let queueHeaderSrc: string;
 
   beforeAll(async () => {
     const fs = await import("fs/promises");
     alertQueueSrc = await fs.readFile("client/src/pages/AlertQueue.tsx", "utf-8");
+    queueItemCardSrc = await fs.readFile("client/src/pages/alert-queue/QueueItemCard.tsx", "utf-8");
+    queueHeaderSrc = await fs.readFile("client/src/pages/alert-queue/QueueHeader.tsx", "utf-8");
   });
 
   it("should destructure canRunTicketing from useAgenticReadiness", () => {
@@ -1263,35 +1267,40 @@ describe("canRunTicketing readiness wiring in AlertQueue", () => {
   });
 
   it("should disable Create Ticket button when canRunTicketing is false", () => {
-    expect(alertQueueSrc).toContain("disabled={createTicketMutation.isPending || !canRunTicketing}");
+    // After decomposition, this logic lives in QueueItemCard sub-component
+    expect(queueItemCardSrc).toContain("disabled={createTicketMutation.isPending || !canRunTicketing}");
   });
 
   it("should show XCircle icon when ticketing is blocked", () => {
-    expect(alertQueueSrc).toContain("!canRunTicketing");
-    expect(alertQueueSrc).toContain("<XCircle");
+    expect(queueItemCardSrc).toContain("!canRunTicketing");
+    expect(queueItemCardSrc).toContain("<XCircle");
   });
 
   it("should show amber styling when ticketing is degraded", () => {
-    expect(alertQueueSrc).toContain("bg-amber-500/10 border border-amber-500/20 text-amber-300");
-    expect(alertQueueSrc).toContain("(degraded)");
+    expect(queueItemCardSrc).toContain("bg-amber-500/10 border border-amber-500/20 text-amber-300");
+    expect(queueItemCardSrc).toContain("(degraded)");
   });
 
   it("should show ticketingReason in tooltip when unavailable", () => {
-    expect(alertQueueSrc).toContain("Ticketing unavailable:");
-    expect(alertQueueSrc).toContain("ticketingReason");
+    expect(queueItemCardSrc).toContain("Ticketing unavailable:");
+    expect(queueItemCardSrc).toContain("ticketingReason");
   });
 
   it("should also gate the batch Create All Tickets button with canRunTicketing", () => {
-    expect(alertQueueSrc).toContain("disabled={batchCreateMutation.isPending || !canRunTicketing}");
+    // After decomposition, batch button lives in QueueHeader sub-component
+    // The prop is passed as isBatchPending from the parent, so the disabled check uses that name
+    expect(queueHeaderSrc).toContain("disabled={isBatchPending || !canRunTicketing}");
   });
 });
 
 describe("Ticket Created indicator on queue items", () => {
   let alertQueueSrc: string;
+  let queueItemCardSrc: string;
 
   beforeAll(async () => {
     const fs = await import("fs/promises");
     alertQueueSrc = await fs.readFile("client/src/pages/AlertQueue.tsx", "utf-8");
+    queueItemCardSrc = await fs.readFile("client/src/pages/alert-queue/QueueItemCard.tsx", "utf-8");
   });
 
   it("should query ticketArtifactCountsByQueueItem for batch ticket status", () => {
@@ -1308,8 +1317,9 @@ describe("Ticket Created indicator on queue items", () => {
   });
 
   it("should show Ticketed badge when hasSuccessfulTicket is true", () => {
-    expect(alertQueueSrc).toContain("Ticketed");
-    expect(alertQueueSrc).toContain("Ticket already created for this queue item");
+    // After decomposition, badge rendering lives in QueueItemCard sub-component
+    expect(queueItemCardSrc).toContain("Ticketed");
+    expect(queueItemCardSrc).toContain("Ticket already created for this queue item");
   });
 
   it("should exclude items with successful ticket artifacts from ticketEligibleCount", () => {
@@ -1317,19 +1327,20 @@ describe("Ticket Created indicator on queue items", () => {
   });
 
   it("should invalidate ticketArtifactCountsByQueueItem after ticket creation", () => {
-    expect(alertQueueSrc).toContain("splunk.ticketArtifactCountsByQueueItem.invalidate()");
+    // After decomposition, invalidation lives in QueueItemCard sub-component
+    expect(queueItemCardSrc).toContain("splunk.ticketArtifactCountsByQueueItem.invalidate()");
   });
 
   it("should accept hasSuccessfulTicket as an optional prop with default false", () => {
-    expect(alertQueueSrc).toContain("hasSuccessfulTicket = false");
+    expect(queueItemCardSrc).toContain("hasSuccessfulTicket = false");
   });
 
   it("should include canRunTicketing as an optional prop with default false (fail-closed)", () => {
-    expect(alertQueueSrc).toContain("canRunTicketing = false");
+    expect(queueItemCardSrc).toContain("canRunTicketing = false");
   });
 
   it("should include ticketingDegraded as an optional prop with default false", () => {
-    expect(alertQueueSrc).toContain("ticketingDegraded = false");
+    expect(queueItemCardSrc).toContain("ticketingDegraded = false");
   });
 });
 

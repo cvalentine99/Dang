@@ -37,18 +37,18 @@ import {
   GitCompare,
 } from "lucide-react";
 import { useState, useMemo, useCallback, lazy, Suspense } from "react";
+import { LazyTabFallback } from "@/components/shared/LazyTabFallback";
 
-import {
-  PackagesTab,
-  PortsTab,
-  ProcessesTab,
-  NetworkTab,
-  HotfixesTab,
-  ExtensionsTab,
-  ServicesTab,
-  UsersTab,
-  GroupsTab,
-} from "./it-hygiene";
+// Lazy-loaded tab sub-components — each loads its own chunk on first render
+const PackagesTab = lazy(() => import("./it-hygiene/PackagesTab").then(m => ({ default: m.PackagesTab })));
+const PortsTab = lazy(() => import("./it-hygiene/PortsTab").then(m => ({ default: m.PortsTab })));
+const ProcessesTab = lazy(() => import("./it-hygiene/ProcessesTab").then(m => ({ default: m.ProcessesTab })));
+const NetworkTab = lazy(() => import("./it-hygiene/NetworkTab").then(m => ({ default: m.NetworkTab })));
+const HotfixesTab = lazy(() => import("./it-hygiene/HotfixesTab").then(m => ({ default: m.HotfixesTab })));
+const ExtensionsTab = lazy(() => import("./it-hygiene/ExtensionsTab").then(m => ({ default: m.ExtensionsTab })));
+const ServicesTab = lazy(() => import("./it-hygiene/ServicesTab").then(m => ({ default: m.ServicesTab })));
+const UsersTab = lazy(() => import("./it-hygiene/UsersTab").then(m => ({ default: m.UsersTab })));
+const GroupsTab = lazy(() => import("./it-hygiene/GroupsTab").then(m => ({ default: m.GroupsTab })));
 
 const DriftComparison = lazy(() => import("@/components/DriftComparison"));
 
@@ -446,35 +446,53 @@ export default function ITHygiene() {
 
           {/* ── SOFTWARE COLUMN ──────────────────────────────────────── */}
           <TabsContent value="packages">
-            <PackagesTab {...tabProps} data={packagesData} rawData={packagesQ.data as Record<string, unknown>} />
+            <Suspense fallback={<LazyTabFallback />}>
+              <PackagesTab {...tabProps} data={packagesData} rawData={packagesQ.data as Record<string, unknown>} />
+            </Suspense>
           </TabsContent>
           <TabsContent value="ports">
-            <PortsTab {...tabProps} data={portsData} rawData={portsQ.data as Record<string, unknown>} />
+            <Suspense fallback={<LazyTabFallback />}>
+              <PortsTab {...tabProps} data={portsData} rawData={portsQ.data as Record<string, unknown>} />
+            </Suspense>
           </TabsContent>
           <TabsContent value="processes">
-            <ProcessesTab {...tabProps} data={processesData} rawData={processesQ.data as Record<string, unknown>} />
+            <Suspense fallback={<LazyTabFallback />}>
+              <ProcessesTab {...tabProps} data={processesData} rawData={processesQ.data as Record<string, unknown>} />
+            </Suspense>
           </TabsContent>
           <TabsContent value="network">
-            <NetworkTab netifaceData={netifaceData} netaddrData={netaddrData} netprotoData={netprotoData} />
+            <Suspense fallback={<LazyTabFallback />}>
+              <NetworkTab netifaceData={netifaceData} netaddrData={netaddrData} netprotoData={netprotoData} />
+            </Suspense>
           </TabsContent>
           <TabsContent value="hotfixes">
-            <HotfixesTab {...tabProps} data={hotfixesData} rawData={hotfixesQ.data as Record<string, unknown>} />
+            <Suspense fallback={<LazyTabFallback />}>
+              <HotfixesTab {...tabProps} data={hotfixesData} rawData={hotfixesQ.data as Record<string, unknown>} />
+            </Suspense>
           </TabsContent>
 
           {/* ── EXTENSIONS & SERVICES COLUMN ─────────────────────────── */}
           <TabsContent value="extensions">
-            <ExtensionsTab {...tabProps} data={extensionsData} />
+            <Suspense fallback={<LazyTabFallback />}>
+              <ExtensionsTab {...tabProps} data={extensionsData} />
+            </Suspense>
           </TabsContent>
           <TabsContent value="services">
-            <ServicesTab {...tabProps} data={servicesData} />
+            <Suspense fallback={<LazyTabFallback />}>
+              <ServicesTab {...tabProps} data={servicesData} />
+            </Suspense>
           </TabsContent>
 
           {/* ── IDENTITY COLUMN ──────────────────────────────────────── */}
           <TabsContent value="users">
-            <UsersTab {...tabProps} data={usersData} interactiveUsers={interactiveUsers} />
+            <Suspense fallback={<LazyTabFallback />}>
+              <UsersTab {...tabProps} data={usersData} interactiveUsers={interactiveUsers} />
+            </Suspense>
           </TabsContent>
           <TabsContent value="groups">
-            <GroupsTab {...tabProps} data={groupsData} />
+            <Suspense fallback={<LazyTabFallback />}>
+              <GroupsTab {...tabProps} data={groupsData} />
+            </Suspense>
           </TabsContent>
         </Tabs>
         </>)}
