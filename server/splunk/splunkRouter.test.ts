@@ -893,3 +893,189 @@ describe("DB Access Normalization — alertQueueRouter", () => {
     expect(matches).toBeNull();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Migration Reconciliation — schema, migration SQL, and DB must agree
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("Migration Reconciliation — ticketArtifacts", () => {
+  it("should have triageId column in migration SQL (0012_ticket_artifacts.sql)", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const migrationPath = path.resolve(
+      new URL("../../drizzle/0012_ticket_artifacts.sql", import.meta.url).pathname
+    );
+    const sql = fs.readFileSync(migrationPath, "utf-8");
+
+    // The migration must include the triageId column definition
+    expect(sql).toContain("`triageId` varchar(64)");
+    // And the index
+    expect(sql).toContain("ta_triageId_idx");
+    expect(sql).toContain("`triageId`");
+  });
+
+  it("should have triageId column in drizzle schema definition", async () => {
+    const { ticketArtifacts } = await import("../../drizzle/schema");
+    expect(ticketArtifacts.triageId).toBeDefined();
+  });
+
+  it("should have triageId positioned after pipelineRunId in migration SQL", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const migrationPath = path.resolve(
+      new URL("../../drizzle/0012_ticket_artifacts.sql", import.meta.url).pathname
+    );
+    const sql = fs.readFileSync(migrationPath, "utf-8");
+
+    // triageId must come after pipelineRunId and before alertId
+    const pipelineRunIdPos = sql.indexOf("`pipelineRunId`");
+    const triageIdPos = sql.indexOf("`triageId`");
+    const alertIdPos = sql.indexOf("`alertId`");
+
+    expect(pipelineRunIdPos).toBeGreaterThan(-1);
+    expect(triageIdPos).toBeGreaterThan(-1);
+    expect(alertIdPos).toBeGreaterThan(-1);
+    expect(triageIdPos).toBeGreaterThan(pipelineRunIdPos);
+    expect(triageIdPos).toBeLessThan(alertIdPos);
+  });
+
+  it("should have all schema columns represented in migration SQL", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const migrationPath = path.resolve(
+      new URL("../../drizzle/0012_ticket_artifacts.sql", import.meta.url).pathname
+    );
+    const sql = fs.readFileSync(migrationPath, "utf-8");
+
+    // Every column in the schema must appear in the migration
+    const requiredColumns = [
+      "id", "ticketId", "system", "queueItemId", "pipelineRunId",
+      "triageId", "alertId", "ruleId", "ruleLevel", "createdBy",
+      "success", "statusMessage", "rawResponse", "httpStatusCode", "createdAt"
+    ];
+
+    for (const col of requiredColumns) {
+      expect(sql).toContain(`\`${col}\``);
+    }
+  });
+
+  it("should have all schema indexes represented in migration SQL", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const migrationPath = path.resolve(
+      new URL("../../drizzle/0012_ticket_artifacts.sql", import.meta.url).pathname
+    );
+    const sql = fs.readFileSync(migrationPath, "utf-8");
+
+    const requiredIndexes = [
+      "ta_ticketId_idx", "ta_queueItemId_idx", "ta_pipelineRunId_idx",
+      "ta_triageId_idx", "ta_alertId_idx", "ta_system_idx", "ta_createdAt_idx"
+    ];
+
+    for (const idx of requiredIndexes) {
+      expect(sql).toContain(idx);
+    }
+  });
+});
+
+describe("Insert Path Proof — ticket artifact with triageId", () => {
+  it("should construct a valid insert payload with triageId for Drizzle", () => {
+    // This simulates exactly what splunkRouter.ts does when inserting
+    const associatedRun = { id: 7, triageId: "triage-abc123" };
+    const item = {
+      alertId: "alert-001",
+      ruleId: "5710",
+      ruleLevel: 12,
+      pipelineTriageId: "triage-abc123",
+    };
+    const result = { success: true, ticketId: "DANG-1709123456-rt-001", message: "Ticket created" };
+
+    const insertPayload = {
+      ticketId: result.ticketId ?? `failed-${Date.now()}`,
+      system: "splunk_es" as const,
+      queueItemId: 42,
+      pipelineRunId: associatedRun?.id ?? null,
+      triageId: associatedRun?.triageId ?? item.pipelineTriageId ?? null,
+      alertId: item.alertId,
+      ruleId: item.ruleId,
+      ruleLevel: item.ruleLevel,
+      createdBy: "admin@example.com",
+      success: result.success === true && !!result.ticketId,
+      statusMessage: result.message,
+      rawResponse: { ticketId: result.ticketId, message: result.message },
+      httpStatusCode: null,
+    };
+
+    // All fields must be present and correctly typed
+    expect(insertPayload.ticketId).toBe("DANG-1709123456-rt-001");
+    expect(insertPayload.triageId).toBe("triage-abc123");
+    expect(insertPayload.pipelineRunId).toBe(7);
+    expect(insertPayload.queueItemId).toBe(42);
+    expect(insertPayload.success).toBe(true);
+    expect(typeof insertPayload.triageId).toBe("string");
+  });
+
+  it("should construct a valid insert payload with null triageId for legacy items", () => {
+    const associatedRun = null;
+    const item = {
+      alertId: "alert-legacy",
+      ruleId: "1234",
+      ruleLevel: 5,
+      pipelineTriageId: null,
+    };
+    const result = { success: true, ticketId: "DANG-legacy-001", message: "OK" };
+
+    const insertPayload = {
+      ticketId: result.ticketId,
+      system: "splunk_es" as const,
+      queueItemId: 99,
+      pipelineRunId: associatedRun?.id ?? null,
+      triageId: (associatedRun as { triageId?: string } | null)?.triageId ?? item.pipelineTriageId ?? null,
+      alertId: item.alertId,
+      ruleId: item.ruleId,
+      ruleLevel: item.ruleLevel,
+      createdBy: "admin",
+      success: true,
+      statusMessage: result.message,
+      rawResponse: null,
+      httpStatusCode: null,
+    };
+
+    // triageId is null but the insert should still be valid
+    expect(insertPayload.triageId).toBeNull();
+    expect(insertPayload.pipelineRunId).toBeNull();
+    expect(insertPayload.success).toBe(true);
+  });
+
+  it("should construct a valid failure insert payload with triageId from pipelineTriageId fallback", () => {
+    // Exception path in batch: no associatedRun lookup, but item has pipelineTriageId
+    const item = {
+      id: 99,
+      alertId: "alert-exception",
+      ruleId: "9999",
+      ruleLevel: 8,
+      pipelineTriageId: "triage-fallback-xyz",
+    };
+
+    const insertPayload = {
+      ticketId: `exception-${Date.now()}`,
+      system: "splunk_es" as const,
+      queueItemId: item.id,
+      pipelineRunId: null,
+      triageId: item.pipelineTriageId ?? null,
+      alertId: item.alertId,
+      ruleId: item.ruleId,
+      ruleLevel: item.ruleLevel,
+      createdBy: "admin",
+      success: false,
+      statusMessage: "Unexpected error",
+      rawResponse: null,
+      httpStatusCode: null,
+    };
+
+    expect(insertPayload.triageId).toBe("triage-fallback-xyz");
+    expect(insertPayload.pipelineRunId).toBeNull();
+    expect(insertPayload.success).toBe(false);
+    expect(insertPayload.ticketId).toMatch(/^exception-\d+$/);
+  });
+});

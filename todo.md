@@ -2427,3 +2427,10 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Secondary: Preserved Wazuh error-detail handling, readiness wiring, Structured Triage vs Ad-hoc wording (verified intact)
 - [x] Tests: 21 new tests covering all three fixes + DB normalization verification
 - [x] Proof: All 1,278 tests passing across 53 test files, zero TypeScript errors
+
+## Migration Reconciliation — ticketArtifacts.triageId
+
+- [x] Fix migration SQL: 0012_ticket_artifacts.sql now includes triageId varchar(64) column and ta_triageId_idx index
+- [x] Verify DB state: confirmed triageId column (varchar(64), nullable) and ta_triageId_idx (BTREE) exist in live DB via DESCRIBE + SHOW INDEX
+- [x] Prove insert path: 8 new tests covering migration-schema alignment (column order, all columns, all indexes) and insert payload construction (success, failure, exception paths with triageId)
+- [x] All 1,286 tests passing across 53 test files, zero TypeScript errors

@@ -1,0 +1,19 @@
+{
+  "query": "SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'ticket_artifacts' AND COLUMN_NAME = 'triageId';\nSHOW INDEX FROM `ticket_artifacts` WHERE Key_name = 'ta_triageId_idx';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'ticket_artifacts' AND COLUMN_NAME = 'triageId';\nSHOW INDEX FROM `ticket_artifacts` WHERE Key_name = 'ta_triageId_idx';",
+  "rows": [
+    {
+      "COLUMN_NAME": "triageId",
+      "DATA_TYPE": "varchar",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": "NULL"
+    }
+  ],
+  "messages": [
+    "Table\tNon_unique\tKey_name\tSeq_in_index\tColumn_name\tCollation\tCardinality\tSub_part\tPacked\tNull\tIndex_type\tComment\tIndex_comment\tVisible\tExpression\tClustered\tGlobal",
+    "ticket_artifacts\t1\tta_triageId_idx\t1\ttriageId\tA\t0\tNULL\tNULL\tYES\tBTREE\t\t\tYES\tNULL\tNO\tNO"
+  ],
+  "stdout": "COLUMN_NAME\tDATA_TYPE\tIS_NULLABLE\tCOLUMN_DEFAULT\ntriageId\tvarchar\tYES\tNULL\nTable\tNon_unique\tKey_name\tSeq_in_index\tColumn_name\tCollation\tCardinality\tSub_part\tPacked\tNull\tIndex_type\tComment\tIndex_comment\tVisible\tExpression\tClustered\tGlobal\nticket_artifacts\t1\tta_triageId_idx\t1\ttriageId\tA\t0\tNULL\tNULL\tYES\tBTREE\t\t\tYES\tNULL\tNO\tNO\n",
+  "stderr": "",
+  "execution_time_ms": 62
+}
