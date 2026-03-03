@@ -2587,3 +2587,14 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Add aria-live="polite" to Status service cards grid, AlertQueue, AgentHealth table, AlertsTimeline table, Vulnerabilities table
 - [x] 35 total aria-label attributes, 9 aria-live regions across the codebase
 - [x] All 1396 tests passing (55 test files)
+
+### Agentic Pipeline Agent Integration Tests
+- [x] Analyze all agent files (correlationAgent, hypothesisAgent, triageAgent, stateMachine, resumePipelineHelper, livingCaseReportService)
+- [x] Write integration tests for correlationAgent (13 tests: entity merging, blast radius, campaign assessment, synthesis, empty indexer)
+- [x] Write integration tests for hypothesisAgent (11 tests: case creation, merge logic, entity dedup, timeline dedup, theory confidence, action materialization)
+- [x] Write integration tests for triageAgent (14 tests: severity normalization, entity extraction, dedup detection, MITRE mapping, route assignment)
+- [x] Write integration tests for stateMachine (12 tests: state transitions, invalid transitions, terminal states, metadata)
+- [x] Write integration tests for resumePipelineHelper (8 tests: stage detection, resume from each stage)
+- [x] Write integration tests for livingCaseReportService (33 tests: full report, executive summary, shift handoff, escalation brief, tuning report)
+- [x] Fixed real bug: hypothesis merge overwrite (line 851 overwrote merged case with unmerged incoming case)
+- [x] All 1518 tests pass across 61 test files (122 new tests added)

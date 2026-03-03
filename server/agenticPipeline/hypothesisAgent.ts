@@ -837,20 +837,32 @@ export async function runHypothesisAgent(
   // 7b. Direction 4: Store action IDs on the living case (reference, not ownership)
   //      Then recompute summary from response_actions (single source of truth)
   if (materializedActionIds.length > 0) {
-    livingCase.recommendedActionIds = materializedActionIds;
-
-    // Derive actionSummary from response_actions table, not from snapshot
-    const freshSummary = await recomputeCaseSummary(caseStateId);
-    if (freshSummary) {
-      livingCase.actionSummary = freshSummary;
-    }
-
-    // Update the persisted case with action references + fresh summary
+    // Re-read the persisted case (which may have been merged in persistLivingCase)
+    // to avoid overwriting the merge result with the unmerged incoming case.
     const dbUpdate = await getDb();
     if (dbUpdate) {
+      const [persistedRow] = await dbUpdate
+        .select({ caseData: livingCaseState.caseData })
+        .from(livingCaseState)
+        .where(eq(livingCaseState.id, caseStateId))
+        .limit(1);
+
+      const persistedCase = (persistedRow?.caseData as LivingCaseObject) ?? livingCase;
+      persistedCase.recommendedActionIds = materializedActionIds;
+
+      // Derive actionSummary from response_actions table, not from snapshot
+      const freshSummary = await recomputeCaseSummary(caseStateId);
+      if (freshSummary) {
+        persistedCase.actionSummary = freshSummary;
+      }
+
+      // Write back the merged case with action references + fresh summary
       await dbUpdate.update(livingCaseState)
-        .set({ caseData: livingCase as any })
-        .where(eq(livingCaseState.sessionId, sessionId));
+        .set({ caseData: persistedCase as any })
+        .where(eq(livingCaseState.id, caseStateId));
+
+      // Update the in-memory reference for the return value
+      Object.assign(livingCase, persistedCase);
     }
 
     // Sync the denormalized counters on living_case_state row
