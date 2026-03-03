@@ -2490,3 +2490,13 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Badge shows count, failed breakdown, and links to /alert-queue?tab=tickets&pipelineRunId=N
 - [x] 19 new tests covering endpoint structure, badge rendering, semantic colors, navigation, and stopPropagation
 - [x] All 1,357 tests passing across 55 test files, zero TypeScript errors
+
+## Names / Contract Cleanup Pass
+
+- [x] Task 1+6: Renamed replayPipelineRun → resumePipelineRun (canonical); added continuePipelineRun (semantic alias for partial runs). UI calls continuePipelineRun for partial, resumePipelineRun for failed.
+- [x] Task 2: Removed all SECURITY_ADMIN references. Splunk router, AdminSettings, and error messages now say "admin role" consistently.
+- [x] Task 3: Added canCreateTickets, ticketingDegraded, ticketingUnavailable, ticketingReason to useAgenticReadiness hook.
+- [x] Task 4: Scrubbed comments — resumePipelineRun error messages use "resume" not "replay"; section headers updated; JSDoc updated.
+- [x] Task 5: UI wording tightened — "Continue Pipeline" / "Replay Pipeline" with semantic tRPC call-sites; admin role wording in AdminSettings.
+- [x] Task 7: Updated directions1-6.test.ts (resumePipelineRun + continuePipelineRun), partialRunContinuation.test.ts (all references updated). Zero stale SECURITY_ADMIN or replayPipelineRun references remain.
+- [x] All 1,357 tests passing across 55 test files, zero TypeScript errors

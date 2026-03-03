@@ -437,7 +437,7 @@ export default function AdminSettings() {
         <ConnectionPanel
           category="splunk"
           title="Splunk Enterprise Security"
-          description="HTTP Event Collector (HEC) integration for pushing Walter triage reports as notable events to Splunk ES Mission Control. Requires SECURITY_ADMIN role to create tickets."
+          description="HTTP Event Collector (HEC) integration for pushing triage reports as notable events to Splunk ES Mission Control. Requires admin role to create tickets."
           icon={<Ticket className="h-5 w-5 text-emerald-400" />}
           accentClass="bg-emerald-500/15"
           toggleField="enabled"

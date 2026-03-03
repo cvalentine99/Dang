@@ -36,5 +36,13 @@ export function useAgenticReadiness() {
     adHocBlocked: data?.workflows.adHocAnalyst.state === "blocked",
     /** Reason the ad-hoc analyst is blocked or degraded */
     adHocReason: data?.workflows.adHocAnalyst.reason ?? null,
+    /** Whether ticketing (Splunk HEC) is available */
+    canCreateTickets: data?.workflows.ticketing?.state === "ready",
+    /** Whether ticketing is degraded (HEC reachable but with issues) */
+    ticketingDegraded: data?.workflows.ticketing?.state === "degraded",
+    /** Whether ticketing is unavailable */
+    ticketingUnavailable: data?.workflows.ticketing?.state === "blocked" || data?.workflows.ticketing?.state === "degraded",
+    /** Reason ticketing is degraded or unavailable */
+    ticketingReason: data?.workflows.ticketing?.reason ?? null,
   };
 }

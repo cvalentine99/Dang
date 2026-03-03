@@ -455,17 +455,27 @@ function PipelineRunCard({ run, ticketCount }: {
 
 function ReplayButton({ runId, runStatus }: { runId: string; runStatus: string }) {
   const utils = trpc.useUtils();
-  const replay = trpc.pipeline.replayPipelineRun.useMutation({
+  const isPartial = runStatus === "partial";
+
+  // Semantic call-site alignment:
+  //   partial runs → continuePipelineRun ("Continue Pipeline")
+  //   failed runs  → resumePipelineRun  ("Replay Pipeline")
+  const continueMutation = trpc.pipeline.continuePipelineRun.useMutation({
     onSuccess: () => {
       utils.pipeline.listPipelineRuns.invalidate();
       utils.pipeline.pipelineRunStats.invalidate();
     },
   });
+  const resumeMutation = trpc.pipeline.resumePipelineRun.useMutation({
+    onSuccess: () => {
+      utils.pipeline.listPipelineRuns.invalidate();
+      utils.pipeline.pipelineRunStats.invalidate();
+    },
+  });
+  const replay = isPartial ? continueMutation : resumeMutation;
 
   // Precise language: "Continue Pipeline" for triage-only partial runs,
-  // "Replay Pipeline" for failed runs. Same backend mutation — it resumes
-  // from the first pending/failed stage.
-  const isPartial = runStatus === "partial";
+  // "Replay Pipeline" for failed runs.
   const title = isPartial ? "Continue Pipeline" : "Replay Pipeline";
   const description = isPartial
     ? "Advance from triage to correlation, hypothesis, and response actions. Triage stage is preserved."

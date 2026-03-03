@@ -20,7 +20,7 @@
  *   ticket → queueItemId → alert_queue (linkage to the original queue item)
  *   ticket → alertId (direct Wazuh alert cross-reference)
  *
- * Feature-gated: createTicket/batchCreateTickets require admin role (SECURITY_ADMIN equivalent).
+ * Feature-gated: createTicket/batchCreateTickets require admin role.
  */
 
 import { z } from "zod";
@@ -135,7 +135,7 @@ export const splunkRouter = router({
    * Create a Splunk ES ticket from a completed triage report.
    * Manual trigger only — analyst clicks "Create Ticket" in the UI.
    * Records a ticket_artifact row for both success and failure (audit trail).
-   * Requires admin role (SECURITY_ADMIN equivalent).
+   * Requires admin role (ticket creation is a privileged action).
    */
   createTicket: protectedProcedure
     .input(
@@ -149,7 +149,7 @@ export const splunkRouter = router({
       if (ctx.user?.role !== "admin") {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "Creating Splunk tickets requires SECURITY_ADMIN role",
+          message: "Creating Splunk tickets requires admin role",
         });
       }
 
@@ -339,7 +339,7 @@ export const splunkRouter = router({
       if (ctx.user?.role !== "admin") {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "Creating Splunk tickets requires SECURITY_ADMIN role",
+          message: "Creating Splunk tickets requires admin role",
         });
       }
 

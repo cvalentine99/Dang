@@ -3,7 +3,7 @@
  * Partial-Run Continuation — Backend Semantics Proof
  * ═══════════════════════════════════════════════════════════════════════════════
  *
- * Proves that the replayPipelineRun mutation in pipelineRouter.ts correctly
+ * Proves that the resumePipelineRun mutation in pipelineRouter.ts correctly
  * handles triage-only partial runs by resuming from the first pending stage
  * (correlation), not erroring because no failed stage exists.
  *
@@ -42,7 +42,7 @@ function extractAutoDetectBlock(src: string): string {
   return src.slice(startIdx, endIdx);
 }
 
-describe("Backend replayPipelineRun — Partial Run Continuation", () => {
+describe("Backend resumePipelineRun — Partial Run Continuation", () => {
   const src = readRouterSource();
   const autoDetect = extractAutoDetectBlock(src);
 
@@ -93,16 +93,16 @@ describe("Backend replayPipelineRun — Partial Run Continuation", () => {
 
   describe("JSDoc documents both failed and partial run paths", () => {
     it("should mention 'partial' in the JSDoc", () => {
-      const jsdocStart = src.indexOf("* Replay a failed pipeline run");
-      const jsdocEnd = src.indexOf("replayPipelineRun: protectedProcedure");
+      const jsdocStart = src.indexOf("* Resume Pipeline Run");
+      const jsdocEnd = src.indexOf("resumePipelineRun: protectedProcedure");
       const jsdoc = src.slice(jsdocStart, jsdocEnd);
       expect(jsdoc).toContain("partial");
       expect(jsdoc).toContain("triage-only");
     });
 
     it("should document the 4-level stage detection priority", () => {
-      const jsdocStart = src.indexOf("* Replay a failed pipeline run");
-      const jsdocEnd = src.indexOf("replayPipelineRun: protectedProcedure");
+      const jsdocStart = src.indexOf("* Resume Pipeline Run");
+      const jsdocEnd = src.indexOf("resumePipelineRun: protectedProcedure");
       const jsdoc = src.slice(jsdocStart, jsdocEnd);
       expect(jsdoc).toContain("Explicit fromStage override");
       expect(jsdoc).toContain("First failed stage");
@@ -199,11 +199,11 @@ describe("Backend replayPipelineRun — Partial Run Continuation", () => {
 
   describe("Prerequisite validation for partial-run continuation", () => {
     it("correlation continuation requires triageId from original run", () => {
-      expect(src).toContain('Cannot replay from correlation — no triage ID from original run');
+      expect(src).toContain('Cannot resume from correlation — no triage ID from original run');
     });
 
     it("hypothesis continuation requires correlationId from original run", () => {
-      expect(src).toContain('Cannot replay from hypothesis — no correlation ID from original run');
+      expect(src).toContain('Cannot resume from hypothesis — no correlation ID from original run');
     });
 
     it("partial run with triageId can continue to correlation", () => {
@@ -245,10 +245,10 @@ describe("Backend replayPipelineRun — Partial Run Continuation", () => {
       expect(inspectorSrc).toContain("Replay Pipeline");
     });
 
-    it("PipelineInspector uses different icons for continue vs replay", () => {
-      // Continue uses ArrowRight, Replay uses RefreshCw
-      expect(inspectorSrc).toContain("ArrowRight");
-      expect(inspectorSrc).toContain("RefreshCw");
+    it("PipelineInspector uses semantic tRPC call-sites", () => {
+      // Continue uses continuePipelineRun, Replay uses resumePipelineRun
+      expect(inspectorSrc).toContain("continuePipelineRun");
+      expect(inspectorSrc).toContain("resumePipelineRun");
     });
 
     it("Continue description mentions advancing from triage", () => {

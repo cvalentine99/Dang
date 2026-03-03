@@ -421,13 +421,14 @@ describe("Direction 6: Pipeline Artifacts Endpoint", () => {
     }
   });
 
-  it("pipelineRouter should export replayPipelineRun procedure", async () => {
+  it("pipelineRouter should export resumePipelineRun and continuePipelineRun procedures", async () => {
     const mod = await import("./agenticPipeline/pipelineRouter");
     const router = mod.pipelineRouter;
     const routerDef = (router as any)._def;
     if (routerDef?.procedures) {
       const procNames = Object.keys(routerDef.procedures);
-      expect(procNames).toContain("replayPipelineRun");
+      expect(procNames).toContain("resumePipelineRun");
+      expect(procNames).toContain("continuePipelineRun");
     }
   });
 });
