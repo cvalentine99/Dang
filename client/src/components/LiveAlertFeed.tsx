@@ -239,6 +239,7 @@ export function LiveAlertFeed({
               onClick={acknowledgeAll}
               className="p-1.5 rounded-lg hover:bg-secondary/40 transition-colors"
               title="Mark all as read"
+              aria-label="Mark all alerts as read"
             >
               <CheckCheck className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
@@ -279,7 +280,7 @@ export function LiveAlertFeed({
       )}
 
       {/* Alert list */}
-      <div className="flex-1 overflow-y-auto space-y-0.5 min-h-0 max-h-[350px]">
+      <div className="flex-1 overflow-y-auto space-y-0.5 min-h-0 max-h-[350px]" aria-live="polite" aria-label="Live alert feed" role="log">
         {alerts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             {status === "connected" ? (
@@ -394,6 +395,7 @@ export function AlertNotificationBell({ collapsed = false }: { collapsed?: boole
                   onClick={clearAlerts}
                   className="p-1 rounded hover:bg-secondary/40 transition-colors"
                   title="Clear all"
+                  aria-label="Clear all alerts"
                 >
                   <Trash2 className="h-3 w-3 text-muted-foreground" />
                 </button>

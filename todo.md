@@ -2575,3 +2575,15 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Lazy-load DriftAnalytics tab content (SuppressionRulesTab, NotificationHistoryTab)
 - [x] Add LazyTabFallback Suspense skeleton for all lazy-loaded tabs
 - [x] All 1396 tests passing with lazy-loading enabled
+
+### Accessibility Improvements
+- [x] Audit all icon-only buttons for missing aria-label attributes (14 found, 14 fixed)
+- [x] Add aria-label to 14 icon-only buttons across 10 files (Status, Investigations, KnowledgeGraph, DriftAnalytics, QueueNotifier, LiveAlertFeed)
+- [x] Add aria-label to icon-only buttons in sub-components (NodeDetailPanel, RiskPathPanel, GraphToolbar, AddToInvestigationDialog, AnomalyDetailPanel, SnapshotDetailPanel)
+- [x] Add aria-live="assertive" + role="alert" to ReadinessBanner (critical status changes)
+- [x] Add aria-live="polite" + role="log" to LiveAlertFeed (real-time alert stream)
+- [x] Add aria-live="polite" to QueueNotifier notification history
+- [x] Add aria-live="polite" + role="status" to Status page overall banner
+- [x] Add aria-live="polite" to Status service cards grid, AlertQueue, AgentHealth table, AlertsTimeline table, Vulnerabilities table
+- [x] 35 total aria-label attributes, 9 aria-live regions across the codebase
+- [x] All 1396 tests passing (55 test files)

@@ -549,7 +549,7 @@ export default function Vulnerabilities() {
           {vulnSearchQ.isLoading ? (
             <TableSkeleton columns={9} rows={12} columnWidths={[2, 1, 1, 2, 1, 2, 1, 1, 1]} />
           ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" aria-live="polite" aria-label="Vulnerabilities table">
             <table className="w-full text-xs">
               <thead><tr className="border-b border-border/30">
                 {(viewMode === "fleet" ? ["CVE", "Severity", "CVSS3", "Package", "Version", "Agent", "Status", "Published", "NVD"] : ["CVE", "Severity", "CVSS3", "Package", "Version", "Title", "Status", "Published", "NVD"]).map(h => <th key={h} className="text-left py-2 px-3 text-muted-foreground font-medium">{h}</th>)}

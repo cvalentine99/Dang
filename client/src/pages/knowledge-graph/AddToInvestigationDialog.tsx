@@ -56,7 +56,7 @@ export function AddToInvestigationDialog({ node, onClose }: AddToInvestigationDi
             <FolderPlus className="w-5 h-5 text-indigo-400" />
             <h2 className="text-lg font-display font-bold text-foreground">Add to Investigation</h2>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-white/10 text-muted-foreground"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="p-1 rounded hover:bg-white/10 text-muted-foreground" aria-label="Close dialog"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="px-6 py-4 space-y-4">

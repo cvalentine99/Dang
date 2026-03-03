@@ -213,6 +213,7 @@ export function GraphToolbar({
           <button
             onClick={onRefresh}
             className="p-1.5 rounded-lg border border-white/10 text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
+            aria-label="Refresh knowledge graph"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>

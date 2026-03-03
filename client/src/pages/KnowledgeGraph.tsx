@@ -927,10 +927,10 @@ export default function KnowledgeGraph(): React.JSX.Element {
 
           {/* Zoom controls */}
           <div className="absolute top-4 left-4 flex flex-col gap-1 z-10">
-            <button onClick={handleZoomIn} className="p-1.5 glass-panel rounded-lg border border-white/10 text-muted-foreground hover:text-foreground transition-colors">
+            <button onClick={handleZoomIn} className="p-1.5 glass-panel rounded-lg border border-white/10 text-muted-foreground hover:text-foreground transition-colors" aria-label="Zoom in">
               <ZoomIn className="w-4 h-4" />
             </button>
-            <button onClick={handleZoomOut} className="p-1.5 glass-panel rounded-lg border border-white/10 text-muted-foreground hover:text-foreground transition-colors">
+            <button onClick={handleZoomOut} className="p-1.5 glass-panel rounded-lg border border-white/10 text-muted-foreground hover:text-foreground transition-colors" aria-label="Zoom out">
               <ZoomOut className="w-4 h-4" />
             </button>
             <button

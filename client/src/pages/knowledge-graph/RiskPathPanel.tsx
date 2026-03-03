@@ -23,7 +23,7 @@ export function RiskPathPanel({
           <Route className="w-4 h-4 text-red-400" />
           <h3 className="text-sm font-medium text-foreground">Risk Paths</h3>
         </div>
-        <button onClick={onClose} className="p-1 rounded hover:bg-white/10 text-muted-foreground">
+        <button onClick={onClose} className="p-1 rounded hover:bg-white/10 text-muted-foreground" aria-label="Close risk paths panel">
           <X className="w-3.5 h-3.5" />
         </button>
       </div>

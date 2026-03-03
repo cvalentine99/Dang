@@ -24,7 +24,7 @@ export function SnapshotDetailPanel({
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b px-5 py-4" style={{ background: "oklch(0.14 0.025 286)", borderColor: BORDER }}>
           <h3 className="font-display text-sm font-semibold">Drift Snapshot Detail</h3>
-          <button onClick={onClose} className="rounded p-1 hover:bg-white/10">
+          <button onClick={onClose} className="rounded p-1 hover:bg-white/10" aria-label="Close snapshot detail panel">
             <X className="h-4 w-4" style={{ color: MUTED }} />
           </button>
         </div>

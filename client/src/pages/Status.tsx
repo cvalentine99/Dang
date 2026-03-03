@@ -310,6 +310,9 @@ export default function Status() {
           background: overallStyle.bg,
           border: `1px solid ${overallStyle.border}`,
         }}
+        role="status"
+        aria-live="polite"
+        aria-label={`System status: ${data?.status ?? "checking"}`}
       >
         <div
           className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0"
@@ -351,6 +354,7 @@ export default function Status() {
           onClick={fetchStatus}
           disabled={isLoading}
           className="shrink-0 p-2.5 rounded-lg bg-[oklch(0.2_0.03_286/50%)] border border-[oklch(0.3_0.04_286/30%)] hover:bg-[oklch(0.25_0.04_286/60%)] transition-all disabled:opacity-50"
+          aria-label="Refresh system status"
         >
           <RefreshCw className={`w-4 h-4 text-muted-foreground ${isLoading ? "animate-spin" : ""}`} />
         </button>
@@ -371,7 +375,7 @@ export default function Status() {
       )}
 
       {/* Service Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5" aria-live="polite" aria-label="Service connection status">
         <ServiceCard
           title="MySQL Database"
           description="Primary data store for users, notes, baselines, and saved searches"

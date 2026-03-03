@@ -24,7 +24,7 @@ export function ReadinessBanner() {
   const problemDeps = depEntries.filter(([, d]) => d.state !== "ready");
 
   return (
-    <div className={`rounded-lg border ${borderColor} ${bgColor} px-4 py-3 mb-4`}>
+    <div className={`rounded-lg border ${borderColor} ${bgColor} px-4 py-3 mb-4`} role="alert" aria-live="assertive">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className={`h-4 w-4 ${textColor}`} />
@@ -43,6 +43,10 @@ export function ReadinessBanner() {
           {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
         </button>
       </div>
+      <span className="sr-only">
+        {isBlocked ? "Critical: Agentic workflows are blocked." : "Warning: Agentic workflows are degraded."}
+        {" "}{problemDeps.length} dependency issue{problemDeps.length !== 1 ? "s" : ""} detected.
+      </span>
 
       {expanded && (
         <div className="mt-3 space-y-2 text-xs">

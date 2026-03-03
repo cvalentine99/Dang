@@ -476,6 +476,7 @@ export function QueueNotifier() {
                         onClick={clearHistory}
                         className="p-1 rounded text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all"
                         title="Clear all notifications"
+                        aria-label="Clear all notifications"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -494,7 +495,7 @@ export function QueueNotifier() {
           </div>
 
           {/* Panel body */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto" aria-live="polite" aria-label="Notification history">
             {showSettings ? (
               /* Settings view */
               <div className="p-4 space-y-1">

@@ -57,7 +57,7 @@ function CreateDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
       <div className="glass-panel rounded-2xl border border-white/10 w-full max-w-lg mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
           <h2 className="text-lg font-display font-bold text-foreground">New Investigation</h2>
-          <button onClick={onClose} className="p-1 rounded hover:bg-white/10 text-muted-foreground"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="p-1 rounded hover:bg-white/10 text-muted-foreground" aria-label="Close dialog"><X className="w-4 h-4" /></button>
         </div>
         <div className="px-6 py-4 space-y-4">
           <div>
@@ -223,7 +223,7 @@ function InvestigationDetail({ id, onBack }: { id: number; onBack: () => void })
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
-          <button onClick={onBack} className="mt-1 p-1 rounded hover:bg-white/10 text-muted-foreground"><ChevronRight className="w-4 h-4 rotate-180" /></button>
+          <button onClick={onBack} className="mt-1 p-1 rounded hover:bg-white/10 text-muted-foreground" aria-label="Go back to investigations list"><ChevronRight className="w-4 h-4 rotate-180" /></button>
           <div>
             <h2 className="text-xl font-display font-bold text-foreground">{data.title}</h2>
             {data.description && <p className="text-sm text-muted-foreground mt-1">{data.description}</p>}

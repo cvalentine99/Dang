@@ -300,7 +300,7 @@ export default function AgentHealth() {
           {isLoading ? (
             <TableSkeleton columns={9} rows={10} columnWidths={[1, 2, 2, 2, 1, 2, 1, 2, 1]} />
           ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" aria-live="polite" aria-label="Agent fleet table">
             <table className="w-full text-xs">
               <thead><tr className="border-b border-border/30">
                 {["ID", "Name", "IP", "OS", "Version", "Group", "Status", "Last Keep Alive", "Actions"].map(h => (

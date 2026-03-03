@@ -536,7 +536,7 @@ export default function AlertsTimeline() {
           {alertsSearchQ.isLoading ? (
             <TableSkeleton columns={9} rows={12} columnWidths={[2, 1, 1, 3, 2, 1, 1, 1, 1]} />
           ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" aria-live="polite" aria-label="Alerts table">
             <table className="w-full text-xs">
               <thead><tr className="border-b border-border/30">
                 {["Timestamp", "Level", "Rule ID", "Description", "Agent", "MITRE", "Source", "", ""].map((h, idx) => (

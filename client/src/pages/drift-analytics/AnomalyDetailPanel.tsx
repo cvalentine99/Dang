@@ -33,7 +33,7 @@ export function AnomalyDetailPanel({
             <TriangleAlert className="h-4 w-4" style={{ color: RED }} />
             Anomaly Detail
           </h3>
-          <button onClick={onClose} className="rounded p-1 hover:bg-white/10">
+          <button onClick={onClose} className="rounded p-1 hover:bg-white/10" aria-label="Close anomaly detail panel">
             <X className="h-4 w-4" style={{ color: MUTED }} />
           </button>
         </div>

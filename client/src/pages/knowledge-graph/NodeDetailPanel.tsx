@@ -57,7 +57,7 @@ export function NodeDetailPanel({
             </div>
           </div>
         </div>
-        <button onClick={onClose} className="p-1 rounded hover:bg-white/10 transition-colors text-muted-foreground">
+        <button onClick={onClose} className="p-1 rounded hover:bg-white/10 transition-colors text-muted-foreground" aria-label="Close node detail panel">
           <X className="w-4 h-4" />
         </button>
       </div>
