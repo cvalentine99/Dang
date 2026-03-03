@@ -157,7 +157,7 @@ function QueueItemCard({
   elapsedSeconds = 0,
   canRunStructuredPipeline = true,
   canRunAdHoc = true,
-  canRunTicketing = true,
+  canRunTicketing = false,
   ticketingDegraded = false,
   ticketingReason = null,
   hasSuccessfulTicket = false,

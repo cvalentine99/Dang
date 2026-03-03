@@ -100,6 +100,7 @@ const GLOBAL_RATE_LIMITS: Record<string, number> = {
   alerts: 30,
   vulnerabilities: 20,
   syscheck: 20,
+  readiness: 10, // Low ceiling — readiness checks are lightweight and periodic
 };
 
 // Per-user limits per endpoint group (fraction of global — ensures fairness)
@@ -109,6 +110,7 @@ const PER_USER_RATE_LIMITS: Record<string, number> = {
   alerts: 15,
   vulnerabilities: 10,
   syscheck: 10,
+  readiness: 5, // Low per-user ceiling — readiness polls every 30s
 };
 
 /**

@@ -153,6 +153,9 @@ export async function loginLocalUser(input: {
   // Create JWT session token using the existing SDK signing
   const token = await sdk.signSession({
     openId: user.openId,
+    // NOTE: VITE_APP_ID is a platform-injected env var available to both client and server.
+    // Despite the VITE_ prefix, it is intentionally used server-side here for JWT session signing
+    // to match the app identity expected by the OAuth SDK.
     appId: process.env.VITE_APP_ID || "dang-local",
     name: user.name || "",
   });

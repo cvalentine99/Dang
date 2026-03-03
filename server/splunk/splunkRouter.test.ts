@@ -1324,8 +1324,8 @@ describe("Ticket Created indicator on queue items", () => {
     expect(alertQueueSrc).toContain("hasSuccessfulTicket = false");
   });
 
-  it("should include canRunTicketing as an optional prop with default true", () => {
-    expect(alertQueueSrc).toContain("canRunTicketing = true");
+  it("should include canRunTicketing as an optional prop with default false (fail-closed)", () => {
+    expect(alertQueueSrc).toContain("canRunTicketing = false");
   });
 
   it("should include ticketingDegraded as an optional prop with default false", () => {
