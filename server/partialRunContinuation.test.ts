@@ -14,7 +14,12 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 
+const HELPER_PATH = "server/agenticPipeline/resumePipelineHelper.ts";
 const ROUTER_PATH = "server/agenticPipeline/pipelineRouter.ts";
+
+function readHelperSource(): string {
+  return fs.readFileSync(HELPER_PATH, "utf-8");
+}
 
 function readRouterSource(): string {
   return fs.readFileSync(ROUTER_PATH, "utf-8");
@@ -43,7 +48,7 @@ function extractAutoDetectBlock(src: string): string {
 }
 
 describe("Backend resumePipelineRun — Partial Run Continuation", () => {
-  const src = readRouterSource();
+  const src = readHelperSource();
   const autoDetect = extractAutoDetectBlock(src);
 
   describe("Stage detection code structure", () => {
@@ -92,22 +97,17 @@ describe("Backend resumePipelineRun — Partial Run Continuation", () => {
   });
 
   describe("JSDoc documents both failed and partial run paths", () => {
-    it("should mention 'partial' in the JSDoc", () => {
-      const jsdocStart = src.indexOf("* Resume Pipeline Run");
-      const jsdocEnd = src.indexOf("resumePipelineRun: protectedProcedure");
-      const jsdoc = src.slice(jsdocStart, jsdocEnd);
-      expect(jsdoc).toContain("partial");
-      expect(jsdoc).toContain("triage-only");
+    it("should mention 'partial' in the helper JSDoc", () => {
+      // JSDoc is in the helper file header, not the router
+      expect(src).toContain("partial/triage-only runs");
     });
 
     it("should document the 4-level stage detection priority", () => {
-      const jsdocStart = src.indexOf("* Resume Pipeline Run");
-      const jsdocEnd = src.indexOf("resumePipelineRun: protectedProcedure");
-      const jsdoc = src.slice(jsdocStart, jsdocEnd);
-      expect(jsdoc).toContain("Explicit fromStage override");
-      expect(jsdoc).toContain("First failed stage");
-      expect(jsdoc).toContain("First pending stage");
-      expect(jsdoc).toContain("Throws if no actionable stage found");
+      // The helper file header documents the priority order
+      expect(src).toContain("Explicit fromStage override");
+      expect(src).toContain("First failed stage");
+      expect(src).toContain("First pending stage");
+      expect(src).toContain("Throws if no actionable stage found");
     });
   });
 
@@ -225,8 +225,8 @@ describe("Backend resumePipelineRun — Partial Run Continuation", () => {
       expect(src).toContain('triageStatus: startIdx > 0 ? "completed" : "pending"');
     });
 
-    it("creates a replay-prefixed run ID", () => {
-      expect(src).toContain("replay-${Date.now().toString(36)}");
+    it("creates a prefixed run ID using runIdPrefix parameter", () => {
+      expect(src).toContain("${runIdPrefix}-${Date.now().toString(36)}");
     });
 
     it("sets status to running for the new replay run", () => {

@@ -200,3 +200,161 @@ describe("Ticket Artifacts Panel Data Contract", () => {
     expect(requiredFields).toHaveLength(15);
   });
 });
+
+describe("Normalized Readiness Hook Field Names", () => {
+  it("useAgenticReadiness exports parallel field naming for all three workflows", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync("client/src/hooks/useAgenticReadiness.ts", "utf-8");
+
+    // Structured Pipeline — parallel pattern
+    expect(src).toContain("canRunStructuredPipeline:");
+    expect(src).toContain("structuredPipelineBlocked:");
+    expect(src).toContain("structuredPipelineDegraded:");
+    expect(src).toContain("structuredPipelineReason:");
+
+    // Ad-hoc Analyst — parallel pattern
+    expect(src).toContain("canRunAdHoc:");
+    expect(src).toContain("adHocBlocked:");
+    expect(src).toContain("adHocDegraded:");
+    expect(src).toContain("adHocReason:");
+
+    // Ticketing — parallel pattern
+    expect(src).toContain("canRunTicketing:");
+    expect(src).toContain("ticketingBlocked:");
+    expect(src).toContain("ticketingDegraded:");
+    expect(src).toContain("ticketingReason:");
+  });
+
+  it("old non-parallel field names are removed", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync("client/src/hooks/useAgenticReadiness.ts", "utf-8");
+
+    // These old names should no longer exist
+    expect(src).not.toContain("canCreateTickets:");
+    expect(src).not.toContain("ticketingUnavailable:");
+  });
+
+  it("hook extracts workflow states into local variables for consistency", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync("client/src/hooks/useAgenticReadiness.ts", "utf-8");
+
+    expect(src).toContain("const pipelineState =");
+    expect(src).toContain("const adHocState =");
+    expect(src).toContain("const ticketingState =");
+  });
+
+  it("JSDoc documents the parallel naming convention", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync("client/src/hooks/useAgenticReadiness.ts", "utf-8");
+
+    expect(src).toContain("canRun{Workflow}");
+    expect(src).toContain("{workflow}Blocked");
+    expect(src).toContain("{workflow}Degraded");
+    expect(src).toContain("{workflow}Reason");
+  });
+});
+
+describe("PipelineContinuationButton Naming", () => {
+  it("PipelineInspector uses PipelineContinuationButton (not ReplayButton)", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync("client/src/pages/PipelineInspector.tsx", "utf-8");
+
+    expect(src).toContain("function PipelineContinuationButton(");
+    expect(src).toContain("<PipelineContinuationButton");
+    expect(src).not.toContain("function ReplayButton(");
+    expect(src).not.toContain("<ReplayButton");
+  });
+
+  it("section header says Pipeline Continuation (not Replay Button)", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync("client/src/pages/PipelineInspector.tsx", "utf-8");
+
+    expect(src).toContain("Pipeline Continuation");
+    expect(src).not.toContain("── Replay Button ──");
+  });
+
+  it("internal variable uses 'mutation' not 'replay'", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync("client/src/pages/PipelineInspector.tsx", "utf-8");
+
+    // Extract the PipelineContinuationButton function body
+    const fnStart = src.indexOf("function PipelineContinuationButton(");
+    const fnEnd = src.indexOf("\n// ──", fnStart + 1);
+    const fnBody = fnEnd > -1 ? src.slice(fnStart, fnEnd) : src.slice(fnStart);
+
+    expect(fnBody).toContain("const mutation = isPartial");
+    expect(fnBody).toContain("mutation.mutate(");
+    expect(fnBody).toContain("mutation.isPending");
+    expect(fnBody).toContain("mutation.isSuccess");
+    expect(fnBody).toContain("mutation.isError");
+  });
+
+  it("success message uses 'Pipeline continued' / 'Pipeline resumed' (not 'Replay started')", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync("client/src/pages/PipelineInspector.tsx", "utf-8");
+
+    expect(src).toContain("Pipeline continued:");
+    expect(src).toContain("Pipeline resumed:");
+    expect(src).not.toContain("Replay started:");
+  });
+});
+
+describe("Shared Continuation Helper Extraction", () => {
+  it("resumePipelineHelper.ts exists and exports executeResumePipeline", async () => {
+    const mod = await import("../agenticPipeline/resumePipelineHelper");
+    expect(typeof mod.executeResumePipeline).toBe("function");
+  });
+
+  it("pipelineRouter imports executeResumePipeline from helper", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync("server/agenticPipeline/pipelineRouter.ts", "utf-8");
+
+    expect(src).toContain('import { executeResumePipeline } from "./resumePipelineHelper"');
+  });
+
+  it("resumePipelineRun delegates to executeResumePipeline", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync("server/agenticPipeline/pipelineRouter.ts", "utf-8");
+
+    // Find the resumePipelineRun mutation body
+    const resumeStart = src.indexOf("resumePipelineRun:");
+    const resumeEnd = src.indexOf("continuePipelineRun:", resumeStart);
+    const resumeBody = src.slice(resumeStart, resumeEnd);
+
+    // The mode label is "replay" for failed-run semantics
+    expect(resumeBody).toContain('executeResumePipeline(input, ctx,');
+    expect(resumeBody).not.toContain("runTriageAgent");
+    expect(resumeBody).not.toContain("runCorrelationAgent");
+  });
+
+  it("continuePipelineRun delegates to executeResumePipeline", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync("server/agenticPipeline/pipelineRouter.ts", "utf-8");
+
+    const continueStart = src.indexOf("continuePipelineRun:");
+    const continueBody = src.slice(continueStart, continueStart + 500);
+
+    expect(continueBody).toContain('executeResumePipeline(input, ctx, "continue")');
+  });
+
+  it("no duplicated stage-execution logic in resume/continue mutations", async () => {
+    const fs = await import("fs");
+    const src = fs.readFileSync("server/agenticPipeline/pipelineRouter.ts", "utf-8");
+
+    // The resume and continue mutations should delegate to the helper,
+    // not contain inline stage-execution logic
+    const resumeStart = src.indexOf("resumePipelineRun:");
+    const continueStart = src.indexOf("continuePipelineRun:");
+    const artifactsStart = src.indexOf("getPipelineArtifacts:");
+    const resumeBody = src.slice(resumeStart, continueStart);
+    const continueBody = src.slice(continueStart, artifactsStart);
+
+    // Neither mutation should contain inline agent calls
+    for (const body of [resumeBody, continueBody]) {
+      expect(body).not.toContain("runTriageAgent(");
+      expect(body).not.toContain("runCorrelationAgent(");
+      expect(body).not.toContain("runHypothesisAgent(");
+      expect(body).toContain("executeResumePipeline(");
+    }
+  });
+});

@@ -2500,3 +2500,10 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Task 5: UI wording tightened — "Continue Pipeline" / "Replay Pipeline" with semantic tRPC call-sites; admin role wording in AdminSettings.
 - [x] Task 7: Updated directions1-6.test.ts (resumePipelineRun + continuePipelineRun), partialRunContinuation.test.ts (all references updated). Zero stale SECURITY_ADMIN or replayPipelineRun references remain.
 - [x] All 1,357 tests passing across 55 test files, zero TypeScript errors
+
+## Polish: Post-Cleanup Review Items
+
+- [x] Fix 1: Extracted ~170 lines into resumePipelineHelper.ts; both resumePipelineRun and continuePipelineRun are 3-line delegations; no circular reference
+- [x] Fix 2: Normalized readiness hook to parallel pattern: canRunStructuredPipeline/canRunAdHoc/canRunTicketing, {workflow}Blocked, {workflow}Degraded, {workflow}Reason
+- [x] Fix 3: Renamed ReplayButton → PipelineContinuationButton; section header → "Pipeline Continuation"; success messages → "Pipeline continued" / "Pipeline resumed"
+- [x] All 1,370 tests passing across 55 test files, zero TypeScript errors

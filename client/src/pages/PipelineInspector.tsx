@@ -428,7 +428,7 @@ function PipelineRunCard({ run, ticketCount }: {
 
           {/* Continue Pipeline for partial (triage-only) runs / Replay for failed runs */}
           {(run.status === "failed" || run.status === "partial") && (
-            <ReplayButton runId={run.runId} runStatus={run.status} />
+            <PipelineContinuationButton runId={run.runId} runStatus={run.status} />
           )}
 
           {/* Direction 6: Artifacts Drill-Down */}
@@ -451,9 +451,13 @@ function PipelineRunCard({ run, ticketCount }: {
   );
 }
 
-// ── Replay Button ─────────────────────────────────────────────────────────
+// ── Pipeline Continuation ───────────────────────────────────────────────────
+// Handles both:
+//   - "Continue Pipeline" for partial/triage-only runs (first pending stage)
+//   - "Replay Pipeline" for failed runs (first failed stage)
+// Both delegate to the shared executeResumePipeline helper on the backend.
 
-function ReplayButton({ runId, runStatus }: { runId: string; runStatus: string }) {
+function PipelineContinuationButton({ runId, runStatus }: { runId: string; runStatus: string }) {
   const utils = trpc.useUtils();
   const isPartial = runStatus === "partial";
 
@@ -472,7 +476,7 @@ function ReplayButton({ runId, runStatus }: { runId: string; runStatus: string }
       utils.pipeline.pipelineRunStats.invalidate();
     },
   });
-  const replay = isPartial ? continueMutation : resumeMutation;
+  const mutation = isPartial ? continueMutation : resumeMutation;
 
   // Precise language: "Continue Pipeline" for triage-only partial runs,
   // "Replay Pipeline" for failed runs.
@@ -502,29 +506,29 @@ function ReplayButton({ runId, runStatus }: { runId: string; runStatus: string }
           </div>
         </div>
         <button
-          onClick={() => replay.mutate({ runId })}
-          disabled={replay.isPending}
+          onClick={() => mutation.mutate({ runId })}
+          disabled={mutation.isPending}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-40 flex items-center gap-1.5 ${btnBg}`}
         >
-          {replay.isPending ? (
+          {mutation.isPending ? (
             <><Loader2 className="w-3 h-3 animate-spin" /> {pendingLabel}</>
           ) : (
             <><ButtonIcon className="w-3 h-3" /> {buttonLabel}</>
           )}
         </button>
       </div>
-      {replay.isSuccess && replay.data && (
+      {mutation.isSuccess && mutation.data && (
         <div className="mt-2 p-2 rounded bg-emerald-500/5 border border-emerald-500/20">
-          <span className="text-[10px] text-emerald-300">{isPartial ? "Pipeline continued: " : "Replay started: "}</span>
-          <span className="text-[10px] font-mono text-emerald-300/70">{replay.data.replayRunId}</span>
+          <span className="text-[10px] text-emerald-300">{isPartial ? "Pipeline continued: " : "Pipeline resumed: "}</span>
+          <span className="text-[10px] font-mono text-emerald-300/70">{mutation.data.replayRunId}</span>
           <span className="text-[10px] text-muted-foreground/40 ml-2">
-            from stage: {replay.data.startedFromStage}
+            from stage: {mutation.data.startedFromStage}
           </span>
         </div>
       )}
-      {replay.isError && (
+      {mutation.isError && (
         <div className="mt-2 p-2 rounded bg-red-500/5 border border-red-500/20">
-          <span className="text-[10px] text-red-300">{replay.error.message}</span>
+          <span className="text-[10px] text-red-300">{mutation.error.message}</span>
         </div>
       )}
     </div>
