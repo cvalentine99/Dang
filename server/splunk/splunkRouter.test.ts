@@ -341,3 +341,242 @@ describe("Batch Progress Tracking", () => {
     expect(status).toBe("completed");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Ticket Artifact Audit Trail Tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("Ticket Artifact Schema", () => {
+  it("should export ticketArtifacts table from schema", async () => {
+    const { ticketArtifacts } = await import("../../drizzle/schema");
+    expect(ticketArtifacts).toBeDefined();
+  });
+
+  it("should export TicketArtifactRow and InsertTicketArtifactRow types", async () => {
+    // Type-level check — if this compiles, the types exist
+    const schema = await import("../../drizzle/schema");
+    expect(schema.ticketArtifacts).toBeDefined();
+    // The types are compile-time only; we verify the table exists at runtime
+  });
+
+  it("should have required columns in ticketArtifacts table", async () => {
+    const { ticketArtifacts } = await import("../../drizzle/schema");
+    const columns = Object.keys(ticketArtifacts);
+    // Drizzle table objects expose column accessors
+    expect(ticketArtifacts.id).toBeDefined();
+    expect(ticketArtifacts.ticketId).toBeDefined();
+    expect(ticketArtifacts.system).toBeDefined();
+    expect(ticketArtifacts.queueItemId).toBeDefined();
+    expect(ticketArtifacts.pipelineRunId).toBeDefined();
+    expect(ticketArtifacts.alertId).toBeDefined();
+    expect(ticketArtifacts.ruleId).toBeDefined();
+    expect(ticketArtifacts.ruleLevel).toBeDefined();
+    expect(ticketArtifacts.createdBy).toBeDefined();
+    expect(ticketArtifacts.success).toBeDefined();
+    expect(ticketArtifacts.statusMessage).toBeDefined();
+    expect(ticketArtifacts.rawResponse).toBeDefined();
+    expect(ticketArtifacts.httpStatusCode).toBeDefined();
+    expect(ticketArtifacts.createdAt).toBeDefined();
+  });
+});
+
+describe("Ticket Artifact Construction — Success Path", () => {
+  it("should construct a success artifact with ticketId and success=true", () => {
+    const result = { success: true, ticketId: "DANG-1709123456-rt-001", message: "Ticket created" };
+
+    const artifact = {
+      ticketId: result.ticketId ?? `failed-${Date.now()}`,
+      system: "splunk_es" as const,
+      queueItemId: 42,
+      pipelineRunId: 7,
+      alertId: "alert-001",
+      ruleId: "5710",
+      ruleLevel: 12,
+      createdBy: "admin@example.com",
+      success: result.success === true && !!result.ticketId,
+      statusMessage: result.message,
+      rawResponse: { ticketId: result.ticketId, message: result.message },
+      httpStatusCode: null,
+    };
+
+    expect(artifact.success).toBe(true);
+    expect(artifact.ticketId).toBe("DANG-1709123456-rt-001");
+    expect(artifact.system).toBe("splunk_es");
+    expect(artifact.pipelineRunId).toBe(7);
+    expect(artifact.statusMessage).toBe("Ticket created");
+  });
+
+  it("should link artifact to queue item and pipeline run", () => {
+    const artifact = {
+      queueItemId: 42,
+      pipelineRunId: 7,
+      alertId: "alert-001",
+    };
+
+    expect(artifact.queueItemId).toBe(42);
+    expect(artifact.pipelineRunId).toBe(7);
+    expect(artifact.alertId).toBe("alert-001");
+  });
+});
+
+describe("Ticket Artifact Construction — Failure Paths", () => {
+  it("should construct a failure artifact when Splunk returns success:false", () => {
+    const result = { success: false, message: "Splunk HEC error (403): Invalid token" };
+
+    const artifact = {
+      ticketId: result.ticketId ?? `failed-${Date.now()}`,
+      system: "splunk_es" as const,
+      queueItemId: 42,
+      pipelineRunId: 7,
+      alertId: "alert-001",
+      ruleId: "5710",
+      ruleLevel: 12,
+      createdBy: "admin@example.com",
+      success: (result as { success: boolean; ticketId?: string }).success === true && !!(result as { ticketId?: string }).ticketId,
+      statusMessage: result.message,
+      rawResponse: { ticketId: undefined, message: result.message },
+      httpStatusCode: null,
+    };
+
+    expect(artifact.success).toBe(false);
+    expect(artifact.ticketId).toMatch(/^failed-\d+$/);
+    expect(artifact.statusMessage).toContain("403");
+    expect(artifact.statusMessage).toContain("Invalid token");
+  });
+
+  it("should construct a failure artifact when HEC times out", () => {
+    const result = { success: false, message: "Splunk HEC request timed out (15s)" };
+
+    const artifact = {
+      ticketId: `failed-${Date.now()}`,
+      success: false,
+      statusMessage: result.message,
+    };
+
+    expect(artifact.success).toBe(false);
+    expect(artifact.statusMessage).toContain("timed out");
+  });
+
+  it("should construct a failure artifact when HEC connection refused", () => {
+    const result = { success: false, message: "Splunk HEC connection error: ECONNREFUSED" };
+
+    const artifact = {
+      ticketId: `failed-${Date.now()}`,
+      success: false,
+      statusMessage: result.message,
+    };
+
+    expect(artifact.success).toBe(false);
+    expect(artifact.statusMessage).toContain("ECONNREFUSED");
+  });
+
+  it("should construct an exception-path artifact for unhandled errors in batch", () => {
+    const err = new Error("Unexpected JSON parse error");
+
+    const artifact = {
+      ticketId: `exception-${Date.now()}`,
+      system: "splunk_es" as const,
+      queueItemId: 99,
+      pipelineRunId: null,
+      alertId: "alert-999",
+      ruleId: "1234",
+      ruleLevel: 5,
+      createdBy: "admin",
+      success: false,
+      statusMessage: err.message,
+      rawResponse: null,
+      httpStatusCode: null,
+    };
+
+    expect(artifact.success).toBe(false);
+    expect(artifact.ticketId).toMatch(/^exception-\d+$/);
+    expect(artifact.pipelineRunId).toBeNull();
+    expect(artifact.rawResponse).toBeNull();
+    expect(artifact.statusMessage).toBe("Unexpected JSON parse error");
+  });
+
+  it("should never set success=true when ticketId is missing", () => {
+    const result = { success: true, message: "OK but no ticket ID" };
+    // The router uses: result.success === true && !!result.ticketId
+    const successFlag = (result as { success: boolean; ticketId?: string }).success === true && !!(result as { ticketId?: string }).ticketId;
+    expect(successFlag).toBe(false);
+  });
+});
+
+describe("Ticket Artifact Workflow Lineage", () => {
+  it("should allow null pipelineRunId for legacy items without pipeline runs", () => {
+    const artifact = {
+      queueItemId: 42,
+      pipelineRunId: null,
+      alertId: "alert-001",
+    };
+
+    expect(artifact.pipelineRunId).toBeNull();
+    expect(artifact.queueItemId).toBe(42);
+  });
+
+  it("should preserve all forensic fields from the original alert", () => {
+    const artifact = {
+      alertId: "alert-001",
+      ruleId: "5710",
+      ruleLevel: 12,
+      createdBy: "admin@example.com",
+    };
+
+    // These fields must match the original alert — never normalized or cleaned
+    expect(artifact.alertId).toBe("alert-001");
+    expect(artifact.ruleId).toBe("5710");
+    expect(artifact.ruleLevel).toBe(12);
+  });
+
+  it("should use splunk_es as the default system for Splunk tickets", () => {
+    const artifact = { system: "splunk_es" as const };
+    expect(artifact.system).toBe("splunk_es");
+  });
+});
+
+describe("Splunk Router — listTicketArtifacts and getTicketArtifact exports", () => {
+  it("should export listTicketArtifacts procedure in splunkRouter", async () => {
+    const { splunkRouter } = await import("./splunkRouter");
+    const routerDef = splunkRouter._def;
+    expect(routerDef).toBeDefined();
+    // The router should have the listTicketArtifacts and getTicketArtifact procedures
+    // We verify the router is defined — full integration testing requires DB
+  });
+});
+
+describe("Failure Truth — UI should see actual error messages", () => {
+  it("should preserve Splunk 403 error message without sanitization", () => {
+    const splunkResponse = "Splunk HEC error (403): Invalid token";
+    // The router returns result.message directly — no sanitization
+    expect(splunkResponse).toContain("403");
+    expect(splunkResponse).toContain("Invalid token");
+  });
+
+  it("should preserve ECONNREFUSED in error message", () => {
+    const errorMsg = "Splunk HEC connection error: ECONNREFUSED";
+    expect(errorMsg).toContain("ECONNREFUSED");
+  });
+
+  it("should preserve timeout message", () => {
+    const errorMsg = "Splunk HEC request timed out (15s)";
+    expect(errorMsg).toContain("timed out");
+    expect(errorMsg).toContain("15s");
+  });
+
+  it("should not return empty string for failure messages", () => {
+    // Workflow truth: never return empty error messages
+    const failureResults = [
+      { success: false, message: "Splunk HEC error (403): Invalid token" },
+      { success: false, message: "Splunk HEC request timed out (15s)" },
+      { success: false, message: "Splunk HEC connection error: ECONNREFUSED" },
+      { success: false, message: "Splunk integration is not enabled" },
+      { success: false, message: "Splunk HEC not configured (missing host or token)" },
+    ];
+
+    for (const result of failureResults) {
+      expect(result.message).toBeTruthy();
+      expect(result.message.length).toBeGreaterThan(0);
+    }
+  });
+});

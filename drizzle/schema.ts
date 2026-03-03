@@ -1375,3 +1375,71 @@ export const pipelineRuns = mysqlTable("pipeline_runs", {
 export type PipelineRunRow = typeof pipelineRuns.$inferSelect;
 export type InsertPipelineRunRow = typeof pipelineRuns.$inferInsert;
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Ticket Artifacts — first-class record of externally-created tickets
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Each row represents a ticket that was manually created by an analyst
+// from a completed triage result and sent to an external ticketing system
+// (currently Splunk ES via HEC).
+//
+// This table provides workflow lineage: which alert queue item, which
+// pipeline run, and which analyst created the ticket, plus the external
+// system's response (ticket ID, status, raw response).
+//
+// This is NOT automated ticket orchestration — every ticket here was
+// explicitly triggered by an analyst clicking "Create Ticket" in the UI.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const ticketArtifacts = mysqlTable("ticket_artifacts", {
+  id: int("id").autoincrement().primaryKey(),
+
+  /** External ticket ID returned by the ticketing system (e.g., "DANG-1709...") */
+  ticketId: varchar("ticketId", { length: 128 }).notNull(),
+
+  /** Which external system holds this ticket */
+  system: mysqlEnum("system", ["splunk_es", "jira", "servicenow", "custom"]).default("splunk_es").notNull(),
+
+  /** FK to alert_queue.id — the queue item this ticket was created from */
+  queueItemId: int("queueItemId").notNull(),
+
+  /** FK to pipeline_runs.id — the pipeline run associated with this triage (nullable for legacy items) */
+  pipelineRunId: int("pipelineRunId"),
+
+  /** Wazuh alert ID for cross-reference */
+  alertId: varchar("alertId", { length: 128 }).notNull(),
+
+  /** Rule ID from the original alert */
+  ruleId: varchar("ruleId", { length: 32 }),
+
+  /** Rule severity level */
+  ruleLevel: int("ruleLevel"),
+
+  /** Who created this ticket (analyst name/email) */
+  createdBy: varchar("createdBy", { length: 256 }).notNull(),
+
+  /** Whether the external system accepted the ticket */
+  success: boolean("success").notNull(),
+
+  /** Human-readable status message from the external system */
+  statusMessage: text("statusMessage"),
+
+  /** Raw response from the external system (for forensic audit) */
+  rawResponse: json("rawResponse"),
+
+  /** HTTP status code from the external system */
+  httpStatusCode: int("httpStatusCode"),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ([
+  index("ta_ticketId_idx").on(table.ticketId),
+  index("ta_queueItemId_idx").on(table.queueItemId),
+  index("ta_pipelineRunId_idx").on(table.pipelineRunId),
+  index("ta_alertId_idx").on(table.alertId),
+  index("ta_system_idx").on(table.system),
+  index("ta_createdAt_idx").on(table.createdAt),
+]));
+
+export type TicketArtifactRow = typeof ticketArtifacts.$inferSelect;
+export type InsertTicketArtifactRow = typeof ticketArtifacts.$inferInsert;

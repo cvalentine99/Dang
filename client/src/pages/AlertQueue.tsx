@@ -225,10 +225,17 @@ function QueueItemCard({
   const splunkEnabled = trpc.splunk.isEnabled.useQuery(undefined, { staleTime: 60_000 });
   const createTicketMutation = trpc.splunk.createTicket.useMutation({
     onSuccess: (result) => {
-      toast.success("Splunk ticket created", {
-        description: `Ticket ${result.ticketId} sent to Splunk ES Mission Control`,
-      });
-      // Refetch to show the ticket ID in the triage result
+      if (result.success === true && result.ticketId) {
+        toast.success("Splunk ticket created", {
+          description: `Ticket ${result.ticketId} sent to Splunk ES Mission Control`,
+        });
+      } else {
+        // Backend returned success:false without throwing — HEC rejected the event
+        toast.error("Splunk ticket creation failed", {
+          description: result.message || "HEC accepted the request but did not create a ticket",
+        });
+      }
+      // Refetch regardless — if ticket was created, show it; if not, state is unchanged
       trpc.useUtils().alertQueue.list.invalidate();
     },
     onError: (err) => {

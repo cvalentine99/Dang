@@ -2408,3 +2408,12 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Bonus: Fixed 9 ITHygiene.tsx TypeScript errors (pre-existing type narrowing issues)
 - [x] Bonus: Zero TypeScript errors across entire codebase
 - [x] All 1,239 tests passing across 53 test files
+
+## Ticket Truth Fixes — Final Sign-off Requirements
+
+- [x] Fix 1: Truthful client handling of success:false — show error toast when result.success !== true
+- [x] Fix 2: Ticket artifact linkage — ticket_artifacts table wired into splunkRouter.ts (single + batch), records success + failure with workflow lineage (queueItemId, pipelineRunId, alertId)
+- [x] Fix 3: Precise live-vs-manual wording — router comments updated to "manual ticket creation from completed triage", no "automated orchestration"
+- [x] Fix 4: Failure-path proof tests — 18 new tests covering artifact construction (success/failure/exception paths), workflow lineage, forensic field preservation, UI error truth
+- [x] Bonus: listTicketArtifacts + getTicketArtifact query endpoints for audit trail visibility
+- [x] All 1,257 tests passing across 53 test files

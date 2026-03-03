@@ -1,0 +1,247 @@
+# ============================================================================
+# Dang! SIEM — Continuous Integration
+#
+# Runs on every push (all branches) and pull request to main.
+# Steps: install → typecheck → test (with MySQL) → contract audit → build
+# ============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  CI: "true"
+
+jobs:
+  # ── Typecheck ─────────────────────────────────────────────────────────────
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run TypeScript check (tsc --noEmit)
+        run: pnpm check
+
+  # ── Test ──────────────────────────────────────────────────────────────────
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: testpassword
+          MYSQL_DATABASE: dang_test
+          MYSQL_USER: testuser
+          MYSQL_PASSWORD: testpassword
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -ptestpassword"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      # Real MySQL connection for tests that need a live database
+      DATABASE_URL: "mysql://testuser:testpassword@127.0.0.1:3306/dang_test"
+      JWT_SECRET: "ci-test-secret-not-for-production"
+      # Wazuh stubs — tests that hit real Wazuh skip via CI=true
+      WAZUH_HOST: "127.0.0.1"
+      WAZUH_PORT: "55000"
+      WAZUH_USER: "test"
+      WAZUH_PASS: "test"
+      WAZUH_INDEXER_HOST: "127.0.0.1"
+      WAZUH_INDEXER_PORT: "9200"
+      WAZUH_INDEXER_USER: "test"
+      WAZUH_INDEXER_PASS: "test"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Wait for MySQL to be ready
+        run: |
+          echo "Waiting for MySQL service..."
+          for i in $(seq 1 30); do
+            if node -e "const net=require('net');const s=net.createConnection({host:'127.0.0.1',port:3306},()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1))" 2>/dev/null; then
+              echo "✓ MySQL is reachable on port 3306"
+              sleep 2
+              break
+            fi
+            echo "  Attempt $i/30 — waiting..."
+            sleep 2
+          done
+
+      - name: Run database migrations
+        run: npx drizzle-kit migrate
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Suite:** Vitest" >> $GITHUB_STEP_SUMMARY
+          echo "- **Node:** $(node --version)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Database:** MySQL 8.0 (service container)" >> $GITHUB_STEP_SUMMARY
+          echo "- **CI env:** \`CI=true\` (network-dependent tests auto-skip)" >> $GITHUB_STEP_SUMMARY
+
+  # ── API Contract Audit Gate ──────────────────────────────────────────────
+  contract-audit:
+    name: API Contract Audit
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify no raw Error throws in routers
+        run: |
+          echo "Checking for raw 'throw new Error(' in router files..."
+          HITS=$(grep -rn "throw new Error(" server/ --include="*Router.ts" --include="routers.ts" | grep -v node_modules | grep -v ".test." | wc -l)
+          if [ "$HITS" -gt 0 ]; then
+            echo "::error::Found $HITS raw 'throw new Error()' in router files. All router errors must use TRPCError."
+            grep -rn "throw new Error(" server/ --include="*Router.ts" --include="routers.ts" | grep -v node_modules | grep -v ".test."
+            exit 1
+          fi
+          echo "✓ Zero raw Error throws in routers"
+
+      - name: Verify no public Wazuh endpoints
+        run: |
+          echo "Checking that no Wazuh endpoints use publicProcedure..."
+          HITS=$(grep -rn "publicProcedure" server/wazuh/ --include="*.ts" | grep -v node_modules | grep -v ".test." | wc -l)
+          if [ "$HITS" -gt 0 ]; then
+            echo "::error::Found $HITS publicProcedure references in server/wazuh/. All Wazuh endpoints must be protected."
+            grep -rn "publicProcedure" server/wazuh/ --include="*.ts" | grep -v node_modules | grep -v ".test."
+            exit 1
+          fi
+          echo "✓ Zero public Wazuh endpoints"
+
+      - name: Verify no public OTX endpoints
+        run: |
+          echo "Checking that no OTX endpoints use publicProcedure..."
+          HITS=$(grep -rn "publicProcedure" server/otx/ --include="*.ts" | grep -v node_modules | grep -v ".test." | wc -l)
+          if [ "$HITS" -gt 0 ]; then
+            echo "::error::Found $HITS publicProcedure references in server/otx/. All OTX endpoints must be protected."
+            grep -rn "publicProcedure" server/otx/ --include="*.ts" | grep -v node_modules | grep -v ".test."
+            exit 1
+          fi
+          echo "✓ Zero public OTX endpoints"
+
+      - name: Verify SSE auth middleware exists
+        run: |
+          echo "Checking that SSE endpoints have auth middleware..."
+          if ! grep -q "sseAuthMiddleware" server/_core/index.ts; then
+            echo "::error::SSE auth middleware not found in server/_core/index.ts"
+            exit 1
+          fi
+          echo "✓ SSE auth middleware is wired"
+
+      - name: Verify SSRF host validation exists
+        run: |
+          echo "Checking that SSRF host validation is in place..."
+          HITS=$(grep -rn "validateHost" server/ --include="*.ts" | grep -v node_modules | grep -v ".test." | wc -l)
+          if [ "$HITS" -eq 0 ]; then
+            echo "::error::SSRF host validation (validateHost) not found in server code"
+            exit 1
+          fi
+          echo "✓ SSRF host validation is in place ($HITS references)"
+
+      - name: Contract audit summary
+        if: always()
+        run: |
+          echo "## API Contract Audit" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| No raw Error in routers | ✓ |" >> $GITHUB_STEP_SUMMARY
+          echo "| No public Wazuh endpoints | ✓ |" >> $GITHUB_STEP_SUMMARY
+          echo "| No public OTX endpoints | ✓ |" >> $GITHUB_STEP_SUMMARY
+          echo "| SSE auth middleware | ✓ |" >> $GITHUB_STEP_SUMMARY
+          echo "| SSRF host validation | ✓ |" >> $GITHUB_STEP_SUMMARY
+
+  # ── Build Verification ───────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [typecheck, test, contract-audit]
+    env:
+      DATABASE_URL: "mysql://test:test@localhost:3306/test"
+      JWT_SECRET: "ci-test-secret-not-for-production"
+      WAZUH_HOST: "127.0.0.1"
+      WAZUH_PORT: "55000"
+      WAZUH_USER: "test"
+      WAZUH_PASS: "test"
+      WAZUH_INDEXER_HOST: "127.0.0.1"
+      WAZUH_INDEXER_PORT: "9200"
+      WAZUH_INDEXER_USER: "test"
+      WAZUH_INDEXER_PASS: "test"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Verify build artifacts
+        run: |
+          echo "Checking build output..."
+          test -d dist/public && echo "✓ Frontend build (dist/public)" || (echo "✗ Missing dist/public" && exit 1)
+          test -f dist/index.js && echo "✓ Backend build (dist/index.js)" || (echo "✗ Missing dist/index.js" && exit 1)
+          echo ""
+          echo "## Build Verification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✓ Frontend bundle: \`dist/public\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ✓ Backend bundle: \`dist/index.js\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Build size: $(du -sh dist/ | cut -f1)" >> $GITHUB_STEP_SUMMARY

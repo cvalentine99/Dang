@@ -1,12 +1,20 @@
 /**
- * Splunk Router — tRPC procedures for Splunk ES Mission Control integration.
+ * Splunk Router — tRPC procedures for Splunk ES ticket creation.
  *
  * Provides:
  * - testConnection: Test Splunk HEC connectivity
- * - createTicket: Push a Walter triage report as a notable event to Splunk ES
- * - getConfig: Get current Splunk configuration (masked token)
+ * - createTicket: Manually create a single Splunk ES notable event from a completed triage
+ * - batchCreateTickets: Manually batch-create Splunk tickets for all eligible completed triages
+ * - getBatchProgress: Poll batch operation progress
+ * - getConfig: Get current Splunk configuration (token masked)
+ * - listTicketArtifacts: Query the audit trail of all ticket creation attempts (success + failure)
+ * - getTicketArtifact: Get a single ticket artifact by ID
  *
- * Feature-gated: createTicket requires admin role (SECURITY_ADMIN equivalent).
+ * This is manual ticket creation from completed triage reports.
+ * Every ticket is explicitly triggered by an analyst — no background automation.
+ * Both success and failure are recorded in the ticket_artifacts table as forensic audit trail.
+ *
+ * Feature-gated: createTicket/batchCreateTickets require admin role (SECURITY_ADMIN equivalent).
  */
 
 import { z } from "zod";
@@ -19,7 +27,7 @@ import {
   isSplunkEnabled,
 } from "./splunkService";
 import { getDb } from "../db";
-import { alertQueue } from "../../drizzle/schema";
+import { alertQueue, ticketArtifacts, pipelineRuns } from "../../drizzle/schema";
 import { eq, and, inArray, isNull, sql } from "drizzle-orm";
 
 /**
@@ -118,7 +126,9 @@ export const splunkRouter = router({
   }),
 
   /**
-   * Create a Splunk ES ticket from a Walter triage report.
+   * Create a Splunk ES ticket from a completed triage report.
+   * Manual trigger only — analyst clicks "Create Ticket" in the UI.
+   * Records a ticket_artifact row for both success and failure (audit trail).
    * Requires admin role (SECURITY_ADMIN equivalent).
    */
   createTicket: protectedProcedure
@@ -205,7 +215,32 @@ export const splunkRouter = router({
         createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
       });
 
-      // If successful, update the queue item with ticket info
+      // Look up the associated pipeline run for artifact linkage
+      const [associatedRun] = await db
+        .select({ id: pipelineRuns.id })
+        .from(pipelineRuns)
+        .where(eq(pipelineRuns.queueItemId, input.queueItemId))
+        .orderBy(sql`${pipelineRuns.startedAt} DESC`)
+        .limit(1);
+
+      // Record the ticket artifact — both success and failure get recorded
+      // This is the first-class audit trail for ticket creation
+      await db.insert(ticketArtifacts).values({
+        ticketId: result.ticketId ?? `failed-${Date.now()}`,
+        system: "splunk_es",
+        queueItemId: input.queueItemId,
+        pipelineRunId: associatedRun?.id ?? null,
+        alertId: item.alertId,
+        ruleId: item.ruleId,
+        ruleLevel: item.ruleLevel,
+        createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
+        success: result.success === true && !!result.ticketId,
+        statusMessage: result.message,
+        rawResponse: { ticketId: result.ticketId, message: result.message },
+        httpStatusCode: null,
+      });
+
+      // If successful, also update the queue item with ticket info (legacy linkage)
       if (result.success && result.ticketId) {
         const existingTriage = (item.triageResult as Record<string, unknown>) ?? {};
         const updatedTriage = {
@@ -385,6 +420,30 @@ export const splunkRouter = router({
             createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
           });
 
+          // Look up associated pipeline run for artifact linkage
+          const [associatedRun] = await db
+            .select({ id: pipelineRuns.id })
+            .from(pipelineRuns)
+            .where(eq(pipelineRuns.queueItemId, item.id))
+            .orderBy(sql`${pipelineRuns.startedAt} DESC`)
+            .limit(1);
+
+          // Record ticket artifact — both success and failure
+          await db.insert(ticketArtifacts).values({
+            ticketId: result.ticketId ?? `failed-${Date.now()}`,
+            system: "splunk_es",
+            queueItemId: item.id,
+            pipelineRunId: associatedRun?.id ?? null,
+            alertId: item.alertId,
+            ruleId: item.ruleId,
+            ruleLevel: item.ruleLevel,
+            createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
+            success: result.success === true && !!result.ticketId,
+            statusMessage: result.message,
+            rawResponse: { ticketId: result.ticketId, message: result.message },
+            httpStatusCode: null,
+          });
+
           if (result.success && result.ticketId) {
             const updatedTriage = {
               ...triage,
@@ -406,6 +465,24 @@ export const splunkRouter = router({
             currentBatch.failed = failed;
           }
         } catch (err) {
+          // Record failed ticket artifact for exception-path failures too
+          try {
+            await db.insert(ticketArtifacts).values({
+              ticketId: `exception-${Date.now()}`,
+              system: "splunk_es",
+              queueItemId: item.id,
+              pipelineRunId: null,
+              alertId: item.alertId,
+              ruleId: item.ruleId,
+              ruleLevel: item.ruleLevel,
+              createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
+              success: false,
+              statusMessage: err instanceof Error ? err.message : "Unknown error",
+              rawResponse: null,
+              httpStatusCode: null,
+            });
+          } catch { /* don't let artifact recording break the batch loop */ }
+
           failed++;
           results.push({
             id: item.id,
@@ -437,5 +514,78 @@ export const splunkRouter = router({
         message: `Batch complete: ${sent} tickets created, ${skipped} skipped (already ticketed), ${failed} failed`,
         results,
       };
+    }),
+
+  /**
+   * List ticket artifacts — the audit trail for all ticket creation attempts.
+   * Returns both successful and failed ticket creation records with workflow lineage.
+   * Ordered by most recent first.
+   */
+  listTicketArtifacts: protectedProcedure
+    .input(
+      z.object({
+        /** Filter by queue item ID */
+        queueItemId: z.number().int().optional(),
+        /** Filter by system */
+        system: z.enum(["splunk_es", "jira", "servicenow", "custom"]).optional(),
+        /** Filter by success/failure */
+        success: z.boolean().optional(),
+        /** Pagination */
+        limit: z.number().int().min(1).max(200).default(50),
+        offset: z.number().int().min(0).default(0),
+      })
+    )
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      }
+
+      const conditions = [];
+      if (input.queueItemId !== undefined) {
+        conditions.push(eq(ticketArtifacts.queueItemId, input.queueItemId));
+      }
+      if (input.system !== undefined) {
+        conditions.push(eq(ticketArtifacts.system, input.system));
+      }
+      if (input.success !== undefined) {
+        conditions.push(eq(ticketArtifacts.success, input.success));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const rows = await db
+        .select()
+        .from(ticketArtifacts)
+        .where(whereClause)
+        .orderBy(sql`${ticketArtifacts.createdAt} DESC`)
+        .limit(input.limit)
+        .offset(input.offset);
+
+      return { artifacts: rows, count: rows.length };
+    }),
+
+  /**
+   * Get a single ticket artifact by ID — full detail view for audit inspection.
+   */
+  getTicketArtifact: protectedProcedure
+    .input(z.object({ id: z.number().int() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+      }
+
+      const [artifact] = await db
+        .select()
+        .from(ticketArtifacts)
+        .where(eq(ticketArtifacts.id, input.id))
+        .limit(1);
+
+      if (!artifact) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Ticket artifact not found" });
+      }
+
+      return artifact;
     }),
 });
