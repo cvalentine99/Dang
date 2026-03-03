@@ -59,7 +59,7 @@ interface StageResult {
 
 /** Full result shape returned by executeResumePipeline. */
 export interface ResumePipelineResult {
-  replayRunId: string;
+  resumedRunId: string;
   originalRunId: string;
   startedFromStage: string;
   stages: {
@@ -132,11 +132,11 @@ export async function executeResumePipeline(
   }
 
   // 4. Create a new pipeline run record
-  const replayRunId = `${runIdPrefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const resumedRunId = `${runIdPrefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const startTime = Date.now();
 
-  const [replayRow] = await db.insert(pipelineRuns).values({
-    runId: replayRunId,
+  const [resumedRow] = await db.insert(pipelineRuns).values({
+    runId: resumedRunId,
     queueItemId: originalRun.queueItemId,
     alertId: originalRun.alertId,
     currentStage: startStage,
@@ -152,7 +152,7 @@ export async function executeResumePipeline(
   }).$returningId();
 
   const result: ResumePipelineResult = {
-    replayRunId,
+    resumedRunId,
     originalRunId: input.runId,
     startedFromStage: startStage,
     stages: {
@@ -195,7 +195,7 @@ export async function executeResumePipeline(
 
       await db.update(pipelineRuns)
         .set({ currentStage: "triage", triageStatus: "running" })
-        .where(eq(pipelineRuns.id, replayRow.id));
+        .where(eq(pipelineRuns.id, resumedRow.id));
 
       const triageResult = await runTriageAgent({
         rawAlert,
@@ -219,7 +219,7 @@ export async function executeResumePipeline(
         triageStatus: "completed",
         triageLatencyMs: triageResult.latencyMs,
         currentStage: "correlation",
-      }).where(eq(pipelineRuns.id, replayRow.id));
+      }).where(eq(pipelineRuns.id, resumedRow.id));
     } catch (err) {
       result.stages.triage = { status: "failed", error: (err as Error).message };
       result.status = "partial";
@@ -229,7 +229,7 @@ export async function executeResumePipeline(
         error: (err as Error).message,
         totalLatencyMs: Date.now() - startTime,
         completedAt: new Date(),
-      }).where(eq(pipelineRuns.id, replayRow.id));
+      }).where(eq(pipelineRuns.id, resumedRow.id));
       result.totalLatencyMs = Date.now() - startTime;
       return result;
     }
@@ -242,7 +242,7 @@ export async function executeResumePipeline(
 
       await db.update(pipelineRuns)
         .set({ correlationStatus: "running", currentStage: "correlation" })
-        .where(eq(pipelineRuns.id, replayRow.id));
+        .where(eq(pipelineRuns.id, resumedRow.id));
 
       const corrResult = await runCorrelationAgent({
         triageId: currentTriageId,
@@ -260,7 +260,7 @@ export async function executeResumePipeline(
         correlationStatus: "completed",
         correlationLatencyMs: corrResult.latencyMs,
         currentStage: "hypothesis",
-      }).where(eq(pipelineRuns.id, replayRow.id));
+      }).where(eq(pipelineRuns.id, resumedRow.id));
     } catch (err) {
       result.stages.correlation = { status: "failed", error: (err as Error).message };
       result.status = "partial";
@@ -270,7 +270,7 @@ export async function executeResumePipeline(
         error: (err as Error).message,
         totalLatencyMs: Date.now() - startTime,
         completedAt: new Date(),
-      }).where(eq(pipelineRuns.id, replayRow.id));
+      }).where(eq(pipelineRuns.id, resumedRow.id));
       result.totalLatencyMs = Date.now() - startTime;
       return result;
     }
@@ -282,7 +282,7 @@ export async function executeResumePipeline(
 
     await db.update(pipelineRuns)
       .set({ hypothesisStatus: "running", currentStage: "hypothesis" })
-      .where(eq(pipelineRuns.id, replayRow.id));
+      .where(eq(pipelineRuns.id, resumedRow.id));
 
     const hypoResult = await runHypothesisAgent({
       correlationId: currentCorrelationId,
@@ -312,7 +312,7 @@ export async function executeResumePipeline(
       status: "completed",
       totalLatencyMs: Date.now() - startTime,
       completedAt: new Date(),
-    }).where(eq(pipelineRuns.id, replayRow.id));
+    }).where(eq(pipelineRuns.id, resumedRow.id));
   } catch (err) {
     result.stages.hypothesis = { status: "failed", error: (err as Error).message };
     result.status = "partial";
@@ -322,7 +322,7 @@ export async function executeResumePipeline(
       error: (err as Error).message,
       totalLatencyMs: Date.now() - startTime,
       completedAt: new Date(),
-    }).where(eq(pipelineRuns.id, replayRow.id));
+    }).where(eq(pipelineRuns.id, resumedRow.id));
     result.totalLatencyMs = Date.now() - startTime;
     return result;
   }

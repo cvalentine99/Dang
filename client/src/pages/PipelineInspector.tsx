@@ -520,7 +520,7 @@ function PipelineContinuationButton({ runId, runStatus }: { runId: string; runSt
       {mutation.isSuccess && mutation.data && (
         <div className="mt-2 p-2 rounded bg-emerald-500/5 border border-emerald-500/20">
           <span className="text-[10px] text-emerald-300">{isPartial ? "Pipeline continued: " : "Pipeline resumed: "}</span>
-          <span className="text-[10px] font-mono text-emerald-300/70">{mutation.data.replayRunId}</span>
+          <span className="text-[10px] font-mono text-emerald-300/70">{mutation.data.resumedRunId}</span>
           <span className="text-[10px] text-muted-foreground/40 ml-2">
             from stage: {mutation.data.startedFromStage}
           </span>

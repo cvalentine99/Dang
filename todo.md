@@ -2507,3 +2507,11 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Fix 2: Normalized readiness hook to parallel pattern: canRunStructuredPipeline/canRunAdHoc/canRunTicketing, {workflow}Blocked, {workflow}Degraded, {workflow}Reason
 - [x] Fix 3: Renamed ReplayButton → PipelineContinuationButton; section header → "Pipeline Continuation"; success messages → "Pipeline continued" / "Pipeline resumed"
 - [x] All 1,370 tests passing across 55 test files, zero TypeScript errors
+
+## Cosmetic: replayRunId → resumedRunId
+
+- [x] Renamed replayRunId → resumedRunId in resumePipelineHelper.ts (variable, return type interface, result object, row variable replayRow → resumedRow)
+- [x] Renamed in PipelineInspector.tsx consumer (mutation.data.resumedRunId)
+- [x] Updated tests in directions8-10.test.ts — also added continue- prefix test
+- [x] Zero remaining replayRunId/replayRow references in source or test files
+- [x] All 1,370 tests passing, 0 TypeScript errors

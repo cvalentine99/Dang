@@ -341,17 +341,19 @@ describe("Direction 9: Pipeline Replay", () => {
     });
   });
 
-  describe("Replay run ID format", () => {
-    it("should generate replay-prefixed run IDs", () => {
-      const replayRunId = `replay-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-      expect(replayRunId).toMatch(/^replay-[a-z0-9]+-[a-z0-9]+$/);
+  describe("Resumed run ID format", () => {
+    it("should generate prefixed run IDs (replay- or continue-)", () => {
+      const resumedRunId = `replay-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      expect(resumedRunId).toMatch(/^replay-[a-z0-9]+-[a-z0-9]+$/);
+      const continuedRunId = `continue-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      expect(continuedRunId).toMatch(/^continue-[a-z0-9]+-[a-z0-9]+$/);
     });
   });
 
-  describe("Replay result shape", () => {
-    it("should include both replayRunId and originalRunId", () => {
+  describe("Resume result shape", () => {
+    it("should include both resumedRunId and originalRunId", () => {
       const result = {
-        replayRunId: "replay-abc123",
+        resumedRunId: "replay-abc123",
         originalRunId: "run-def456",
         startedFromStage: "correlation",
         stages: {
@@ -364,7 +366,7 @@ describe("Direction 9: Pipeline Replay", () => {
         status: "completed",
       };
 
-      expect(result.replayRunId).toMatch(/^replay-/);
+      expect(result.resumedRunId).toMatch(/^replay-/);
       expect(result.originalRunId).toMatch(/^run-/);
       expect(result.startedFromStage).toBe("correlation");
       expect(result.stages.triage.reused).toBe(true);
