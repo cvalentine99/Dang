@@ -435,3 +435,132 @@ describe("Gate 2C: Provenance-Required", () => {
     expect(warning).toContain("provenance_gap");
   });
 });
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Fix 3 Proof: Object-Source Leak — dangerousEndpoints stripped from synthesis
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("Fix 3: Object-Source Leak (dangerousEndpoints sanitization)", () => {
+  it("strips dangerousEndpoints from risk-analysis object and records blocked paths", () => {
+    const riskAnalysisSource: RetrievalSource = {
+      type: "graph",
+      label: "Risk Analysis (Endpoint Classification)",
+      data: {
+        dangerousEndpoints: [
+          { id: 99, method: "DELETE", path: "/agents/{agent_id}", riskLevel: "DESTRUCTIVE", operationType: "DELETE", trustScore: "0.500" },
+          { id: 100, method: "PUT", path: "/active-response", riskLevel: "MUTATING", operationType: "UPDATE", trustScore: "0.500" },
+        ],
+        resourceRiskMap: [
+          { resource: "agents", safe: 10, mutating: 3, destructive: 2 },
+        ],
+        llmBlockedCount: 65,
+      },
+      relevance: "primary",
+    };
+
+    const { filteredSources, blockedEndpoints } = gateSafeOnly([riskAnalysisSource]);
+
+    // dangerousEndpoints must be stripped
+    const sanitized = filteredSources[0].data as Record<string, unknown>;
+    expect(sanitized).not.toHaveProperty("dangerousEndpoints");
+
+    // Safe summary fields must survive
+    expect(sanitized).toHaveProperty("resourceRiskMap");
+    expect(sanitized).toHaveProperty("llmBlockedCount");
+    expect(sanitized.llmBlockedCount).toBe(65);
+
+    // Blocked endpoints must be recorded
+    expect(blockedEndpoints).toContain("DELETE /agents/{agent_id}");
+    expect(blockedEndpoints).toContain("PUT /active-response");
+    expect(blockedEndpoints).toHaveLength(2);
+  });
+
+  it("passes through object-shaped graph sources without dangerousEndpoints unchanged", () => {
+    const safeObjectSource: RetrievalSource = {
+      type: "graph",
+      label: "Resource Overview",
+      data: { resources: [{ name: "agents", endpointCount: 15 }] },
+      relevance: "context",
+    };
+
+    const { filteredSources, blockedEndpoints } = gateSafeOnly([safeObjectSource]);
+    expect(filteredSources[0].data).toEqual(safeObjectSource.data);
+    expect(blockedEndpoints).toHaveLength(0);
+  });
+
+  it("handles empty dangerousEndpoints array without error", () => {
+    const emptyDangerousSource: RetrievalSource = {
+      type: "graph",
+      label: "Risk Analysis",
+      data: {
+        dangerousEndpoints: [],
+        resourceRiskMap: [],
+        llmBlockedCount: 0,
+      },
+      relevance: "primary",
+    };
+
+    const { filteredSources, blockedEndpoints } = gateSafeOnly([emptyDangerousSource]);
+    const sanitized = filteredSources[0].data as Record<string, unknown>;
+    expect(sanitized).not.toHaveProperty("dangerousEndpoints");
+    expect(blockedEndpoints).toHaveLength(0);
+  });
+
+  it("does not touch non-graph source types even if they contain dangerousEndpoints", () => {
+    const indexerSource: RetrievalSource = {
+      type: "indexer",
+      label: "Alerts",
+      data: { dangerousEndpoints: [{ method: "DELETE", path: "/fake" }] },
+      relevance: "primary",
+    };
+
+    const { filteredSources, blockedEndpoints } = gateSafeOnly([indexerSource]);
+    const data = filteredSources[0].data as Record<string, unknown>;
+    expect(data).toHaveProperty("dangerousEndpoints"); // untouched
+    expect(blockedEndpoints).toHaveLength(0);
+  });
+
+  it("combined: array endpoints + object risk analysis both sanitized in one pass", () => {
+    const sources: RetrievalSource[] = [
+      {
+        type: "graph",
+        label: "KG search",
+        data: [
+          { id: "endpoint-1", type: "endpoint", label: "GET /agents", properties: { riskLevel: "SAFE", allowedForLlm: 1 } },
+          { id: "endpoint-2", type: "endpoint", label: "DELETE /agents/{agent_id}", properties: { riskLevel: "DESTRUCTIVE", allowedForLlm: 0, method: "DELETE", path: "/agents/{agent_id}" } },
+        ],
+        relevance: "primary",
+      },
+      {
+        type: "graph",
+        label: "Risk Analysis",
+        data: {
+          dangerousEndpoints: [
+            { method: "PUT", path: "/groups/{group_id}/configuration", riskLevel: "MUTATING" },
+          ],
+          resourceRiskMap: [{ resource: "groups", safe: 5, mutating: 1, destructive: 0 }],
+          llmBlockedCount: 10,
+        },
+        relevance: "primary",
+      },
+    ];
+
+    const { filteredSources, blockedEndpoints } = gateSafeOnly(sources);
+
+    // Array source: DESTRUCTIVE endpoint stripped, SAFE kept
+    const arrayData = filteredSources[0].data as Record<string, unknown>[];
+    expect(arrayData).toHaveLength(1);
+    expect((arrayData[0] as Record<string, unknown>).label).toBe("GET /agents");
+
+    // Object source: dangerousEndpoints stripped
+    const objData = filteredSources[1].data as Record<string, unknown>;
+    expect(objData).not.toHaveProperty("dangerousEndpoints");
+    expect(objData).toHaveProperty("resourceRiskMap");
+
+    // All blocked endpoints recorded
+    expect(blockedEndpoints).toHaveLength(2);
+    expect(blockedEndpoints).toContain("DELETE /agents/{agent_id}");
+    expect(blockedEndpoints).toContain("PUT /groups/{group_id}/configuration");
+  });
+});

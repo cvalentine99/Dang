@@ -377,7 +377,7 @@ export async function getOverviewGraph(options?: { layer?: string; riskLevel?: s
 /**
  * Search across all KG layers by keyword.
  */
-export async function searchGraph(query: string, limit: number = 50): Promise<GraphNode[]> {
+export async function searchGraph(query: string, limit: number = 50, options?: { llmSafe?: boolean }): Promise<GraphNode[]> {
   const db = await getDb();
   if (!db) return [];
 
@@ -385,8 +385,13 @@ export async function searchGraph(query: string, limit: number = 50): Promise<Gr
   const results: GraphNode[] = [];
 
   // Search endpoints (path, summary)
+  // When llmSafe=true, only return SAFE endpoints (allowedForLlm=1)
+  const epConditions = [or(like(kgEndpoints.path, pattern), like(kgEndpoints.summary, pattern), like(kgEndpoints.description, pattern))];
+  if (options?.llmSafe) {
+    epConditions.push(eq(kgEndpoints.allowedForLlm, 1));
+  }
   const eps = await db.select().from(kgEndpoints)
-    .where(or(like(kgEndpoints.path, pattern), like(kgEndpoints.summary, pattern), like(kgEndpoints.description, pattern)))
+    .where(and(...epConditions))
     .limit(limit);
   for (const ep of eps) {
     results.push({

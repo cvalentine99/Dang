@@ -1127,7 +1127,7 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 ## Phase: Knowledge Graph Rebuild (Nemotron-3 Nano Hybrid RAG Architecture)
 - [x] Finish stripping mock data from RulesetExplorer
 - [x] Finish stripping mock data from remaining pages (DriftComparison was last)
-- [x] Redesign KG schema: API Ontology Graph (178 endpoints, 1110 params, 1102 responses, 2 auth methods, 21 resources)
+- [x] Redesign KG schema: API Ontology Graph (182 endpoints, 1186 params, 1126 responses, 2 auth methods, 21 resources)
 - [x] Redesign KG schema: Operational Semantics Graph (16 use cases)
 - [x] Redesign KG schema: Schema & Field Lineage Graph (5 indices, 60 fields)
 - [x] Redesign KG schema: Error & Failure Graph (9 error patterns)
@@ -2765,3 +2765,36 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] 3a. Build docs/gap-proof-matrix.md cross-referencing each KG layer gap against its agentic proof
 - [x] 3b. Include: retrieval query, reasoning decision, output contract, refusal condition for each gap
 - [x] 3c. Include API commands used in each proof
+
+## Contract Audit Correction Order (2026-03-04)
+
+### Fix 1: Stale Counts Everywhere
+- [x] seed-kg.mjs header: change "~2,507" to "~2,611"
+- [x] VALIDATION_CONTRACT.md line 95-97: change 178/1,110/1,102 to 182/1,186/1,126
+- [x] todo.md line 1130: update old KG counts to current canonical
+- [x] agenticPipeline.ts help text: verify "~2,611" is correct (already correct)
+
+### Fix 2: Make Retrieval LLM-Safe
+- [x] searchGraph(): add allowedForLlm filter so MUTATING/DESTRUCTIVE endpoints are excluded from synthesis-bound retrieval
+- [x] getEndpoints() call at line 429: pass llmAllowed: true so label matches reality
+- [x] Stop labeling raw endpoint lists as "SAFE" unless they really are (now DB-level filtered)
+
+### Fix 3: Patch the Object-Source Leak
+- [x] gateSafeOnly(): sanitize object-shaped graph sources (not just arrays)
+- [x] Strip dangerousEndpoints from risk-analysis objects before synthesis context
+- [x] Split risk analysis into LLM-safe summary (resourceRiskMap, llmBlockedCount) vs internal-only detail (dangerousEndpoints)
+
+### Fix 4: Hard-Gate Tests (Verify + Expand)
+- [x] Confirm existing 32 tests in agenticGates.test.ts cover all three gates (26 gate tests + 6 provenance tests)
+- [x] Add test: object-shaped source with dangerousEndpoints is sanitized by gateSafeOnly (5 new tests)
+- [x] Add test: searchGraph LLM-safe mode verified via DB-level filter (llmSafe option added to searchGraph)
+
+### Fix 5: Body-Param Truth Tests
+- [x] Add endpoint-specific body-param assertions for PUT /active-response
+- [x] Add endpoint-specific body-param assertions for POST /agents
+- [x] Add endpoint-specific body-param assertions for POST /security/user/authenticate
+
+### Fix 6: Reconcile Contract Language
+- [x] VALIDATION_CONTRACT.md: reword provenance from "guaranteed" to "best-effort with warning support"
+- [x] VALIDATION_CONTRACT.md: update Graph-Level Exclusion to reflect new searchGraph LLM-safe mode
+- [x] VALIDATION_CONTRACT.md: update test counts to current (1,900+), added Hard Gates table (4.3), added new test file rows

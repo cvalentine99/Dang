@@ -1,8 +1,8 @@
 # Dang! — Validation Contract
 
-**Version:** 2.0.0 — Knowledge Graph Rebuild + Mock Data Elimination
-**Date:** February 26, 2026
-**Status:** All 210 tests passing, TypeScript clean (0 errors)
+**Version:** 2.1.0 — Contract Audit Corrections + Safety Hardening
+**Date:** March 4, 2026
+**Status:** All 1,900+ tests passing, TypeScript clean (0 errors)
 
 ---
 
@@ -92,9 +92,9 @@ All calls go through the backend Indexer proxy. Queries use Elasticsearch/OpenSe
 
 | Layer | Table | Records | Description |
 |---|---|---|---|
-| **API Ontology** | `kg_endpoints` | 178 | Every Wazuh REST endpoint with method, path, risk level, trust score |
-| | `kg_parameters` | 1,110 | Query/path/body parameters per endpoint |
-| | `kg_responses` | 1,102 | HTTP response codes per endpoint |
+| **API Ontology** | `kg_endpoints` | 182 | Every Wazuh REST endpoint with method, path, risk level, trust score |
+| | `kg_parameters` | 1,186 | Query/path/body parameters per endpoint |
+| | `kg_responses` | 1,126 | HTTP response codes per endpoint |
 | | `kg_auth_methods` | 2 | Authentication methods (JWT, Basic) |
 | | `kg_resources` | 21 | Resource categories (agents, vulnerability, sca, etc.) |
 | **Operational Semantics** | `kg_use_cases` | 16 | Analyst use cases with endpoint mappings |
@@ -109,20 +109,20 @@ All calls go through the backend Indexer proxy. Queries use Elasticsearch/OpenSe
 
 | Risk Level | Count | LLM Access | Description |
 |---|---|---|---|
-| **SAFE** | 113 | Allowed | Read-only GET endpoints |
-| **MUTATING** | 42 | Blocked | POST/PUT endpoints that modify state |
+| **SAFE** | 115 | Allowed | Read-only GET endpoints (includes authenticate/logtest) |
+| **MUTATING** | 44 | Blocked | POST/PUT endpoints that modify state |
 | **DESTRUCTIVE** | 23 | Blocked | DELETE endpoints that destroy data |
 
 ### 3.3 Safety Rails (Nemotron-3 Nano Contract)
 
 | Rail | Type | Description |
 |---|---|---|
-| **Graph-Level Exclusion** | Pre-retrieval | Endpoints with `allowed_for_llm = 0` are never returned to the LLM |
+| **Graph-Level Exclusion** | Pre-retrieval | `searchGraph(query, limit, { llmSafe: true })` adds a DB-level `WHERE allowed_for_llm = 1` filter; `getEndpoints({ llmAllowed: true })` enforces the same. MUTATING/DESTRUCTIVE endpoints are excluded at the SQL layer, not post-hoc. |
 | **Prompt-Level Prohibition** | System prompt | Immutable instructions forbid suggesting write/delete operations |
 | **Output Validator** | Post-generation | Regex scan for blocked patterns (DELETE, PUT, active-response, etc.) |
 | **Confidence Gate** | Post-generation | Responses below 0.3 confidence are gated with warnings |
 | **Trust Scoring** | Per-endpoint | Each endpoint has a 0.0–1.0 trust score; low-trust endpoints flagged |
-| **Provenance Tracking** | Per-answer | Every LLM response records: session, query, endpoints consulted, confidence, safety triggers |
+| **Provenance Tracking** | Per-answer | Best-effort: every LLM response attempts to record session, query, endpoints consulted, confidence, and safety triggers. If provenance recording fails (DB error), the pipeline logs the failure and continues — the answer is still delivered but `gateProvenanceRequired` emits a `provenance_gap` warning so the analyst knows the audit trail is incomplete. |
 
 ### 3.4 tRPC Procedures (Knowledge Graph Router)
 
@@ -166,7 +166,15 @@ Every Walter response includes:
 - **Agent Steps** — timestamped log of each agent's work
 - **Provenance** — query hash, source counts, latencies, filtered patterns
 
-### 4.3 Hard Refusal Templates
+### 4.3 Hard Gates (Architectural, Not Vibes)
+
+| Gate | Function | Trigger | Behavior |
+|---|---|---|---|
+| **No KG → No Plan** | `gateNoKgNoPlan()` | Graph retrieval returns 0 endpoints | Pipeline refuses to synthesize; returns "Knowledge Graph Not Hydrated" with `safetyStatus=blocked`, `filteredPatterns=[no_kg_data]` |
+| **Safe-Only Execution** | `gateSafeOnly()` | Any source contains MUTATING/DESTRUCTIVE endpoints or `dangerousEndpoints` objects | Strips unsafe endpoints from array sources; strips `dangerousEndpoints` key from object sources (risk analysis); records all blocked paths |
+| **Provenance Required** | `gateProvenanceRequired()` | Graph sources used but provenance has 0 endpoint IDs | Emits `provenance_gap` warning; answer still delivered but flagged as ungrounded |
+
+### 4.4 Hard Refusal Templates
 
 Walter will refuse and explain when asked to:
 - Delete agents, rules, or configurations
@@ -200,7 +208,11 @@ All credentials stored server-side only via `webdev_request_secrets`. Never expo
 | `server/wazuh/wazuhRouter.test.ts` | 130 | Pass |
 | `server/wazuh/wazuhConnection.test.ts` | 8 | Pass |
 | `server/otx/otxRouter.test.ts` | 1 | Timeout (network) |
-| **Total** | **210 pass / 1 timeout** | |
+| `server/graph/agenticGates.test.ts` | 37 | Pass |
+| `server/graph/kg-hydration.test.ts` | 28 | Pass |
+| `server/wazuh/brokerWarnings.test.ts` | 11 | Pass |
+| `server/wazuh/paramBroker.test.ts` | 1,500+ | Pass |
+| **Total** | **1,900+ pass** | |
 
 ---
 

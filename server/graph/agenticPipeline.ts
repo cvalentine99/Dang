@@ -417,7 +417,7 @@ async function retrieveFromGraph(intent: IntentAnalysis, steps: AgentStep[]): Pr
     ].filter(Boolean);
 
     for (const keyword of allKeywords.slice(0, 3)) {
-      const results = await searchGraph(keyword, 20);
+      const results = await searchGraph(keyword, 20, { llmSafe: true });
       if (results.length > 0) {
         sources.push({ type: "graph", label: `KG search: "${keyword}"`, data: results, relevance: "supporting" });
         dataPoints += results.length;
@@ -426,7 +426,7 @@ async function retrieveFromGraph(intent: IntentAnalysis, steps: AgentStep[]): Pr
 
     // Direct endpoint listing for API exploration
     if (intent.intent === "api_exploration") {
-      const { endpoints } = await getEndpoints({ limit: 20 });
+      const { endpoints } = await getEndpoints({ limit: 20, llmAllowed: true });
       if (endpoints.length > 0) {
         sources.push({ type: "graph", label: "API Endpoints (SAFE only)", data: endpoints, relevance: "primary" });
         dataPoints += endpoints.length;
@@ -1084,7 +1084,33 @@ export function gateSafeOnly(sources: RetrievalSource[]): {
   const blockedEndpoints: string[] = [];
 
   const filteredSources = sources.map(source => {
-    if (source.type !== "graph" || !Array.isArray(source.data)) return source;
+    if (source.type !== "graph") return source;
+
+    // ── Handle object-shaped graph sources (e.g., risk analysis) ──
+    // getRiskAnalysis() returns { dangerousEndpoints, resourceRiskMap, llmBlockedCount }.
+    // dangerousEndpoints is an array of MUTATING/DESTRUCTIVE endpoint details that
+    // MUST NOT leak into the LLM synthesis context. Strip it and keep only the
+    // safe summary fields (resourceRiskMap, llmBlockedCount).
+    if (!Array.isArray(source.data) && typeof source.data === "object" && source.data !== null) {
+      const obj = source.data as Record<string, unknown>;
+      if ("dangerousEndpoints" in obj) {
+        const dangerous = obj.dangerousEndpoints as Array<Record<string, unknown>>;
+        if (Array.isArray(dangerous)) {
+          for (const ep of dangerous) {
+            const method = (ep.method ?? "") as string;
+            const path = (ep.path ?? "unknown") as string;
+            blockedEndpoints.push(`${method} ${path}`.trim());
+          }
+        }
+        // Return sanitized version: strip dangerousEndpoints, keep safe summary
+        const { dangerousEndpoints: _stripped, ...safeSummary } = obj;
+        return { ...source, data: safeSummary };
+      }
+      return source;
+    }
+
+    // ── Handle array-shaped graph sources (endpoint node lists) ──
+    if (!Array.isArray(source.data)) return source;
 
     const filtered = (source.data as Record<string, unknown>[]).filter(item => {
       if (typeof item !== "object" || item === null) return true;

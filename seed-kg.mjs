@@ -3,7 +3,9 @@
  * seed-kg.mjs — Knowledge Graph Seeder
  *
  * Parses the Wazuh OpenAPI v4.14.3 spec and populates all 12 kg_* tables.
- * Produces ~2,507 records deterministically from the spec file.
+ * Produces ~2,611 records deterministically from the spec file.
+ * (182 endpoints, 1,186 parameters, 1,126 responses, 2 auth methods,
+ *  21 resources, 16 use cases, 5 indices, 60 fields, 9 error patterns, 4 sync)
  *
  * Usage:
  *   DATABASE_URL=mysql://user:pass@host:port/db node seed-kg.mjs [--spec path/to/spec.yaml] [--drop]

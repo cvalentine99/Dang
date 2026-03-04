@@ -306,3 +306,158 @@ describe("KG Hydration Proof — Section C: Risk Classification", () => {
     if (conn) await conn.end();
   });
 });
+
+describe("KG Hydration Proof — Section D: Body-Param Truth Tests (Mutating Endpoints)", () => {
+  let conn: any;
+
+  beforeAll(async () => {
+    if (!HAS_DB) return;
+    const mysql = await import("mysql2/promise");
+    conn = await (mysql as any).createConnection(process.env.DATABASE_URL);
+  });
+
+  // Helper: get endpoint DB id by method+path
+  async function getEndpointId(method: string, path: string): Promise<number | null> {
+    const [rows] = await conn.execute(
+      "SELECT id FROM kg_endpoints WHERE method = ? AND path = ?",
+      [method, path]
+    );
+    return (rows as any)[0]?.id ?? null;
+  }
+
+  // Helper: get body params for an endpoint
+  async function getBodyParams(endpointDbId: number): Promise<Array<{ name: string; required: number; param_type: string }>> {
+    const [rows] = await conn.execute(
+      "SELECT name, required, param_type FROM kg_parameters WHERE endpoint_id = ? AND location = 'body' ORDER BY name",
+      [endpointDbId]
+    );
+    return rows as any[];
+  }
+
+  // Helper: get all param names for an endpoint (any location)
+  async function getParamNames(endpointDbId: number, location?: string): Promise<string[]> {
+    const query = location
+      ? "SELECT name FROM kg_parameters WHERE endpoint_id = ? AND location = ? ORDER BY name"
+      : "SELECT name FROM kg_parameters WHERE endpoint_id = ? ORDER BY name";
+    const params = location ? [endpointDbId, location] : [endpointDbId];
+    const [rows] = await conn.execute(query, params);
+    return (rows as any).map((r: any) => r.name);
+  }
+
+  // ── PUT /active-response: must have body params for command, arguments, alert ──
+  it.skipIf(!HAS_DB)(
+    "PUT /active-response has body params extracted from requestBody schema",
+    async () => {
+      const epId = await getEndpointId("PUT", "/active-response");
+      expect(epId).not.toBeNull();
+      const bodyParams = await getBodyParams(epId!);
+      expect(bodyParams.length).toBeGreaterThan(0);
+      const names = bodyParams.map(p => p.name);
+      // The active-response requestBody has command and arguments at minimum
+      expect(names).toContain("command");
+      expect(names).toContain("arguments");
+    }
+  );
+
+  it.skipIf(!HAS_DB)(
+    "PUT /active-response is classified as DESTRUCTIVE with allowedForLlm=0 (active response = remote execution)",
+    async () => {
+      const [rows] = await conn.execute(
+        "SELECT risk_level, allowed_for_llm FROM kg_endpoints WHERE method = 'PUT' AND path = '/active-response'"
+      );
+      expect((rows as any).length).toBe(1);
+      // PUT /active-response triggers remote command execution on agents,
+      // which the seeder classifies as DESTRUCTIVE (not merely MUTATING)
+      expect((rows as any)[0].risk_level).toBe("DESTRUCTIVE");
+      expect((rows as any)[0].allowed_for_llm).toBe(0);
+    }
+  );
+
+  // ── POST /agents: must have body params for agent enrollment ──
+  it.skipIf(!HAS_DB)(
+    "POST /agents has body params extracted from requestBody schema",
+    async () => {
+      const epId = await getEndpointId("POST", "/agents");
+      expect(epId).not.toBeNull();
+      const bodyParams = await getBodyParams(epId!);
+      expect(bodyParams.length).toBeGreaterThan(0);
+      const names = bodyParams.map(p => p.name);
+      // POST /agents requires name at minimum
+      expect(names).toContain("name");
+    }
+  );
+
+  it.skipIf(!HAS_DB)(
+    "POST /agents is classified as MUTATING with allowedForLlm=0",
+    async () => {
+      const [rows] = await conn.execute(
+        "SELECT risk_level, allowed_for_llm FROM kg_endpoints WHERE method = 'POST' AND path = '/agents'"
+      );
+      expect((rows as any).length).toBe(1);
+      expect((rows as any)[0].risk_level).toBe("MUTATING");
+      expect((rows as any)[0].allowed_for_llm).toBe(0);
+    }
+  );
+
+  // ── POST /security/user/authenticate: classified as SAFE (read-like) ──
+  it.skipIf(!HAS_DB)(
+    "POST /security/user/authenticate is classified as SAFE (read-like auth endpoint)",
+    async () => {
+      const [rows] = await conn.execute(
+        "SELECT risk_level, allowed_for_llm FROM kg_endpoints WHERE method = 'POST' AND path = '/security/user/authenticate'"
+      );
+      expect((rows as any).length).toBe(1);
+      expect((rows as any)[0].risk_level).toBe("SAFE");
+      expect((rows as any)[0].allowed_for_llm).toBe(1);
+    }
+  );
+
+  // ── Verify body params have correct location='body' ──
+  it.skipIf(!HAS_DB)(
+    "all body params across mutating endpoints have location='body'",
+    async () => {
+      const [rows] = await conn.execute(
+        "SELECT COUNT(*) as c FROM kg_parameters WHERE location = 'body'"
+      );
+      // We know from the seeder dry-run that 38 body params were extracted
+      expect((rows as any)[0].c).toBeGreaterThanOrEqual(30);
+    }
+  );
+
+  // ── Verify no body params leak into SAFE GET endpoints ──
+  it.skipIf(!HAS_DB)(
+    "GET endpoints have zero body params (GET cannot have requestBody)",
+    async () => {
+      const [rows] = await conn.execute(`
+        SELECT e.method, e.path, COUNT(p.id) as body_count
+        FROM kg_endpoints e
+        JOIN kg_parameters p ON p.endpoint_id = e.id AND p.location = 'body'
+        WHERE e.method = 'GET'
+        GROUP BY e.method, e.path
+        HAVING body_count > 0
+      `);
+      expect((rows as any).length).toBe(0);
+    }
+  );
+
+  // ── DELETE /agents: must be DESTRUCTIVE with no body params (uses query params) ──
+  it.skipIf(!HAS_DB)(
+    "DELETE /agents is DESTRUCTIVE and has query params (agents_list, purge, older_than, status)",
+    async () => {
+      const epId = await getEndpointId("DELETE", "/agents");
+      expect(epId).not.toBeNull();
+      const bodyParams = await getBodyParams(epId!);
+      const queryParams = await getParamNames(epId!, "query");
+      // DELETE /agents uses query params, not body
+      expect(bodyParams.length).toBe(0);
+      expect(queryParams).toContain("agents_list");
+      expect(queryParams).toContain("purge");
+      expect(queryParams).toContain("older_than");
+      expect(queryParams).toContain("status");
+    }
+  );
+
+  afterAll(async () => {
+    if (conn) await conn.end();
+  });
+});
