@@ -2818,3 +2818,9 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Add paramBroker tests for new P2 endpoints (no broker configs needed for these endpoints)
 - [x] Add router tests for new P2 endpoints (14 tests: 3 agentsSummary, 2 managerVersionCheck, 4 managerComponentConfig, 1 securityConfig, 2 securityCurrentUser, 2 auth rejection)
 - [x] Update VALIDATION_CONTRACT.md with new P2 endpoint rows (5 rows added: agentsSummary, managerVersionCheck, managerComponentConfig, securityConfig, securityCurrentUser)
+
+## Bug Fixes — /mitre Page Errors (Mar 4, 2026)
+
+- [x] BUG: Duplicate React keys (key=180056) on /mitre page — ruleIds can contain duplicates, fixed with index-based keys
+- [x] BUG: Wazuh connection URL pointing to localhost:55000 instead of 192.168.50.158 — updated WAZUH_HOST secret to 192.168.50.158
+- [x] BUG: Missing llm_usage table — created table via SQL migration matching drizzle/schema.ts definition

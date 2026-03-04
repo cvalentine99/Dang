@@ -635,8 +635,8 @@ export default function MitreAttack() {
                   <div className="bg-secondary/20 rounded-lg p-3 border border-border/20">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Associated Rule IDs</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {selectedTechnique.ruleIds.slice(0, 30).map(id => (
-                        <span key={id} className="text-[10px] px-2 py-0.5 rounded-full bg-secondary/50 text-foreground font-mono border border-border/30">{id}</span>
+                      {selectedTechnique.ruleIds.slice(0, 30).map((id, idx) => (
+                        <span key={`${id}-${idx}`} className="text-[10px] px-2 py-0.5 rounded-full bg-secondary/50 text-foreground font-mono border border-border/30">{id}</span>
                       ))}
                       {selectedTechnique.ruleIds.length > 30 ? <span className="text-[10px] text-muted-foreground">+{selectedTechnique.ruleIds.length - 30} more</span> : null}
                     </div>
