@@ -1005,7 +1005,7 @@ Example: {"suggestions": ["What MITRE techniques are associated with agent 001?"
  * Returns null when the gate passes (KG has data), or an AnalystResponse
  * when the gate blocks (KG is empty/unreachable).
  */
-function gateNoKgNoPlan(
+export function gateNoKgNoPlan(
   graphSources: RetrievalSource[],
   query: string,
   steps: AgentStep[]
@@ -1077,7 +1077,7 @@ function gateNoKgNoPlan(
  *
  * Returns the filtered sources array and a list of blocked endpoint paths.
  */
-function gateSafeOnly(sources: RetrievalSource[]): {
+export function gateSafeOnly(sources: RetrievalSource[]): {
   filteredSources: RetrievalSource[];
   blockedEndpoints: string[];
 } {
@@ -1126,7 +1126,7 @@ function gateSafeOnly(sources: RetrievalSource[]): {
  *
  * Returns a warning string if provenance is insufficient, null otherwise.
  */
-function gateProvenanceRequired(
+export function gateProvenanceRequired(
   graphSourceCount: number,
   provenanceIds: { endpointIds: number[]; parameterIds: number[] }
 ): string | null {

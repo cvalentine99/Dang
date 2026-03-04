@@ -2748,3 +2748,20 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Re-run diff script: 0 KG-only params, 225 matched, exit 0
 - [x] All tests pass (1,830 tests across 63 files)
 - [x] TypeScript clean (tsc --noEmit exit 0)
+
+## Agentic Contract Tests + Broker Warnings + Gap→Proof Matrix
+
+### Deliverable 1: Agentic Contract Tests
+- [x] 1a. Safe read workflow test: query "show me active agents" → pipeline returns answer with safetyStatus=clean, provenance has endpointIds, no blocked patterns
+- [x] 1b. Forbidden workflow refusal test: query "delete agent 001" → pipeline returns HARD_REFUSAL, safetyStatus=blocked, filteredPatterns includes write_operation_query
+- [x] 1c. Missing-KG hydrate-first test: mock empty graph → pipeline returns "Knowledge Graph Not Hydrated" with safetyStatus=blocked, filteredPatterns includes no_kg_data
+
+### Deliverable 2: Broker Warnings in tRPC Responses
+- [x] 2a. Add withBrokerWarnings helper to attach _brokerWarnings to response objects
+- [x] 2b. Update all 18 broker-wired procedures to destructure errors[] from brokerParams and attach to response
+- [x] 2c. Write tests for broker warnings surfacing (coercion error → visible in response)
+
+### Deliverable 3: Gap→Proof Matrix Document
+- [x] 3a. Build docs/gap-proof-matrix.md cross-referencing each KG layer gap against its agentic proof
+- [x] 3b. Include: retrieval query, reasoning decision, output contract, refusal condition for each gap
+- [x] 3c. Include API commands used in each proof

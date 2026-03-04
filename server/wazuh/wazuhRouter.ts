@@ -63,6 +63,28 @@ async function proxyGet(
   return wazuhGet(config, { path, params, rateLimitGroup: group, userId });
 }
 
+/**
+ * Attach broker coercion/validation warnings to the Wazuh response.
+ * If the broker produced errors during parameter coercion, they are surfaced
+ * as `_brokerWarnings` on the response object so analysts can see when filter
+ * inputs were silently coerced or dropped.
+ *
+ * When there are no warnings, the response is returned unchanged.
+ */
+async function withBrokerWarnings(
+  responsePromise: Promise<unknown>,
+  brokerErrors: string[]
+): Promise<unknown> {
+  const data = await responsePromise;
+  if (brokerErrors.length === 0) return data;
+  // Attach warnings to the response envelope
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    return { ...data, _brokerWarnings: brokerErrors };
+  }
+  // If data is not an object (unlikely for Wazuh), wrap it
+  return { data, _brokerWarnings: brokerErrors };
+}
+
 // ── Wazuh-specific procedure with per-user rate limit context ────────────────
 // Extends protectedProcedure to run each handler inside AsyncLocalStorage,
 // making the user's ID available to proxyGet for per-user rate limiting.
@@ -142,14 +164,14 @@ export const wazuhRouter = router({
     )
     .query(({ input }) => {
       const params = input ?? {};
-      const { forwardedQuery, unsupportedParams } = brokerParams(MANAGER_CONFIG, params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(MANAGER_CONFIG, params);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /manager/configuration: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet("/manager/configuration", forwardedQuery);
+      return withBrokerWarnings(proxyGet("/manager/configuration", forwardedQuery), errors);
     }),
   managerConfigValidation: wazuhProcedure.query(() => proxyGet("/manager/configuration/validation")),
 
@@ -189,14 +211,14 @@ export const wazuhRouter = router({
       })
     )
     .query(({ input }) => {
-      const { forwardedQuery, unsupportedParams } = brokerParams(MANAGER_LOGS_CONFIG, input);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(MANAGER_LOGS_CONFIG, input);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /manager/logs: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet("/manager/logs", forwardedQuery, "alerts");
+      return withBrokerWarnings(proxyGet("/manager/logs", forwardedQuery, "alerts"), errors);
     }),
 
   managerLogsSummary: wazuhProcedure.query(() =>
@@ -227,14 +249,14 @@ export const wazuhRouter = router({
     )
     .query(({ input }) => {
       if (!input) return proxyGet("/cluster/nodes");
-      const { forwardedQuery, unsupportedParams } = brokerParams(CLUSTER_NODES_CONFIG, input);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(CLUSTER_NODES_CONFIG, input);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /cluster/nodes: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet("/cluster/nodes", forwardedQuery);
+      return withBrokerWarnings(proxyGet("/cluster/nodes", forwardedQuery), errors);
     }),
   clusterHealthcheck: wazuhProcedure.query(() => proxyGet("/cluster/healthcheck")),
   clusterLocalInfo: wazuhProcedure.query(() => proxyGet("/cluster/local/info")),
@@ -294,14 +316,14 @@ export const wazuhRouter = router({
       })
     )
     .query(({ input }) => {
-      const { forwardedQuery, unsupportedParams } = brokerParams(AGENTS_CONFIG, input);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(AGENTS_CONFIG, input);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /agents: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet("/agents", forwardedQuery);
+      return withBrokerWarnings(proxyGet("/agents", forwardedQuery), errors);
     }),
 
   agentSummaryStatus: wazuhProcedure.query(() =>
@@ -370,14 +392,14 @@ export const wazuhRouter = router({
     )
     .query(({ input }) => {
       if (!input) return proxyGet("/groups");
-      const { forwardedQuery, unsupportedParams } = brokerParams(GROUPS_CONFIG, input);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(GROUPS_CONFIG, input);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /groups: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet("/groups", forwardedQuery);
+      return withBrokerWarnings(proxyGet("/groups", forwardedQuery), errors);
     }),
 
   /** Agents with outdated version compared to manager */
@@ -420,14 +442,14 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const { groupId, ...rest } = input;
-      const { forwardedQuery, unsupportedParams } = brokerParams(GROUP_AGENTS_CONFIG, rest);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(GROUP_AGENTS_CONFIG, rest);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /groups/{group_id}/agents: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet(`/groups/${groupId}/agents`, forwardedQuery);
+      return withBrokerWarnings(proxyGet(`/groups/${groupId}/agents`, forwardedQuery), errors);
     }),
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -463,14 +485,14 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
-      const { forwardedQuery, unsupportedParams } = brokerParams(SYSCOLLECTOR_PACKAGES_CONFIG, rest);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SYSCOLLECTOR_PACKAGES_CONFIG, rest);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /syscollector/{agent_id}/packages: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet(`/syscollector/${agentId}/packages`, forwardedQuery);
+      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/packages`, forwardedQuery), errors);
     }),
 
   agentPorts: wazuhProcedure
@@ -494,14 +516,14 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
-      const { forwardedQuery, unsupportedParams } = brokerParams(SYSCOLLECTOR_PORTS_CONFIG, rest);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SYSCOLLECTOR_PORTS_CONFIG, rest);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /syscollector/{agent_id}/ports: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet(`/syscollector/${agentId}/ports`, forwardedQuery);
+      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/ports`, forwardedQuery), errors);
     }),
 
   agentProcesses: wazuhProcedure
@@ -531,14 +553,14 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
-      const { forwardedQuery, unsupportedParams } = brokerParams(SYSCOLLECTOR_PROCESSES_CONFIG, rest);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SYSCOLLECTOR_PROCESSES_CONFIG, rest);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /syscollector/{agent_id}/processes: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet(`/syscollector/${agentId}/processes`, forwardedQuery);
+      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/processes`, forwardedQuery), errors);
     }),
 
   agentNetaddr: wazuhProcedure
@@ -590,14 +612,14 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
-      const { forwardedQuery, unsupportedParams } = brokerParams(SYSCOLLECTOR_SERVICES_CONFIG, rest);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SYSCOLLECTOR_SERVICES_CONFIG, rest);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /syscollector/{agent_id}/services: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet(`/syscollector/${agentId}/services`, forwardedQuery)
+      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/services`, forwardedQuery), errors)
         .catch(() => ({ data: { affected_items: [], total_affected_items: 0 } }));
     }),
 
@@ -664,14 +686,14 @@ export const wazuhRouter = router({
       })
     )
     .query(({ input }) => {
-      const { forwardedQuery, unsupportedParams } = brokerParams(RULES_CONFIG, input);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(RULES_CONFIG, input);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /rules: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet("/rules", forwardedQuery);
+      return withBrokerWarnings(proxyGet("/rules", forwardedQuery), errors);
     }),
 
   ruleGroups: wazuhProcedure.query(() => proxyGet("/rules/groups")),
@@ -718,14 +740,14 @@ export const wazuhRouter = router({
       technique_ids: z.union([z.string(), z.array(z.string())]).optional(),
     }))
     .query(({ input }) => {
-      const { forwardedQuery, unsupportedParams } = brokerParams(MITRE_TECHNIQUES_CONFIG, input);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(MITRE_TECHNIQUES_CONFIG, input);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /mitre/techniques: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet("/mitre/techniques", forwardedQuery);
+      return withBrokerWarnings(proxyGet("/mitre/techniques", forwardedQuery), errors);
     }),
 
   mitreMitigations: wazuhProcedure
@@ -787,14 +809,14 @@ export const wazuhRouter = router({
     )
     .query(({ input }) => {
       const { agentId, ...rest } = input;
-      const { forwardedQuery, unsupportedParams } = brokerParams(SCA_POLICIES_CONFIG, rest);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SCA_POLICIES_CONFIG, rest);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /sca/{agent_id}: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet(`/sca/${agentId}`, forwardedQuery);
+      return withBrokerWarnings(proxyGet(`/sca/${agentId}`, forwardedQuery), errors);
     }),
 
   /**
@@ -831,14 +853,14 @@ export const wazuhRouter = router({
     )
     .query(({ input }) => {
       const { agentId, policyId, ...rest } = input;
-      const { forwardedQuery, unsupportedParams } = brokerParams(SCA_CHECKS_CONFIG, rest);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SCA_CHECKS_CONFIG, rest);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /sca/{agent_id}/checks/{policy_id}: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet(`/sca/${agentId}/checks/${policyId}`, forwardedQuery);
+      return withBrokerWarnings(proxyGet(`/sca/${agentId}/checks/${policyId}`, forwardedQuery), errors);
     }),
 
   /**
@@ -868,14 +890,14 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
-      const { forwardedQuery, unsupportedParams } = brokerParams(CISCAT_CONFIG, rest);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(CISCAT_CONFIG, rest);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /ciscat/{agent_id}/results: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet(`/ciscat/${agentId}/results`, forwardedQuery);
+      return withBrokerWarnings(proxyGet(`/ciscat/${agentId}/results`, forwardedQuery), errors);
     }),
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -912,14 +934,14 @@ export const wazuhRouter = router({
     )
     .query(({ input }) => {
       const { agentId, ...rest } = input;
-      const { forwardedQuery, unsupportedParams } = brokerParams(SYSCHECK_CONFIG, rest);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SYSCHECK_CONFIG, rest);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /syscheck/{agent_id}: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet(`/syscheck/${agentId}`, forwardedQuery, "syscheck");
+      return withBrokerWarnings(proxyGet(`/syscheck/${agentId}`, forwardedQuery, "syscheck"), errors);
     }),
 
   syscheckLastScan: wazuhProcedure
@@ -952,14 +974,14 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
-      const { forwardedQuery, unsupportedParams } = brokerParams(ROOTCHECK_CONFIG, rest);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(ROOTCHECK_CONFIG, rest);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /rootcheck/{agent_id}: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet(`/rootcheck/${agentId}`, forwardedQuery);
+      return withBrokerWarnings(proxyGet(`/rootcheck/${agentId}`, forwardedQuery), errors);
     }),
 
   rootcheckLastScan: wazuhProcedure
@@ -990,14 +1012,14 @@ export const wazuhRouter = router({
       status: z.enum(["enabled", "disabled", "all"]).optional(),
     }))
     .query(({ input }) => {
-      const { forwardedQuery, unsupportedParams } = brokerParams(DECODERS_CONFIG, input);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(DECODERS_CONFIG, input);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unsupported parameters for /decoders: ${unsupportedParams.join(", ")}`,
         });
       }
-      return proxyGet("/decoders", forwardedQuery);
+      return withBrokerWarnings(proxyGet("/decoders", forwardedQuery), errors);
     }),
 
   decoderFiles: wazuhProcedure
