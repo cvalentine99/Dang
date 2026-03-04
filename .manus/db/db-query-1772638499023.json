@@ -1,0 +1,100 @@
+{
+  "query": "SELECT COLUMN_NAME, DATA_TYPE, COLUMN_DEFAULT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kg_endpoints' ORDER BY ORDINAL_POSITION",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute SELECT COLUMN_NAME, DATA_TYPE, COLUMN_DEFAULT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'kg_endpoints' ORDER BY ORDINAL_POSITION",
+  "rows": [
+    {
+      "COLUMN_NAME": "id",
+      "DATA_TYPE": "int",
+      "COLUMN_DEFAULT": "NULL"
+    },
+    {
+      "COLUMN_NAME": "endpoint_id",
+      "DATA_TYPE": "varchar",
+      "COLUMN_DEFAULT": "NULL"
+    },
+    {
+      "COLUMN_NAME": "path",
+      "DATA_TYPE": "varchar",
+      "COLUMN_DEFAULT": "NULL"
+    },
+    {
+      "COLUMN_NAME": "method",
+      "DATA_TYPE": "varchar",
+      "COLUMN_DEFAULT": "NULL"
+    },
+    {
+      "COLUMN_NAME": "summary",
+      "DATA_TYPE": "text",
+      "COLUMN_DEFAULT": "NULL"
+    },
+    {
+      "COLUMN_NAME": "description",
+      "DATA_TYPE": "text",
+      "COLUMN_DEFAULT": "NULL"
+    },
+    {
+      "COLUMN_NAME": "tags",
+      "DATA_TYPE": "json",
+      "COLUMN_DEFAULT": "NULL"
+    },
+    {
+      "COLUMN_NAME": "operation_id",
+      "DATA_TYPE": "varchar",
+      "COLUMN_DEFAULT": "NULL"
+    },
+    {
+      "COLUMN_NAME": "resource",
+      "DATA_TYPE": "varchar",
+      "COLUMN_DEFAULT": "NULL"
+    },
+    {
+      "COLUMN_NAME": "operation_type",
+      "DATA_TYPE": "enum",
+      "COLUMN_DEFAULT": "READ"
+    },
+    {
+      "COLUMN_NAME": "risk_level",
+      "DATA_TYPE": "enum",
+      "COLUMN_DEFAULT": "SAFE"
+    },
+    {
+      "COLUMN_NAME": "allowed_for_llm",
+      "DATA_TYPE": "tinyint",
+      "COLUMN_DEFAULT": "1"
+    },
+    {
+      "COLUMN_NAME": "auth_method",
+      "DATA_TYPE": "varchar",
+      "COLUMN_DEFAULT": "JWT"
+    },
+    {
+      "COLUMN_NAME": "trust_score",
+      "DATA_TYPE": "decimal",
+      "COLUMN_DEFAULT": "0.500"
+    },
+    {
+      "COLUMN_NAME": "deprecated",
+      "DATA_TYPE": "tinyint",
+      "COLUMN_DEFAULT": "0"
+    },
+    {
+      "COLUMN_NAME": "last_verified_at",
+      "DATA_TYPE": "timestamp",
+      "COLUMN_DEFAULT": "NULL"
+    },
+    {
+      "COLUMN_NAME": "created_at",
+      "DATA_TYPE": "timestamp",
+      "COLUMN_DEFAULT": "CURRENT_TIMESTAMP"
+    },
+    {
+      "COLUMN_NAME": "updated_at",
+      "DATA_TYPE": "timestamp",
+      "COLUMN_DEFAULT": "CURRENT_TIMESTAMP"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\tDATA_TYPE\tCOLUMN_DEFAULT\nid\tint\tNULL\nendpoint_id\tvarchar\tNULL\npath\tvarchar\tNULL\nmethod\tvarchar\tNULL\nsummary\ttext\tNULL\ndescription\ttext\tNULL\ntags\tjson\tNULL\noperation_id\tvarchar\tNULL\nresource\tvarchar\tNULL\noperation_type\tenum\tREAD\nrisk_level\tenum\tSAFE\nallowed_for_llm\ttinyint\t1\nauth_method\tvarchar\tJWT\ntrust_score\tdecimal\t0.500\ndeprecated\ttinyint\t0\nlast_verified_at\ttimestamp\tNULL\ncreated_at\ttimestamp\tCURRENT_TIMESTAMP\nupdated_at\ttimestamp\tCURRENT_TIMESTAMP\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

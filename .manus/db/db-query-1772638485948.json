@@ -1,0 +1,226 @@
+{
+  "query": "DESCRIBE kg_endpoints; DESCRIBE kg_parameters;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute DESCRIBE kg_endpoints; DESCRIBE kg_parameters;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "endpoint_id",
+      "Type": "varchar(256)",
+      "Null": "NO",
+      "Key": "UNI",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "path",
+      "Type": "varchar(512)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "method",
+      "Type": "varchar(16)",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "summary",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "description",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "tags",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "operation_id",
+      "Type": "varchar(256)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "resource",
+      "Type": "varchar(128)",
+      "Null": "YES",
+      "Key": "MUL",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "operation_type",
+      "Type": "enum('READ','CREATE','UPDATE','DELETE')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "READ",
+      "Extra": ""
+    },
+    {
+      "Field": "risk_level",
+      "Type": "enum('SAFE','MUTATING','DESTRUCTIVE')",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": "SAFE",
+      "Extra": ""
+    },
+    {
+      "Field": "allowed_for_llm",
+      "Type": "tinyint",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": "1",
+      "Extra": ""
+    },
+    {
+      "Field": "auth_method",
+      "Type": "varchar(32)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "JWT",
+      "Extra": ""
+    },
+    {
+      "Field": "trust_score",
+      "Type": "decimal(4,3)",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": "0.500",
+      "Extra": ""
+    },
+    {
+      "Field": "deprecated",
+      "Type": "tinyint",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "last_verified_at",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "created_at",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    },
+    {
+      "Field": "updated_at",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    },
+    {
+      "Field": "Field",
+      "Type": "Type",
+      "Null": "Null",
+      "Key": "Key",
+      "Default": "Default",
+      "Extra": "Extra"
+    },
+    {
+      "Field": "id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "endpoint_id",
+      "Type": "int",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "name",
+      "Type": "varchar(128)",
+      "Null": "NO",
+      "Key": "MUL",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "location",
+      "Type": "enum('query','path','header','body')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "query",
+      "Extra": ""
+    },
+    {
+      "Field": "required",
+      "Type": "tinyint",
+      "Null": "NO",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "param_type",
+      "Type": "varchar(64)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "string",
+      "Extra": ""
+    },
+    {
+      "Field": "description",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "created_at",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "CURRENT_TIMESTAMP",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\nendpoint_id\tvarchar(256)\tNO\tUNI\tNULL\t\npath\tvarchar(512)\tNO\t\tNULL\t\nmethod\tvarchar(16)\tNO\tMUL\tNULL\t\nsummary\ttext\tYES\t\tNULL\t\ndescription\ttext\tYES\t\tNULL\t\ntags\tjson\tYES\t\tNULL\t\noperation_id\tvarchar(256)\tYES\t\tNULL\t\nresource\tvarchar(128)\tYES\tMUL\tNULL\t\noperation_type\tenum('READ','CREATE','UPDATE','DELETE')\tNO\t\tREAD\t\nrisk_level\tenum('SAFE','MUTATING','DESTRUCTIVE')\tNO\tMUL\tSAFE\t\nallowed_for_llm\ttinyint\tNO\tMUL\t1\t\nauth_method\tvarchar(32)\tYES\t\tJWT\t\ntrust_score\tdecimal(4,3)\tNO\tMUL\t0.500\t\ndeprecated\ttinyint\tNO\t\t0\t\nlast_verified_at\ttimestamp\tYES\t\tNULL\t\ncreated_at\ttimestamp\tYES\t\tCURRENT_TIMESTAMP\t\nupdated_at\ttimestamp\tYES\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\nField\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\nendpoint_id\tint\tNO\tMUL\tNULL\t\nname\tvarchar(128)\tNO\tMUL\tNULL\t\nlocation\tenum('query','path','header','body')\tNO\t\tquery\t\nrequired\ttinyint\tNO\t\t0\t\nparam_type\tvarchar(64)\tYES\t\tstring\t\ndescription\ttext\tYES\t\tNULL\t\ncreated_at\ttimestamp\tYES\t\tCURRENT_TIMESTAMP\t\n",
+  "stderr": "",
+  "execution_time_ms": 110
+}

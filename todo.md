@@ -2648,3 +2648,13 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Tests: coerceBoolean rejects truthy strings and records error
 - [x] Tests: distinct=false is NOT forwarded to Wazuh
 - [x] Tests: status array coerced to csv for multi-status filter
+
+### Phase 2 Sign-off + KG Enrichment
+- [x] Step 1: Pin error message assertion (replace regex with exact string match)
+- [x] Step 2: Verify status Zod schema accepts z.array(z.string())
+- [x] Step 3: Run full test suite + tsc --noEmit fresh (0 failures, EXIT 0)
+- [x] Step 4: Update broker-coverage-ledger.md with Phase 2 Review Fixes section
+- [x] Step 4b: Update verification-status.md with Phase 2 broker entry
+- [x] Step 6: Write idempotent brokerOverlay.mjs script (tag endpoints, add aliases, update trust scores)
+- [x] Step 7: Run brokerOverlay.mjs against KG and spot-check with SELECT
+- [x] Step 8: Smoke-test alias resolution (query "filter by os_platform ubuntu" resolves to os.platform)

@@ -323,13 +323,36 @@ Frontend: `client/src/pages/PipelineInspector.tsx` (ArtifactsDrillDown), `Living
 
 ---
 
+## Phase 2: Wazuh Parameter Broker
+
+**Status:** Complete
+
+**Code Evidence:**
+- Broker core: `server/wazuh/paramBroker.ts` (552 lines — `CoerceResult` tuple pattern, 4 default coercers, `brokerParams()` with alias resolution, 7 endpoint configs)
+- Router integration: `server/wazuh/wazuhRouter.ts` (7 call sites using `brokerParams()` for agents, rules, groups, cluster/nodes, sca/policies, sca/checks, manager/configuration)
+- Coverage ledger: `docs/broker-coverage-ledger.md` (endpoint inventory, parameter families, test counts, out-of-scope list)
+
+**Test Evidence:**
+`server/wazuh/paramBroker.test.ts` (~215 tests covering: broker core mechanics, Fix A1 os.platform alias resolution, Fix A2 search vs q distinction, endpoint-specific configs, universal params, compliance filter family, manager config precision params, SCA filters, cross-endpoint isolation, Phase 2 Review Fixes: errors[] contract, coerceBoolean strict semantics, status CSV array, level custom serializer, distinct flag omission)
+
+**Type-Check:** 0 errors (2026-03-04T10:28Z, fresh `npx tsc --noEmit` EXIT 0)
+
+**Runtime Validation:** `pnpm test --run` — 1,684 passed / 0 failed across 62 test files (2026-03-04T10:28Z, Manus sandbox). Broker logic is pure-function, no live Wazuh connection required for unit tests. End-to-end parameter forwarding to live Wazuh not validated (requires private network).
+
+**Remaining Caveats:**
+1. Router call sites destructure `{ forwardedQuery, unsupportedParams }` but do not yet surface `errors[]` to API callers — coercion errors are recorded but not returned in responses. This is a future enhancement, not a correctness issue.
+2. Syscollector family (8 endpoints) not yet broker-wired — Phase 3 candidate.
+3. MITRE, syscheck, manager/logs, vulnerability endpoints not yet broker-wired.
+
+---
+
 ## Global Verification Summary
 
 | Metric | Value | When | Where | Method |
 |--------|-------|------|-------|--------|
-| TypeScript errors | 0 | 2026-02-28T19:30Z | Manus sandbox | Fresh `npx tsc --noEmit` (not stale watch) |
-| Test suite | 929 passed / 0 failed | 2026-02-28T19:30Z | Manus sandbox | `pnpm test -- --run` |
-| Test files | 41 | 2026-02-28T19:30Z | Manus sandbox | All passed |
+| TypeScript errors | 0 | 2026-03-04T10:28Z | Manus sandbox | Fresh `npx tsc --noEmit` EXIT 0 |
+| Test suite | 1,684 passed / 0 failed | 2026-03-04T10:28Z | Manus sandbox | `pnpm test --run` |
+| Test files | 62 | 2026-03-04T10:28Z | Manus sandbox | All passed |
 | Runtime (Wazuh API) | Not validated | — | — | No live Wazuh instance connected to sandbox |
 | Runtime (Indexer) | Not validated | — | — | No live Wazuh Indexer connected to sandbox |
 | Runtime (LLM) | Not validated | — | — | Private network LLM endpoint unreachable from sandbox |

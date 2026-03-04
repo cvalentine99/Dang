@@ -447,6 +447,7 @@ export const kgEndpoints = mysqlTable("kg_endpoints", {
   authMethod: varchar("auth_method", { length: 64 }),
   trustScore: varchar("trust_score", { length: 8 }).default("1.0").notNull(),
   deprecated: int("deprecated").default(0).notNull(),
+  brokerValidated: int("broker_validated").default(0).notNull(),
   lastVerifiedAt: timestamp("last_verified_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
@@ -471,6 +472,7 @@ export const kgParameters = mysqlTable("kg_parameters", {
   required: int("required").default(0).notNull(),
   paramType: varchar("param_type", { length: 32 }).notNull(),
   description: text("description"),
+  appAliases: json("app_aliases").$type<string[]>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ([
   index("kgp_endpoint_id_idx").on(table.endpointId),

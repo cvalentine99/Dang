@@ -1,0 +1,118 @@
+{
+  "query": "SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'kg_endpoints' ORDER BY ORDINAL_POSITION; SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'kg_parameters' ORDER BY ORDINAL_POSITION;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'kg_endpoints' ORDER BY ORDINAL_POSITION; SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'kg_parameters' ORDER BY ORDINAL_POSITION;",
+  "rows": [
+    {
+      "COLUMN_NAME": "id",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "endpoint_id",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "path",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "method",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "summary",
+      "DATA_TYPE": "text"
+    },
+    {
+      "COLUMN_NAME": "description",
+      "DATA_TYPE": "text"
+    },
+    {
+      "COLUMN_NAME": "tags",
+      "DATA_TYPE": "json"
+    },
+    {
+      "COLUMN_NAME": "operation_id",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "resource",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "operation_type",
+      "DATA_TYPE": "enum"
+    },
+    {
+      "COLUMN_NAME": "risk_level",
+      "DATA_TYPE": "enum"
+    },
+    {
+      "COLUMN_NAME": "allowed_for_llm",
+      "DATA_TYPE": "tinyint"
+    },
+    {
+      "COLUMN_NAME": "auth_method",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "trust_score",
+      "DATA_TYPE": "decimal"
+    },
+    {
+      "COLUMN_NAME": "deprecated",
+      "DATA_TYPE": "tinyint"
+    },
+    {
+      "COLUMN_NAME": "last_verified_at",
+      "DATA_TYPE": "timestamp"
+    },
+    {
+      "COLUMN_NAME": "created_at",
+      "DATA_TYPE": "timestamp"
+    },
+    {
+      "COLUMN_NAME": "updated_at",
+      "DATA_TYPE": "timestamp"
+    },
+    {
+      "COLUMN_NAME": "COLUMN_NAME",
+      "DATA_TYPE": "DATA_TYPE"
+    },
+    {
+      "COLUMN_NAME": "id",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "endpoint_id",
+      "DATA_TYPE": "int"
+    },
+    {
+      "COLUMN_NAME": "name",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "location",
+      "DATA_TYPE": "enum"
+    },
+    {
+      "COLUMN_NAME": "required",
+      "DATA_TYPE": "tinyint"
+    },
+    {
+      "COLUMN_NAME": "param_type",
+      "DATA_TYPE": "varchar"
+    },
+    {
+      "COLUMN_NAME": "description",
+      "DATA_TYPE": "text"
+    },
+    {
+      "COLUMN_NAME": "created_at",
+      "DATA_TYPE": "timestamp"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\tDATA_TYPE\nid\tint\nendpoint_id\tvarchar\npath\tvarchar\nmethod\tvarchar\nsummary\ttext\ndescription\ttext\ntags\tjson\noperation_id\tvarchar\nresource\tvarchar\noperation_type\tenum\nrisk_level\tenum\nallowed_for_llm\ttinyint\nauth_method\tvarchar\ntrust_score\tdecimal\ndeprecated\ttinyint\nlast_verified_at\ttimestamp\ncreated_at\ttimestamp\nupdated_at\ttimestamp\nCOLUMN_NAME\tDATA_TYPE\nid\tint\nendpoint_id\tint\nname\tvarchar\nlocation\tenum\nrequired\ttinyint\nparam_type\tvarchar\ndescription\ttext\ncreated_at\ttimestamp\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

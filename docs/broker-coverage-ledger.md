@@ -1,7 +1,7 @@
 # Wazuh Parameter Broker — Coverage Ledger
 
 **Spec baseline:** Wazuh REST API OpenAPI v4.14.3-rc3
-**Last updated:** Phase 2 completion
+**Last updated:** Phase 2 Review Fixes sign-off (2026-03-04)
 
 ## Broker-Wired Endpoints
 
@@ -64,6 +64,19 @@ Available exclusively on `GET /manager/configuration`:
 | A1 | `os_platform` now maps to spec-correct `os.platform` via alias resolution | 1 |
 | A2 | `search` is forwarded natively as `search`, never rewritten into `q=name~...` | 1 |
 
+## Phase 2 Review Fixes — Coercion Trust Violations
+
+Six issues identified during independent code review. All resolved.
+
+| # | Severity | Issue | Resolution |
+|---|---|---|---|
+| 1 | Critical | `errors[]` dead infrastructure — always returned `[]` | Refactored coercers to return `CoerceResult` tuples `{ value, error }`. `brokerParams()` reads `result.error` and pushes to `errors[]`. Contract is now alive. |
+| 2 | Critical | NaN coercion silently dropped params | `coerceNumber` returns `{ value: null, error: 'could not coerce "X" to number' }` on NaN. Error recorded, param omitted. |
+| 3 | Moderate | `coerceBoolean` converted any truthy string to `"true"` | Strict semantics: `true`/`1` → `"true"`, `false`/`0` → `null` (omit), anything else → `{ value: null, error }`. |
+| 4 | Moderate | `distinct: false` forwarded as `"false"` to Wazuh | Flag semantics: `false`/`0` returns `{ value: null, error: null }`. Recognized, not forwarded, no error. |
+| 5 | Moderate | `status` CSV array blocked by Zod schema | Agents Zod schema updated to accept `z.array(z.string())` for status. Broker CSV capability now reachable from router. |
+| 6 | Low | `level` in RULES_CONFIG had type `"string"` but accepted numbers | Custom `serialize()` on level handles both number and string input. NaN produces error. |
+
 ## Test Coverage
 
 | Test Suite | Tests | Phase |
@@ -79,7 +92,13 @@ Available exclusively on `GET /manager/configuration`:
 | SCA expanded filter verification | 21 | 2 |
 | Manager config universal param scoping | 1 | 2 |
 | Phase 2 cross-endpoint isolation | 5 | 2 |
-| **Total paramBroker tests** | **189** | |
+| Review Fix: errors[] contract (coercion failures, NaN, accumulation) | 8 | 2-RF |
+| Review Fix: coerceBoolean strict semantics (truthy strings, flag omission) | 5 | 2-RF |
+| Review Fix: status CSV array capability | 4 | 2-RF |
+| Review Fix: level custom serializer (number, string, NaN) | 4 | 2-RF |
+| Review Fix: errors[] contract verification (always array, descriptive, separate from unsupported) | 4 | 2-RF |
+| Review Fix: distinct=false omission (flag semantics) | 1 | 2-RF |
+| **Total paramBroker tests** | **~215** | |
 
 ## Out of Scope (Not Yet Broker-Wired)
 

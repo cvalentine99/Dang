@@ -1028,7 +1028,7 @@ describe("errors[] contract verification", () => {
   it("errors[] contains descriptive messages for coercion failures", () => {
     const result = brokerParams(AGENTS_CONFIG, { limit: "abc" });
     expect(result.errors.length).toBe(1);
-    expect(result.errors[0]).toMatch(/limit.*coerce.*abc/i);
+    expect(result.errors[0]).toBe('limit: could not coerce "abc" to number');
   });
 
   it("errors[] is separate from unsupportedParams", () => {
