@@ -20,9 +20,9 @@ import {
 import {
   Users, Activity, AlertTriangle, Wifi, WifiOff, Clock, Search,
   Monitor, Server, Cpu, ChevronLeft, ChevronRight, X,
-  ArrowDownCircle, FolderX, BarChart3,
+  ArrowDownCircle, FolderX, BarChart3, Filter, Code,
 } from "lucide-react";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip,
@@ -59,9 +59,27 @@ export default function AgentHealth() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [groupFilter, setGroupFilter] = useState<string>("all");
+  const [osPlatformFilter, setOsPlatformFilter] = useState<string>("");
+  const [advancedQuery, setAdvancedQuery] = useState<string>("");
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [page, setPage] = useState(0);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const pageSize = 25;
+
+  // ─── Debounce (300ms) for text inputs to reduce Wazuh API calls ──────────
+  function useDebounced<T>(value: T, delayMs = 300): T {
+    const [debounced, setDebounced] = useState(value);
+    const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+    useEffect(() => {
+      timer.current = setTimeout(() => setDebounced(value), delayMs);
+      return () => clearTimeout(timer.current);
+    }, [value, delayMs]);
+    return debounced;
+  }
+
+  const debouncedSearch = useDebounced(search);
+  const debouncedOsPlatform = useDebounced(osPlatformFilter);
+  const debouncedAdvancedQuery = useDebounced(advancedQuery);
 
   const statusQ = trpc.wazuh.status.useQuery(undefined, { retry: 1, staleTime: 60_000 });
   const isConnected = statusQ.data?.configured === true && statusQ.data?.data != null;
@@ -70,12 +88,23 @@ export default function AgentHealth() {
   const agentSummaryOsQ = trpc.wazuh.agentSummaryOs.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
   const groupsQ = trpc.wazuh.agentGroups.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
 
-  const agentsQ = trpc.wazuh.agents.useQuery({
-    limit: pageSize, offset: page * pageSize,
-    status: statusFilter !== "all" ? statusFilter as "active" | "disconnected" | "never_connected" | "pending" : undefined,
-    group: groupFilter !== "all" ? groupFilter : undefined,
-    search: search || undefined, sort: "-dateAdd",
-  }, { retry: 1, staleTime: 15_000, enabled: isConnected });
+  // ─── Server-side query params (broker-wired, debounced) ──────────────────
+  const agentsQueryParams = useMemo(() => {
+    const params: Record<string, unknown> = {
+      limit: pageSize, offset: page * pageSize, sort: "-dateAdd",
+    };
+    if (statusFilter !== "all") params.status = statusFilter;
+    if (groupFilter !== "all") params.group = groupFilter;
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (debouncedOsPlatform) params.os_platform = debouncedOsPlatform;
+    if (debouncedAdvancedQuery) params.q = debouncedAdvancedQuery;
+    return params;
+  }, [page, pageSize, statusFilter, groupFilter, debouncedSearch, debouncedOsPlatform, debouncedAdvancedQuery]);
+
+  const agentsQ = trpc.wazuh.agents.useQuery(
+    agentsQueryParams as any,
+    { retry: 1, staleTime: 15_000, enabled: isConnected }
+  );
 
   // New: outdated & ungrouped agent queries
   const outdatedQ = trpc.wazuh.agentsOutdated.useQuery({ limit: 1, offset: 0 }, { retry: 1, staleTime: 60_000, enabled: isConnected });
@@ -294,8 +323,60 @@ export default function AgentHealth() {
               {groupFilter !== "all" && (
                 <Button variant="outline" size="sm" onClick={() => setGroupFilter("all")} className="h-8 text-xs bg-transparent border-border gap-1"><X className="h-3 w-3" /> {groupFilter}</Button>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className={`h-8 text-xs gap-1 bg-transparent border-border ${showAdvancedFilters ? "text-primary border-primary/40" : ""}`}
+              >
+                <Filter className="h-3 w-3" />
+                Advanced
+                {(osPlatformFilter || advancedQuery) && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-mono">
+                    {[osPlatformFilter, advancedQuery].filter(Boolean).length}
+                  </span>
+                )}
+              </Button>
             </div>
           </div>
+
+          {/* Advanced Filters Panel */}
+          {showAdvancedFilters && (
+            <div className="mb-4 p-3 rounded-lg bg-secondary/20 border border-border/30">
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">OS Platform</label>
+                  <Input
+                    placeholder="e.g. ubuntu, centos, windows..."
+                    value={osPlatformFilter}
+                    onChange={(e) => { setOsPlatformFilter(e.target.value); setPage(0); }}
+                    className="h-8 w-48 text-xs bg-secondary/50 border-border font-mono"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+                  <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <Code className="h-3 w-3" /> Wazuh Query (q)
+                  </label>
+                  <Input
+                    placeholder="e.g. status=active;os.platform=ubuntu"
+                    value={advancedQuery}
+                    onChange={(e) => { setAdvancedQuery(e.target.value); setPage(0); }}
+                    className="h-8 text-xs bg-secondary/50 border-border font-mono"
+                  />
+                </div>
+                {(osPlatformFilter || advancedQuery) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { setOsPlatformFilter(""); setAdvancedQuery(""); setPage(0); }}
+                    className="h-8 text-xs bg-transparent border-border gap-1 self-end"
+                  >
+                    <X className="h-3 w-3" /> Clear Advanced
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
 
           {isLoading ? (
             <TableSkeleton columns={9} rows={10} columnWidths={[1, 2, 2, 2, 1, 2, 1, 2, 1]} />

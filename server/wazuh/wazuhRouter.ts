@@ -21,6 +21,10 @@ import {
   CLUSTER_NODES_CONFIG,
   SCA_POLICIES_CONFIG,
   SCA_CHECKS_CONFIG,
+  SYSCOLLECTOR_PACKAGES_CONFIG,
+  SYSCOLLECTOR_PORTS_CONFIG,
+  SYSCOLLECTOR_PROCESSES_CONFIG,
+  SYSCOLLECTOR_SERVICES_CONFIG,
 } from "./paramBroker";
 
 // ── Per-request user context for rate limiting ──────────────────────────────
@@ -403,42 +407,98 @@ export const wazuhRouter = router({
   agentPackages: wazuhProcedure
     .input(z.object({
       agentId: agentIdSchema,
+      // Broker-wired: universal params + vendor, name, architecture, format, version
       search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      vendor: z.string().optional(),
+      name: z.string().optional(),
+      architecture: z.string().optional(),
+      format: z.string().optional(),
+      version: z.string().optional(),
       ...paginationSchema.shape,
     }))
-    .query(({ input }) =>
-      proxyGet(`/syscollector/${input.agentId}/packages`, {
-        limit: input.limit,
-        offset: input.offset,
-        search: input.search,
-      })
-    ),
+    .query(({ input }) => {
+      const { agentId, ...rest } = input;
+      const { forwardedQuery, unsupportedParams } = brokerParams(SYSCOLLECTOR_PACKAGES_CONFIG, rest);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unsupported parameters for /syscollector/{agent_id}/packages: ${unsupportedParams.join(", ")}`,
+        });
+      }
+      return proxyGet(`/syscollector/${agentId}/packages`, forwardedQuery);
+    }),
 
   agentPorts: wazuhProcedure
     .input(z.object({
       agentId: agentIdSchema,
+      // Broker-wired: universal params + pid, protocol, local.ip, local.port, remote.ip, tx_queue, state, process
+      search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      pid: z.string().optional(),
+      protocol: z.string().optional(),
+      "local.ip": z.string().optional(),
+      "local.port": z.string().optional(),
+      "remote.ip": z.string().optional(),
+      tx_queue: z.string().optional(),
+      state: z.string().optional(),
+      process: z.string().optional(),
       ...paginationSchema.shape,
     }))
-    .query(({ input }) =>
-      proxyGet(`/syscollector/${input.agentId}/ports`, {
-        limit: input.limit,
-        offset: input.offset,
-      })
-    ),
+    .query(({ input }) => {
+      const { agentId, ...rest } = input;
+      const { forwardedQuery, unsupportedParams } = brokerParams(SYSCOLLECTOR_PORTS_CONFIG, rest);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unsupported parameters for /syscollector/{agent_id}/ports: ${unsupportedParams.join(", ")}`,
+        });
+      }
+      return proxyGet(`/syscollector/${agentId}/ports`, forwardedQuery);
+    }),
 
   agentProcesses: wazuhProcedure
     .input(z.object({
       agentId: agentIdSchema,
+      // Broker-wired: universal params + pid, state, ppid, egroup, euser, fgroup, name, nlwp, pgrp, priority, rgroup, ruser, sgroup, suser
       search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      pid: z.string().optional(),
+      state: z.string().optional(),
+      ppid: z.string().optional(),
+      egroup: z.string().optional(),
+      euser: z.string().optional(),
+      fgroup: z.string().optional(),
+      name: z.string().optional(),
+      nlwp: z.string().optional(),
+      pgrp: z.string().optional(),
+      priority: z.string().optional(),
+      rgroup: z.string().optional(),
+      ruser: z.string().optional(),
+      sgroup: z.string().optional(),
+      suser: z.string().optional(),
       ...paginationSchema.shape,
     }))
-    .query(({ input }) =>
-      proxyGet(`/syscollector/${input.agentId}/processes`, {
-        limit: input.limit,
-        offset: input.offset,
-        search: input.search,
-      })
-    ),
+    .query(({ input }) => {
+      const { agentId, ...rest } = input;
+      const { forwardedQuery, unsupportedParams } = brokerParams(SYSCOLLECTOR_PROCESSES_CONFIG, rest);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unsupported parameters for /syscollector/{agent_id}/processes: ${unsupportedParams.join(", ")}`,
+        });
+      }
+      return proxyGet(`/syscollector/${agentId}/processes`, forwardedQuery);
+    }),
 
   agentNetaddr: wazuhProcedure
     .input(z.object({ agentId: agentIdSchema }))
@@ -477,13 +537,28 @@ export const wazuhRouter = router({
 
   /** System services / daemons (Windows services, systemd units) */
   agentServices: wazuhProcedure
-    .input(z.object({ agentId: agentIdSchema, ...paginationSchema.shape }))
-    .query(({ input }) =>
-      proxyGet(`/syscollector/${input.agentId}/services`, {
-        limit: input.limit,
-        offset: input.offset,
-      }).catch(() => ({ data: { affected_items: [], total_affected_items: 0 } }))
-    ),
+    .input(z.object({
+      agentId: agentIdSchema,
+      // Broker-wired: universal params only (no field-specific filters in spec)
+      search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      ...paginationSchema.shape,
+    }))
+    .query(({ input }) => {
+      const { agentId, ...rest } = input;
+      const { forwardedQuery, unsupportedParams } = brokerParams(SYSCOLLECTOR_SERVICES_CONFIG, rest);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Unsupported parameters for /syscollector/{agent_id}/services: ${unsupportedParams.join(", ")}`,
+        });
+      }
+      return proxyGet(`/syscollector/${agentId}/services`, forwardedQuery)
+        .catch(() => ({ data: { affected_items: [], total_affected_items: 0 } }));
+    }),
 
   /** Local users on the agent */
   agentUsers: wazuhProcedure

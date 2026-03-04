@@ -636,3 +636,241 @@ export const SCA_CHECKS_CONFIG: EndpointParamConfig = {
     },
   },
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 3 — Syscollector Endpoint Configs
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /syscollector/{agent_id}/packages — Agent installed packages
+ * Spec ref: operationId api.controllers.syscollector_controller.get_packages_info
+ */
+export const SYSCOLLECTOR_PACKAGES_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/packages",
+  params: {
+    // Universal params
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+
+    // Endpoint-specific field filters
+    vendor: {
+      wazuhName: "vendor",
+      description: "Filter by package vendor",
+      type: "string",
+    },
+    name: {
+      wazuhName: "name",
+      description: "Filter by package name",
+      type: "string",
+      aliases: ["package_name"],
+    },
+    architecture: {
+      wazuhName: "architecture",
+      description: "Filter by architecture (e.g. amd64, x86_64)",
+      type: "string",
+      aliases: ["arch"],
+    },
+    format: {
+      wazuhName: "format",
+      description: "Filter by package format (e.g. deb, rpm)",
+      type: "string",
+      aliases: ["file_format"],
+    },
+    version: {
+      wazuhName: "version",
+      description: "Filter by package version",
+      type: "string",
+      aliases: ["package_version"],
+    },
+  },
+};
+
+/**
+ * GET /syscollector/{agent_id}/ports — Agent open network ports
+ * Spec ref: operationId api.controllers.syscollector_controller.get_ports_info
+ */
+export const SYSCOLLECTOR_PORTS_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/ports",
+  params: {
+    // Universal params
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+
+    // Endpoint-specific field filters
+    pid: {
+      wazuhName: "pid",
+      description: "Filter by PID",
+      type: "string",
+    },
+    protocol: {
+      wazuhName: "protocol",
+      description: "Filter by protocol (e.g. tcp, udp)",
+      type: "string",
+    },
+    "local.ip": {
+      wazuhName: "local.ip",
+      description: "Filter by local IP address",
+      type: "string",
+      aliases: ["local_ip"],
+    },
+    "local.port": {
+      wazuhName: "local.port",
+      description: "Filter by local port number",
+      type: "string",
+      aliases: ["local_port"],
+    },
+    "remote.ip": {
+      wazuhName: "remote.ip",
+      description: "Filter by remote IP address",
+      type: "string",
+      aliases: ["remote_ip"],
+    },
+    tx_queue: {
+      wazuhName: "tx_queue",
+      description: "Filter by TX queue",
+      type: "string",
+    },
+    state: {
+      wazuhName: "state",
+      description: "Filter by connection state (e.g. listening, established)",
+      type: "string",
+    },
+    process: {
+      wazuhName: "process",
+      description: "Filter by process name associated with port",
+      type: "string",
+    },
+  },
+};
+
+/**
+ * GET /syscollector/{agent_id}/processes — Agent running processes
+ * Spec ref: operationId api.controllers.syscollector_controller.get_processes_info
+ *
+ * NOTE: Several spec params use aliased names:
+ *   process_pid  → outbound "pid"
+ *   process_state → outbound "state"
+ *   process_name → outbound "name"
+ */
+export const SYSCOLLECTOR_PROCESSES_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/processes",
+  params: {
+    // Universal params
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+
+    // Endpoint-specific field filters
+    // NOTE: The spec defines process_pid, process_state, process_name as the
+    // component parameter names, but their outbound Wazuh query param names
+    // are "pid", "state", "name" respectively.
+    pid: {
+      wazuhName: "pid",
+      description: "Filter by process PID",
+      type: "string",
+      aliases: ["process_pid"],
+    },
+    state: {
+      wazuhName: "state",
+      description: "Filter by process state (e.g. S, R, Z)",
+      type: "string",
+      aliases: ["process_state"],
+    },
+    ppid: {
+      wazuhName: "ppid",
+      description: "Filter by parent process PID",
+      type: "string",
+    },
+    egroup: {
+      wazuhName: "egroup",
+      description: "Filter by effective group",
+      type: "string",
+    },
+    euser: {
+      wazuhName: "euser",
+      description: "Filter by effective user",
+      type: "string",
+    },
+    fgroup: {
+      wazuhName: "fgroup",
+      description: "Filter by filesystem group",
+      type: "string",
+    },
+    name: {
+      wazuhName: "name",
+      description: "Filter by process name",
+      type: "string",
+      aliases: ["process_name"],
+    },
+    nlwp: {
+      wazuhName: "nlwp",
+      description: "Filter by number of lightweight processes (threads)",
+      type: "string",
+    },
+    pgrp: {
+      wazuhName: "pgrp",
+      description: "Filter by process group ID",
+      type: "string",
+    },
+    priority: {
+      wazuhName: "priority",
+      description: "Filter by scheduling priority",
+      type: "string",
+    },
+    rgroup: {
+      wazuhName: "rgroup",
+      description: "Filter by real group",
+      type: "string",
+    },
+    ruser: {
+      wazuhName: "ruser",
+      description: "Filter by real user",
+      type: "string",
+    },
+    sgroup: {
+      wazuhName: "sgroup",
+      description: "Filter by saved group",
+      type: "string",
+    },
+    suser: {
+      wazuhName: "suser",
+      description: "Filter by saved user",
+      type: "string",
+    },
+  },
+};
+
+/**
+ * GET /syscollector/{agent_id}/services — Agent system services
+ * Spec ref: operationId api.controllers.syscollector_controller.get_services_info
+ *
+ * NOTE: The spec defines only universal params for this endpoint.
+ * No field-specific filters are available.
+ */
+export const SYSCOLLECTOR_SERVICES_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/services",
+  params: {
+    // Universal params only — no field-specific filters in spec
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+  },
+};

@@ -8,8 +8,9 @@
  *   - Type coercion works for string, number, boolean, csv
  *   - Empty/null/undefined values are omitted (not forwarded as empty strings)
  *
- * Also proves the endpoint-specific configs for all 5 wired endpoints:
- *   /agents, /rules, /groups, /cluster/nodes, /sca/{agent_id}, /manager/configuration
+ * Also proves the endpoint-specific configs for all 11 wired endpoints:
+ *   /agents, /rules, /groups, /cluster/nodes, /sca/{agent_id}, /manager/configuration,
+ *   /syscollector/{agent_id}/packages, /ports, /processes, /services
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -22,6 +23,10 @@ import {
   SCA_CHECKS_CONFIG,
   MANAGER_CONFIG,
   UNIVERSAL_PARAMS,
+  SYSCOLLECTOR_PACKAGES_CONFIG,
+  SYSCOLLECTOR_PORTS_CONFIG,
+  SYSCOLLECTOR_PROCESSES_CONFIG,
+  SYSCOLLECTOR_SERVICES_CONFIG,
 } from "./paramBroker";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1048,4 +1053,305 @@ describe("errors[] contract verification", () => {
     expect(result.errors[0]).toContain("raw");
     expect(result.forwardedQuery).not.toHaveProperty("raw");
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHASE 3 — SYSCOLLECTOR ENDPOINT CONFIGS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("Phase 3: /syscollector/{agent_id}/packages", () => {
+  it("forwards all field-specific params with correct outbound names", () => {
+    const result = brokerParams(SYSCOLLECTOR_PACKAGES_CONFIG, {
+      vendor: "Canonical",
+      name: "openssl",
+      architecture: "amd64",
+      format: "deb",
+      version: "1.1.1",
+    });
+    expect(result.forwardedQuery).toEqual({
+      vendor: "Canonical",
+      name: "openssl",
+      architecture: "amd64",
+      format: "deb",
+      version: "1.1.1",
+    });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("resolves package_name alias to name", () => {
+    const result = brokerParams(SYSCOLLECTOR_PACKAGES_CONFIG, {
+      package_name: "nginx",
+    });
+    expect(result.forwardedQuery).toEqual({ name: "nginx" });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("resolves file_format alias to format", () => {
+    const result = brokerParams(SYSCOLLECTOR_PACKAGES_CONFIG, {
+      file_format: "rpm",
+    });
+    expect(result.forwardedQuery).toEqual({ format: "rpm" });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("resolves package_version alias to version", () => {
+    const result = brokerParams(SYSCOLLECTOR_PACKAGES_CONFIG, {
+      package_version: "2.0.0",
+    });
+    expect(result.forwardedQuery).toEqual({ version: "2.0.0" });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("resolves arch alias to architecture", () => {
+    const result = brokerParams(SYSCOLLECTOR_PACKAGES_CONFIG, {
+      arch: "x86_64",
+    });
+    expect(result.forwardedQuery).toEqual({ architecture: "x86_64" });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("includes universal params", () => {
+    const result = brokerParams(SYSCOLLECTOR_PACKAGES_CONFIG, {
+      offset: 10,
+      limit: 50,
+      sort: "+name",
+      search: "ssl",
+      q: "vendor=Canonical",
+    });
+    expect(result.forwardedQuery).toEqual({
+      offset: "10",
+      limit: "50",
+      sort: "+name",
+      search: "ssl",
+      q: "vendor=Canonical",
+    });
+  });
+
+  it("rejects unsupported params", () => {
+    const result = brokerParams(SYSCOLLECTOR_PACKAGES_CONFIG, {
+      vendor: "Canonical",
+      bogus_field: "nope",
+    });
+    expect(result.unsupportedParams).toEqual(["bogus_field"]);
+    expect(result.forwardedQuery).toEqual({ vendor: "Canonical" });
+  });
+});
+
+describe("Phase 3: /syscollector/{agent_id}/ports", () => {
+  it("forwards all field-specific params", () => {
+    const result = brokerParams(SYSCOLLECTOR_PORTS_CONFIG, {
+      pid: "1234",
+      protocol: "tcp",
+      "local.ip": "127.0.0.1",
+      "local.port": "8080",
+      "remote.ip": "10.0.0.1",
+      tx_queue: "0",
+      state: "listening",
+      process: "nginx",
+    });
+    expect(result.forwardedQuery).toEqual({
+      pid: "1234",
+      protocol: "tcp",
+      "local.ip": "127.0.0.1",
+      "local.port": "8080",
+      "remote.ip": "10.0.0.1",
+      tx_queue: "0",
+      state: "listening",
+      process: "nginx",
+    });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("resolves local_ip alias to local.ip", () => {
+    const result = brokerParams(SYSCOLLECTOR_PORTS_CONFIG, {
+      local_ip: "192.168.1.1",
+    });
+    expect(result.forwardedQuery).toEqual({ "local.ip": "192.168.1.1" });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("resolves local_port alias to local.port", () => {
+    const result = brokerParams(SYSCOLLECTOR_PORTS_CONFIG, {
+      local_port: "443",
+    });
+    expect(result.forwardedQuery).toEqual({ "local.port": "443" });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("resolves remote_ip alias to remote.ip", () => {
+    const result = brokerParams(SYSCOLLECTOR_PORTS_CONFIG, {
+      remote_ip: "10.0.0.5",
+    });
+    expect(result.forwardedQuery).toEqual({ "remote.ip": "10.0.0.5" });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("rejects unsupported params", () => {
+    const result = brokerParams(SYSCOLLECTOR_PORTS_CONFIG, {
+      protocol: "tcp",
+      rx_queue: "not_in_spec",
+    });
+    expect(result.unsupportedParams).toEqual(["rx_queue"]);
+    expect(result.forwardedQuery).toEqual({ protocol: "tcp" });
+  });
+});
+
+describe("Phase 3: /syscollector/{agent_id}/processes", () => {
+  it("forwards all field-specific params", () => {
+    const result = brokerParams(SYSCOLLECTOR_PROCESSES_CONFIG, {
+      pid: "42",
+      state: "S",
+      ppid: "1",
+      egroup: "root",
+      euser: "root",
+      fgroup: "root",
+      name: "sshd",
+      nlwp: "1",
+      pgrp: "42",
+      priority: "20",
+      rgroup: "root",
+      ruser: "root",
+      sgroup: "root",
+      suser: "root",
+    });
+    expect(result.forwardedQuery).toEqual({
+      pid: "42",
+      state: "S",
+      ppid: "1",
+      egroup: "root",
+      euser: "root",
+      fgroup: "root",
+      name: "sshd",
+      nlwp: "1",
+      pgrp: "42",
+      priority: "20",
+      rgroup: "root",
+      ruser: "root",
+      sgroup: "root",
+      suser: "root",
+    });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("resolves process_pid alias to pid", () => {
+    const result = brokerParams(SYSCOLLECTOR_PROCESSES_CONFIG, {
+      process_pid: "99",
+    });
+    expect(result.forwardedQuery).toEqual({ pid: "99" });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("resolves process_state alias to state", () => {
+    const result = brokerParams(SYSCOLLECTOR_PROCESSES_CONFIG, {
+      process_state: "R",
+    });
+    expect(result.forwardedQuery).toEqual({ state: "R" });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("resolves process_name alias to name", () => {
+    const result = brokerParams(SYSCOLLECTOR_PROCESSES_CONFIG, {
+      process_name: "nginx",
+    });
+    expect(result.forwardedQuery).toEqual({ name: "nginx" });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("rejects unsupported params", () => {
+    const result = brokerParams(SYSCOLLECTOR_PROCESSES_CONFIG, {
+      name: "sshd",
+      cpu_percent: "50",
+      memory_rss: "1024",
+    });
+    expect(result.unsupportedParams).toEqual(["cpu_percent", "memory_rss"]);
+    expect(result.forwardedQuery).toEqual({ name: "sshd" });
+  });
+});
+
+describe("Phase 3: /syscollector/{agent_id}/services", () => {
+  it("forwards universal params only (no field-specific filters in spec)", () => {
+    const result = brokerParams(SYSCOLLECTOR_SERVICES_CONFIG, {
+      offset: 0,
+      limit: 100,
+      sort: "+name",
+      search: "ssh",
+      q: "state=running",
+    });
+    expect(result.forwardedQuery).toEqual({
+      offset: "0",
+      limit: "100",
+      sort: "+name",
+      search: "ssh",
+      q: "state=running",
+    });
+    expect(result.unsupportedParams).toEqual([]);
+  });
+
+  it("rejects any field-specific param since spec defines none", () => {
+    const result = brokerParams(SYSCOLLECTOR_SERVICES_CONFIG, {
+      limit: 50,
+      name: "sshd",
+      state: "running",
+    });
+    expect(result.unsupportedParams).toEqual(["name", "state"]);
+    expect(result.forwardedQuery).toEqual({ limit: "50" });
+  });
+});
+
+describe("Phase 3: Cross-endpoint isolation — syscollector", () => {
+  it("packages rejects ports-specific params", () => {
+    const result = brokerParams(SYSCOLLECTOR_PACKAGES_CONFIG, {
+      protocol: "tcp",
+      "local.port": "8080",
+    });
+    expect(result.unsupportedParams).toContain("protocol");
+    expect(result.unsupportedParams).toContain("local.port");
+  });
+
+  it("ports rejects packages-specific params", () => {
+    const result = brokerParams(SYSCOLLECTOR_PORTS_CONFIG, {
+      vendor: "Canonical",
+      architecture: "amd64",
+    });
+    expect(result.unsupportedParams).toContain("vendor");
+    expect(result.unsupportedParams).toContain("architecture");
+  });
+
+  it("processes rejects ports-specific params", () => {
+    const result = brokerParams(SYSCOLLECTOR_PROCESSES_CONFIG, {
+      protocol: "tcp",
+      "local.ip": "127.0.0.1",
+    });
+    expect(result.unsupportedParams).toContain("protocol");
+    expect(result.unsupportedParams).toContain("local.ip");
+  });
+
+  it("services rejects all field-specific params from other endpoints", () => {
+    const result = brokerParams(SYSCOLLECTOR_SERVICES_CONFIG, {
+      vendor: "Canonical",
+      pid: "42",
+      euser: "root",
+    });
+    expect(result.unsupportedParams).toContain("vendor");
+    expect(result.unsupportedParams).toContain("pid");
+    expect(result.unsupportedParams).toContain("euser");
+  });
+});
+
+describe("Phase 3: Universal params present in all syscollector configs", () => {
+  const configs = [
+    { name: "packages", config: SYSCOLLECTOR_PACKAGES_CONFIG },
+    { name: "ports", config: SYSCOLLECTOR_PORTS_CONFIG },
+    { name: "processes", config: SYSCOLLECTOR_PROCESSES_CONFIG },
+    { name: "services", config: SYSCOLLECTOR_SERVICES_CONFIG },
+  ];
+  const universalKeys = Object.keys(UNIVERSAL_PARAMS);
+
+  for (const { name, config } of configs) {
+    it(`${name} config includes all ${universalKeys.length} universal params`, () => {
+      for (const key of universalKeys) {
+        expect(config.params).toHaveProperty(key);
+      }
+    });
+  }
 });

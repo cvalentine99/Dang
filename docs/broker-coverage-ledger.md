@@ -1,7 +1,7 @@
 # Wazuh Parameter Broker — Coverage Ledger
 
 **Spec baseline:** Wazuh REST API OpenAPI v4.14.3-rc3
-**Last updated:** Phase 2 Review Fixes sign-off (2026-03-04)
+**Last updated:** Phase 3 Syscollector Campaign sign-off (2026-03-04)
 
 ## Broker-Wired Endpoints
 
@@ -16,6 +16,10 @@ The following endpoints are fully wired through `paramBroker.ts`. All accepted p
 | `GET /sca/{agent_id}` | `SCA_POLICIES_CONFIG` | offset, limit, sort, search, select, q, distinct | name (alias: policyName), description, references | 1 |
 | `GET /sca/{agent_id}/checks/{policy_id}` | `SCA_CHECKS_CONFIG` | offset, limit, sort, search, select, q, distinct | title, description, rationale, remediation, command, reason, file (alias: full_path), process, directory, registry, references, result, condition | 1 |
 | `GET /manager/configuration` | `MANAGER_CONFIG` | distinct only (offset/limit/sort/search/select/q NOT in spec) | section, field, raw | 2 |
+| `GET /syscollector/{agent_id}/packages` | `SYSCOLLECTOR_PACKAGES_CONFIG` | offset, limit, sort, search, select, q, distinct | vendor, name (alias: package_name), architecture (alias: arch), format (alias: file_format), version (alias: package_version) | 3 |
+| `GET /syscollector/{agent_id}/ports` | `SYSCOLLECTOR_PORTS_CONFIG` | offset, limit, sort, search, select, q, distinct | pid, protocol, local.ip (alias: local_ip), local.port (alias: local_port), remote.ip (alias: remote_ip), tx_queue, state, process | 3 |
+| `GET /syscollector/{agent_id}/processes` | `SYSCOLLECTOR_PROCESSES_CONFIG` | offset, limit, sort, search, select, q, distinct | pid (alias: process_pid), state (alias: process_state), ppid, egroup, euser, fgroup, name (alias: process_name), nlwp, pgrp, priority, rgroup, ruser, sgroup, suser | 3 |
+| `GET /syscollector/{agent_id}/services` | `SYSCOLLECTOR_SERVICES_CONFIG` | offset, limit, sort, search, select, q, distinct | (none — spec defines only universal params) | 3 |
 
 ## Universal Query Family
 
@@ -56,6 +60,56 @@ Available exclusively on `GET /manager/configuration`:
 | section | section | string | Configuration section (e.g. global, alerts, syscheck, ruleset) |
 | field | field | string | Section child field (e.g. decoder_dir, rule_dir) |
 | raw | raw | boolean | Return raw config text. When true, section and field are ignored by Wazuh |
+
+## Syscollector Field Filters (Phase 3)
+
+The syscollector family provides per-agent inventory data. Four endpoints were wired in Phase 3, each with field-level filters mapped from the OpenAPI spec.
+
+### Packages (`/syscollector/{agent_id}/packages`)
+
+| Parameter | Wazuh Name | Aliases | Description |
+|---|---|---|---|
+| vendor | vendor | — | Package vendor |
+| name | name | package_name | Package name |
+| architecture | architecture | arch | CPU architecture (amd64, x86_64, etc.) |
+| format | format | file_format | Package format (deb, rpm, etc.) |
+| version | version | package_version | Package version string |
+
+### Ports (`/syscollector/{agent_id}/ports`)
+
+| Parameter | Wazuh Name | Aliases | Description |
+|---|---|---|---|
+| pid | pid | — | Process ID owning the port |
+| protocol | protocol | — | Network protocol (tcp, udp) |
+| local.ip | local.ip | local_ip | Local IP address |
+| local.port | local.port | local_port | Local port number |
+| remote.ip | remote.ip | remote_ip | Remote IP address |
+| tx_queue | tx_queue | — | Transmit queue size |
+| state | state | — | Connection state (listening, established, etc.) |
+| process | process | — | Process name associated with port |
+
+### Processes (`/syscollector/{agent_id}/processes`)
+
+| Parameter | Wazuh Name | Aliases | Description |
+|---|---|---|---|
+| pid | pid | process_pid | Process ID |
+| state | state | process_state | Process state (S, R, Z, etc.) |
+| ppid | ppid | — | Parent process ID |
+| egroup | egroup | — | Effective group |
+| euser | euser | — | Effective user |
+| fgroup | fgroup | — | Filesystem group |
+| name | name | process_name | Process name |
+| nlwp | nlwp | — | Number of lightweight processes (threads) |
+| pgrp | pgrp | — | Process group ID |
+| priority | priority | — | Scheduling priority |
+| rgroup | rgroup | — | Real group |
+| ruser | ruser | — | Real user |
+| sgroup | sgroup | — | Saved group |
+| suser | suser | — | Saved user |
+
+### Services (`/syscollector/{agent_id}/services`)
+
+No field-specific filters are defined in the Wazuh v4.14.3 spec for this endpoint. Only universal query parameters (offset, limit, sort, search, select, q, distinct) are accepted.
 
 ## Correctness Fixes Applied
 
@@ -98,21 +152,22 @@ Six issues identified during independent code review. All resolved.
 | Review Fix: level custom serializer (number, string, NaN) | 4 | 2-RF |
 | Review Fix: errors[] contract verification (always array, descriptive, separate from unsupported) | 4 | 2-RF |
 | Review Fix: distinct=false omission (flag semantics) | 1 | 2-RF |
-| **Total paramBroker tests** | **~215** | |
+| Syscollector packages: forwarding + alias resolution | 7 | 3 |
+| Syscollector ports: forwarding + alias resolution | 7 | 3 |
+| Syscollector processes: forwarding + alias resolution | 7 | 3 |
+| Syscollector services: universal-only + unsupported rejection | 6 | 3 |
+| **Total paramBroker tests** | **~242** | |
 
 ## Out of Scope (Not Yet Broker-Wired)
 
-The following endpoint families are intentionally NOT wired in Phase 1 or Phase 2. They remain candidates for future phases.
+The following endpoint families are intentionally NOT wired in Phases 1–3. They remain candidates for future phases.
 
-### Phase 3 Candidate: Syscollector Family
+### Phase 4 Candidates: Remaining Syscollector Family
 
 | Endpoint | Current State |
 |---|---|
 | `GET /syscollector/{agent_id}/hardware` | Manual param forwarding (limit, offset only) |
 | `GET /syscollector/{agent_id}/os` | Manual param forwarding (limit, offset only) |
-| `GET /syscollector/{agent_id}/packages` | Manual param forwarding (limit, offset, search) |
-| `GET /syscollector/{agent_id}/processes` | Manual param forwarding (limit, offset only) |
-| `GET /syscollector/{agent_id}/ports` | Manual param forwarding (limit, offset only) |
 | `GET /syscollector/{agent_id}/netiface` | Manual param forwarding (limit, offset only) |
 | `GET /syscollector/{agent_id}/netaddr` | Manual param forwarding (limit, offset only) |
 | `GET /syscollector/{agent_id}/netproto` | Manual param forwarding (limit, offset only) |

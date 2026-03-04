@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { GlassPanel, StatCard, ThreatBadge, RawJsonViewer, RefreshControl } from "@/components/shared";
 import { TableSkeleton } from "@/components/shared/TableSkeleton";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -155,11 +155,31 @@ export default function RulesetExplorer() {
   const [gpg13Filter, setGpg13Filter] = useState("");
   const [mitreFilter, setMitreFilter] = useState("");
 
+  // ─── Debounce (300ms) for text inputs to reduce Wazuh API calls ──────────
+  function useDebounced<T>(value: T, delayMs = 300): T {
+    const [debounced, setDebounced] = useState(value);
+    const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+    useEffect(() => {
+      timer.current = setTimeout(() => setDebounced(value), delayMs);
+      return () => clearTimeout(timer.current);
+    }, [value, delayMs]);
+    return debounced;
+  }
+
+  const debouncedSearch = useDebounced(searchQuery);
+  const debouncedPciDss = useDebounced(pciDssFilter);
+  const debouncedGdpr = useDebounced(gdprFilter);
+  const debouncedHipaa = useDebounced(hipaaFilter);
+  const debouncedNist80053 = useDebounced(nist80053Filter);
+  const debouncedTsc = useDebounced(tscFilter);
+  const debouncedGpg13 = useDebounced(gpg13Filter);
+  const debouncedMitre = useDebounced(mitreFilter);
+
   // ─── API Queries ─────────────────────────────────────────────────────────
   const statusQ = trpc.wazuh.status.useQuery();
   const isConfigured = !!(statusQ.data as Record<string, unknown>)?.configured;
 
-  // ─── Server-side query params (broker-wired) ─────────────────────────────
+  // ─── Server-side query params (broker-wired, using debounced values) ──────
   const rulesQueryParams = useMemo(() => {
     const params: Record<string, unknown> = { limit: 500, offset: 0 };
 
@@ -168,9 +188,9 @@ export default function RulesetExplorer() {
       params.sort = `${sortDir === "desc" ? "-" : "+"}${sortField === "id" ? "id" : "level"}`;
     }
 
-    // Search — forwarded as native Wazuh search (not q=name~)
-    if (searchQuery.trim()) {
-      params.search = searchQuery.trim();
+    // Search — debounced, forwarded as native Wazuh search (not q=name~)
+    if (debouncedSearch.trim()) {
+      params.search = debouncedSearch.trim();
     }
 
     // Group filter — server-side
@@ -188,17 +208,17 @@ export default function RulesetExplorer() {
       params.status = statusFilter;
     }
 
-    // Compliance filters — server-side via broker
-    if (pciDssFilter) params.pci_dss = pciDssFilter;
-    if (gdprFilter) params.gdpr = gdprFilter;
-    if (hipaaFilter) params.hipaa = hipaaFilter;
-    if (nist80053Filter) params["nist-800-53"] = nist80053Filter;
-    if (tscFilter) params.tsc = tscFilter;
-    if (gpg13Filter) params.gpg13 = gpg13Filter;
-    if (mitreFilter) params.mitre = mitreFilter;
+    // Compliance filters — debounced, server-side via broker
+    if (debouncedPciDss) params.pci_dss = debouncedPciDss;
+    if (debouncedGdpr) params.gdpr = debouncedGdpr;
+    if (debouncedHipaa) params.hipaa = debouncedHipaa;
+    if (debouncedNist80053) params["nist-800-53"] = debouncedNist80053;
+    if (debouncedTsc) params.tsc = debouncedTsc;
+    if (debouncedGpg13) params.gpg13 = debouncedGpg13;
+    if (debouncedMitre) params.mitre = debouncedMitre;
 
     return params;
-  }, [sortField, sortDir, searchQuery, groupFilter, filenameFilter, statusFilter, pciDssFilter, gdprFilter, hipaaFilter, nist80053Filter, tscFilter, gpg13Filter, mitreFilter]);
+  }, [sortField, sortDir, debouncedSearch, groupFilter, filenameFilter, statusFilter, debouncedPciDss, debouncedGdpr, debouncedHipaa, debouncedNist80053, debouncedTsc, debouncedGpg13, debouncedMitre]);
 
   const rulesQ = trpc.wazuh.rules.useQuery(
     rulesQueryParams as any,

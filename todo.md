@@ -2669,3 +2669,24 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Wire filter state into wazuh.rules tRPC query params
 - [x] Preserve Amethyst Nexus glass-morphism styling for filter controls
 - [x] Tests: verify filter params are passed through to query
+
+### Part 1 — Debounced Compliance Filter Inputs
+- [x] Add 300ms debounce to all 7 compliance filter text inputs on Ruleset Explorer
+- [x] Ensure debounced values are what gets passed to the tRPC query (not raw keystroke values)
+- [x] Verify no unnecessary Wazuh API calls on rapid typing
+
+### Part 2 — Fleet Command Broker Filters
+- [x] Surface os.platform filter control on Fleet Command
+- [x] Surface multi-status filter (status[]) on Fleet Command
+- [x] Surface q (advanced query) input on Fleet Command
+- [x] Wire all filter state into trpc.wazuh.agents.useQuery() params (server-side via broker)
+
+### Part 3 — Syscollector Broker Campaign
+- [x] Add PACKAGES_CONFIG to paramBroker.ts (vendor, name, architecture, format, version + aliases)
+- [x] Add PORTS_CONFIG to paramBroker.ts (protocol, local.ip, local.port, remote.ip, state, pid, process, tx_queue + aliases)
+- [x] Add PROCESSES_CONFIG to paramBroker.ts (pid, state, ppid, egroup, euser, fgroup, name, nlwp, pgrp, priority, rgroup, ruser, sgroup, suser + aliases)
+- [x] Add SERVICES_CONFIG to paramBroker.ts (universal params only — no field-specific filters in spec)
+- [x] Wire all 4 syscollector configs into wazuhRouter.ts endpoints
+- [x] Tests: syscollector broker forwarding correctness (27 new tests)
+- [x] Tests: unsupported-param rejection for syscollector endpoints
+- [x] Update broker-coverage-ledger.md with syscollector entries
