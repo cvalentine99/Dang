@@ -210,6 +210,75 @@ describe("wazuh router", () => {
     expect(result).toBeDefined();
     expect(result).toHaveProperty("data");
   });
+
+  // ── P2 GAP Fill Endpoints ──────────────────────────────────────────────────
+
+  describe("P2: agentsSummary", () => {
+    it("calls GET /agents/summary with no params", async () => {
+      const result = await caller.wazuh.agentsSummary();
+      expect(result).toBeDefined();
+    });
+    it("calls GET /agents/summary with agents_list filter", async () => {
+      const result = await caller.wazuh.agentsSummary({ agents_list: "001,002" });
+      expect(result).toBeDefined();
+    });
+    it("calls GET /agents/summary with agents_list as array", async () => {
+      const result = await caller.wazuh.agentsSummary({ agents_list: ["001", "002"] });
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe("P2: managerVersionCheck", () => {
+    it("calls GET /manager/version/check with no params", async () => {
+      const result = await caller.wazuh.managerVersionCheck();
+      expect(result).toBeDefined();
+    });
+    it("calls GET /manager/version/check with force_query=true", async () => {
+      const result = await caller.wazuh.managerVersionCheck({ force_query: true });
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe("P2: managerComponentConfig", () => {
+    it("calls GET /manager/configuration/{component}/{configuration}", async () => {
+      const result = await caller.wazuh.managerComponentConfig({
+        component: "analysis",
+        configuration: "global",
+      });
+      expect(result).toBeDefined();
+    });
+    it("calls with different component/configuration pairs", async () => {
+      const result = await caller.wazuh.managerComponentConfig({
+        component: "logcollector",
+        configuration: "localfile",
+      });
+      expect(result).toBeDefined();
+    });
+    it("rejects missing component", async () => {
+      await expect(
+        (caller.wazuh.managerComponentConfig as any)({ configuration: "global" })
+      ).rejects.toThrow();
+    });
+    it("rejects missing configuration", async () => {
+      await expect(
+        (caller.wazuh.managerComponentConfig as any)({ component: "analysis" })
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("P2: securityConfig", () => {
+    it("calls GET /security/config", async () => {
+      const result = await caller.wazuh.securityConfig();
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe("P2: securityCurrentUser", () => {
+    it("calls GET /security/users/me", async () => {
+      const result = await caller.wazuh.securityCurrentUser();
+      expect(result).toBeDefined();
+    });
+  });
 });
 
 describe("wazuh router auth gating", () => {
@@ -238,5 +307,14 @@ describe("wazuh router auth gating", () => {
       res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
     });
     await expect(unauthCaller.wazuh.managerInfo()).rejects.toThrow();
+  });
+
+  it("rejects unauthenticated access to wazuh.securityCurrentUser", async () => {
+    const unauthCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+    });
+    await expect(unauthCaller.wazuh.securityCurrentUser()).rejects.toThrow();
   });
 });

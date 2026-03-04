@@ -2798,3 +2798,23 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] VALIDATION_CONTRACT.md: reword provenance from "guaranteed" to "best-effort with warning support"
 - [x] VALIDATION_CONTRACT.md: update Graph-Level Exclusion to reflect new searchGraph LLM-safe mode
 - [x] VALIDATION_CONTRACT.md: update test counts to current (1,900+), added Hard Gates table (4.3), added new test file rows
+
+## GAP Report Corrections — March 4, 2026
+
+### Contract Truth Errors (3)
+- [x] ERROR #1: Fix wazuh.agentUsers mapping — change GET /experimental/syscollector/users to GET /syscollector/{agent_id}/users
+- [x] ERROR #2: Remove wazuh.mitreOverview → GET /mitre. Replace with 7-row expansion for actual MITRE sub-endpoints
+- [x] ERROR #3: Move wazuh.vulnerabilities and wazuh.topVulnerabilities from Manager API table to Indexer section as indexer.vulnSearchByAgent
+
+### P2 Endpoint Gaps (5)
+- [x] Implement GET /agents/summary → wazuh.agentsSummary (broader agent overview, distinct from /agents/summary/status)
+- [x] Implement GET /manager/version/check → wazuh.managerVersionCheck (version compliance)
+- [x] Implement GET /manager/configuration/{component}/{configuration} → wazuh.managerComponentConfig (granular config inspection)
+- [x] Implement GET /security/config → wazuh.securityConfig (token TTL, RBAC settings)
+- [x] Implement GET /security/users/me → wazuh.securityCurrentUser (current user identity)
+
+### Broker + Tests for P2 Endpoints
+- [x] Add broker configs for new P2 endpoints where applicable (agentsSummary and managerVersionCheck are simple param-forward, no broker needed; managerComponentConfig uses path params)
+- [x] Add paramBroker tests for new P2 endpoints (no broker configs needed for these endpoints)
+- [x] Add router tests for new P2 endpoints (14 tests: 3 agentsSummary, 2 managerVersionCheck, 4 managerComponentConfig, 1 securityConfig, 2 securityCurrentUser, 2 auth rejection)
+- [x] Update VALIDATION_CONTRACT.md with new P2 endpoint rows (5 rows added: agentsSummary, managerVersionCheck, managerComponentConfig, securityConfig, securityCurrentUser)

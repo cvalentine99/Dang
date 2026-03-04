@@ -1,8 +1,8 @@
 # Dang! — Validation Contract
 
-**Version:** 2.1.0 — Contract Audit Corrections + Safety Hardening
+**Version:** 2.2.0 — GAP Report Corrections + P2 Endpoint Coverage
 **Date:** March 4, 2026
-**Status:** All 1,900+ tests passing, TypeScript clean (0 errors)
+**Status:** All 1,898 tests passing across 65 files, TypeScript clean (0 errors)
 
 ---
 
@@ -15,8 +15,8 @@ Every page in the application has been stripped of mock data fallbacks. The `cli
 | Home.tsx (SOC Console) | `MOCK_AGENTS`, `MOCK_ALERTS`, `MOCK_VULNERABILITIES`, `MOCK_MITRE_TECHNIQUES`, `MOCK_SCA_RESULTS`, `MOCK_FIM_EVENTS` | `trpc.wazuh.*` + `trpc.indexer.*` |
 | AgentHealth.tsx (Fleet Command) | `MOCK_AGENTS` | `trpc.wazuh.agents` |
 | AlertsTimeline.tsx | `MOCK_ALERTS` | `trpc.indexer.alertsSearch` |
-| Vulnerabilities.tsx | `MOCK_VULNERABILITIES`, `MOCK_AGENTS` | `trpc.wazuh.vulnerabilities` + `trpc.wazuh.agents` |
-| MitreAttack.tsx | `MOCK_MITRE_TECHNIQUES`, `MOCK_ALERTS` | `trpc.wazuh.mitreOverview` + `trpc.indexer.alertsSearch` |
+| Vulnerabilities.tsx | `MOCK_VULNERABILITIES`, `MOCK_AGENTS` | `trpc.indexer.vulnSearchByAgent` + `trpc.wazuh.agents` |
+| MitreAttack.tsx | `MOCK_MITRE_TECHNIQUES`, `MOCK_ALERTS` | `trpc.wazuh.mitreTechniques` + `trpc.indexer.alertsSearch` |
 | Compliance.tsx | `MOCK_SCA_RESULTS`, `MOCK_AGENTS` | `trpc.wazuh.scaPolicies` + `trpc.wazuh.agents` |
 | FileIntegrity.tsx | `MOCK_FIM_EVENTS`, `MOCK_AGENTS` | `trpc.wazuh.syscheckEvents` + `trpc.wazuh.agents` |
 | ITHygiene.tsx | `MOCK_AGENTS`, `MOCK_PACKAGES`, `MOCK_SERVICES`, `MOCK_USERS`, `MOCK_HARDWARE`, `MOCK_OS_INFO`, `MOCK_NETWORK_INFO`, `MOCK_PORTS` | `trpc.wazuh.agents` + `trpc.wazuh.syscollector*` |
@@ -38,10 +38,15 @@ All calls go through the backend proxy (`proxyGet`). No direct browser→Wazuh c
 |---|---|---|---|
 | `wazuh.agents` | `GET /agents` | GET | Home, AgentHealth, Vulnerabilities, Compliance, FIM, ITHygiene, ThreatHunting, DriftComparison |
 | `wazuh.agentSummary` | `GET /agents/summary/status` | GET | Home |
+| `wazuh.agentsSummary` | `GET /agents/summary` | GET | (P2 GAP fill) |
 | `wazuh.agentOs` | `GET /agents/summary/os` | GET | Home |
-| `wazuh.vulnerabilities` | `GET /vulnerability/{agent_id}` | GET | Vulnerabilities, ThreatHunting |
-| `wazuh.topVulnerabilities` | `GET /vulnerability/{agent_id}` | GET | Home |
-| `wazuh.mitreOverview` | `GET /mitre` | GET | MitreAttack |
+| `wazuh.mitreTechniques` | `GET /mitre/techniques` | GET | MitreAttack |
+| `wazuh.mitreTactics` | `GET /mitre/tactics` | GET | MitreAttack |
+| `wazuh.mitreGroups` | `GET /mitre/groups` | GET | MitreAttack |
+| `wazuh.mitreMetadata` | `GET /mitre/metadata` | GET | MitreAttack |
+| `wazuh.mitreMitigations` | `GET /mitre/mitigations` | GET | MitreAttack |
+| `wazuh.mitreReferences` | `GET /mitre/references` | GET | MitreAttack |
+| `wazuh.mitreSoftware` | `GET /mitre/software` | GET | MitreAttack |
 | `wazuh.scaPolicies` | `GET /sca/{agent_id}` | GET | Compliance |
 | `wazuh.scaChecks` | `GET /sca/{agent_id}/checks/{policy_id}` | GET | Compliance |
 | `wazuh.syscheckEvents` | `GET /syscheck/{agent_id}` | GET | FileIntegrity, ThreatHunting |
@@ -53,10 +58,12 @@ All calls go through the backend proxy (`proxyGet`). No direct browser→Wazuh c
 | `wazuh.syscollectorPorts` | `GET /syscollector/{agent_id}/ports` | GET | ITHygiene |
 | `wazuh.agentPackages` | `GET /syscollector/{agent_id}/packages` | GET | DriftComparison |
 | `wazuh.agentServices` | `GET /syscollector/{agent_id}/processes` | GET | DriftComparison |
-| `wazuh.agentUsers` | `GET /experimental/syscollector/users` | GET | DriftComparison |
+| `wazuh.agentUsers` | `GET /syscollector/{agent_id}/users` | GET | DriftComparison |
 | `wazuh.rules` | `GET /rules` | GET | RulesetExplorer |
 | `wazuh.decoders` | `GET /decoders` | GET | RulesetExplorer |
 | `wazuh.cdbLists` | `GET /lists` | GET | RulesetExplorer |
+| `wazuh.securityConfig` | `GET /security/config` | GET | (P2 GAP fill) |
+| `wazuh.securityCurrentUser` | `GET /security/users/me` | GET | (P2 GAP fill) |
 | `wazuh.clusterStatus` | `GET /cluster/status` | GET | ClusterHealth |
 | `wazuh.clusterNodes` | `GET /cluster/nodes` | GET | ClusterHealth |
 | `wazuh.clusterHealthcheck` | `GET /cluster/healthcheck` | GET | ClusterHealth |
@@ -64,6 +71,8 @@ All calls go through the backend proxy (`proxyGet`). No direct browser→Wazuh c
 | `wazuh.managerStatus` | `GET /manager/status` | GET | Status |
 | `wazuh.managerLogs` | `GET /manager/logs` | GET | Status |
 | `wazuh.managerStats` | `GET /manager/stats` | GET | Status |
+| `wazuh.managerVersionCheck` | `GET /manager/version/check` | GET | (P2 GAP fill) |
+| `wazuh.managerComponentConfig` | `GET /manager/configuration/{component}/{configuration}` | GET | (P2 GAP fill) |
 
 ### 2.2 Wazuh Indexer API (via `server/indexer/indexerClient.ts`)
 
@@ -75,6 +84,7 @@ All calls go through the backend Indexer proxy. Queries use Elasticsearch/OpenSe
 | `indexer.alertsAggregation` | `POST /wazuh-alerts-*/_search` (aggs) | Home, AlertsTimeline |
 | `indexer.indicesStats` | `GET /_cat/indices/wazuh-*` | Status |
 | `indexer.clusterHealth` | `GET /_cluster/health` | Status |
+| `indexer.vulnSearchByAgent` | `POST /wazuh-states-vulnerabilities-*/_search` | Vulnerabilities, ThreatHunting, Home |
 
 ### 2.3 OTX Threat Intelligence (via `server/otx/otxRouter.ts`)
 

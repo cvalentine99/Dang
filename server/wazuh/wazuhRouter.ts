@@ -225,6 +225,33 @@ export const wazuhRouter = router({
     proxyGet("/manager/logs/summary", {}, "alerts")
   ),
 
+  /**
+   * GET /manager/version/check — Check available Wazuh updates
+   * P2 GAP fill. Optional force_query to bypass CTI cache.
+   */
+  managerVersionCheck: wazuhProcedure
+    .input(z.object({
+      force_query: z.boolean().optional(),
+    }).optional())
+    .query(({ input }) => {
+      const params: Record<string, string | number | boolean | undefined> = {};
+      if (input?.force_query !== undefined) params.force_query = input.force_query;
+      return proxyGet("/manager/version/check", params);
+    }),
+
+  /**
+   * GET /manager/configuration/{component}/{configuration} — Granular active config
+   * P2 GAP fill. Returns the active configuration for a specific component/configuration pair.
+   */
+  managerComponentConfig: wazuhProcedure
+    .input(z.object({
+      component: z.string(),
+      configuration: z.string(),
+    }))
+    .query(({ input }) =>
+      proxyGet(`/manager/configuration/${input.component}/${input.configuration}`)
+    ),
+
   // ══════════════════════════════════════════════════════════════════════════════
   // CLUSTER
   // ══════════════════════════════════════════════════════════════════════════════
@@ -333,6 +360,24 @@ export const wazuhRouter = router({
   agentSummaryOs: wazuhProcedure.query(() =>
     proxyGet("/agents/summary/os")
   ),
+
+  /**
+   * GET /agents/summary — Broader agent summary (OS, status, groups)
+   * P2 GAP fill. Accepts optional agents_list filter.
+   */
+  agentsSummary: wazuhProcedure
+    .input(z.object({
+      agents_list: z.union([z.string(), z.array(z.string())]).optional(),
+    }).optional())
+    .query(({ input }) => {
+      const params: Record<string, string | number | boolean | undefined> = {};
+      if (input?.agents_list) {
+        params.agents_list = Array.isArray(input.agents_list)
+          ? input.agents_list.join(",")
+          : input.agents_list;
+      }
+      return proxyGet("/agents/summary", params);
+    }),
 
   agentOverview: wazuhProcedure.query(() =>
     proxyGet("/overview/agents")
@@ -1063,6 +1108,18 @@ export const wazuhRouter = router({
   securityRoles: wazuhProcedure.query(() => proxyGet("/security/roles")),
   securityPolicies: wazuhProcedure.query(() => proxyGet("/security/policies")),
   securityUsers: wazuhProcedure.query(() => proxyGet("/security/users")),
+
+  /**
+   * GET /security/config — Security configuration (token TTL, RBAC mode)
+   * P2 GAP fill. No parameters beyond pretty/wait_for_complete.
+   */
+  securityConfig: wazuhProcedure.query(() => proxyGet("/security/config")),
+
+  /**
+   * GET /security/users/me — Current authenticated user info
+   * P2 GAP fill. No parameters beyond pretty/wait_for_complete.
+   */
+  securityCurrentUser: wazuhProcedure.query(() => proxyGet("/security/users/me")),
 
   // ══════════════════════════════════════════════════════════════════════════════
   // LISTS (CDB Lists — read-only)
