@@ -31,9 +31,9 @@ export interface ParamDef {
   aliases?: string[];
   /**
    * Optional coercion/serializer. Receives the raw input value and returns
-   * the string to send to Wazuh, or null to omit the parameter.
+   * a CoerceResult with the serialized string (or null to omit) and any error.
    */
-  serialize?: (value: unknown) => string | null;
+  serialize?: (value: unknown) => CoerceResult;
 }
 
 export interface EndpointParamConfig {
@@ -54,32 +54,61 @@ export interface BrokerResult {
   errors: string[];
 }
 
+// ── Coercer result type ──────────────────────────────────────────────────────
+
+interface CoerceResult {
+  /** The serialized value, or null if the value should be omitted */
+  value: string | null;
+  /** Error message if the value was provided but could not be coerced */
+  error: string | null;
+}
+
 // ── Coercers ─────────────────────────────────────────────────────────────────
+// Each coercer returns a CoerceResult so the broker can distinguish between
+// "param not provided" (skip silently) and "param provided but invalid" (record error).
 
-function coerceString(value: unknown): string | null {
-  if (value === undefined || value === null || value === "") return null;
-  return String(value);
+function coerceString(value: unknown): CoerceResult {
+  if (value === undefined || value === null || value === "") return { value: null, error: null };
+  return { value: String(value), error: null };
 }
 
-function coerceNumber(value: unknown): string | null {
-  if (value === undefined || value === null) return null;
+function coerceNumber(value: unknown): CoerceResult {
+  if (value === undefined || value === null) return { value: null, error: null };
   const n = Number(value);
-  if (Number.isNaN(n)) return null;
-  return String(n);
+  if (Number.isNaN(n)) {
+    return { value: null, error: `could not coerce ${JSON.stringify(value)} to number` };
+  }
+  return { value: String(n), error: null };
 }
 
-function coerceBoolean(value: unknown): string | null {
-  if (value === undefined || value === null) return null;
-  return String(Boolean(value));
+/**
+ * Boolean coercion with strict semantics:
+ * - true / 1 → "true"
+ * - false / 0 → null (flag semantics: false = absent, not forwarded)
+ * - Anything else (truthy strings like "no", "yes", "false") → error
+ *
+ * The Wazuh spec treats boolean params (e.g. `distinct`, `raw`) as flags
+ * where only presence with value "true" is meaningful. Sending "false" is
+ * either ignored or undefined behavior per spec.
+ */
+function coerceBoolean(value: unknown): CoerceResult {
+  if (value === undefined || value === null) return { value: null, error: null };
+  if (value === true || value === 1) return { value: "true", error: null };
+  if (value === false || value === 0) return { value: null, error: null }; // false = absent (flag semantics)
+  // Anything else is ambiguous — reject it
+  return { value: null, error: `could not coerce ${JSON.stringify(value)} to boolean (expected true/false)` };
 }
 
-function coerceCsv(value: unknown): string | null {
-  if (value === undefined || value === null) return null;
-  if (Array.isArray(value)) return value.join(",") || null;
-  return String(value);
+function coerceCsv(value: unknown): CoerceResult {
+  if (value === undefined || value === null) return { value: null, error: null };
+  if (Array.isArray(value)) {
+    const joined = value.join(",");
+    return joined ? { value: joined, error: null } : { value: null, error: null };
+  }
+  return { value: String(value), error: null };
 }
 
-const DEFAULT_COERCERS: Record<ParamType, (v: unknown) => string | null> = {
+const DEFAULT_COERCERS: Record<ParamType, (v: unknown) => CoerceResult> = {
   string: coerceString,
   number: coerceNumber,
   boolean: coerceBoolean,
@@ -142,15 +171,22 @@ export function brokerParams(
 
     // Apply custom serializer or default coercer
     const coerce = def.serialize ?? DEFAULT_COERCERS[def.type];
-    const serialized = coerce(inputValue);
+    const result = coerce(inputValue);
 
-    if (serialized === null) {
-      // Value coerced to nothing — skip but don't flag as unsupported
+    // Record coercion errors (value was provided but could not be serialized)
+    if (result.error) {
+      errors.push(`${inputKey}: ${result.error}`);
+    }
+
+    if (result.value === null) {
+      // Value coerced to nothing — recognized but not forwarded
+      // (could be a valid omission like false for a flag, or a coercion failure)
+      recognizedParams.push(inputKey);
       continue;
     }
 
     // Use the Wazuh spec parameter name for the outbound query
-    forwardedQuery[def.wazuhName] = serialized;
+    forwardedQuery[def.wazuhName] = result.value;
     recognizedParams.push(inputKey);
   }
 
@@ -327,6 +363,19 @@ export const RULES_CONFIG: EndpointParamConfig = {
       wazuhName: "level",
       description: "Filter by rule level. Can be a single level (4) or an interval (2-4)",
       type: "string",
+      /**
+       * Custom serializer: the Wazuh spec accepts level as a string ("4" or "2-4"),
+       * but the Zod schema also allows numeric input (z.number().int()). This
+       * serializer handles both forms correctly.
+       */
+      serialize: (value: unknown): CoerceResult => {
+        if (value === undefined || value === null) return { value: null, error: null };
+        if (typeof value === "number") {
+          if (Number.isNaN(value)) return { value: null, error: `could not coerce ${JSON.stringify(value)} to level` };
+          return { value: String(value), error: null };
+        }
+        return { value: String(value), error: null };
+      },
     },
     filename: {
       wazuhName: "filename",

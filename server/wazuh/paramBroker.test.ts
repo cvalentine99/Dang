@@ -61,7 +61,7 @@ describe("brokerParams core", () => {
     expect(result.forwardedQuery).not.toHaveProperty("another_fake");
   });
 
-  it("omits null, undefined, and empty-string values", () => {
+  it("omits null, undefined, and empty-string values from forwarded query", () => {
     const result = brokerParams(AGENTS_CONFIG, {
       limit: 10,
       status: null,
@@ -69,7 +69,12 @@ describe("brokerParams core", () => {
       sort: "",
     });
     expect(result.forwardedQuery).toEqual({ limit: "10" });
-    expect(result.recognizedParams).toEqual(["limit"]);
+    // limit and sort are recognized (sort has a value that coerces to null)
+    // null and undefined values are skipped before reaching the coercer
+    expect(result.recognizedParams).toContain("limit");
+    expect(result.recognizedParams).toContain("sort");
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.errors).toHaveLength(0);
   });
 
   it("resolves aliases to canonical Wazuh param names", () => {
@@ -88,9 +93,50 @@ describe("brokerParams core", () => {
     expect(result.forwardedQuery.offset).toBe("0");
   });
 
-  it("coerces boolean values to strings", () => {
+  it("coerces boolean true to string 'true'", () => {
     const result = brokerParams(AGENTS_CONFIG, { distinct: true });
     expect(result.forwardedQuery.distinct).toBe("true");
+  });
+
+  // Fix #4: distinct: false should be omitted (flag semantics)
+  it("does NOT forward distinct=false to Wazuh (flag semantics)", () => {
+    const result = brokerParams(AGENTS_CONFIG, { distinct: false });
+    expect(result.forwardedQuery).not.toHaveProperty("distinct");
+    // false is a valid omission, not an error
+    expect(result.errors).toHaveLength(0);
+    // but it IS recognized
+    expect(result.recognizedParams).toContain("distinct");
+  });
+
+  // Fix #3: coerceBoolean rejects truthy strings
+  it("coerceBoolean rejects truthy strings like 'yes'", () => {
+    const result = brokerParams(AGENTS_CONFIG, { distinct: "yes" as any });
+    expect(result.forwardedQuery).not.toHaveProperty("distinct");
+    expect(result.errors.length).toBeGreaterThan(0);
+  });
+
+  it("coerceBoolean rejects string 'no' (does not silently coerce to true)", () => {
+    const result = brokerParams(AGENTS_CONFIG, { distinct: "no" as any });
+    expect(result.forwardedQuery).not.toHaveProperty("distinct");
+    expect(result.errors.length).toBeGreaterThan(0);
+  });
+
+  it("coerceBoolean rejects string 'false' (does not silently coerce to true)", () => {
+    const result = brokerParams(AGENTS_CONFIG, { distinct: "false" as any });
+    expect(result.forwardedQuery).not.toHaveProperty("distinct");
+    expect(result.errors.length).toBeGreaterThan(0);
+  });
+
+  it("coerceBoolean accepts numeric 1 as true", () => {
+    const result = brokerParams(AGENTS_CONFIG, { distinct: 1 as any });
+    expect(result.forwardedQuery.distinct).toBe("true");
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("coerceBoolean treats numeric 0 as false (omitted)", () => {
+    const result = brokerParams(AGENTS_CONFIG, { distinct: 0 as any });
+    expect(result.forwardedQuery).not.toHaveProperty("distinct");
+    expect(result.errors).toHaveLength(0);
   });
 
   it("coerces csv (array) values to comma-separated strings", () => {
@@ -103,9 +149,36 @@ describe("brokerParams core", () => {
     expect(result.forwardedQuery.select).toBe("name,ip");
   });
 
-  it("handles NaN number coercion by omitting the param", () => {
+  // Fix #1/#2: NaN coercion records an error instead of silently dropping
+  it("records an error when a number param receives a non-numeric value", () => {
     const result = brokerParams(AGENTS_CONFIG, { limit: "not-a-number" });
     expect(result.forwardedQuery).not.toHaveProperty("limit");
+    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.errors[0]).toContain("limit");
+    expect(result.errors[0]).toContain("not-a-number");
+  });
+
+  it("records an error when a number param receives NaN", () => {
+    const result = brokerParams(AGENTS_CONFIG, { limit: NaN });
+    expect(result.forwardedQuery).not.toHaveProperty("limit");
+    expect(result.errors.length).toBeGreaterThan(0);
+  });
+
+  it("errors[] is empty when all values are valid", () => {
+    const result = brokerParams(AGENTS_CONFIG, { limit: 50, offset: 10, status: "active" });
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("errors[] is empty when no params are provided", () => {
+    const result = brokerParams(AGENTS_CONFIG, {});
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("errors[] accumulates multiple coercion failures", () => {
+    const result = brokerParams(AGENTS_CONFIG, { limit: "bad", offset: "worse" });
+    expect(result.errors.length).toBe(2);
+    expect(result.errors[0]).toContain("limit");
+    expect(result.errors[1]).toContain("offset");
   });
 
   it("returns empty result for empty input", () => {
@@ -205,7 +278,7 @@ describe("/agents endpoint config", () => {
       search: "test",
       select: "name,ip,status",
       q: "status=active",
-      distinct: false,
+      distinct: true,
       status: "active",
       "os.platform": "ubuntu",
       "os.version": "22.04",
@@ -648,7 +721,7 @@ describe("/manager/configuration precision params", () => {
     expect(result.unsupportedParams).toHaveLength(0);
   });
 
-  it("forwards all three precision params simultaneously", () => {
+  it("forwards section + field but omits raw=false (flag semantics)", () => {
     const result = brokerParams(MANAGER_CONFIG, {
       section: "alerts",
       field: "log_alert_level",
@@ -656,7 +729,9 @@ describe("/manager/configuration precision params", () => {
     });
     expect(result.forwardedQuery.section).toBe("alerts");
     expect(result.forwardedQuery.field).toBe("log_alert_level");
-    expect(result.forwardedQuery.raw).toBe("false");
+    // raw: false should be omitted per flag semantics
+    expect(result.forwardedQuery).not.toHaveProperty("raw");
+    // All three are recognized even though raw is omitted
     expect(result.recognizedParams.length).toBe(3);
   });
 
@@ -880,5 +955,97 @@ describe("Phase 2 cross-endpoint isolation", () => {
     expect(result.unsupportedParams).toContain("section");
     expect(result.unsupportedParams).toContain("field");
     expect(result.unsupportedParams).toContain("raw");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REVIEW FIX #5 — status CSV array capability
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("Fix #5: status CSV array capability", () => {
+  it("coerces status array to csv for multi-status filter", () => {
+    const result = brokerParams(AGENTS_CONFIG, { status: ["active", "disconnected"] });
+    expect(result.forwardedQuery.status).toBe("active,disconnected");
+    expect(result.recognizedParams).toContain("status");
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("coerces status single string pass-through", () => {
+    const result = brokerParams(AGENTS_CONFIG, { status: "active" });
+    expect(result.forwardedQuery.status).toBe("active");
+  });
+
+  it("coerces status three-value array", () => {
+    const result = brokerParams(AGENTS_CONFIG, { status: ["active", "disconnected", "pending"] });
+    expect(result.forwardedQuery.status).toBe("active,disconnected,pending");
+  });
+
+  it("omits status when empty array is provided", () => {
+    const result = brokerParams(AGENTS_CONFIG, { status: [] });
+    expect(result.forwardedQuery).not.toHaveProperty("status");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REVIEW FIX #6 — level custom serializer handles both number and string
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("Fix #6: level custom serializer", () => {
+  it("serializes numeric level to string", () => {
+    const result = brokerParams(RULES_CONFIG, { level: 4 as any });
+    expect(result.forwardedQuery.level).toBe("4");
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("serializes string level range pass-through", () => {
+    const result = brokerParams(RULES_CONFIG, { level: "2-4" });
+    expect(result.forwardedQuery.level).toBe("2-4");
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("serializes single string level pass-through", () => {
+    const result = brokerParams(RULES_CONFIG, { level: "8" });
+    expect(result.forwardedQuery.level).toBe("8");
+  });
+
+  it("handles NaN level with error", () => {
+    const result = brokerParams(RULES_CONFIG, { level: NaN as any });
+    expect(result.forwardedQuery).not.toHaveProperty("level");
+    expect(result.errors.length).toBeGreaterThan(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REVIEW — errors[] contract is alive and populated
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("errors[] contract verification", () => {
+  it("errors[] is always an array (never undefined)", () => {
+    const result = brokerParams(AGENTS_CONFIG, {});
+    expect(Array.isArray(result.errors)).toBe(true);
+  });
+
+  it("errors[] contains descriptive messages for coercion failures", () => {
+    const result = brokerParams(AGENTS_CONFIG, { limit: "abc" });
+    expect(result.errors.length).toBe(1);
+    expect(result.errors[0]).toMatch(/limit.*coerce.*abc/i);
+  });
+
+  it("errors[] is separate from unsupportedParams", () => {
+    const result = brokerParams(AGENTS_CONFIG, { limit: "bad", bogus: "param" });
+    // limit is recognized but fails coercion → errors
+    expect(result.errors.length).toBe(1);
+    expect(result.errors[0]).toContain("limit");
+    // bogus is unrecognized → unsupportedParams
+    expect(result.unsupportedParams).toContain("bogus");
+    // They don't overlap
+    expect(result.unsupportedParams).not.toContain("limit");
+  });
+
+  it("boolean coercion errors are recorded for ambiguous string values", () => {
+    const result = brokerParams(MANAGER_CONFIG, { raw: "yes" as any });
+    expect(result.errors.length).toBe(1);
+    expect(result.errors[0]).toContain("raw");
+    expect(result.forwardedQuery).not.toHaveProperty("raw");
   });
 });

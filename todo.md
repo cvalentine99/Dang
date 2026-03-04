@@ -2636,3 +2636,15 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Update coverage ledger (what is wired vs out of scope)
 - [x] No syscollector expansion (Phase 3)
 - [x] No UI claims beyond what is broker-wired
+
+### Phase 2 Review Fixes — paramBroker Trust Violations
+- [x] Fix #1: Implement errors[] population for coercion failures (or remove dead field)
+- [x] Fix #2: NaN coercion should push to errors[], not silently drop
+- [x] Fix #3: coerceBoolean must not convert arbitrary truthy strings to "true"
+- [x] Fix #4: distinct: false should be omitted (not forwarded as "false") — flag semantics
+- [x] Fix #5: status Zod schema should allow array input to expose broker csv capability
+- [x] Fix #6: level in RULES_CONFIG — custom serializer handles both number and string input
+- [x] Tests: error recorded when number param receives non-numeric value
+- [x] Tests: coerceBoolean rejects truthy strings and records error
+- [x] Tests: distinct=false is NOT forwarded to Wazuh
+- [x] Tests: status array coerced to csv for multi-status filter

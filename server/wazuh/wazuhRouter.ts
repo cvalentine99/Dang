@@ -248,6 +248,7 @@ export const wazuhRouter = router({
         status: z.union([
           z.enum(["active", "disconnected", "never_connected", "pending"]),
           z.string(),
+          z.array(z.string()),
         ]).optional(),
         os_platform: z.string().optional(),
         search: z.string().optional(),
