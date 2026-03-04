@@ -418,6 +418,64 @@ export const wazuhRouter = router({
     ),
 
   /**
+   * GET /agents/upgrade_result — Agent upgrade results
+   * Sprint v2 P0 gap fill. Supports agents_list, q, and agent filter params.
+   */
+  agentsUpgradeResult: wazuhProcedure
+    .input(
+      z.object({
+        agents_list: z.union([z.string(), z.array(z.string())]).optional(),
+        q: z.string().optional(),
+        os_platform: z.string().optional(),
+        os_version: z.string().optional(),
+        os_name: z.string().optional(),
+        manager: z.string().optional(),
+        version: z.string().optional(),
+        group: z.string().optional(),
+        node_name: z.string().optional(),
+        name: z.string().optional(),
+        ip: z.string().optional(),
+        registerIP: z.string().optional(),
+      }).optional()
+    )
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input?.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
+      if (input?.q) params.q = input.q;
+      if (input?.os_platform) params["os.platform"] = input.os_platform;
+      if (input?.os_version) params["os.version"] = input.os_version;
+      if (input?.os_name) params["os.name"] = input.os_name;
+      if (input?.manager) params.manager = input.manager;
+      if (input?.version) params.version = input.version;
+      if (input?.group) params.group = input.group;
+      if (input?.node_name) params.node_name = input.node_name;
+      if (input?.name) params.name = input.name;
+      if (input?.ip) params.ip = input.ip;
+      if (input?.registerIP) params.registerIP = input.registerIP;
+      return proxyGet("/agents/upgrade_result", params);
+    }),
+
+  /**
+   * GET /agents/uninstall — Check user permission to uninstall agents
+   * Sprint v2 P0 gap fill. No parameters.
+   */
+  agentsUninstallPermission: wazuhProcedure.query(() => proxyGet("/agents/uninstall")),
+
+  /**
+   * GET /agents/{agent_id}/group/is_sync — Agent group sync status (deprecated in spec)
+   * Sprint v2 P0 gap fill. Path param only.
+   */
+  agentGroupSync: wazuhProcedure
+    .input(z.object({ agentId: agentIdSchema }))
+    .query(({ input }) => proxyGet(`/agents/${input.agentId}/group/is_sync`)),
+
+  /**
+   * GET / — Basic Wazuh API info (root endpoint)
+   * Sprint v2 P0 gap fill. No parameters.
+   */
+  apiInfo: wazuhProcedure.query(() => proxyGet("/")),
+
+  /**
    * GET /groups — List groups (broker-wired)
    *
    * Previously accepted no parameters. Now supports the full universal param family
@@ -697,6 +755,271 @@ export const wazuhRouter = router({
         offset: input.offset,
       }).catch(() => ({ data: { affected_items: [], total_affected_items: 0 } }))
     ),
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // EXPERIMENTAL SYSCOLLECTOR — Cross-agent bulk endpoints (Sprint v2 P0)
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  /** GET /experimental/syscollector/packages — All packages across all agents */
+  expSyscollectorPackages: wazuhProcedure
+    .input(paginationSchema.extend({
+      search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      agents_list: z.union([z.string(), z.array(z.string())]).optional(),
+      vendor: z.string().optional(),
+      name: z.string().optional(),
+      architecture: z.string().optional(),
+      format: z.string().optional(),
+      version: z.string().optional(),
+    }))
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input.limit) params.limit = String(input.limit);
+      if (input.offset) params.offset = String(input.offset);
+      if (input.search) params.search = input.search;
+      if (input.q) params.q = input.q;
+      if (input.sort) params.sort = input.sort;
+      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
+      if (input.distinct !== undefined) params.distinct = String(input.distinct);
+      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
+      if (input.vendor) params.vendor = input.vendor;
+      if (input.name) params.name = input.name;
+      if (input.architecture) params.architecture = input.architecture;
+      if (input.format) params.format = input.format;
+      if (input.version) params.version = input.version;
+      return proxyGet("/experimental/syscollector/packages", params);
+    }),
+
+  /** GET /experimental/syscollector/processes — All processes across all agents */
+  expSyscollectorProcesses: wazuhProcedure
+    .input(paginationSchema.extend({
+      search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      agents_list: z.union([z.string(), z.array(z.string())]).optional(),
+      pid: z.string().optional(),
+      state: z.string().optional(),
+      ppid: z.string().optional(),
+      egroup: z.string().optional(),
+      euser: z.string().optional(),
+      fgroup: z.string().optional(),
+      name: z.string().optional(),
+      nlwp: z.string().optional(),
+      pgrp: z.string().optional(),
+      priority: z.string().optional(),
+      rgroup: z.string().optional(),
+      ruser: z.string().optional(),
+      sgroup: z.string().optional(),
+      suser: z.string().optional(),
+    }))
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input.limit) params.limit = String(input.limit);
+      if (input.offset) params.offset = String(input.offset);
+      if (input.search) params.search = input.search;
+      if (input.q) params.q = input.q;
+      if (input.sort) params.sort = input.sort;
+      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
+      if (input.distinct !== undefined) params.distinct = String(input.distinct);
+      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
+      if (input.pid) params.pid = input.pid;
+      if (input.state) params.state = input.state;
+      if (input.ppid) params.ppid = input.ppid;
+      if (input.egroup) params.egroup = input.egroup;
+      if (input.euser) params.euser = input.euser;
+      if (input.fgroup) params.fgroup = input.fgroup;
+      if (input.name) params.name = input.name;
+      if (input.nlwp) params.nlwp = input.nlwp;
+      if (input.pgrp) params.pgrp = input.pgrp;
+      if (input.priority) params.priority = input.priority;
+      if (input.rgroup) params.rgroup = input.rgroup;
+      if (input.ruser) params.ruser = input.ruser;
+      if (input.sgroup) params.sgroup = input.sgroup;
+      if (input.suser) params.suser = input.suser;
+      return proxyGet("/experimental/syscollector/processes", params);
+    }),
+
+  /** GET /experimental/syscollector/ports — All ports across all agents */
+  expSyscollectorPorts: wazuhProcedure
+    .input(paginationSchema.extend({
+      search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      agents_list: z.union([z.string(), z.array(z.string())]).optional(),
+      pid: z.string().optional(),
+      protocol: z.string().optional(),
+      "local.ip": z.string().optional(),
+      "local.port": z.string().optional(),
+      "remote.ip": z.string().optional(),
+      tx_queue: z.string().optional(),
+      state: z.string().optional(),
+      process: z.string().optional(),
+    }))
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input.limit) params.limit = String(input.limit);
+      if (input.offset) params.offset = String(input.offset);
+      if (input.search) params.search = input.search;
+      if (input.q) params.q = input.q;
+      if (input.sort) params.sort = input.sort;
+      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
+      if (input.distinct !== undefined) params.distinct = String(input.distinct);
+      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
+      if (input.pid) params.pid = input.pid;
+      if (input.protocol) params.protocol = input.protocol;
+      if (input["local.ip"]) params["local.ip"] = input["local.ip"];
+      if (input["local.port"]) params["local.port"] = input["local.port"];
+      if (input["remote.ip"]) params["remote.ip"] = input["remote.ip"];
+      if (input.tx_queue) params.tx_queue = input.tx_queue;
+      if (input.state) params.state = input.state;
+      if (input.process) params.process = input.process;
+      return proxyGet("/experimental/syscollector/ports", params);
+    }),
+
+  /** GET /experimental/syscollector/netaddr — All network addresses across all agents */
+  expSyscollectorNetaddr: wazuhProcedure
+    .input(paginationSchema.extend({
+      search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      agents_list: z.union([z.string(), z.array(z.string())]).optional(),
+    }))
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input.limit) params.limit = String(input.limit);
+      if (input.offset) params.offset = String(input.offset);
+      if (input.search) params.search = input.search;
+      if (input.q) params.q = input.q;
+      if (input.sort) params.sort = input.sort;
+      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
+      if (input.distinct !== undefined) params.distinct = String(input.distinct);
+      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
+      return proxyGet("/experimental/syscollector/netaddr", params);
+    }),
+
+  /** GET /experimental/syscollector/netiface — All network interfaces across all agents */
+  expSyscollectorNetiface: wazuhProcedure
+    .input(paginationSchema.extend({
+      search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      agents_list: z.union([z.string(), z.array(z.string())]).optional(),
+    }))
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input.limit) params.limit = String(input.limit);
+      if (input.offset) params.offset = String(input.offset);
+      if (input.search) params.search = input.search;
+      if (input.q) params.q = input.q;
+      if (input.sort) params.sort = input.sort;
+      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
+      if (input.distinct !== undefined) params.distinct = String(input.distinct);
+      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
+      return proxyGet("/experimental/syscollector/netiface", params);
+    }),
+
+  /** GET /experimental/syscollector/netproto — All network protocols across all agents */
+  expSyscollectorNetproto: wazuhProcedure
+    .input(paginationSchema.extend({
+      search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      agents_list: z.union([z.string(), z.array(z.string())]).optional(),
+    }))
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input.limit) params.limit = String(input.limit);
+      if (input.offset) params.offset = String(input.offset);
+      if (input.search) params.search = input.search;
+      if (input.q) params.q = input.q;
+      if (input.sort) params.sort = input.sort;
+      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
+      if (input.distinct !== undefined) params.distinct = String(input.distinct);
+      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
+      return proxyGet("/experimental/syscollector/netproto", params);
+    }),
+
+  /** GET /experimental/syscollector/os — All OS info across all agents */
+  expSyscollectorOs: wazuhProcedure
+    .input(paginationSchema.extend({
+      search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      agents_list: z.union([z.string(), z.array(z.string())]).optional(),
+    }))
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input.limit) params.limit = String(input.limit);
+      if (input.offset) params.offset = String(input.offset);
+      if (input.search) params.search = input.search;
+      if (input.q) params.q = input.q;
+      if (input.sort) params.sort = input.sort;
+      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
+      if (input.distinct !== undefined) params.distinct = String(input.distinct);
+      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
+      return proxyGet("/experimental/syscollector/os", params);
+    }),
+
+  /** GET /experimental/syscollector/hardware — All hardware info across all agents */
+  expSyscollectorHardware: wazuhProcedure
+    .input(paginationSchema.extend({
+      search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      agents_list: z.union([z.string(), z.array(z.string())]).optional(),
+    }))
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input.limit) params.limit = String(input.limit);
+      if (input.offset) params.offset = String(input.offset);
+      if (input.search) params.search = input.search;
+      if (input.q) params.q = input.q;
+      if (input.sort) params.sort = input.sort;
+      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
+      if (input.distinct !== undefined) params.distinct = String(input.distinct);
+      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
+      return proxyGet("/experimental/syscollector/hardware", params);
+    }),
+
+  /** GET /experimental/syscollector/hotfixes — All hotfixes across all agents */
+  expSyscollectorHotfixes: wazuhProcedure
+    .input(paginationSchema.extend({
+      search: z.string().optional(),
+      q: z.string().optional(),
+      sort: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
+      distinct: z.boolean().optional(),
+      agents_list: z.union([z.string(), z.array(z.string())]).optional(),
+    }))
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input.limit) params.limit = String(input.limit);
+      if (input.offset) params.offset = String(input.offset);
+      if (input.search) params.search = input.search;
+      if (input.q) params.q = input.q;
+      if (input.sort) params.sort = input.sort;
+      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
+      if (input.distinct !== undefined) params.distinct = String(input.distinct);
+      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
+      return proxyGet("/experimental/syscollector/hotfixes", params);
+    }),
 
   // ══════════════════════════════════════════════════════════════════════════════
   // ALERTS / RULES
@@ -1121,6 +1444,63 @@ export const wazuhRouter = router({
    */
   securityCurrentUser: wazuhProcedure.query(() => proxyGet("/security/users/me")),
 
+  /**
+   * GET /security/rules — List RBAC security rules
+   * Sprint v2 P0 gap fill. Supports rule_ids, pagination, search, sort, q, distinct.
+   */
+  securityRbacRules: wazuhProcedure
+    .input(
+      paginationSchema.extend({
+        rule_ids: z.union([z.string(), z.array(z.string())]).optional(),
+        search: z.string().optional(),
+        select: z.union([z.string(), z.array(z.string())]).optional(),
+        sort: z.string().optional(),
+        q: z.string().optional(),
+        distinct: z.boolean().optional(),
+      })
+    )
+    .query(({ input }) => {
+      const { limit, offset, ...rest } = input;
+      const params: Record<string, string | number | boolean> = { limit, offset };
+      if (rest.rule_ids) params.rule_ids = Array.isArray(rest.rule_ids) ? rest.rule_ids.join(",") : rest.rule_ids;
+      if (rest.search) params.search = rest.search;
+      if (rest.select) params.select = Array.isArray(rest.select) ? rest.select.join(",") : rest.select;
+      if (rest.sort) params.sort = rest.sort;
+      if (rest.q) params.q = rest.q;
+      if (rest.distinct !== undefined) params.distinct = rest.distinct;
+      return proxyGet("/security/rules", params);
+    }),
+
+  /**
+   * GET /security/actions — List all RBAC actions
+   * Sprint v2 P0 gap fill. Optional endpoint filter.
+   */
+  securityActions: wazuhProcedure
+    .input(z.object({ endpoint: z.string().optional() }).optional())
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input?.endpoint) params.endpoint = input.endpoint;
+      return proxyGet("/security/actions", params);
+    }),
+
+  /**
+   * GET /security/resources — List all RBAC resources
+   * Sprint v2 P0 gap fill. Optional resource filter.
+   */
+  securityResources: wazuhProcedure
+    .input(z.object({ resource: z.string().optional() }).optional())
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input?.resource) params.resource = input.resource;
+      return proxyGet("/security/resources", params);
+    }),
+
+  /**
+   * GET /security/users/me/policies — Current user's processed RBAC policies
+   * Sprint v2 P0 gap fill. No parameters.
+   */
+  securityCurrentUserPolicies: wazuhProcedure.query(() => proxyGet("/security/users/me/policies")),
+
   // ══════════════════════════════════════════════════════════════════════════════
   // LISTS (CDB Lists — read-only)
   // ══════════════════════════════════════════════════════════════════════════════
@@ -1152,4 +1532,86 @@ export const wazuhRouter = router({
     .query(({ input }) =>
       proxyGet(`/groups/${input.groupId}/files`)
     ),
+
+  /** GET /lists/files/{filename} — Specific CDB list file content (Sprint v2 P0) */
+  listsFileContent: wazuhProcedure
+    .input(z.object({ filename: z.string() }))
+    .query(({ input }) =>
+      proxyGet(`/lists/files/${input.filename}`)
+    ),
+
+  /** GET /groups/{group_id}/files/{file_name} — Specific group file content (Sprint v2 P0) */
+  groupFileContent: wazuhProcedure
+    .input(z.object({ groupId: z.string(), fileName: z.string() }))
+    .query(({ input }) =>
+      proxyGet(`/groups/${input.groupId}/files/${input.fileName}`)
+    ),
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // CLUSTER PER-NODE — Sprint v2 P0 gap fill
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  /** GET /cluster/{node_id}/status — Node daemon status */
+  clusterNodeStatus: wazuhProcedure
+    .input(z.object({ nodeId: z.string() }))
+    .query(({ input }) => proxyGet(`/cluster/${input.nodeId}/status`)),
+
+  /** GET /cluster/{node_id}/configuration — Full node configuration */
+  clusterNodeConfiguration: wazuhProcedure
+    .input(z.object({ nodeId: z.string() }))
+    .query(({ input }) => proxyGet(`/cluster/${input.nodeId}/configuration`)),
+
+  /** GET /cluster/{node_id}/configuration/{component}/{configuration} — Granular node config */
+  clusterNodeComponentConfig: wazuhProcedure
+    .input(z.object({ nodeId: z.string(), component: z.string(), configuration: z.string() }))
+    .query(({ input }) => proxyGet(`/cluster/${input.nodeId}/configuration/${input.component}/${input.configuration}`)),
+
+  /** GET /cluster/{node_id}/daemons/stats — Node daemon statistics */
+  clusterNodeDaemonStats: wazuhProcedure
+    .input(z.object({ nodeId: z.string() }))
+    .query(({ input }) => proxyGet(`/cluster/${input.nodeId}/daemons/stats`)),
+
+  /** GET /cluster/{node_id}/logs — Node logs */
+  clusterNodeLogs: wazuhProcedure
+    .input(z.object({
+      nodeId: z.string(),
+      ...paginationSchema.shape,
+      sort: z.string().optional(),
+      search: z.string().optional(),
+      tag: z.string().optional(),
+      level: z.string().optional(),
+      q: z.string().optional(),
+    }))
+    .query(({ input }) => {
+      const { nodeId, ...rest } = input;
+      const params: Record<string, string> = {};
+      if (rest.limit) params.limit = String(rest.limit);
+      if (rest.offset) params.offset = String(rest.offset);
+      if (rest.sort) params.sort = rest.sort;
+      if (rest.search) params.search = rest.search;
+      if (rest.tag) params.tag = rest.tag;
+      if (rest.level) params.level = rest.level;
+      if (rest.q) params.q = rest.q;
+      return proxyGet(`/cluster/${nodeId}/logs`, params);
+    }),
+
+  /** GET /cluster/{node_id}/logs/summary — Node log summary */
+  clusterNodeLogsSummary: wazuhProcedure
+    .input(z.object({ nodeId: z.string() }))
+    .query(({ input }) => proxyGet(`/cluster/${input.nodeId}/logs/summary`)),
+
+  /** GET /cluster/{node_id}/stats/analysisd — Node analysisd stats */
+  clusterNodeStatsAnalysisd: wazuhProcedure
+    .input(z.object({ nodeId: z.string() }))
+    .query(({ input }) => proxyGet(`/cluster/${input.nodeId}/stats/analysisd`)),
+
+  /** GET /cluster/{node_id}/stats/remoted — Node remoted stats */
+  clusterNodeStatsRemoted: wazuhProcedure
+    .input(z.object({ nodeId: z.string() }))
+    .query(({ input }) => proxyGet(`/cluster/${input.nodeId}/stats/remoted`)),
+
+  /** GET /cluster/{node_id}/stats/weekly — Node weekly stats */
+  clusterNodeStatsWeekly: wazuhProcedure
+    .input(z.object({ nodeId: z.string() }))
+    .query(({ input }) => proxyGet(`/cluster/${input.nodeId}/stats/weekly`)),
 });

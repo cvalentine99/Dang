@@ -2824,3 +2824,75 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] BUG: Duplicate React keys (key=180056) on /mitre page — ruleIds can contain duplicates, fixed with index-based keys
 - [x] BUG: Wazuh connection URL pointing to localhost:55000 instead of 192.168.50.158 — updated WAZUH_HOST secret to 192.168.50.158
 - [x] BUG: Missing llm_usage table — created table via SQL migration matching drizzle/schema.ts definition
+
+## Sprint v2 — Correction Sprint (Mar 4, 2026)
+
+### [P0] Objective 1 — Close Remaining Phase 3 Endpoint Gaps
+
+#### Security Family
+- [x] GET /security/rules → wazuh.securityRbacRules (with rule_ids, limit, offset, search, select, sort, q, distinct)
+- [x] GET /security/actions → wazuh.securityActions (with endpoint param)
+- [x] GET /security/resources → wazuh.securityResources (with resource param)
+- [x] GET /security/users/me/policies → wazuh.securityCurrentUserPolicies (no params)
+
+#### Agent Lifecycle
+- [x] GET /agents/upgrade_result → wazuh.agentsUpgradeResult (with agents_list, q, os.platform, os.version, os.name, manager, version, group, node_name, name, ip, registerIP)
+- [x] GET /agents/uninstall → wazuh.agentsUninstallPermission (no params)- [x] GET /agents/{agent_id}/group/is_sync → wazuh.agentGroupSync (path param - [x] GET / → wazuh.apiInfo (root endpoint, no params) API info)
+
+#### Experimental Syscollector Bulk Endpoints
+- [x] GET /experimental/syscollector/packages → wazuh.expSyscollectorPackages
+- [x] GET /experimental/syscollector/processes → wazuh.expSyscollectorProcesses
+- [x] GET /experimental/syscollector/ports → wazuh.expSyscollectorPorts
+- [x] GET /experimental/syscollector/netaddr → wazuh.expSyscollectorNetaddr
+- [x] GET /experimental/syscollector/netiface → wazuh.expSyscollectorNetiface
+- [x] GET /experimental/syscollector/netproto → wazuh.expSyscollectorNetproto
+- [x] GET /experimental/syscollector/hardware → wazuh.expSyscollectorHardware
+- [x] GET /experimental/syscollector/os → wazuh.expSyscollectorOs
+- [x] GET /experimental/syscollector/hotfixes → wazuh.expSyscollectorHotfixes
+- [ ] NOTE: /experimental/syscollector/network and /experimental/syscollector/users do NOT exist in spec v4.14.3 — disposition: Out of scope (not in spec)
+
+#### Partial-Coverage Review
+- [x] GET /lists/files/{filename} → wazuh.listsFileContent (specific CDB list file content)
+- [x] GET /groups/{group_id}/files/{file_name} → wazuh.groupFileContent (specific group file content)
+- [x] Cluster per-node: GET /cluster/{node_id}/status → wazuh.clusterNodeStatus
+- [x] Cluster per-node: GET /cluster/{node_id}/configuration → wazuh.clusterNodeConfiguration
+- [x] Cluster per-node: GET /cluster/{node_id}/daemons/stats → wazuh.clusterNodeDaemonStats
+- [x] Cluster per-node: GET /cluster/{node_id}/stats/weekly → wazuh.clusterNodeStatsWeekly
+- [x] Cluster per-node: GET /cluster/{node_id}/stats/analysisd → wazuh.clusterNodeStatsAnalysisd
+- [x] Cluster per-node: GET /cluster/{node_id}/stats/remoted → wazuh.clusterNodeStatsRemoted
+- [x] Cluster per-node: GET /cluster/{node_id}/logs → wazuh.clusterNodeLogs
+- [x] Cluster per-node: GET /cluster/{node_id}/logs/summary → wazuh.clusterNodeLogsSummary
+- [x] Cluster per-node: GET /cluster/{node_id}/configuration/{component}/{configuration} → wazuh.clusterNodeComponentConfig
+
+### [P1] Objective 2 — Dashboard and UI Parameter Propagation
+- [ ] Verify PUT /active-response body params visible in API Explorer endpoint detail
+- [ ] Verify POST /agents body params visible in API Explorer endpoint detail
+- [ ] Verify one syscollector endpoint params visible in dashboard/API Explorer
+- [ ] Verify one dashboard-consumed endpoint params match KG truth
+- [ ] Document source-of-truth for each verified param (KG / router / hardcoded)
+
+### [P1] Objective 3 — Agent Introspection Parity
+- [ ] Verify agentic pipeline parameter introspection reflects updated KG shapes
+- [ ] Confirm no stale cached parameter list overrides live KG
+- [ ] Add agent introspection test proving payload construction is correct post-correction
+
+### [P1] Objective 4 — Auth/RBAC Negative Tests on Security Endpoints
+- [ ] GET /security/rules — negative auth test (unauthenticated → 401/403)
+- [ ] GET /security/actions — negative auth test
+- [ ] GET /security/resources — negative auth test
+- [ ] GET /security/users/me/policies — negative auth test
+
+### [P1] Objective 5 — Regression Fixture for Phase 1/2 Closed Gaps
+- [ ] Create JSON fixture of known-good endpoint contracts for Phase 1/2 gaps
+- [ ] Wire fixture into CI so future hydration regressions fail the build
+- [ ] Backend metadata test — server response includes new parameters
+- [ ] UI/component test — dashboard/API explorer consumes updated metadata
+
+### [P2] Objective 6 — KG Schema Versioning (Hardening — Deferred)
+- [ ] Document deferral rationale in Gap Closure Matrix
+
+### [P2] Objective 7 — Full Error Contract Parity (Hardening — Deferred)
+- [ ] Document deferral rationale in Gap Closure Matrix
+
+### [P2] Objective 8 — Syscollector Staleness/TTL UX (Hardening — Deferred)
+- [ ] Document deferral rationale in Gap Closure Matrix
