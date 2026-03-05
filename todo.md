@@ -2896,3 +2896,46 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 
 ### [P2] Objective 8 — Syscollector Staleness/TTL UX (Hardening — Deferred)
 - [x] Document deferral rationale in Gap Closure Matrix (see docs/gap-closure-matrix.md §7.3)
+
+## UI Wiring — Sprint v2 Endpoints (Mar 4, 2026)
+
+### Fleet-Wide Inventory Page (new page: /fleet-inventory)
+- [x] Create FleetInventory.tsx — fleet-wide syscollector view with tabs for packages, processes, ports, network, hardware, OS, hotfixes
+- [x] Wire expSyscollectorPackages endpoint — searchable/sortable table with agent column
+- [x] Wire expSyscollectorProcesses endpoint — process table with agent, name, PID, state, CPU
+- [x] Wire expSyscollectorPorts endpoint — port table with agent, protocol, local port, PID
+- [x] Wire expSyscollectorNetaddr endpoint — network addresses table
+- [x] Wire expSyscollectorNetiface endpoint — network interfaces table
+- [x] Wire expSyscollectorNetproto endpoint — network protocols table
+- [x] Wire expSyscollectorOs endpoint — OS inventory table with agent, OS name, version, architecture
+- [x] Wire expSyscollectorHardware endpoint — hardware inventory table with agent, CPU, RAM, board
+- [x] Wire expSyscollectorHotfixes endpoint — hotfixes table with agent, hotfix ID
+- [x] Add KPI cards (total packages, total processes, unique ports, agents reporting)
+- [x] Add search/filter controls and pagination
+- [x] Add navigation entry in sidebar under Posture group
+
+### Cluster Health — Per-Node Drill-Down Enhancement
+- [x] Add clickable node cards in Cluster Topology section
+- [x] Wire clusterNodeStatus endpoint — show node daemon status in drill-down
+- [x] Wire clusterNodeConfiguration endpoint — show node configuration in drill-down
+- [x] Wire clusterNodeComponentConfig endpoint — component-level config viewer
+- [x] Wire clusterNodeDaemonStats endpoint — per-node daemon metrics
+- [x] Wire clusterNodeLogs endpoint — per-node log viewer with search/filter
+- [x] Wire clusterNodeLogsSummary endpoint — log level summary badges
+- [x] Wire clusterNodeStatsAnalysisd endpoint — per-node analysisd metrics
+- [x] Wire clusterNodeStatsRemoted endpoint — per-node remoted metrics
+- [x] Wire clusterNodeStatsWeekly endpoint — per-node weekly stats chart
+
+### Security & RBAC Explorer (new page: /security)
+- [x] Create SecurityExplorer.tsx — security RBAC overview page
+- [x] Wire securityRbacRules endpoint — RBAC rules table
+- [x] Wire securityActions endpoint — available actions list
+- [x] Wire securityResources endpoint — available resources list
+- [x] Wire securityCurrentUserPolicies endpoint — current user effective policies
+
+### Agent Lifecycle & API Info
+- [ ] Wire agentsUpgradeResult endpoint into Fleet Command page — upgrade status column/panel
+- [ ] Wire agentGroupSync endpoint into Agent Detail page — group sync status badge
+- [ ] Wire apiInfo endpoint into System Status page — API version/info panel
+- [ ] Wire listsFileContent endpoint into Ruleset Explorer — CDB list file viewer
+- [ ] Wire groupFileContent endpoint into Fleet Command groups — group file content viewer

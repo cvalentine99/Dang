@@ -1,0 +1,13 @@
+{
+  "query": "SHOW TABLES LIKE 'baseline_schedules';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute SHOW TABLES LIKE 'baseline_schedules';",
+  "rows": [
+    {
+      "Tables_in_9n2ukZGVgWAjZMdS2ZS3BU (baseline_schedules)": "baseline_schedules"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_9n2ukZGVgWAjZMdS2ZS3BU (baseline_schedules)\nbaseline_schedules\n",
+  "stderr": "",
+  "execution_time_ms": 100
+}

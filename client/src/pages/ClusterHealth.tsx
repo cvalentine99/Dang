@@ -5,12 +5,15 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { WazuhGuard } from "@/components/shared/WazuhGuard";
 import { ThreatBadge } from "@/components/shared/ThreatBadge";
 import { RawJsonViewer } from "@/components/shared/RawJsonViewer";
-
+import { TableSkeleton } from "@/components/shared/TableSkeleton";
+import { Input } from "@/components/ui/input";
 import {
   Server, Activity, CheckCircle2,
   XCircle, AlertTriangle, Network, Gauge, BarChart3,
+  ChevronDown, ChevronUp, FileText, Search, X,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
-import { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, useState, type ReactNode } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -40,7 +43,6 @@ function QueueGauge({ label, used, total }: { label: string; used: number; total
   const circumference = 2 * Math.PI * 36;
   const offset = circumference - (pct / 100) * circumference;
   const color = pct >= 90 ? COLORS.red : pct >= 70 ? COLORS.yellow : COLORS.green;
-
   return (
     <div className="flex flex-col items-center">
       <svg width="90" height="90" viewBox="0 0 90 90">
@@ -60,12 +62,344 @@ function extractItems(raw: unknown): Array<Record<string, unknown>> {
   return (d?.affected_items as Array<Record<string, unknown>>) ?? [];
 }
 
-export default function ClusterHealth() {
-  const utils = trpc.useUtils();
+function MetricRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+  return (
+    <div className="flex items-center justify-between py-1 border-b border-border/10">
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className="text-[11px] font-mono text-foreground">{value != null ? String(value) : "—"}</span>
+    </div>
+  );
+}
 
+// ── Node Logs Panel (render function to isolate tRPC unknown type) ────────
+function renderNodeLogs(props: {
+  nodeLogsQ: { data: unknown; isLoading: boolean };
+  nodeLogs: { items: Array<Record<string, unknown>>; total: number };
+  nodeName: string;
+  logSearch: string;
+  setLogSearch: (v: string) => void;
+  logPage: number;
+  setLogPage: (fn: (p: number) => number) => void;
+  logTotalPages: number;
+}): React.JSX.Element {
+  const { nodeLogsQ, nodeLogs, nodeName, logSearch, setLogSearch, logPage, setLogPage, logTotalPages } = props;
+  const rawData = nodeLogsQ.data != null ? (nodeLogsQ.data as Record<string, unknown>) : null;
+  return (
+    <GlassPanel>
+      <div className="flex items-center justify-between mb-3">
+        <h5 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+          <FileText className="h-3.5 w-3.5 text-primary" /> Node Logs
+          <span className="text-muted-foreground/60">({nodeLogs.total.toLocaleString()} entries)</span>
+        </h5>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+            <Input
+              placeholder="Search logs..."
+              value={logSearch}
+              onChange={(e) => { setLogSearch(e.target.value); setLogPage(() => 1); }}
+              className="pl-7 h-7 text-xs bg-secondary/20 border-border/30 w-48"
+            />
+            {logSearch && (
+              <button onClick={() => { setLogSearch(""); setLogPage(() => 1); }} className="absolute right-2 top-1/2 -translate-y-1/2">
+                <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+              </button>
+            )}
+          </div>
+          {rawData ? <RawJsonViewer data={rawData} title={`${nodeName} Logs JSON`} /> : null}
+        </div>
+      </div>
+
+      {nodeLogsQ.isLoading ? (
+        <TableSkeleton columns={4} rows={5} />
+      ) : nodeLogs.items.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-6">No logs found</p>
+      ) : (
+        <div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="border-b border-border/30">
+                  {["Timestamp", "Tag", "Level", "Description"].map(h => (
+                    <th key={h} className="text-left py-1.5 px-2 text-muted-foreground font-medium">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {nodeLogs.items.map((log: Record<string, unknown>, i: number) => {
+                  const level = String(log.level ?? log.tag ?? "info").toLowerCase();
+                  const levelColor = level.includes("error") ? "text-red-400" :
+                    level.includes("warn") ? "text-yellow-400" :
+                    level.includes("debug") ? "text-gray-400" : "text-blue-400";
+                  return (
+                    <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
+                      <td className="py-1.5 px-2 font-mono text-muted-foreground whitespace-nowrap">{String(log.timestamp ?? "\u2014")}</td>
+                      <td className="py-1.5 px-2 font-mono text-primary">{String(log.tag ?? "\u2014")}</td>
+                      <td className="py-1.5 px-2">
+                        <span className={`font-mono ${levelColor}`}>{String(log.level ?? "\u2014")}</span>
+                      </td>
+                      <td className="py-1.5 px-2 text-foreground truncate max-w-[500px]">{String(log.description ?? "\u2014")}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {logTotalPages > 1 && (
+            <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/10">
+              <span className="text-[10px] text-muted-foreground">{nodeLogs.total.toLocaleString()} total</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={logPage <= 1} className="p-0.5 rounded hover:bg-secondary/30 disabled:opacity-30">
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <span className="text-[10px] text-muted-foreground">Page {logPage}/{logTotalPages}</span>
+                <button onClick={() => setLogPage(p => Math.min(logTotalPages, p + 1))} disabled={logPage >= logTotalPages} className="p-0.5 rounded hover:bg-secondary/30 disabled:opacity-30">
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </GlassPanel>
+  );
+}
+
+// ── Per-Node Drill-Down Component ──────────────────────────────────────────
+function NodeDrillDown({ nodeId, nodeName, isConnected }: { nodeId: string; nodeName: string; isConnected: boolean }) {
+  const [logSearch, setLogSearch] = useState("");
+  const [logPage, setLogPage] = useState(1);
+  const logPageSize = 20;
+
+  // Per-node queries
+  const nodeStatusQ = trpc.wazuh.clusterNodeStatus.useQuery(
+    { nodeId },
+    { retry: 1, staleTime: 30_000, enabled: isConnected }
+  );
+  const nodeConfigQ = trpc.wazuh.clusterNodeConfiguration.useQuery(
+    { nodeId },
+    { retry: 1, staleTime: 60_000, enabled: isConnected }
+  );
+  const nodeDaemonStatsQ = trpc.wazuh.clusterNodeDaemonStats.useQuery(
+    { nodeId },
+    { retry: 1, staleTime: 15_000, enabled: isConnected }
+  );
+  const nodeLogsQ = trpc.wazuh.clusterNodeLogs.useQuery(
+    { nodeId, limit: logPageSize, offset: (logPage - 1) * logPageSize, ...(logSearch ? { search: logSearch } : {}) },
+    { retry: 1, staleTime: 15_000, enabled: isConnected }
+  );
+  const nodeLogsSummaryQ = trpc.wazuh.clusterNodeLogsSummary.useQuery(
+    { nodeId },
+    { retry: 1, staleTime: 30_000, enabled: isConnected }
+  );
+  const nodeAnalysisdQ = trpc.wazuh.clusterNodeStatsAnalysisd.useQuery(
+    { nodeId },
+    { retry: 1, staleTime: 30_000, enabled: isConnected }
+  );
+  const nodeRemotedQ = trpc.wazuh.clusterNodeStatsRemoted.useQuery(
+    { nodeId },
+    { retry: 1, staleTime: 30_000, enabled: isConnected }
+  );
+  const nodeWeeklyQ = trpc.wazuh.clusterNodeStatsWeekly.useQuery(
+    { nodeId },
+    { retry: 1, staleTime: 60_000, enabled: isConnected }
+  );
+
+  // Parse data
+  const nodeStatus: Record<string, unknown> = useMemo((): Record<string, unknown> => {
+    const d = (nodeStatusQ.data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+    const items = (d?.affected_items as Array<Record<string, unknown>>) ?? [];
+    if (items.length > 0) return items[0];
+    if (d && typeof d === "object") {
+      const keys = Object.keys(d).filter(k => !["affected_items", "total_affected_items", "total_failed_items", "failed_items"].includes(k));
+      if (keys.length > 0) return d;
+    }
+    return {};
+  }, [nodeStatusQ.data]);
+
+  const nodeDaemonStats = useMemo(() => extractItems(nodeDaemonStatsQ.data), [nodeDaemonStatsQ.data]);
+  const nodeLogs = useMemo(() => {
+    const d = (nodeLogsQ.data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+    const items = (d?.affected_items as Array<Record<string, unknown>>) ?? [];
+    const total = Number(d?.total_affected_items ?? items.length);
+    return { items, total };
+  }, [nodeLogsQ.data]);
+
+  const nodeLogsSummary: Record<string, unknown> = useMemo(() => {
+    const d = (nodeLogsSummaryQ.data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+    const items = (d?.affected_items as Array<Record<string, unknown>>) ?? [];
+    return (items[0] ?? d ?? {}) as Record<string, unknown>;
+  }, [nodeLogsSummaryQ.data]);
+
+  const nodeAnalysisd = useMemo(() => extractItems(nodeAnalysisdQ.data), [nodeAnalysisdQ.data]);
+  const nodeRemoted = useMemo(() => extractItems(nodeRemotedQ.data), [nodeRemotedQ.data]);
+  const nodeWeekly = useMemo(() => extractItems(nodeWeeklyQ.data), [nodeWeeklyQ.data]);
+
+  // Status entries
+  const statusEntries: [string, unknown][] = Object.entries(nodeStatus).filter(([k]) =>
+    !["affected_items", "total_affected_items", "total_failed_items", "failed_items"].includes(k)
+  );
+
+  const logTotalPages = Math.max(1, Math.ceil(nodeLogs.total / logPageSize));
+
+  // Log summary badges
+  const logSummaryEntries: [string, unknown][] = Object.entries(nodeLogsSummary).filter(([k]) =>
+    !["affected_items", "total_affected_items", "total_failed_items", "failed_items"].includes(k)
+  );
+
+  const isLoading = nodeStatusQ.isLoading;
+
+  return (
+    <div className="space-y-4 mt-4 pl-4 border-l-2 border-primary/30">
+      <div className="flex items-center gap-2 mb-2">
+        <Server className="h-4 w-4 text-primary" />
+        <h4 className="text-sm font-display font-semibold text-foreground">{nodeName} — Drill-Down</h4>
+      </div>
+
+      {isLoading ? (
+        <TableSkeleton columns={4} rows={3} />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Node Daemon Status */}
+          <GlassPanel>
+            <h5 className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5 text-primary" /> Daemon Status
+            </h5>
+            <div className="grid grid-cols-2 gap-1.5">
+              {statusEntries.map(([name, status]) => {
+                const isRunning = String(status) === "running";
+                return (
+                  <div key={name} className={`flex items-center gap-1.5 p-2 rounded border text-[11px] ${
+                    isRunning ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"
+                  }`}>
+                    <div className={`h-1.5 w-1.5 rounded-full ${isRunning ? "bg-green-400" : "bg-red-400"}`} />
+                    <span className="font-mono text-foreground truncate">{name}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {nodeStatusQ.data != null ? <div className="mt-2"><RawJsonViewer data={nodeStatusQ.data as Record<string, unknown>} title={`${nodeName} Status JSON`} /></div> : null}
+          </GlassPanel>
+
+          {/* Node Analysisd Stats */}
+          <GlassPanel>
+            <h5 className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+              <BarChart3 className="h-3.5 w-3.5 text-primary" /> Analysisd Stats
+            </h5>
+            <div className="space-y-1">
+              {nodeAnalysisd.length > 0 ? (
+                ([
+                  ["Events Received", nodeAnalysisd[0]?.events_received],
+                  ["Events Dropped", nodeAnalysisd[0]?.events_dropped],
+                  ["Alerts Written", nodeAnalysisd[0]?.alerts_written],
+                  ["Syscheck Decoded", nodeAnalysisd[0]?.syscheck_events_decoded],
+                  ["SCA Decoded", nodeAnalysisd[0]?.sca_events_decoded],
+                ] as [string, unknown][]).map(([l, v]) => <MetricRow key={l} label={l} value={v != null ? Number(v).toLocaleString() : "—"} />)
+              ) : (
+                <p className="text-xs text-muted-foreground">No analysisd stats available</p>
+              )}
+            </div>
+            {nodeAnalysisdQ.data != null ? <div className="mt-2"><RawJsonViewer data={nodeAnalysisdQ.data as Record<string, unknown>} title={`${nodeName} Analysisd JSON`} /></div> : null}
+          </GlassPanel>
+
+          {/* Node Remoted Stats */}
+          <GlassPanel>
+            <h5 className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Network className="h-3.5 w-3.5 text-primary" /> Remoted Stats
+            </h5>
+            <div className="space-y-1">
+              {nodeRemoted.length > 0 ? (
+                ([
+                  ["Queue Size", nodeRemoted[0]?.queue_size],
+                  ["TCP Sessions", nodeRemoted[0]?.tcp_sessions],
+                  ["Events Count", nodeRemoted[0]?.evt_count],
+                  ["Control Messages", nodeRemoted[0]?.ctrl_msg_count],
+                  ["Discarded", nodeRemoted[0]?.discarded_count],
+                ] as [string, unknown][]).map(([l, v]) => <MetricRow key={l} label={l} value={v != null ? Number(v).toLocaleString() : "—"} />)
+              ) : (
+                <p className="text-xs text-muted-foreground">No remoted stats available</p>
+              )}
+            </div>
+            {nodeRemotedQ.data != null ? <div className="mt-2"><RawJsonViewer data={nodeRemotedQ.data as Record<string, unknown>} title={`${nodeName} Remoted JSON`} /></div> : null}
+          </GlassPanel>
+        </div>
+      )}
+
+      {/* Log Summary Badges */}
+      {logSummaryEntries.length > 0 && (
+        <GlassPanel>
+          <h5 className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+            <FileText className="h-3.5 w-3.5 text-primary" /> Log Level Summary
+          </h5>
+          <div className="flex flex-wrap gap-2">
+            {logSummaryEntries.map(([level, data]: [string, unknown]) => {
+              const count: number = typeof data === "object" && data !== null
+                ? Object.values(data as Record<string, number>).reduce((a: number, b: number) => a + (Number(b) || 0), 0)
+                : Number(data) || 0;
+              const colorMap: Record<string, string> = {
+                error: "bg-red-500/20 text-red-300 border-red-500/30",
+                warning: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
+                info: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+                debug: "bg-gray-500/20 text-gray-300 border-gray-500/30",
+              };
+              return (
+                <span key={level} className={`text-[10px] px-2 py-1 rounded border font-mono ${colorMap[level] ?? "bg-secondary/30 text-muted-foreground border-border/30"}`}>
+                  {level}: {count.toLocaleString()}
+                </span>
+              );
+            })}
+          </div>
+        </GlassPanel>
+      )}
+
+      {/* Node Logs Table */}
+      {renderNodeLogs({
+        nodeLogsQ, nodeLogs, nodeName, logSearch, setLogSearch, logPage, setLogPage, logTotalPages
+      })}
+
+      {/* Weekly Stats Chart */}
+      {nodeWeekly.length > 0 && (
+        <GlassPanel>
+          <h5 className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+            <BarChart3 className="h-3.5 w-3.5 text-primary" /> Weekly Stats
+          </h5>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={nodeWeekly.map((d, i) => ({
+              day: String(d.hour ?? d.day ?? i),
+              totalall: Number(d.totalall ?? 0),
+              events: Number(d.events ?? 0),
+            }))}>
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
+              <XAxis dataKey="day" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
+              <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
+              <ReTooltip content={<ChartTooltip />} />
+              <Bar dataKey="totalall" fill={COLORS.purple} name="Total" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="events" fill={COLORS.cyan} name="Events" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+          {nodeWeeklyQ.data != null ? <div className="mt-2"><RawJsonViewer data={nodeWeeklyQ.data as Record<string, unknown>} title={`${nodeName} Weekly JSON`} /></div> : null}
+        </GlassPanel>
+      )}
+
+      {/* Node Configuration */}
+      {nodeConfigQ.data != null ? (
+        <GlassPanel>
+          <h5 className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+            <Server className="h-3.5 w-3.5 text-primary" /> Node Configuration
+          </h5>
+          <RawJsonViewer data={nodeConfigQ.data as Record<string, unknown>} title={`${nodeName} Configuration JSON`} />
+        </GlassPanel>
+      ) : null}
+    </div>
+  );
+}
+
+// ── Main Component ──────────────────────────────────────────────────────────
+export default function ClusterHealth() {
+  const [expandedNode, setExpandedNode] = useState<string | null>(null);
+  const utils = trpc.useUtils();
   const statusQ = trpc.wazuh.status.useQuery(undefined, { retry: 1, staleTime: 60_000 });
   const isConnected = statusQ.data?.configured === true && statusQ.data?.data != null;
-
   const managerStatusQ = trpc.wazuh.managerStatus.useQuery(undefined, { retry: 1, staleTime: 15_000, enabled: isConnected });
   const managerInfoQ = trpc.wazuh.managerInfo.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
   const managerStatsHourlyQ = trpc.wazuh.statsHourly.useQuery(undefined, { retry: 1, staleTime: 30_000, enabled: isConnected });
@@ -73,10 +407,8 @@ export default function ClusterHealth() {
   const configValidQ = trpc.wazuh.managerConfigValidation.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
   const clusterStatusQ = trpc.wazuh.clusterStatus.useQuery(undefined, { retry: 1, staleTime: 30_000, enabled: isConnected });
   const clusterNodesQ = trpc.wazuh.clusterNodes.useQuery(undefined, { retry: 1, staleTime: 30_000, enabled: isConnected });
-
   const handleRefresh = useCallback(() => { utils.wazuh.invalidate(); }, [utils]);
 
-  // ── Daemon status (real or fallback) ──────────────────────────────────
   const daemonStatuses = useMemo(() => {
     const src = managerStatusQ.data;
     const d = (src as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
@@ -87,19 +419,15 @@ export default function ClusterHealth() {
       if (keys.length > 0) return d;
     }
     return {};
-  }, [managerStatusQ.data, isConnected]);
+  }, [managerStatusQ.data]);
 
-  // ── Manager info (real or fallback) ───────────────────────────────────
   const managerInfo = useMemo(() => {
-    const src = managerInfoQ.data;
-    const items = extractItems(src);
+    const items = extractItems(managerInfoQ.data);
     return items[0] ?? {};
-  }, [managerInfoQ.data, isConnected]);
+  }, [managerInfoQ.data]);
 
-  // ── Hourly stats (real or fallback) ───────────────────────────────────
   const hourlyData = useMemo(() => {
-    const src = managerStatsHourlyQ.data;
-    const items = extractItems(src);
+    const items = extractItems(managerStatsHourlyQ.data);
     return items.map((item, i) => ({
       hour: `${String(item.hour ?? i).toString().padStart(2, "0")}:00`,
       totalall: Number(item.totalall ?? 0),
@@ -107,35 +435,22 @@ export default function ClusterHealth() {
       syscheck: Number(item.syscheck ?? 0),
       firewall: Number(item.firewall ?? 0),
     }));
-  }, [managerStatsHourlyQ.data, isConnected]);
+  }, [managerStatsHourlyQ.data]);
 
-  // ── Daemon metrics (real or fallback) ─────────────────────────────────
-  const daemonMetrics = useMemo(() => {
-    const src = daemonStatsQ.data;
-    return extractItems(src);
-  }, [daemonStatsQ.data, isConnected]);
+  const daemonMetrics = useMemo(() => extractItems(daemonStatsQ.data), [daemonStatsQ.data]);
 
-  // ── Config validation (real or fallback) ──────────────────────────────
   const configValid = useMemo(() => {
-    const src = configValidQ.data;
-    const items = extractItems(src);
+    const items = extractItems(configValidQ.data);
     return items[0] ?? {};
-  }, [configValidQ.data, isConnected]);
+  }, [configValidQ.data]);
 
-  // ── Cluster status (real or fallback) ─────────────────────────────────
   const clusterStatus = useMemo(() => {
-    const src = clusterStatusQ.data;
-    const d = (src as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+    const d = (clusterStatusQ.data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
     return d ?? {};
-  }, [clusterStatusQ.data, isConnected]);
+  }, [clusterStatusQ.data]);
 
-  // ── Cluster nodes (real or fallback) ──────────────────────────────────
-  const clusterNodes = useMemo(() => {
-    const src = clusterNodesQ.data;
-    return extractItems(src);
-  }, [clusterNodesQ.data, isConnected]);
+  const clusterNodes = useMemo(() => extractItems(clusterNodesQ.data), [clusterNodesQ.data]);
 
-  // Count running/stopped daemons
   const daemonEntries = Object.entries(daemonStatuses).filter(([k]) => !["affected_items", "total_affected_items", "total_failed_items", "failed_items"].includes(k));
   const runningCount = daemonEntries.filter(([, v]) => String(v) === "running").length;
   const stoppedCount = daemonEntries.filter(([, v]) => String(v) !== "running").length;
@@ -147,18 +462,16 @@ export default function ClusterHealth() {
     { name: "Stopped", value: stoppedCount, color: COLORS.red },
   ].filter(d => d.value > 0), [runningCount, stoppedCount]);
 
-  // Parse remoted queue for gauge
   const remotedDaemon = daemonMetrics.find(d => String(d.name) === "wazuh-remoted");
   const queueUsed = Number(remotedDaemon?.queue_size ?? 128);
   const queueTotal = Number(remotedDaemon?.total_queue_size ?? 131072);
-
   const analysisdDaemon = daemonMetrics.find(d => String(d.name) === "wazuh-analysisd");
   const dbDaemon = daemonMetrics.find(d => String(d.name) === "wazuh-db");
 
   return (
     <WazuhGuard>
       <div className="space-y-6">
-        <PageHeader title="Cluster Health" subtitle="Manager daemons, event queues, cluster topology, and configuration validation" onRefresh={handleRefresh} isLoading={isLoading} />
+        <PageHeader title="Cluster Health" subtitle="Manager daemons, event queues, cluster topology with per-node drill-down, and configuration validation" onRefresh={handleRefresh} isLoading={isLoading} />
 
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -171,7 +484,6 @@ export default function ClusterHealth() {
 
         {/* Row: Daemon Status + Queue Gauges + Manager Info */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* Daemon Status Grid */}
           <GlassPanel className="lg:col-span-5">
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /> Daemon Status</h3>
             <div className="grid grid-cols-2 gap-2">
@@ -191,7 +503,6 @@ export default function ClusterHealth() {
             {managerStatusQ.data ? <div className="mt-3"><RawJsonViewer data={managerStatusQ.data as Record<string, unknown>} title="Manager Status JSON" /></div> : null}
           </GlassPanel>
 
-          {/* Event Queue Gauges */}
           <GlassPanel className="lg:col-span-3">
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Gauge className="h-4 w-4 text-primary" /> Event Queues</h3>
             <div className="flex flex-col items-center gap-4">
@@ -210,7 +521,6 @@ export default function ClusterHealth() {
             </div>
           </GlassPanel>
 
-          {/* Manager Info */}
           <GlassPanel className="lg:col-span-4">
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Server className="h-4 w-4 text-primary" /> Manager Info</h3>
             <div className="space-y-2">
@@ -238,7 +548,6 @@ export default function ClusterHealth() {
 
         {/* Daemon Metrics Detail */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Analysisd */}
           <GlassPanel>
             <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /> wazuh-analysisd</h3>
             <div className="space-y-2">
@@ -253,15 +562,11 @@ export default function ClusterHealth() {
                 ["Rootcheck Decoded", analysisdDaemon?.rootcheck_events_decoded],
                 ["SCA Decoded", analysisdDaemon?.sca_events_decoded],
               ] as [string, unknown][]).map(([label, val]) => (
-                <div key={label} className="flex items-center justify-between py-1 border-b border-border/10">
-                  <span className="text-[11px] text-muted-foreground">{label}</span>
-                  <span className="text-[11px] font-mono text-foreground">{val != null ? Number(val).toLocaleString() : "—"}</span>
-                </div>
+                <MetricRow key={label} label={label} value={val != null ? Number(val).toLocaleString() : "—"} />
               ))}
             </div>
           </GlassPanel>
 
-          {/* Remoted */}
           <GlassPanel>
             <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2"><Network className="h-4 w-4 text-primary" /> wazuh-remoted</h3>
             <div className="space-y-2">
@@ -275,15 +580,11 @@ export default function ClusterHealth() {
                 ["Messages Sent", remotedDaemon?.msg_sent],
                 ["Bytes Received", remotedDaemon?.recv_bytes],
               ] as [string, unknown][]).map(([label, val]) => (
-                <div key={label} className="flex items-center justify-between py-1 border-b border-border/10">
-                  <span className="text-[11px] text-muted-foreground">{label}</span>
-                  <span className="text-[11px] font-mono text-foreground">{val != null ? Number(val).toLocaleString() : "—"}</span>
-                </div>
+                <MetricRow key={label} label={label} value={val != null ? Number(val).toLocaleString() : "—"} />
               ))}
             </div>
           </GlassPanel>
 
-          {/* wazuh-db */}
           <GlassPanel>
             <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2"><Server className="h-4 w-4 text-primary" /> wazuh-db</h3>
             <div className="space-y-2">
@@ -297,10 +598,7 @@ export default function ClusterHealth() {
                   ["MITRE Queries", breakdown.mitre],
                   ["Wazuh Queries", breakdown.wazuh],
                 ] as [string, unknown][]).map(([label, val]) => (
-                  <div key={label} className="flex items-center justify-between py-1 border-b border-border/10">
-                    <span className="text-[11px] text-muted-foreground">{label}</span>
-                    <span className="text-[11px] font-mono text-foreground">{val != null ? Number(val).toLocaleString() : "—"}</span>
-                  </div>
+                  <MetricRow key={label} label={label} value={val != null ? Number(val).toLocaleString() : "—"} />
                 ));
               })()}
             </div>
@@ -325,7 +623,7 @@ export default function ClusterHealth() {
           </ResponsiveContainer>
         </GlassPanel>
 
-        {/* Cluster Nodes */}
+        {/* Cluster Nodes with Drill-Down */}
         <GlassPanel>
           <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Network className="h-4 w-4 text-primary" /> Cluster Topology</h3>
           <div className="flex items-center gap-3 mb-4">
@@ -338,22 +636,38 @@ export default function ClusterHealth() {
             {clusterNodes.map((node, i) => {
               const nodeType = String(node.type ?? "worker");
               const isMaster = nodeType === "master";
+              const nodeName = String(node.name ?? "Unknown");
+              const isExpanded = expandedNode === nodeName;
               return (
-                <div key={i} className={`bg-secondary/20 rounded-lg p-4 border ${isMaster ? "border-primary/40 bg-primary/5" : "border-border/20"}`}>
+                <button
+                  key={i}
+                  onClick={() => setExpandedNode(isExpanded ? null : nodeName)}
+                  className={`text-left bg-secondary/20 rounded-lg p-4 border transition-all hover:bg-secondary/30 ${
+                    isMaster ? "border-primary/40 bg-primary/5" : "border-border/20"
+                  } ${isExpanded ? "ring-1 ring-primary/50" : ""}`}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <Server className={`h-4 w-4 ${isMaster ? "text-primary" : "text-muted-foreground"}`} />
-                    <span className="text-sm font-medium text-foreground">{String(node.name ?? "Unknown")}</span>
+                    <span className="text-sm font-medium text-foreground">{nodeName}</span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${isMaster ? "bg-primary/20 text-primary" : "bg-secondary/40 text-muted-foreground"}`}>{nodeType}</span>
+                    <span className="ml-auto">
+                      {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+                    </span>
                   </div>
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between"><span className="text-muted-foreground">IP</span><span className="font-mono text-foreground">{String(node.ip ?? "—")}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Version</span><span className="font-mono text-foreground">{String(node.version ?? "—")}</span></div>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
           {clusterNodesQ.data ? <div className="mt-3"><RawJsonViewer data={clusterNodesQ.data as Record<string, unknown>} title="Cluster Nodes JSON" /></div> : null}
+
+          {/* Expanded Node Drill-Down */}
+          {expandedNode && (
+            <NodeDrillDown nodeId={expandedNode} nodeName={expandedNode} isConnected={isConnected} />
+          )}
         </GlassPanel>
 
         {/* Config Validation */}

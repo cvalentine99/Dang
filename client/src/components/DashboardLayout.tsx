@@ -58,6 +58,8 @@ import {
   ShieldAlert,
   BarChart3,
   GitCompare,
+  Package,
+  Lock,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -183,9 +185,11 @@ const menuItems = [
   { icon: ShieldCheck, label: "Compliance", path: "/compliance", group: "Posture" },
   { icon: FileSearch, label: "File Integrity", path: "/fim", group: "Posture" },
   { icon: Monitor, label: "IT Hygiene", path: "/hygiene", group: "Posture" },
+  { icon: Package, label: "Fleet Inventory", path: "/fleet-inventory", group: "Posture" },
   { icon: GitCompare, label: "Drift Analytics", path: "/drift-analytics", group: "Posture", hasAnomalyBadge: true },
   { icon: Server, label: "Cluster Health", path: "/cluster", group: "System" },
   { icon: HeartPulse, label: "System Status", path: "/status", group: "System" },
+  { icon: Lock, label: "Security Explorer", path: "/security", group: "System" },
   { icon: Brain, label: "Security Analyst", path: "/analyst", group: "Intelligence", hasQueueBadge: true },
   { icon: Network, label: "Knowledge Graph", path: "/graph", group: "Intelligence" },
   { icon: FolderSearch, label: "Investigations", path: "/investigations", group: "Intelligence" },

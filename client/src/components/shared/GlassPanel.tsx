@@ -1,15 +1,8 @@
 import { cn } from "@/lib/utils";
-import { forwardRef, ReactNode } from "react";
+import { forwardRef } from "react";
 
-interface GlassPanelProps {
-  children: ReactNode;
-  className?: string;
-  hover?: boolean;
-  glow?: boolean;
-}
-
-export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
-  ({ children, className, hover, glow }, ref) => {
+export const GlassPanel = forwardRef<HTMLDivElement, React.ComponentProps<"div"> & { hover?: boolean; glow?: boolean }>(
+  ({ children, className, hover, glow, ...rest }, ref) => {
     return (
       <div
         ref={ref}
@@ -19,6 +12,7 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
           glow && "amethyst-glow",
           className
         )}
+        {...rest}
       >
         {children}
       </div>
@@ -27,7 +21,7 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 );
 GlassPanel.displayName = "GlassPanel";
 
-export function GlassCard({ children, className, hover = true }: GlassPanelProps) {
+export function GlassCard({ children, className, hover = true }: React.ComponentProps<"div"> & { hover?: boolean }) {
   return (
     <div className={cn("glass-card p-4", !hover && "pointer-events-none", className)}>
       {children}
