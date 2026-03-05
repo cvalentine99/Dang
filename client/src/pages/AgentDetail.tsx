@@ -1011,6 +1011,12 @@ function ConfigStatsTab({ agentId }: { agentId: string }) {
     { retry: false }
   );
 
+  // ── Agent Daemon Stats ──
+  const daemonStatsQ = trpc.wazuh.agentDaemonStats.useQuery(
+    { agentId },
+    { retry: false }
+  );
+
   // ── Agent Key (admin-only, disclosure policy) ──
   const [keyRevealed, setKeyRevealed] = useState(false);
   const [keyCopied, setKeyCopied] = useState(false);
@@ -1138,6 +1144,32 @@ function ConfigStatsTab({ agentId }: { agentId: string }) {
           </div>
         ) : (
           <RawJsonViewer data={statsQ.data} />
+        )}
+      </GlassPanel>
+
+      {/* ── Agent Daemon Stats ── */}
+      <GlassPanel className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-display font-bold text-foreground flex items-center gap-2">
+            <Activity className="w-4 h-4 text-emerald-400" /> Daemon Stats
+          </h3>
+          <span className="text-[10px] text-muted-foreground font-mono">
+            GET /agents/{agentId}/daemons/stats
+          </span>
+        </div>
+
+        <BrokerWarnings data={daemonStatsQ.data} context="Daemon Stats" />
+
+        {daemonStatsQ.isLoading ? (
+          <div className="animate-pulse space-y-2">
+            {[...Array(4)].map((_, i) => <div key={i} className="h-4 bg-white/5 rounded" />)}
+          </div>
+        ) : daemonStatsQ.isError ? (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+            <p className="text-xs text-red-300">Failed to fetch daemon stats: {daemonStatsQ.error?.message ?? "Unknown error"}</p>
+          </div>
+        ) : (
+          <RawJsonViewer data={daemonStatsQ.data} />
         )}
       </GlassPanel>
 

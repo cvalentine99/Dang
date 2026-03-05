@@ -1,0 +1,13 @@
+{
+  "query": "SHOW TABLES LIKE 'sensitive_access_audit';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute SHOW TABLES LIKE 'sensitive_access_audit';",
+  "rows": [
+    {
+      "Tables_in_9n2ukZGVgWAjZMdS2ZS3BU (sensitive_access_audit)": "sensitive_access_audit"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_9n2ukZGVgWAjZMdS2ZS3BU (sensitive_access_audit)\nsensitive_access_audit\n",
+  "stderr": "",
+  "execution_time_ms": 70
+}

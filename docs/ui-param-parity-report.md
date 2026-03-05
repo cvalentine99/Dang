@@ -2,8 +2,8 @@
 
 **Generated:** 2026-03-05  
 **Script:** `scripts/audit-ui-param-parity.mjs`  
-**Callsites audited:** 119  
-**Unique procedures consumed:** 69 of 113 total  
+**Callsites audited:** 121  
+**Unique procedures consumed:** 71 of 113 total  
 
 ---
 
@@ -12,10 +12,10 @@
 
 | Metric | Count |
 |--------|-------|
-| Total callsites | 119 |
-| Unique procedures consumed | 69 |
+| Total callsites | 121 |
+| Unique procedures consumed | 71 |
 | Router procedures available | 113 |
-| Parameters surfaced in UI | 74 |
+| Parameters surfaced in UI | 75 |
 | Parameters hardcoded/constant | 88 |
 | Parameters not supported (classified) | 550 |
 | Violations | 0 |
@@ -26,10 +26,8 @@
 
 | Procedure | Input Keys | Disposition |
 |-----------|-----------|-------------|
-| `agentDaemonStats` | agentId | Backend-only / Not yet wired to UI |
 | `agentGroupMembers` | limit, offset, groupId, search, sort, q, select, distinct, status | Backend-only / Not yet wired to UI |
 | `agentGroupSync` | agentId | Backend-only / Not yet wired to UI |
-| `agentOverview` | (void) | Backend-only / Not yet wired to UI |
 | `agentsStatsDistinct` | fields | Backend-only / Not yet wired to UI |
 | `agentsSummary` | agents_list | Backend-only / Not yet wired to UI |
 | `agentsUninstallPermission` | (void) | Backend-only / Not yet wired to UI |
@@ -368,13 +366,19 @@ Input: void (no parameters) — **OK**
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
 | `component` | Optional | No | Passed | **Constant** (hardcoded: `statsComponent`) |
 
-### Line 1017: `wazuh.agentKey`
+### Line 1015: `wazuh.agentDaemonStats`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 1251: `wazuh.agentById`
+### Line 1023: `wazuh.agentKey`
+
+| Parameter | Router | Required | UI Status | Classification |
+|-----------|--------|----------|-----------|----------------|
+| `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+
+### Line 1283: `wazuh.agentById`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -953,7 +957,11 @@ Input: void (no parameters) — **OK**
 
 Input: void (no parameters) — **OK**
 
-### Line 166: `wazuh.managerLogsSummary`
+### Line 166: `wazuh.agentOverview`
+
+Input: void (no parameters) — **OK**
+
+### Line 167: `wazuh.managerLogsSummary`
 
 Input: void (no parameters) — **OK**
 
@@ -1379,8 +1387,6 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `status` | Optional | No | Passed | **Constant** (hardcoded: `"active"`) |
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
-
-
 
 
 

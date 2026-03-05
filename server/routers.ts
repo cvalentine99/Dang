@@ -28,6 +28,7 @@ import { suppressionRouter } from "./baselines/suppressionRouter";
 import { exportRouter } from "./baselines/exportRouter";
 import { enhancedLLMRouter } from "./enhancedLLM/enhancedLLMRouter";
 import { readinessRouter } from "./agenticReadiness/readinessRouter";
+import { sensitiveAccessRouter } from "./admin/sensitiveAccessRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -121,6 +122,9 @@ export const appRouter = router({
 
   // Agentic Readiness — pre-flight dependency and workflow status
   readiness: readinessRouter,
+
+  // Sensitive Access Audit — admin-only compliance viewer
+  sensitiveAccess: sensitiveAccessRouter,
 });
 
 export type AppRouter = typeof appRouter;

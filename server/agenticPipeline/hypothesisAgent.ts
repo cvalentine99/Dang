@@ -54,6 +54,12 @@ export interface HypothesisAgentResult {
   isNewSession: boolean;
   /** IDs of response_actions rows materialized from LLM recommendations */
   materializedActionIds: string[];
+  /** Non-null when some actions failed to materialize — partial failure signal */
+  materializePartialFailure: {
+    attempted: number;
+    succeeded: number;
+    failed: Array<{ index: number; action: string; error: string }>;
+  } | null;
 }
 
 // ── Context Assembly ────────────────────────────────────────────────────────
@@ -828,12 +834,12 @@ export async function runHypothesisAgent(
 
   // 7. Materialize response actions as first-class DB rows
   //    The LLM output is the *source*, the DB rows are the *system of record*.
-  const materializedActionIds = await materializeResponseActions(
+  const materializeResult = await materializeResponseActions(
     livingCase,
     caseStateId,
     ctx
   );
-
+  const materializedActionIds = materializeResult.ids;
   // 7b. Direction 4: Store action IDs on the living case (reference, not ownership)
   //      Then recompute summary from response_actions (single source of truth)
   if (materializedActionIds.length > 0) {
@@ -881,6 +887,13 @@ export async function runHypothesisAgent(
     tokensUsed,
     isNewSession: isNew,
     materializedActionIds,
+    materializePartialFailure: materializeResult.failed.length > 0
+      ? {
+          attempted: materializeResult.attempted,
+          succeeded: materializeResult.succeeded,
+          failed: materializeResult.failed,
+        }
+      : null,
   };
 }
 
@@ -985,14 +998,15 @@ async function materializeResponseActions(
   livingCase: LivingCaseObject,
   caseId: number,
   ctx: HypothesisContext
-): Promise<string[]> {
+): Promise<{ ids: string[]; attempted: number; succeeded: number; failed: Array<{ index: number; action: string; error: string }> }> {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) return { ids: [], attempted: 0, succeeded: 0, failed: [] };
 
   const actions = livingCase.recommendedActions ?? [];
-  if (actions.length === 0) return [];
+  if (actions.length === 0) return { ids: [], attempted: 0, succeeded: 0, failed: [] };
 
   const materializedIds: string[] = [];
+  const failedActions: Array<{ index: number; action: string; error: string }> = [];
 
   // Map LLM category strings to our typed enum values
   const CATEGORY_MAP: Record<string, string> = {
@@ -1170,11 +1184,28 @@ async function materializeResponseActions(
       materializedIds.push(actionId);
     } catch (err) {
       // Log but don't fail the whole pipeline for one action
-      console.error(`[HypothesisAgent] Failed to materialize action: ${(err as Error).message}`);
+      const errMsg = (err as Error).message;
+      console.error(`[HypothesisAgent] Failed to materialize action: ${errMsg}`);
+      failedActions.push({
+        index: actions.indexOf(rec),
+        action: (rec.action ?? "Unnamed action").slice(0, 128),
+        error: errMsg,
+      });
     }
   }
 
-  return materializedIds;
+  if (failedActions.length > 0) {
+    console.warn(
+      `[HypothesisAgent] Partial failure: ${materializedIds.length}/${actions.length} actions materialized, ${failedActions.length} failed`
+    );
+  }
+
+  return {
+    ids: materializedIds,
+    attempted: actions.length,
+    succeeded: materializedIds.length,
+    failed: failedActions,
+  };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

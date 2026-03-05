@@ -163,6 +163,7 @@ export default function Home() {
   const rulesQ = trpc.wazuh.rules.useQuery({ limit: 10, sort: "-level" }, { retry: false, staleTime: 60_000, enabled: isConnected });
   const agentsQ = trpc.wazuh.agents.useQuery({ limit: 8, sort: "-dateAdd" }, { retry: false, staleTime: 30_000, enabled: isConnected });
   const mitreTacticsQ = trpc.wazuh.mitreTactics.useQuery(undefined, { retry: false, staleTime: 120_000, enabled: isConnected });
+  const agentOverviewQ = trpc.wazuh.agentOverview.useQuery(undefined, { retry: false, staleTime: 60_000, enabled: isConnected });
   const logsSummaryQ = trpc.wazuh.managerLogsSummary.useQuery(undefined, { retry: false, staleTime: 60_000, enabled: isConnected });
 
   // ── Indexer queries ─────────────────────────────────────────────────────────
@@ -910,7 +911,78 @@ export default function Home() {
           </GlassPanel>
         </div>
         )}
+
+        {/* ── Row 6: Agent Overview (Wazuh /overview/agents) ─────────────── */}
+        {isConnected && (
+          <GlassPanel>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" /> Agent Overview
+              </h3>
+              <div className="flex items-center gap-2">
+                <SourceBadge source="server" />
+                {agentOverviewQ.data ? <RawJsonViewer data={agentOverviewQ.data as Record<string, unknown>} title="Agent Overview" /> : null}
+              </div>
+            </div>
+            {agentOverviewQ.isLoading ? (
+              <div className="animate-pulse space-y-2">
+                {[...Array(3)].map((_, i) => <div key={i} className="h-4 bg-white/5 rounded" />)}
+              </div>
+            ) : agentOverviewQ.isError ? (
+              <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                <p className="text-xs text-red-300">Failed to load agent overview: {agentOverviewQ.error?.message}</p>
+              </div>
+            ) : agentOverviewQ.data ? (
+              <div className="overflow-x-auto">
+                <AgentOverviewTable data={agentOverviewQ.data} />
+              </div>
+            ) : null}
+          </GlassPanel>
+        )}
       </div>
     </WazuhGuard>
+  );
+}
+
+/** Renders the agent overview data as a structured summary table */
+function AgentOverviewTable({ data }: { data: unknown }) {
+  const raw = data as Record<string, unknown>;
+  const items = (raw?.data as Record<string, unknown>)?.affected_items as Array<Record<string, unknown>> | undefined;
+  const nodes = items?.[0]?.nodes as Array<Record<string, unknown>> | undefined;
+
+  if (!nodes?.length) {
+    return <p className="text-xs text-muted-foreground">No overview data available.</p>;
+  }
+
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="border-b border-border/30">
+          <th className="text-left py-2 px-2 text-muted-foreground font-medium">Node</th>
+          <th className="text-left py-2 px-2 text-muted-foreground font-medium">Type</th>
+          <th className="text-right py-2 px-2 text-muted-foreground font-medium">Active</th>
+          <th className="text-right py-2 px-2 text-muted-foreground font-medium">Disconnected</th>
+          <th className="text-right py-2 px-2 text-muted-foreground font-medium">Never Connected</th>
+          <th className="text-right py-2 px-2 text-muted-foreground font-medium">Pending</th>
+          <th className="text-right py-2 px-2 text-muted-foreground font-medium">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {nodes.map((node, i) => {
+          const count = node.count as Record<string, number> | undefined;
+          return (
+            <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
+              <td className="py-2 px-2 font-mono text-primary">{String(node.node_name ?? "—")}</td>
+              <td className="py-2 px-2 text-muted-foreground">{String(node.node_type ?? "—")}</td>
+              <td className="py-2 px-2 text-right font-mono text-threat-low">{count?.active ?? 0}</td>
+              <td className="py-2 px-2 text-right font-mono text-threat-high">{count?.disconnected ?? 0}</td>
+              <td className="py-2 px-2 text-right font-mono text-yellow-400">{count?.never_connected ?? 0}</td>
+              <td className="py-2 px-2 text-right font-mono text-info-cyan">{count?.pending ?? 0}</td>
+              <td className="py-2 px-2 text-right font-mono font-bold text-foreground">{count?.total ?? 0}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }

@@ -1,11 +1,12 @@
 {
-  "generated": "2026-03-05T13:05:31.550Z",
-  "callsiteCount": 119,
+  "generated": "2026-03-05T13:58:25.154Z",
+  "callsiteCount": 121,
   "procedureCount": 113,
   "consumedProcedures": [
     "agentBrowserExtensions",
     "agentById",
     "agentConfig",
+    "agentDaemonStats",
     "agentGroups",
     "agentGroups2",
     "agentHardware",
@@ -15,6 +16,7 @@
     "agentNetiface",
     "agentNetproto",
     "agentOs",
+    "agentOverview",
     "agentPackages",
     "agentPorts",
     "agentProcesses",
@@ -245,7 +247,16 @@
     },
     {
       "file": "client/src/pages/AgentDetail.tsx",
-      "line": 1017,
+      "line": 1015,
+      "procedure": "agentDaemonStats",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 1023,
       "procedure": "agentKey",
       "passedKeys": {
         "agentId": "shorthand"
@@ -254,7 +265,7 @@
     },
     {
       "file": "client/src/pages/AgentDetail.tsx",
-      "line": 1251,
+      "line": 1283,
       "procedure": "agentById",
       "passedKeys": {
         "agentId": "shorthand"
@@ -760,6 +771,13 @@
     {
       "file": "client/src/pages/Home.tsx",
       "line": 166,
+      "procedure": "agentOverview",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "line": 167,
       "procedure": "managerLogsSummary",
       "passedKeys": {},
       "isVoid": true

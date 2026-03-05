@@ -288,19 +288,26 @@ describe("Fail-Closed Audit Gate", () => {
 
 describe("Sensitive Access Audit — Migration", () => {
   const { existsSync } = require("fs");
-  const migrationPath = join(ROOT, "drizzle", "0012_sensitive_access_audit.sql");
+  const migrationPath = join(ROOT, "drizzle", "0013_sensitive_access_audit.sql");
 
-  it("migration file 0012 should exist", () => {
+  it("migration file 0013_sensitive_access_audit.sql should exist", () => {
     expect(existsSync(migrationPath)).toBe(true);
   });
 
+  it("migration should be registered in drizzle journal", () => {
+    const journal = JSON.parse(readFile("drizzle/meta/_journal.json"));
+    const entry = journal.entries.find((e: any) => e.tag === "0013_sensitive_access_audit");
+    expect(entry).toBeDefined();
+    expect(entry.idx).toBe(13);
+  });
+
   it("migration should CREATE TABLE sensitive_access_audit", () => {
-    const sql = readFile("drizzle/0012_sensitive_access_audit.sql");
+    const sql = readFile("drizzle/0013_sensitive_access_audit.sql");
     expect(sql).toMatch(/CREATE TABLE.*sensitive_access_audit/i);
   });
 
   it("migration should create indexes for userId, resourceType, resourceId, createdAt", () => {
-    const sql = readFile("drizzle/0012_sensitive_access_audit.sql");
+    const sql = readFile("drizzle/0013_sensitive_access_audit.sql");
     expect(sql).toMatch(/CREATE INDEX.*saa_userId_idx/i);
     expect(sql).toMatch(/CREATE INDEX.*saa_resourceType_idx/i);
     expect(sql).toMatch(/CREATE INDEX.*saa_resourceId_idx/i);
@@ -383,5 +390,189 @@ describe("ClusterHealth — managerConfiguration UI Wiring", () => {
 
   it("should include RawJsonViewer for managerConfiguration", () => {
     expect(src).toContain("Manager Configuration JSON");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 9. Sensitive Access Audit — Admin Viewer
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("Sensitive Access Audit — Admin Router", () => {
+  const router = readFile("server/admin/sensitiveAccessRouter.ts");
+
+  it("should export sensitiveAccessRouter", () => {
+    expect(router).toMatch(/export\s+(const|function)\s+sensitiveAccessRouter/);
+  });
+
+  it("should use adminProcedure for listSensitiveAccess", () => {
+    expect(router).toContain("adminProcedure");
+  });
+
+  it("should query sensitiveAccessAudit table", () => {
+    expect(router).toContain("sensitiveAccessAudit");
+  });
+
+  it("should support pagination (limit/offset)", () => {
+    expect(router).toContain("limit");
+    expect(router).toContain("offset");
+  });
+
+  it("should support filtering by resourceType", () => {
+    expect(router).toContain("resourceType");
+  });
+});
+
+describe("Sensitive Access Audit — UI Page", () => {
+  const src = readFile("client/src/pages/SensitiveAccessAudit.tsx");
+
+  it("should consume trpc.sensitiveAccess.list.useQuery", () => {
+    expect(src).toContain("trpc.sensitiveAccess.list.useQuery");
+  });
+
+  it("should render a table with userId, resourceType, resourceId, action, createdAt columns", () => {
+    expect(src).toContain("User");
+    expect(src).toContain("Resource Type");
+    expect(src).toContain("Resource ID");
+    expect(src).toContain("Action");
+  });
+
+  it("should have pagination controls", () => {
+    expect(src).toContain("setPage");
+    expect(src).toMatch(/page/);
+  });
+
+  it("should use GlassPanel for the table container", () => {
+    expect(src).toContain("GlassPanel");
+  });
+
+  it("should use GlassPanel-based layout", () => {
+    // Audit page uses GlassPanel for the table container
+    expect(src).toContain("GlassPanel");
+  });
+});
+
+describe("Sensitive Access Audit — Route + Nav", () => {
+  const appSrc = readFile("client/src/App.tsx");
+  const navSrc = readFile("client/src/components/DashboardLayout.tsx");
+
+  it("should have /admin/audit route in App.tsx", () => {
+    expect(appSrc).toMatch(/\/admin\/audit/);
+  });
+
+  it("should import SensitiveAccessAudit page", () => {
+    expect(appSrc).toContain("SensitiveAccessAudit");
+  });
+
+  it("should have Access Audit link in DashboardLayout sidebar", () => {
+    expect(navSrc).toContain("Access Audit");
+    expect(navSrc).toContain("/admin/audit");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 10. Agent Overview — Home Page Wiring
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("Home — agentOverview Wiring", () => {
+  const src = readFile("client/src/pages/Home.tsx");
+
+  it("should consume trpc.wazuh.agentOverview.useQuery", () => {
+    expect(src).toContain("trpc.wazuh.agentOverview.useQuery");
+  });
+
+  it("should render AgentOverviewTable component", () => {
+    expect(src).toContain("AgentOverviewTable");
+  });
+
+  it("should include RawJsonViewer for agent overview data", () => {
+    expect(src).toContain('title="Agent Overview"');
+  });
+
+  it("should show node-level breakdown (node_name, node_type, counts)", () => {
+    expect(src).toContain("node_name");
+    expect(src).toContain("node_type");
+  });
+
+  it("should show per-status counts (active, disconnected, never_connected, pending)", () => {
+    expect(src).toContain("active");
+    expect(src).toContain("disconnected");
+    expect(src).toContain("never_connected");
+    expect(src).toContain("pending");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 11. Agent Daemon Stats — Agent Detail Wiring
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("Agent Detail — agentDaemonStats Wiring", () => {
+  const src = readFile("client/src/pages/AgentDetail.tsx");
+
+  it("should consume trpc.wazuh.agentDaemonStats.useQuery", () => {
+    expect(src).toContain("trpc.wazuh.agentDaemonStats.useQuery");
+  });
+
+  it("should render daemon stats panel in ConfigStatsTab", () => {
+    expect(src).toContain("Daemon Stats");
+  });
+
+  it("should include RawJsonViewer for daemon stats data", () => {
+    expect(src).toContain("RawJsonViewer");
+    expect(src).toContain("daemonStatsQ.data");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 12. materializeResponseActions — Partial Failure Signal
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("materializeResponseActions — Partial Failure Signal", () => {
+  const hypoSrc = readFile("server/agenticPipeline/hypothesisAgent.ts");
+
+  it("should return structured result with ids, attempted, succeeded, failed", () => {
+    expect(hypoSrc).toContain("ids: materializedIds");
+    expect(hypoSrc).toContain("attempted: actions.length");
+    expect(hypoSrc).toContain("succeeded: materializedIds.length");
+    expect(hypoSrc).toContain("failed: failedActions");
+  });
+
+  it("should track failed actions with index, action name, and error", () => {
+    expect(hypoSrc).toContain("failedActions.push");
+    expect(hypoSrc).toContain("index:");
+    expect(hypoSrc).toContain("error: errMsg");
+  });
+
+  it("should log partial failure warning when some actions fail", () => {
+    expect(hypoSrc).toContain("Partial failure:");
+  });
+
+  it("should propagate materializePartialFailure on HypothesisAgentResult", () => {
+    expect(hypoSrc).toContain("materializePartialFailure:");
+    // The return value uses ternary: materializePartialFailure: ... ? { ... } : null
+    expect(hypoSrc).toContain(": null,");
+  });
+
+  it("HypothesisAgentResult interface should include materializePartialFailure field", () => {
+    expect(hypoSrc).toMatch(/materializePartialFailure.*\{/);
+    expect(hypoSrc).toContain("attempted: number");
+    expect(hypoSrc).toContain("succeeded: number");
+  });
+});
+
+describe("Partial Failure Signal — Pipeline Router Propagation", () => {
+  const routerSrc = readFile("server/agenticPipeline/pipelineRouter.ts");
+  const resumeSrc = readFile("server/agenticPipeline/resumePipelineHelper.ts");
+
+  it("pipelineRouter should propagate materializePartialFailure in hypothesis mutation", () => {
+    expect(routerSrc).toContain("materializePartialFailure: result.materializePartialFailure");
+  });
+
+  it("pipelineRouter should set responseActions status to 'partial' on partial failure", () => {
+    expect(routerSrc).toContain('? "partial"');
+  });
+
+  it("resumePipelineHelper should propagate partial failure in responseActions stage", () => {
+    expect(resumeSrc).toContain("partialFailure");
+    expect(resumeSrc).toContain('? "partial"');
   });
 });

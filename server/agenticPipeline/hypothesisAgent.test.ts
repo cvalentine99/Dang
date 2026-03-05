@@ -43,8 +43,9 @@ vi.mock("../wazuh/wazuhClient", () => ({
   getEffectiveWazuhConfig: async () => ({ host: "mock", port: 55000, user: "admin", pass: "admin", protocol: "https" }),
 }));
 
-vi.mock("../threatIntel/otxService", () => ({
+vi.mock("../otx/otxClient", () => ({
   otxGet: async () => ({}),
+  isOtxConfigured: () => false,
 }));
 
 const HAS_DB = !!process.env.DATABASE_URL;
@@ -321,18 +322,17 @@ describe("runHypothesisAgent — full pipeline", () => {
 });
 
 describe("runHypothesisAgent — response action materialization", () => {
-  let testCorrelationId2: string;
+  // Each test gets its own isolated correlationId — no shared state between tests.
+  // This prevents the "2 actions from test A leak into test B" problem.
 
-  beforeAll(async () => {
-    if (!HAS_DB) return;
-
+  async function createIsolatedCorrelation(alertId: string): Promise<string> {
     const { runTriageAgent } = await import("./triageAgent");
     const { runCorrelationAgent } = await import("./correlationAgent");
 
     mockLLMResponse.mockResolvedValueOnce(TRIAGE_LLM_RESPONSE);
     const triageResult = await runTriageAgent({
       rawAlert: {
-        id: "hypo-test-actions-1",
+        id: alertId,
         timestamp: new Date().toISOString(),
         rule: { id: "5710", level: 10, description: "Test", mitre: { id: ["T1021"], technique: ["Remote Services"], tactic: ["Lateral Movement"] } },
         agent: { id: "001", name: "test-host" },
@@ -343,12 +343,13 @@ describe("runHypothesisAgent — response action materialization", () => {
 
     mockLLMResponse.mockResolvedValueOnce(CORRELATION_LLM_RESPONSE);
     const corrResult = await runCorrelationAgent({ triageId: triageResult.triageId! });
-    testCorrelationId2 = corrResult.correlationId;
-  });
+    return corrResult.correlationId;
+  }
 
   it.skipIf(!HAS_DB)(
     "materializes response actions with correct initial state (proposed)",
     async () => {
+      const correlationId = await createIsolatedCorrelation("hypo-test-actions-materialize-1");
       const { runHypothesisAgent } = await import("./hypothesisAgent");
 
       mockLLMResponse.mockResolvedValueOnce(makeHypothesisLLMResponse({
@@ -374,7 +375,7 @@ describe("runHypothesisAgent — response action materialization", () => {
         ],
       }));
 
-      const result = await runHypothesisAgent({ correlationId: testCorrelationId2 });
+      const result = await runHypothesisAgent({ correlationId });
 
       expect(result.materializedActionIds.length).toBe(2);
       // All materialized actions should start in "proposed" state
@@ -387,13 +388,14 @@ describe("runHypothesisAgent — response action materialization", () => {
   it.skipIf(!HAS_DB)(
     "handles hypothesis with zero recommended actions",
     async () => {
+      const correlationId = await createIsolatedCorrelation("hypo-test-actions-zero-1");
       const { runHypothesisAgent } = await import("./hypothesisAgent");
 
       mockLLMResponse.mockResolvedValueOnce(makeHypothesisLLMResponse({
         recommendedActions: [],
       }));
 
-      const result = await runHypothesisAgent({ correlationId: testCorrelationId2 });
+      const result = await runHypothesisAgent({ correlationId });
 
       expect(result.caseId).toBeGreaterThan(0);
       // No new actions to materialize

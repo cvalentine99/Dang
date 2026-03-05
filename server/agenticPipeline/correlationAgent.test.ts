@@ -44,8 +44,9 @@ vi.mock("../wazuh/wazuhClient", () => ({
 }));
 
 const mockOtxGet = vi.fn().mockResolvedValue({});
-vi.mock("../threatIntel/otxService", () => ({
+vi.mock("../otx/otxClient", () => ({
   otxGet: (...args: any[]) => mockOtxGet(...args),
+  isOtxConfigured: () => false,
 }));
 
 const HAS_DB = !!process.env.DATABASE_URL;

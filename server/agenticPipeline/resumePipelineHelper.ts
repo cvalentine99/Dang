@@ -296,10 +296,14 @@ export async function executeResumePipeline(
     };
 
     const actionIds = hypoResult.materializedActionIds ?? [];
+    const partialFailure = hypoResult.materializePartialFailure;
     result.stages.responseActions = {
-      status: actionIds.length > 0 ? "completed" : "skipped",
+      status: partialFailure
+        ? "partial"
+        : actionIds.length > 0 ? "completed" : "skipped",
       count: actionIds.length,
       actionIds,
+      ...(partialFailure ? { partialFailure } : {}),
     };
 
     await db.update(pipelineRuns).set({

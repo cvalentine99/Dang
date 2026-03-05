@@ -607,6 +607,7 @@ export const pipelineRouter = router({
           latencyMs: result.latencyMs,
           tokensUsed: result.tokensUsed,
           isNewSession: result.isNewSession,
+          materializePartialFailure: result.materializePartialFailure,
         };
       } catch (err) {
         return {
@@ -973,10 +974,14 @@ export const pipelineRouter = router({
 
         // Response actions are already materialized by the hypothesis agent
         const actionIds = hypoResult.materializedActionIds ?? [];
+        const partialFailure = hypoResult.materializePartialFailure;
         result.stages.responseActions = {
-          status: actionIds.length > 0 ? "completed" : "skipped",
+          status: partialFailure
+            ? "partial"
+            : actionIds.length > 0 ? "completed" : "skipped",
           count: actionIds.length,
           actionIds,
+          ...(partialFailure ? { partialFailure } : {}),
         };
 
         await db.update(pipelineRuns).set({

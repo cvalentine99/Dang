@@ -3051,3 +3051,36 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] managerConfiguration: reclassified from "planned" to "NOW WIRED" (wired to ClusterHealth, not just validation)
 - [x] Updated counts: 40 UI-planned, 5 newly wired (was 42/3), total 49 backend-only unchanged
 - [x] UI parity audit: 119 callsites, 69/113 procedures, 0 violations
+
+## Smell Audit Correction Order (Mar 5, 2026 — Chase directive)
+### P0: Fix 4 pre-existing test failures (blocks success:true)
+- [x] Fix OTX mock path in correlationAgent.test.ts (../threatIntel/otxService → ../otx/otxClient)
+- [x] Fix OTX mock path in hypothesisAgent.test.ts (../threatIntel/otxService → ../otx/otxClient)
+- [x] Mock both otxGet and isOtxConfigured explicitly in both files
+- [x] Fix hypothesisAgent test isolation: each response-action materialization test gets own correlationId via per-test setup
+- [x] All 4 previously failing tests pass: correlationAgent 13/13, hypothesisAgent 24/24 (was 11/11+2fail), resumePipelineHelper 9/9
+### P0: Fix drizzle migration journaling (blocks production correctness)
+- [x] Removed orphan hand-written 0012_sensitive_access_audit.sql
+- [x] Created proper 0013_sensitive_access_audit.sql with CREATE TABLE + 4 indexes
+- [x] Added entry to drizzle/meta/_journal.json (idx: 13, tag: 0013_sensitive_access_audit)
+- [x] Table verified in DB via webdev_execute_sql (DESCRIBE + SELECT)
+### P1: Build Sensitive Access Audit Viewer (admin-only)
+- [x] Backend: server/admin/sensitiveAccessRouter.ts with listSensitiveAccess adminProcedure (pagination, resourceType filter, date range)
+- [x] UI: client/src/pages/SensitiveAccessAudit.tsx — GlassPanel table, pagination, filters
+- [x] Route /admin/audit in App.tsx, sidebar link in DashboardLayout
+- [x] Non-admins gated by adminProcedure (FORBIDDEN error)
+### P2: Agent Detail wiring corrections
+- [x] Wire agentDaemonStats to Agent Detail Config & Stats tab (query by agentId, RawJsonViewer)
+- [x] Do NOT wire agentGroupSync (deprecated — confirmed)
+- [x] Wire agentOverview to Home page Row 6 (fleet-wide node breakdown table + RawJsonViewer)
+### P2: Fix materializeResponseActions partial-failure signal
+- [x] Return structured result: { ids, attempted, succeeded, failed: [{index, action, error}] }
+- [x] Track per-action failures with index, action name, and error message
+- [x] Log partial failure warning when some actions fail
+- [x] Propagate materializePartialFailure on HypothesisAgentResult (null when clean)
+- [x] pipelineRouter + resumePipelineHelper set responseActions status to 'partial' on partial failure
+### Proof artifacts
+- [x] Generated vitest.json: 72 files, 597 suites, 2168 tests (2167 passed, 1 failed)
+- [x] 1 failure: OTX API Key Validation network timeout (pre-existing, env-dependent — OTX_API_KEY set but OTX API unreachable)
+- [x] Generated ci-proof-artifact.md from vitest.json via generate-ci-proof.mjs — PHYSICS MATCH
+- [x] UI parity audit: 121 callsites, 71/113 procedures, 0 violations
