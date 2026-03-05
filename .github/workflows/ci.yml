@@ -249,11 +249,85 @@ jobs:
             echo "| Violations | $VIOLATIONS |" >> $GITHUB_STEP_SUMMARY
           fi
 
+  # ── CI Proof Artifact Generation ──────────────────────────────────────────────
+  ci-proof:
+    name: CI Proof Artifact
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests with JSON reporter
+        run: pnpm test -- --run --reporter=json --outputFile.json=test-output/vitest.json
+        continue-on-error: true
+        env:
+          DATABASE_URL: "mysql://test:test@localhost:3306/test"
+          JWT_SECRET: "ci-test-secret-not-for-production"
+          WAZUH_HOST: "127.0.0.1"
+          WAZUH_PORT: "55000"
+          WAZUH_USER: "ci"
+          WAZUH_PASS: "ci"
+          WAZUH_INDEXER_HOST: "127.0.0.1"
+          WAZUH_INDEXER_PORT: "9200"
+          WAZUH_INDEXER_USER: "ci"
+          WAZUH_INDEXER_PASS: "ci"
+
+      - name: Generate proof artifact from JSON
+        run: pnpm proof:generate
+
+      - name: Verify proof artifact is committed (no drift)
+        run: |
+          echo "Checking for uncommitted CI proof changes..."
+          if ! git diff --exit-code docs/ci-proof-artifact.md; then
+            echo "::error::CI proof artifact is stale. Run 'pnpm test -- --run --reporter=json --outputFile.json=test-output/vitest.json && pnpm proof:generate' locally and commit the updated files."
+            exit 1
+          fi
+          echo "✓ CI proof artifact is up-to-date"
+
+      - name: Upload JSON report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-json-report
+          path: test-output/vitest.json
+          retention-days: 30
+
+      - name: Proof summary
+        if: always()
+        run: |
+          echo "## CI Proof Artifact" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f test-output/vitest.json ]; then
+            FILES=$(node -e "const j=JSON.parse(require('fs').readFileSync('test-output/vitest.json','utf-8')); console.log(j.testResults.length)")
+            TESTS=$(node -e "const j=JSON.parse(require('fs').readFileSync('test-output/vitest.json','utf-8')); console.log(j.numTotalTests)")
+            PASSED=$(node -e "const j=JSON.parse(require('fs').readFileSync('test-output/vitest.json','utf-8')); console.log(j.numPassedTests)")
+            FAILED=$(node -e "const j=JSON.parse(require('fs').readFileSync('test-output/vitest.json','utf-8')); console.log(j.numFailedTests)")
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Test files | $FILES |" >> $GITHUB_STEP_SUMMARY
+            echo "| Total tests | $TESTS |" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
+          fi
+
   # ── Build Verification ───────────────────────────────────────────────────────
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [typecheck, test, contract-audit, ui-parity]
+    needs: [typecheck, test, contract-audit, ui-parity, ci-proof]
     env:
       DATABASE_URL: "mysql://test:test@localhost:3306/test"
       JWT_SECRET: "ci-test-secret-not-for-production"

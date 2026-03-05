@@ -516,7 +516,7 @@ The following table lists all 113 tRPC procedures in the `wazuhRouter`, organize
 Run these commands to verify the full sprint closure:
 
 ```bash
-# Full test suite (expect 2,071 passing, 1 network-dependent timeout)
+# Full test suite (measured counts from test-output/vitest.json)
 cd /home/ubuntu/dang && pnpm test
 
 # TypeScript compilation (expect EXIT 0)
@@ -542,6 +542,13 @@ pnpm test -- --run server/wazuh/uiParamParity.test.ts
 
 # Security auth-negative tests (expect 4 passing)
 pnpm test -- --reporter=verbose server/wazuh/wazuhRouter.test.ts 2>&1 | grep -E 'securityRbacRules|securityActions|securityResources|securityCurrentUserPolicies'
+
+# Generate machine-measured CI proof (produces test-output/vitest.json + docs/ci-proof-artifact.md)
+pnpm test -- --run --reporter=json --outputFile.json=test-output/vitest.json
+pnpm proof:generate
+
+# Verify proof artifact is not stale
+git diff --exit-code docs/ci-proof-artifact.md test-output/vitest.json
 ```
 
 ---
@@ -678,6 +685,6 @@ No procedures are "implicitly handled" — every one has an explicit disposition
 | UI Param Parity Report | `docs/ui-param-parity-report.md` | 114 callsites, 64 procedures, 0 violations |
 | UI Param Parity JSON | `docs/ui-param-parity.json` | Machine-readable parity data for CI guard |
 | Parity Audit Script | `scripts/audit-ui-param-parity.mjs` | Deterministic static analysis of UI→Router param flow |
-| CI Proof Artifact | `docs/ci-proof-artifact.md` | Test suite execution proof with verification commands |
+| CI Proof Artifact | `docs/ci-proof-artifact.md` | Machine-generated from `test-output/vitest.json` via `scripts/generate-ci-proof.mjs` — no hand-written counts |
 | Sprint Plan | `dang-sprint-final-v2.docx` | Original P0/P1/P2 objective definitions |
 | Todo Tracker | `todo.md` | Line-by-line completion status for all sprint items |

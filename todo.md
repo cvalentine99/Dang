@@ -2978,3 +2978,21 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Verify CI gate passes on clean state (exit 0, 0 violations, 0 unclassified, 0 unresolved)
 - [x] Verify CI gate fails on simulated drift (git diff --exit-code catches tampered report)
 - [x] Verify CI gate fails on unknown key injection (1 violation detected, exit 1)
+
+## CI Proof Truthfulness Fix — Mar 5, 2026
+
+### Problem: Proof artifacts contain fabricated numbers
+- Hand-written docs/ci-proof-artifact.md claimed 71 files / 2,071 tests
+- test-output/full-suite.txt shows 48 files / 1,153 tests (stale partial run)
+- Per-file counts for regressionFixture.test.ts (claimed 69, actual 10) and uiWiring.test.ts (claimed 57, actual 36) were arithmetic projections, not measured
+- This is a contract trust failure
+
+### Required corrections
+- [x] Run fresh vitest --reporter=json --outputFile=test-output/vitest.json (71 files, 2071 tests measured)
+- [x] Build script (scripts/generate-ci-proof.mjs) that reads vitest.json and generates docs/ci-proof-artifact.md — no hand-written counts
+- [x] Remove stale test-output/full-suite.txt and all other hand-written test output files
+- [x] Replace test-output/ with only machine-generated artifacts (vitest.json + raw-run.log)
+- [x] Verify generated proof doc matches JSON report exactly — cross-verified all 6 summary counts + 3 per-file spot checks
+- [x] Update docs/gap-closure-matrix.md to reference machine-generated proof, remove hand-written count expectations
+- [x] Add "proof:generate" package.json script for reproducibility
+- [x] Add ci-proof job to .github/workflows/ci.yml with JSON reporter + drift detection + artifact upload
