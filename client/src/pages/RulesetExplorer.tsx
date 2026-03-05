@@ -73,7 +73,7 @@ const CHART_COLORS = [
   "oklch(0.7 0.15 320)",
 ];
 
-type TabType = "rules" | "decoders";
+type TabType = "rules" | "decoders" | "rulesFiles" | "decoderFiles" | "cdbLists";
 
 // ─── View Source File Button ────────────────────────────────────────────────
 function ViewSourceButton({ type, filename }: { type: "rules" | "decoders"; filename: string }) {
@@ -232,6 +232,31 @@ export default function RulesetExplorer() {
   const ruleGroupsQ = trpc.wazuh.ruleGroups.useQuery(undefined, {
     enabled: isConfigured,
   });
+
+  // ─── New file-level queries (Task 4: Ruleset File Content) ──────────────
+  const rulesFilesQ = trpc.wazuh.rulesFiles.useQuery(
+    { limit: 500, offset: 0 },
+    { enabled: isConfigured && activeTab === "rulesFiles" }
+  );
+  const decoderFilesQ = trpc.wazuh.decoderFiles.useQuery(
+    { limit: 500, offset: 0 },
+    { enabled: isConfigured && activeTab === "decoderFiles" }
+  );
+  const listsQ = trpc.wazuh.lists.useQuery(
+    { limit: 500, offset: 0 },
+    { enabled: isConfigured && activeTab === "cdbLists" }
+  );
+  const listsFilesQ = trpc.wazuh.listsFiles.useQuery(
+    { limit: 500, offset: 0 },
+    { enabled: isConfigured && activeTab === "cdbLists" }
+  );
+
+  // ─── CDB List file viewer state ────────────────────────────────────────
+  const [cdbFileToView, setCdbFileToView] = useState<string | null>(null);
+  const cdbFileContentQ = trpc.wazuh.listsFileContent.useQuery(
+    { filename: cdbFileToView ?? "" },
+    { enabled: !!cdbFileToView }
+  );
 
   // ─── Data ────────────────────────────────────────────────────────────────
   const rulesRaw = rulesQ.data ?? { data: { affected_items: [] } };
@@ -547,6 +572,39 @@ export default function RulesetExplorer() {
           >
             <Code className="h-4 w-4" />
             Decoders ({decoders.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("rulesFiles")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
+              activeTab === "rulesFiles"
+                ? "bg-violet-500/20 text-violet-300 border-b-2 border-violet-400"
+                : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+            }`}
+          >
+            <FileText className="h-4 w-4" />
+            Rule Files
+          </button>
+          <button
+            onClick={() => setActiveTab("decoderFiles")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
+              activeTab === "decoderFiles"
+                ? "bg-violet-500/20 text-violet-300 border-b-2 border-violet-400"
+                : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+            }`}
+          >
+            <Terminal className="h-4 w-4" />
+            Decoder Files
+          </button>
+          <button
+            onClick={() => setActiveTab("cdbLists")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
+              activeTab === "cdbLists"
+                ? "bg-violet-500/20 text-violet-300 border-b-2 border-violet-400"
+                : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+            }`}
+          >
+            <Database className="h-4 w-4" />
+            CDB Lists
           </button>
         </div>
 
@@ -1184,6 +1242,214 @@ export default function RulesetExplorer() {
           )}
           </>)}
         </GlassPanel>
+      )}
+
+      {/* ── Rule Files Tab ──────────────────────────────────────────────── */}
+      {activeTab === "rulesFiles" && (
+        <GlassPanel>
+          <BrokerWarnings data={rulesFilesQ.data} context="rulesFiles" />
+          <h3 className="text-sm font-semibold text-violet-300 mb-3">Rule Files</h3>
+          {rulesFilesQ.isLoading ? (
+            <TableSkeleton columns={3} rows={10} />
+          ) : (() => {
+            const items = ((rulesFilesQ.data as any)?.data?.affected_items ?? []) as Array<Record<string, unknown>>;
+            return items.length === 0 ? (
+              <div className="py-12 text-center text-slate-500">
+                <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No rule files found</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-slate-500 uppercase border-b border-white/10">
+                        <th className="py-2 px-3">Filename</th>
+                        <th className="py-2 px-3">Relative Path</th>
+                        <th className="py-2 px-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((f, i) => (
+                        <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                          <td className="py-2 px-3 font-mono text-xs text-violet-300">{String(f.filename ?? "")}</td>
+                          <td className="py-2 px-3 font-mono text-xs text-slate-400">{String(f.relative_dirname ?? "")}</td>
+                          <td className="py-2 px-3">
+                            <ViewSourceButton type="rules" filename={String(f.filename ?? "")} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <RawJsonViewer data={rulesFilesQ.data} title="rulesFiles" />
+              </>
+            );
+          })()}
+        </GlassPanel>
+      )}
+
+      {/* ── Decoder Files Tab ──────────────────────────────────────────── */}
+      {activeTab === "decoderFiles" && (
+        <GlassPanel>
+          <BrokerWarnings data={decoderFilesQ.data} context="decoderFiles" />
+          <h3 className="text-sm font-semibold text-violet-300 mb-3">Decoder Files</h3>
+          {decoderFilesQ.isLoading ? (
+            <TableSkeleton columns={3} rows={10} />
+          ) : (() => {
+            const items = ((decoderFilesQ.data as any)?.data?.affected_items ?? []) as Array<Record<string, unknown>>;
+            return items.length === 0 ? (
+              <div className="py-12 text-center text-slate-500">
+                <Terminal className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No decoder files found</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-slate-500 uppercase border-b border-white/10">
+                        <th className="py-2 px-3">Filename</th>
+                        <th className="py-2 px-3">Relative Path</th>
+                        <th className="py-2 px-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((f, i) => (
+                        <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                          <td className="py-2 px-3 font-mono text-xs text-violet-300">{String(f.filename ?? "")}</td>
+                          <td className="py-2 px-3 font-mono text-xs text-slate-400">{String(f.relative_dirname ?? "")}</td>
+                          <td className="py-2 px-3">
+                            <ViewSourceButton type="decoders" filename={String(f.filename ?? "")} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <RawJsonViewer data={decoderFilesQ.data} title="decoderFiles" />
+              </>
+            );
+          })()}
+        </GlassPanel>
+      )}
+
+      {/* ── CDB Lists Tab ──────────────────────────────────────────────── */}
+      {activeTab === "cdbLists" && (
+        <>
+          <GlassPanel>
+            <BrokerWarnings data={listsQ.data} context="lists" />
+            <h3 className="text-sm font-semibold text-violet-300 mb-3">CDB Lists</h3>
+            {listsQ.isLoading ? (
+              <TableSkeleton columns={3} rows={8} />
+            ) : (() => {
+              const items = ((listsQ.data as any)?.data?.affected_items ?? []) as Array<Record<string, unknown>>;
+              return items.length === 0 ? (
+                <div className="py-12 text-center text-slate-500">
+                  <Database className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No CDB lists found</p>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs text-slate-500 uppercase border-b border-white/10">
+                          <th className="py-2 px-3">Relative Path</th>
+                          <th className="py-2 px-3">Items</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((l, i) => (
+                          <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                            <td className="py-2 px-3 font-mono text-xs text-violet-300">{String(l.relative_dirname ?? "")}/{String(l.filename ?? "")}</td>
+                            <td className="py-2 px-3 font-mono text-xs text-slate-400">{String((l.items as any[])?.length ?? 0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <RawJsonViewer data={listsQ.data} title="lists" />
+                </>
+              );
+            })()}
+          </GlassPanel>
+
+          <GlassPanel>
+            <BrokerWarnings data={listsFilesQ.data} context="listsFiles" />
+            <h3 className="text-sm font-semibold text-violet-300 mb-3">CDB List Files</h3>
+            {listsFilesQ.isLoading ? (
+              <TableSkeleton columns={3} rows={8} />
+            ) : (() => {
+              const items = ((listsFilesQ.data as any)?.data?.affected_items ?? []) as Array<Record<string, unknown>>;
+              return items.length === 0 ? (
+                <div className="py-12 text-center text-slate-500">
+                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No CDB list files found</p>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs text-slate-500 uppercase border-b border-white/10">
+                          <th className="py-2 px-3">Filename</th>
+                          <th className="py-2 px-3">Relative Path</th>
+                          <th className="py-2 px-3">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((f, i) => (
+                          <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                            <td className="py-2 px-3 font-mono text-xs text-violet-300">{String(f.filename ?? "")}</td>
+                            <td className="py-2 px-3 font-mono text-xs text-slate-400">{String(f.relative_dirname ?? "")}</td>
+                            <td className="py-2 px-3">
+                              <button
+                                onClick={() => setCdbFileToView(String(f.filename ?? ""))}
+                                className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1"
+                              >
+                                <Eye className="h-3 w-3" /> View Content
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <RawJsonViewer data={listsFilesQ.data} title="listsFiles" />
+                </>
+              );
+            })()}
+          </GlassPanel>
+
+          {/* CDB List File Content Viewer */}
+          {cdbFileToView && (
+            <GlassPanel>
+              <BrokerWarnings data={cdbFileContentQ.data} context="listsFileContent" />
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-violet-300">
+                  <span className="font-mono">{cdbFileToView}</span> — Content
+                </h3>
+                <button
+                  onClick={() => setCdbFileToView(null)}
+                  className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1"
+                >
+                  <X className="h-3 w-3" /> Close
+                </button>
+              </div>
+              {cdbFileContentQ.isLoading ? (
+                <TableSkeleton columns={2} rows={6} />
+              ) : (
+                <>
+                  <pre className="bg-black/30 rounded-lg p-4 text-xs font-mono text-slate-300 overflow-auto max-h-[400px] whitespace-pre-wrap">
+                    {JSON.stringify(cdbFileContentQ.data, null, 2)}
+                  </pre>
+                  <RawJsonViewer data={cdbFileContentQ.data} title="listsFileContent" />
+                </>
+              )}
+            </GlassPanel>
+          )}
+        </>
       )}
     </div>
   );

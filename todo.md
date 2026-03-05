@@ -3108,3 +3108,74 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Generated ci-proof-artifact.md from vitest.json — PHYSICS MATCH
 - [x] UI parity audit: 124 callsites, 74/113 procedures, 0 violations
 - [x] 39 new trustDocSprint.test.ts tests — all passing
+
+## Next Phase Sprint — Contract-Compliance (Mar 5, 2026)
+
+### Task 0: CSV Export on Sensitive Access Audit (P0)
+- [ ] Import exportToCsv from @/lib/exportUtils in SensitiveAccessAudit.tsx
+- [ ] Add Export CSV button in filter bar next to Clear Filters
+- [ ] Wire onClick to exportToCsv with current data array, filename: sensitive-access-audit-${Date.now()}.csv
+- [ ] Test: confirm export shape matches list endpoint data
+
+### Task 1: Cluster Node Deep-Dive UI — 7 procedures (P1)
+- [ ] Wire clusterHealthcheck — healthcheck panel in ClusterHealth.tsx
+- [ ] Wire clusterLocalConfig — local config section in ClusterHealth.tsx
+- [ ] Wire clusterLocalInfo — local node info card in ClusterHealth.tsx
+- [ ] Wire clusterNodeComponentConfig — per-node config drawer (component/config selector)
+- [ ] Wire clusterNodeInfo — node detail panel in ClusterHealth.tsx
+- [ ] Wire clusterNodeStats — node stats tab in ClusterHealth.tsx
+- [ ] Wire clusterNodeStatsHourly — hourly chart in ClusterHealth.tsx
+- [ ] All queries: staleTime: 30_000, retry: 1
+- [ ] All panels: BrokerWarnings + RawJsonViewer
+- [ ] nodeId from selected node in clusterNodesQ.data — no hardcoding
+
+### Task 2: Security & RBAC Procedures — 4 procedures (P1)
+- [ ] Wire securityCurrentUser — current user info panel in SecurityExplorer.tsx
+- [ ] Wire securityPolicies — policies tab in SecurityExplorer.tsx
+- [ ] Wire securityRoles — roles tab in SecurityExplorer.tsx
+- [ ] Wire securityUsers — users tab in SecurityExplorer.tsx (ADMIN-GATED)
+- [ ] securityUsers must check user?.role !== 'admin' — same pattern as SensitiveAccessAudit
+
+### Task 3: Agent Group Management — 8 procedures, new page (P1)
+- [ ] Create AgentGroups.tsx page
+- [ ] Wire agentGroupMembers — group member table with pagination
+- [ ] Wire agentGroupSync — sync badge on agent row
+- [ ] Wire agentsUninstallPermission — ungrouped agent warning banner
+- [ ] Wire agentsUpgradeResult — upgrade result status column
+- [ ] Wire groupConfiguration — group config JSON drawer
+- [ ] Wire groupFileContent — file content viewer
+- [ ] Wire groupFiles — group files list
+- [ ] Wire taskStatus — background task status badge (poll 10s only when active tasks)
+- [ ] Add route /agent-groups to App.tsx
+- [ ] Add nav entry in DashboardLayout.tsx under Fleet Command
+- [ ] WazuhGuard wrap pattern
+
+### Task 4: Ruleset File Content — 7 procedures (P2)
+- [ ] Wire decoderFiles — decoder file list tab in RulesetExplorer.tsx
+- [ ] Wire decoderParents — parent decoder filter in RulesetExplorer.tsx
+- [ ] Wire rulesFiles — rule file list tab in RulesetExplorer.tsx
+- [ ] Wire rulesByRequirement — PCI/HIPAA requirement filter dropdown
+- [ ] Wire lists — CDB list directory view in RulesetExplorer.tsx
+- [ ] Wire listsFiles — CDB list file browser in RulesetExplorer.tsx
+- [ ] Wire listsFileContent — CDB list content viewer (raw text in pre, NOT RawJsonViewer)
+
+### Task 5: Manager Stats + Rootcheck — 4 procedures (P2)
+- [x] Wire managerStats — manager stats panel in Status.tsx (WazuhApiIntelligence 4-col grid)
+- [x] Wire mitreMetadata — metadata tab in MitreAttack.tsx (staleTime: 300_000)
+- [x] Wire rootcheckLastScan — rootcheck tab in AgentDetail.tsx (enabled: !!agentId)
+- [x] Wire rootcheckResults — rootcheck tab in AgentDetail.tsx with pagination, filters (status/search/pci_dss/cis)
+
+### Task 6: Misc Uncovered — 3 procedures (P2)
+- [ ] Wire agentsStatsDistinct — agent OS breakdown in Home.tsx
+- [ ] Wire agentsSummary — SOC Console summary card in Home.tsx
+- [ ] Wire isConfigured — config validation panel in Status.tsx
+
+### Acceptance Criteria
+- [ ] Parity audit >= 110/113
+- [ ] All existing tests pass — zero regressions
+- [ ] New vitest tests for every wired procedure
+- [ ] SensitiveAccessAudit.tsx has CSV export wired to exportUtils
+- [ ] AgentGroups.tsx exists and registered in App.tsx
+- [ ] securityUsers is admin-gated
+- [ ] No MUTATING or DESTRUCTIVE procedures wired — Phase 1 read-only
+- [ ] Analyst Notes NOT listed as next step (done in Phase 9 + Phase 36)

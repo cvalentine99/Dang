@@ -7,6 +7,7 @@ import { TableSkeleton } from "@/components/shared/TableSkeleton";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { WazuhGuard } from "@/components/shared/WazuhGuard";
 import { RawJsonViewer } from "@/components/shared/RawJsonViewer";
+import { BrokerWarnings } from "@/components/shared/BrokerWarnings";
 
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/tabs";
 import {
   Crosshair, Shield, Layers, Grid3X3, Target, ExternalLink,
-  Database, Activity, TrendingUp, Flame, Clock, Loader2,
+  Database, Activity, TrendingUp, Flame, Clock, Loader2, Info,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
 import {
@@ -118,6 +119,7 @@ export default function MitreAttack() {
   const techniquesQ = trpc.wazuh.mitreTechniques.useQuery({ limit: 500 }, { retry: 1, staleTime: 60_000, enabled: isConnected });
   const groupsQ = trpc.wazuh.mitreGroups.useQuery({ limit: 100 }, { retry: 1, staleTime: 120_000, enabled: isConnected });
   const rulesQ = trpc.wazuh.rules.useQuery({ limit: 500, offset: 0, sort: "-level" }, { retry: 1, staleTime: 60_000, enabled: isConnected });
+  const mitreMetadataQ = trpc.wazuh.mitreMetadata.useQuery(undefined, { retry: 1, staleTime: 300_000, enabled: isConnected });
 
   // Indexer MITRE aggregation
   const mitreTimeWindow = useMemo(() => ({
@@ -338,6 +340,7 @@ export default function MitreAttack() {
             <TabsTrigger value="heatmap" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"><Flame className="h-3 w-3 mr-1" /> Detection Heatmap</TabsTrigger>
             <TabsTrigger value="alerts" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"><Database className="h-3 w-3 mr-1" /> Alert Activity</TabsTrigger>
             <TabsTrigger value="groups" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"><Target className="h-3 w-3 mr-1" /> Threat Groups</TabsTrigger>
+            <TabsTrigger value="metadata" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary"><Info className="h-3 w-3 mr-1" /> Metadata</TabsTrigger>
           </TabsList>
 
           {/* ── ATT&CK Matrix Tab ──────────────────────────────────────── */}
@@ -593,6 +596,72 @@ export default function MitreAttack() {
                   </div>
                 ))}
               </div>
+            </GlassPanel>
+          </TabsContent>
+          {/* ── MITRE Metadata Tab ────────────────────────────────────────── */}
+          <TabsContent value="metadata" className="space-y-4 mt-4">
+            <GlassPanel>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Info className="h-4 w-4 text-primary" /> MITRE ATT&CK Metadata
+                  <SourceBadge source="server" />
+                </h3>
+                {mitreMetadataQ.data ? <RawJsonViewer data={mitreMetadataQ.data} title="MITRE Metadata JSON" /> : null}
+              </div>
+              <BrokerWarnings data={mitreMetadataQ.data} context="mitreMetadata" />
+              {mitreMetadataQ.isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : mitreMetadataQ.isError ? (
+                <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+                  <p className="text-xs text-red-300">{mitreMetadataQ.error.message}</p>
+                </div>
+              ) : mitreMetadataQ.data ? (
+                (() => {
+                  const raw = mitreMetadataQ.data as Record<string, unknown>;
+                  const inner = (raw?.data && typeof raw.data === "object") ? (raw.data as Record<string, unknown>) : raw;
+                  const items = Array.isArray(inner?.affected_items) ? (inner.affected_items as Array<Record<string, unknown>>) : [];
+                  if (items.length === 0) {
+                    // Show flat key-value if no affected_items
+                    const entries = Object.entries(inner).filter(([k]) => k !== "_brokerWarnings" && k !== "error");
+                    return (
+                      <div className="space-y-2">
+                        {entries.map(([key, value]) => (
+                          <div key={key} className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground capitalize">{key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim()}</span>
+                            <span className="font-mono text-foreground truncate max-w-[60%] text-right">{typeof value === "object" ? JSON.stringify(value) : String(value ?? "—")}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-border/30">
+                            {Object.keys(items[0]).map(k => (
+                              <th key={k} className="text-left py-2 px-3 text-muted-foreground font-medium capitalize">{k.replace(/_/g, " ")}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {items.map((item, idx) => (
+                            <tr key={idx} className="border-b border-border/10 hover:bg-secondary/20">
+                              {Object.values(item).map((v, vi) => (
+                                <td key={vi} className="py-2 px-3 font-mono text-foreground truncate max-w-[200px]">{typeof v === "object" ? JSON.stringify(v) : String(v ?? "—")}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()
+              ) : (
+                <p className="text-xs text-muted-foreground italic">No metadata available</p>
+              )}
             </GlassPanel>
           </TabsContent>
         </Tabs>

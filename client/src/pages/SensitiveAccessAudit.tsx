@@ -4,6 +4,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { GlassPanel } from "@/components/shared/GlassPanel";
 import { Button } from "@/components/ui/button";
+import { exportCSV } from "@/lib/exportUtils";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,6 +28,7 @@ import {
   Clock,
   Filter,
   X,
+  Download,
 } from "lucide-react";
 
 export default function SensitiveAccessAudit() {
@@ -145,11 +147,38 @@ export default function SensitiveAccessAudit() {
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium text-foreground">Filters</span>
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="ml-auto text-xs text-muted-foreground hover:text-foreground">
-              <X className="w-3 h-3 mr-1" /> Clear all
+          <div className="ml-auto flex items-center gap-2">
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground">
+                <X className="w-3 h-3 mr-1" /> Clear all
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!listQ.data?.rows?.length}
+              onClick={() => {
+                if (listQ.data?.rows?.length) {
+                  exportCSV(listQ.data.rows as Array<Record<string, unknown>>, "sensitive-access-audit", {
+                    columns: [
+                      { key: "id", label: "ID" },
+                      { key: "userId", label: "User ID" },
+                      { key: "userName", label: "User Name" },
+                      { key: "action", label: "Action" },
+                      { key: "resourceType", label: "Resource Type" },
+                      { key: "resourceId", label: "Resource ID" },
+                      { key: "metadata", label: "Metadata" },
+                      { key: "ipAddress", label: "IP Address" },
+                      { key: "createdAt", label: "Timestamp" },
+                    ],
+                  });
+                }
+              }}
+              className="text-xs border-violet-500/30 hover:bg-violet-500/10"
+            >
+              <Download className="w-3 h-3 mr-1" /> Export CSV
             </Button>
-          )}
+          </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <Select

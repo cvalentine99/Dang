@@ -10,7 +10,7 @@ import {
   Server, Wifi, WifiOff, Clock, Package, Globe, Users, HardDrive,
   AlertTriangle, ChevronLeft, ChevronRight, ExternalLink, Eye,
   FolderSearch, Plus, Link2, GitBranch, Settings, BarChart3, Key,
-  Copy, EyeOff, Loader2, Lock, ShieldAlert,
+  Copy, EyeOff, Loader2, Lock, ShieldAlert, Search, CheckCircle2, XCircle,
 } from "lucide-react";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -22,7 +22,7 @@ import {
 } from "recharts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type Tab = "overview" | "alerts" | "vulnerabilities" | "fim" | "syscollector" | "timeline" | "config";
+type Tab = "overview" | "alerts" | "vulnerabilities" | "fim" | "syscollector" | "timeline" | "config" | "rootcheck";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "overview", label: "Overview", icon: <Monitor className="w-3.5 h-3.5" /> },
@@ -32,6 +32,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "syscollector", label: "System Info", icon: <Cpu className="w-3.5 h-3.5" /> },
   { id: "timeline", label: "Timeline", icon: <GitBranch className="w-3.5 h-3.5" /> },
   { id: "config", label: "Config & Stats", icon: <Settings className="w-3.5 h-3.5" /> },
+  { id: "rootcheck", label: "Rootcheck", icon: <ShieldAlert className="w-3.5 h-3.5" /> },
 ];
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -1273,6 +1274,245 @@ function Row({ label, value, mono, children }: { label: string; value?: string; 
   );
 }
 
+// ── Rootcheck Tab ────────────────────────────────────────────────────────
+
+const ROOTCHECK_STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  outstanding: { bg: "oklch(0.795 0.184 86.047 / 12%)", text: "oklch(0.795 0.184 86.047)", border: "oklch(0.795 0.184 86.047 / 25%)" },
+  solved: { bg: "oklch(0.765 0.177 163.223 / 12%)", text: "oklch(0.765 0.177 163.223)", border: "oklch(0.765 0.177 163.223 / 25%)" },
+};
+
+function RootcheckTab({ agentId }: { agentId: string }) {
+  const [page, setPage] = useState(0);
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [pciFilter, setPciFilter] = useState("");
+  const [cisFilter, setCisFilter] = useState("");
+  const PAGE_SIZE = 20;
+
+  const lastScanQ = trpc.wazuh.rootcheckLastScan.useQuery(
+    { agentId },
+    { retry: 1, staleTime: 30_000, enabled: !!agentId }
+  );
+
+  const resultsQ = trpc.wazuh.rootcheckResults.useQuery(
+    {
+      agentId,
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(searchTerm ? { search: searchTerm } : {}),
+      ...(pciFilter ? { pci_dss: pciFilter } : {}),
+      ...(cisFilter ? { cis: cisFilter } : {}),
+    },
+    { retry: 1, staleTime: 30_000, enabled: !!agentId }
+  );
+
+  const raw = resultsQ.data as Record<string, unknown> | undefined;
+  const inner = (raw?.data && typeof raw.data === "object") ? (raw.data as Record<string, unknown>) : raw;
+  const items = Array.isArray(inner?.affected_items) ? (inner.affected_items as Array<Record<string, unknown>>) : [];
+  const totalItems = typeof inner?.total_affected_items === "number" ? inner.total_affected_items : items.length;
+  const totalPages = Math.max(1, Math.ceil((totalItems as number) / PAGE_SIZE));
+
+  const lastScanRaw = lastScanQ.data as Record<string, unknown> | undefined;
+  const lastScanInner = (lastScanRaw?.data && typeof lastScanRaw.data === "object") ? (lastScanRaw.data as Record<string, unknown>) : lastScanRaw;
+  const lastScanItems = Array.isArray(lastScanInner?.affected_items) ? (lastScanInner.affected_items as Array<Record<string, unknown>>) : [];
+  const lastScan = lastScanItems[0] ?? null;
+
+  const hasFilters = statusFilter || searchTerm || pciFilter || cisFilter;
+
+  return (
+    <div className="space-y-4">
+      {/* Last Scan Info */}
+      <GlassPanel>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary" /> Last Rootcheck Scan
+          </h3>
+          <div className="flex items-center gap-2">
+            {lastScanQ.data ? <RawJsonViewer data={lastScanQ.data} title="Last Scan JSON" /> : null}
+          </div>
+        </div>
+        <BrokerWarnings data={lastScanQ.data} context="rootcheckLastScan" />
+        {lastScanQ.isLoading ? (
+          <div className="animate-pulse space-y-2">
+            {[...Array(2)].map((_, i) => <div key={i} className="h-4 bg-white/5 rounded" />)}
+          </div>
+        ) : lastScanQ.isError ? (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+            <p className="text-xs text-red-300">{lastScanQ.error.message}</p>
+          </div>
+        ) : lastScan ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {lastScan.start ? (
+              <div className="bg-secondary/20 rounded-lg p-3 border border-border/20">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Start</p>
+                <p className="text-xs font-mono text-foreground mt-1">{new Date(String(lastScan.start)).toLocaleString()}</p>
+              </div>
+            ) : null}
+            {lastScan.end ? (
+              <div className="bg-secondary/20 rounded-lg p-3 border border-border/20">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">End</p>
+                <p className="text-xs font-mono text-foreground mt-1">{new Date(String(lastScan.end)).toLocaleString()}</p>
+              </div>
+            ) : null}
+            {Object.entries(lastScan).filter(([k]) => k !== "start" && k !== "end").map(([k, v]) => (
+              <div key={k} className="bg-secondary/20 rounded-lg p-3 border border-border/20">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{k.replace(/_/g, " ")}</p>
+                <p className="text-xs font-mono text-foreground mt-1">{String(v ?? "\u2014")}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">No scan data available</p>
+        )}
+      </GlassPanel>
+
+      {/* Rootcheck Results */}
+      <GlassPanel>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4 text-primary" /> Rootcheck Results
+            <span className="text-[10px] font-mono text-muted-foreground">({totalItems as number} total)</span>
+          </h3>
+          <div className="flex items-center gap-2">
+            {resultsQ.data ? <RawJsonViewer data={resultsQ.data} title="Rootcheck Results JSON" /> : null}
+          </div>
+        </div>
+        <BrokerWarnings data={resultsQ.data} context="rootcheckResults" />
+
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+              className="h-8 pl-8 pr-3 rounded-lg bg-secondary/30 border border-border/30 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 w-48"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
+            className="h-8 px-3 rounded-lg bg-secondary/30 border border-border/30 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+          >
+            <option value="">All Statuses</option>
+            <option value="outstanding">Outstanding</option>
+            <option value="solved">Solved</option>
+          </select>
+          <input
+            type="text"
+            placeholder="PCI-DSS filter..."
+            value={pciFilter}
+            onChange={(e) => { setPciFilter(e.target.value); setPage(0); }}
+            className="h-8 px-3 rounded-lg bg-secondary/30 border border-border/30 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 w-36"
+          />
+          <input
+            type="text"
+            placeholder="CIS filter..."
+            value={cisFilter}
+            onChange={(e) => { setCisFilter(e.target.value); setPage(0); }}
+            className="h-8 px-3 rounded-lg bg-secondary/30 border border-border/30 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 w-36"
+          />
+          {hasFilters ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setStatusFilter(""); setSearchTerm(""); setPciFilter(""); setCisFilter(""); setPage(0); }}
+              className="h-8 text-[10px] bg-transparent border-white/10 text-muted-foreground hover:bg-white/5"
+            >
+              Clear Filters
+            </Button>
+          ) : null}
+        </div>
+
+        {/* Results Table */}
+        {resultsQ.isLoading ? (
+          <TableSkeleton columns={5} rows={8} />
+        ) : resultsQ.isError ? (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+            <p className="text-xs text-red-300">{resultsQ.error.message}</p>
+          </div>
+        ) : items.length === 0 ? (
+          <div className="text-center py-8">
+            <ShieldAlert className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-40" />
+            <p className="text-xs text-muted-foreground">No rootcheck results found</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border/30">
+                    <th className="text-left py-2 px-3 text-muted-foreground font-medium">Status</th>
+                    <th className="text-left py-2 px-3 text-muted-foreground font-medium">Event</th>
+                    <th className="text-left py-2 px-3 text-muted-foreground font-medium">PCI-DSS</th>
+                    <th className="text-left py-2 px-3 text-muted-foreground font-medium">CIS</th>
+                    <th className="text-left py-2 px-3 text-muted-foreground font-medium">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, idx) => {
+                    const status = String(item.status ?? "unknown");
+                    const colors = ROOTCHECK_STATUS_COLORS[status] ?? { bg: "oklch(0.3 0.02 286 / 12%)", text: "oklch(0.6 0.02 286)", border: "oklch(0.3 0.02 286 / 25%)" };
+                    return (
+                      <tr key={idx} className="border-b border-border/10 hover:bg-secondary/20">
+                        <td className="py-2 px-3">
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium uppercase"
+                            style={{ background: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                          >
+                            {status === "solved" ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                            {status}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-foreground max-w-[400px] truncate" title={String(item.event ?? "")}>{String(item.event ?? "\u2014")}</td>
+                        <td className="py-2 px-3 font-mono text-muted-foreground">{String(item.pci_dss ?? "\u2014")}</td>
+                        <td className="py-2 px-3 font-mono text-muted-foreground">{String(item.cis ?? "\u2014")}</td>
+                        <td className="py-2 px-3 font-mono text-muted-foreground">
+                          {item.date_first ? new Date(String(item.date_first)).toLocaleString() : item.oldDay ? String(item.oldDay) : "\u2014"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-[10px] text-muted-foreground">
+                Page {page + 1} of {totalPages} ({totalItems as number} results)
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="h-7 text-[10px] bg-transparent border-white/10 text-muted-foreground hover:bg-white/5"
+                >
+                  <ChevronLeft className="w-3 h-3" /> Prev
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="h-7 text-[10px] bg-transparent border-white/10 text-muted-foreground hover:bg-white/5"
+                >
+                  Next <ChevronRight className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </GlassPanel>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────
 export default function AgentDetail() {
   const [, params] = useRoute("/fleet/:agentId");
@@ -1373,6 +1613,7 @@ export default function AgentDetail() {
             {activeTab === "syscollector" && <SyscollectorTab agentId={agentId} />}
             {activeTab === "timeline" && <ActivityTimelineTab agentId={agentId} />}
             {activeTab === "config" && <ConfigStatsTab agentId={agentId} />}
+            {activeTab === "rootcheck" && <RootcheckTab agentId={agentId} />}
           </>
         )}
       </div>

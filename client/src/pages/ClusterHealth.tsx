@@ -205,6 +205,24 @@ function NodeDrillDown({ nodeId, nodeName, isConnected }: { nodeId: string; node
     { nodeId },
     { retry: 1, staleTime: 60_000, enabled: isConnected }
   );
+  const nodeInfoQ = trpc.wazuh.clusterNodeInfo.useQuery(
+    { nodeId },
+    { retry: 1, staleTime: 30_000, enabled: isConnected }
+  );
+  const nodeStatsQ = trpc.wazuh.clusterNodeStats.useQuery(
+    { nodeId },
+    { retry: 1, staleTime: 30_000, enabled: isConnected }
+  );
+  const nodeStatsHourlyQ = trpc.wazuh.clusterNodeStatsHourly.useQuery(
+    { nodeId },
+    { retry: 1, staleTime: 30_000, enabled: isConnected }
+  );
+  const [compComponent, setCompComponent] = useState("agent");
+  const [compConfiguration, setCompConfiguration] = useState("client");
+  const nodeComponentConfigQ = trpc.wazuh.clusterNodeComponentConfig.useQuery(
+    { nodeId, component: compComponent, configuration: compConfiguration },
+    { retry: 1, staleTime: 30_000, enabled: isConnected }
+  );
 
   // Parse data
   const nodeStatus: Record<string, unknown> = useMemo((): Record<string, unknown> => {
@@ -391,6 +409,102 @@ function NodeDrillDown({ nodeId, nodeName, isConnected }: { nodeId: string; node
           <RawJsonViewer data={nodeConfigQ.data as Record<string, unknown>} title={`${nodeName} Configuration JSON`} />
         </GlassPanel>
       ) : null}
+
+      {/* Node Info */}
+      <GlassPanel>
+        <h5 className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+          <Server className="h-3.5 w-3.5 text-primary" /> Node Info
+        </h5>
+        <BrokerWarnings data={nodeInfoQ.data} context={`${nodeName} Info`} />
+        {nodeInfoQ.isLoading ? <TableSkeleton columns={2} rows={3} /> : (() => {
+          const infoItems = extractItems(nodeInfoQ.data);
+          const info = infoItems[0] ?? ((nodeInfoQ.data as Record<string, unknown>)?.data as Record<string, unknown>) ?? {};
+          const entries = Object.entries(info).filter(([k]) => !["affected_items", "total_affected_items", "total_failed_items", "failed_items"].includes(k));
+          return entries.length === 0 ? <p className="text-xs text-muted-foreground py-2">No info available.</p> : (
+            <div className="space-y-1">{entries.map(([k, v]) => <MetricRow key={k} label={k} value={typeof v === "object" ? JSON.stringify(v) : String(v ?? "\u2014")} />)}</div>
+          );
+        })()}
+        {nodeInfoQ.data != null ? <div className="mt-2"><RawJsonViewer data={nodeInfoQ.data as Record<string, unknown>} title={`${nodeName} Info JSON`} /></div> : null}
+      </GlassPanel>
+
+      {/* Node Stats */}
+      <GlassPanel>
+        <h5 className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+          <Gauge className="h-3.5 w-3.5 text-primary" /> Node Stats
+        </h5>
+        <BrokerWarnings data={nodeStatsQ.data} context={`${nodeName} Stats`} />
+        {nodeStatsQ.isLoading ? <TableSkeleton columns={2} rows={3} /> : (() => {
+          const statsItems = extractItems(nodeStatsQ.data);
+          return statsItems.length === 0 ? <p className="text-xs text-muted-foreground py-2">No stats available.</p> : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]">
+                <thead><tr className="border-b border-border/20 text-muted-foreground">
+                  <th className="text-left py-1.5 px-2 font-medium">Hour</th>
+                  <th className="text-right py-1.5 px-2 font-medium">Total</th>
+                  <th className="text-right py-1.5 px-2 font-medium">Events</th>
+                  <th className="text-right py-1.5 px-2 font-medium">Syscheck</th>
+                  <th className="text-right py-1.5 px-2 font-medium">Firewall</th>
+                </tr></thead>
+                <tbody>
+                  {statsItems.slice(0, 24).map((s, i) => (
+                    <tr key={i} className="border-b border-border/5 hover:bg-secondary/10">
+                      <td className="py-1 px-2 font-mono text-muted-foreground">{String(s.hour ?? i)}</td>
+                      <td className="py-1 px-2 text-right font-mono text-foreground">{Number(s.totalall ?? 0).toLocaleString()}</td>
+                      <td className="py-1 px-2 text-right font-mono text-foreground">{Number(s.events ?? 0).toLocaleString()}</td>
+                      <td className="py-1 px-2 text-right font-mono text-foreground">{Number(s.syscheck ?? 0).toLocaleString()}</td>
+                      <td className="py-1 px-2 text-right font-mono text-foreground">{Number(s.firewall ?? 0).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
+        {nodeStatsQ.data != null ? <div className="mt-2"><RawJsonViewer data={nodeStatsQ.data as Record<string, unknown>} title={`${nodeName} Stats JSON`} /></div> : null}
+      </GlassPanel>
+
+      {/* Node Stats Hourly */}
+      <GlassPanel>
+        <h5 className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+          <BarChart3 className="h-3.5 w-3.5 text-primary" /> Node Stats (Hourly)
+        </h5>
+        <BrokerWarnings data={nodeStatsHourlyQ.data} context={`${nodeName} Stats Hourly`} />
+        {nodeStatsHourlyQ.isLoading ? <TableSkeleton columns={3} rows={3} /> : (() => {
+          const hourlyItems = extractItems(nodeStatsHourlyQ.data);
+          return hourlyItems.length === 0 ? <p className="text-xs text-muted-foreground py-2">No hourly stats available.</p> : (
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={hourlyItems.map((d, i) => ({ hour: String(d.id ?? d.hour ?? i), total: Number(d.totalall ?? 0), events: Number(d.events ?? 0) }))}>
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
+                <XAxis dataKey="hour" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
+                <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
+                <ReTooltip content={<ChartTooltip />} />
+                <Bar dataKey="total" fill={COLORS.purple} name="Total" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="events" fill={COLORS.cyan} name="Events" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          );
+        })()}
+        {nodeStatsHourlyQ.data != null ? <div className="mt-2"><RawJsonViewer data={nodeStatsHourlyQ.data as Record<string, unknown>} title={`${nodeName} Hourly Stats JSON`} /></div> : null}
+      </GlassPanel>
+
+      {/* Node Component Config */}
+      <GlassPanel>
+        <h5 className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+          <Settings className="h-3.5 w-3.5 text-primary" /> Node Component Config
+        </h5>
+        <div className="flex items-center gap-2 mb-3">
+          <select value={compComponent} onChange={e => setCompComponent(e.target.value)} className="bg-secondary/30 border border-border/20 rounded px-2 py-1 text-xs text-foreground">
+            {["agent", "agentless", "analysis", "auth", "com", "csyslog", "integrator", "logcollector", "mail", "monitor", "request", "syscheck", "wdb", "wmodules"].map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={compConfiguration} onChange={e => setCompConfiguration(e.target.value)} className="bg-secondary/30 border border-border/20 rounded px-2 py-1 text-xs text-foreground">
+            {["client", "buffer", "labels", "internal", "cluster", "active-response", "alerts", "command", "decoders", "global", "localfile", "remote", "rules", "socket", "syscheck", "vulnerability-detector", "wmodules", "integration"].map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <BrokerWarnings data={nodeComponentConfigQ.data} context={`${nodeName} Component Config`} />
+        {nodeComponentConfigQ.isLoading ? <TableSkeleton columns={2} rows={3} /> : nodeComponentConfigQ.data != null ? (
+          <RawJsonViewer data={nodeComponentConfigQ.data as Record<string, unknown>} title={`${nodeName} ${compComponent}/${compConfiguration} Config JSON`} />
+        ) : <p className="text-xs text-muted-foreground py-2">No component config available.</p>}
+      </GlassPanel>
     </div>
   );
 }
@@ -408,6 +522,9 @@ export default function ClusterHealth() {
   const configValidQ = trpc.wazuh.managerConfigValidation.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
   const clusterStatusQ = trpc.wazuh.clusterStatus.useQuery(undefined, { retry: 1, staleTime: 30_000, enabled: isConnected });
   const clusterNodesQ = trpc.wazuh.clusterNodes.useQuery(undefined, { retry: 1, staleTime: 30_000, enabled: isConnected });
+  const clusterHealthcheckQ = trpc.wazuh.clusterHealthcheck.useQuery(undefined, { retry: 1, staleTime: 30_000, enabled: isConnected });
+  const clusterLocalInfoQ = trpc.wazuh.clusterLocalInfo.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
+  const clusterLocalConfigQ = trpc.wazuh.clusterLocalConfig.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
   // ── Manager Logs (the actual procedure, not summary) ──────────────────────
   const [logLevel, setLogLevel] = useState<string>("");
   const [logTag, setLogTag] = useState("");
@@ -797,6 +914,83 @@ export default function ClusterHealth() {
             );
           })()}
           {managerConfigQ.data ? <div className="mt-3"><RawJsonViewer data={managerConfigQ.data as Record<string, unknown>} title="Manager Configuration JSON" /></div> : null}
+        </GlassPanel>
+
+        {/* ── Cluster Healthcheck ──────────────────────────────── */}
+        <GlassPanel>
+          <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /> Cluster Healthcheck</h3>
+          <BrokerWarnings data={clusterHealthcheckQ.data} context="Cluster Healthcheck" />
+          {clusterHealthcheckQ.isLoading ? <TableSkeleton columns={3} rows={2} /> : (() => {
+            const hcItems = extractItems(clusterHealthcheckQ.data);
+            const hcRaw = (clusterHealthcheckQ.data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+            const nodes = hcItems.length > 0 ? hcItems : (hcRaw?.nodes as Record<string, unknown>) ? Object.entries(hcRaw!.nodes as Record<string, unknown>).map(([name, info]) => ({ name, ...(typeof info === "object" && info !== null ? info as Record<string, unknown> : {}) })) : [];
+            return (nodes as Array<Record<string, unknown>>).length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">No healthcheck data available.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px]">
+                  <thead><tr className="border-b border-border/20 text-muted-foreground">
+                    <th className="text-left py-1.5 px-2 font-medium">Node</th>
+                    <th className="text-left py-1.5 px-2 font-medium">Info</th>
+                  </tr></thead>
+                  <tbody>
+                    {(nodes as Array<Record<string, unknown>>).map((n, i) => (
+                      <tr key={i} className="border-b border-border/5 hover:bg-secondary/10">
+                        <td className="py-1 px-2 font-mono text-primary">{String(n.name ?? n.node ?? `Node ${i}`)}</td>
+                        <td className="py-1 px-2 font-mono text-foreground text-[10px] break-all">{JSON.stringify(Object.fromEntries(Object.entries(n).filter(([k]) => k !== "name" && k !== "node")))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+          {clusterHealthcheckQ.data != null ? <div className="mt-2"><RawJsonViewer data={clusterHealthcheckQ.data as Record<string, unknown>} title="Cluster Healthcheck JSON" /></div> : null}
+        </GlassPanel>
+
+        {/* ── Cluster Local Info ───────────────────────────────── */}
+        <GlassPanel>
+          <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Server className="h-4 w-4 text-primary" /> Local Node Info</h3>
+          <BrokerWarnings data={clusterLocalInfoQ.data} context="Cluster Local Info" />
+          {clusterLocalInfoQ.isLoading ? <TableSkeleton columns={2} rows={3} /> : (() => {
+            const localItems = extractItems(clusterLocalInfoQ.data);
+            const localInfo = localItems[0] ?? ((clusterLocalInfoQ.data as Record<string, unknown>)?.data as Record<string, unknown>) ?? {};
+            const entries = Object.entries(localInfo).filter(([k]) => !["affected_items", "total_affected_items", "total_failed_items", "failed_items"].includes(k));
+            return entries.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">No local info available.</p>
+            ) : (
+              <div className="space-y-1">
+                {entries.map(([k, v]) => <MetricRow key={k} label={k} value={typeof v === "object" ? JSON.stringify(v) : String(v ?? "—")} />)}
+              </div>
+            );
+          })()}
+          {clusterLocalInfoQ.data != null ? <div className="mt-2"><RawJsonViewer data={clusterLocalInfoQ.data as Record<string, unknown>} title="Cluster Local Info JSON" /></div> : null}
+        </GlassPanel>
+
+        {/* ── Cluster Local Config ──────────────────────────────── */}
+        <GlassPanel>
+          <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Settings className="h-4 w-4 text-primary" /> Local Cluster Config</h3>
+          <BrokerWarnings data={clusterLocalConfigQ.data} context="Cluster Local Config" />
+          {clusterLocalConfigQ.isLoading ? <TableSkeleton columns={2} rows={3} /> : (() => {
+            const cfgItems = extractItems(clusterLocalConfigQ.data);
+            const cfgRaw = (clusterLocalConfigQ.data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+            const entries: Array<[string, unknown]> = [];
+            if (cfgItems.length > 0) cfgItems.forEach(item => Object.entries(item).forEach(([k, v]) => entries.push([k, v])));
+            else if (cfgRaw) Object.entries(cfgRaw).filter(([k]) => !["affected_items", "total_affected_items", "total_failed_items", "failed_items"].includes(k)).forEach(([k, v]) => entries.push([k, v]));
+            return entries.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">No local config available.</p>
+            ) : (
+              <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                {entries.map(([k, v], i) => (
+                  <div key={i} className="flex items-start gap-3 py-1.5 border-b border-border/10">
+                    <span className="text-[11px] font-mono text-primary min-w-[180px] shrink-0">{k}</span>
+                    <span className="text-[11px] font-mono text-foreground break-all">{typeof v === "object" && v !== null ? JSON.stringify(v, null, 2) : String(v ?? "—")}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          {clusterLocalConfigQ.data != null ? <div className="mt-2"><RawJsonViewer data={clusterLocalConfigQ.data as Record<string, unknown>} title="Cluster Local Config JSON" /></div> : null}
         </GlassPanel>
 
         {/* Config Validation */}

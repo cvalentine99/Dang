@@ -547,6 +547,11 @@ function WazuhApiIntelligence() {
     retry: 1,
   });
 
+  const managerStatsQ = trpc.wazuh.managerStats.useQuery(undefined, {
+    staleTime: 60_000,
+    retry: 1,
+  });
+
   const isLoading = apiInfoQ.isLoading || versionCheckQ.isLoading || securityConfigQ.isLoading;
 
   return (
@@ -556,7 +561,7 @@ function WazuhApiIntelligence() {
         Wazuh API Intelligence
       </h2>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-5">
         {/* API Info — GET / */}
         <GlassPanel className="p-0 overflow-hidden">
           <div className="px-5 py-4 border-b border-[oklch(0.3_0.04_286/20%)]">
@@ -659,6 +664,43 @@ function WazuhApiIntelligence() {
             ) : securityConfigQ.data ? (
               <div className="space-y-2">
                 {extractKeyValues(securityConfigQ.data).map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground capitalize">{formatKey(key)}</span>
+                    <span className="font-mono text-foreground truncate max-w-[60%] text-right">{String(value)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">No data available</p>
+            )}
+          </div>
+        </GlassPanel>
+        {/* Manager Stats — GET /manager/stats */}
+        <GlassPanel className="p-0 overflow-hidden">
+          <div className="px-5 py-4 border-b border-[oklch(0.3_0.04_286/20%)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground font-[Space_Grotesk] flex items-center gap-2">
+                <Activity className="w-4 h-4 text-[oklch(0.7_0.15_286)]" />
+                Manager Stats
+              </h3>
+              {managerStatsQ.data ? <RawJsonViewer data={managerStatsQ.data} title="Manager Stats JSON" /> : null}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">GET /manager/stats — Runtime statistics</p>
+          </div>
+          <BrokerWarnings data={managerStatsQ.data} context="managerStats" />
+          <div className="px-5 py-3">
+            {managerStatsQ.isLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-violet-400" />
+              </div>
+            ) : managerStatsQ.isError ? (
+              <div className="flex items-center gap-2 text-red-400 text-xs">
+                <XCircle className="w-4 h-4" />
+                <span>{managerStatsQ.error.message}</span>
+              </div>
+            ) : managerStatsQ.data ? (
+              <div className="space-y-2">
+                {extractKeyValues(managerStatsQ.data).map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground capitalize">{formatKey(key)}</span>
                     <span className="font-mono text-foreground truncate max-w-[60%] text-right">{String(value)}</span>

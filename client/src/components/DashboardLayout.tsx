@@ -60,6 +60,7 @@ import {
   GitCompare,
   Package,
   Lock,
+  FolderOpen,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -190,6 +191,7 @@ const menuItems = [
   { icon: Server, label: "Cluster Health", path: "/cluster", group: "System" },
   { icon: HeartPulse, label: "System Status", path: "/status", group: "System" },
   { icon: Lock, label: "Security Explorer", path: "/security", group: "System" },
+  { icon: FolderOpen, label: "Group Management", path: "/groups", group: "System" },
   { icon: Brain, label: "Security Analyst", path: "/analyst", group: "Intelligence", hasQueueBadge: true },
   { icon: Network, label: "Knowledge Graph", path: "/graph", group: "Intelligence" },
   { icon: FolderSearch, label: "Investigations", path: "/investigations", group: "Intelligence" },

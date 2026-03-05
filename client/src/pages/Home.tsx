@@ -165,6 +165,8 @@ export default function Home() {
   const mitreTacticsQ = trpc.wazuh.mitreTactics.useQuery(undefined, { retry: false, staleTime: 120_000, enabled: isConnected });
   const agentOverviewQ = trpc.wazuh.agentOverview.useQuery(undefined, { retry: false, staleTime: 60_000, enabled: isConnected });
   const logsSummaryQ = trpc.wazuh.managerLogsSummary.useQuery(undefined, { retry: false, staleTime: 60_000, enabled: isConnected });
+  const managerStatsQ = trpc.wazuh.managerStats.useQuery(undefined, { retry: false, staleTime: 60_000, enabled: isConnected });
+  const remotedStatsQ = trpc.wazuh.remoted.useQuery(undefined, { retry: false, staleTime: 60_000, enabled: isConnected });
 
   // ── Indexer queries ─────────────────────────────────────────────────────────
   const indexerStatusQ = trpc.indexer.status.useQuery(undefined, { retry: 1, staleTime: 60_000 });
@@ -939,8 +941,89 @@ export default function Home() {
             ) : null}
           </GlassPanel>
         )}
+        {/* ── Row 7: Manager Stats + Remoted Stats ──────────────────────── */}
+        {isConnected && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <GlassPanel>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-primary" /> Manager Stats
+                </h3>
+                <div className="flex items-center gap-2">
+                  <SourceBadge source="server" />
+                  {managerStatsQ.data ? <RawJsonViewer data={managerStatsQ.data as Record<string, unknown>} title="Manager Stats" /> : null}
+                </div>
+              </div>
+              {managerStatsQ.isLoading ? (
+                <div className="animate-pulse space-y-2">
+                  {[...Array(4)].map((_, i) => <div key={i} className="h-4 bg-white/5 rounded" />)}
+                </div>
+              ) : managerStatsQ.isError ? (
+                <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                  <p className="text-xs text-red-300">Failed to load manager stats</p>
+                </div>
+              ) : managerStatsQ.data ? (
+                <ManagerStatsTable data={managerStatsQ.data} />
+              ) : null}
+            </GlassPanel>
+
+            <GlassPanel>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-primary" /> Remoted Stats
+                </h3>
+                <div className="flex items-center gap-2">
+                  <SourceBadge source="server" />
+                  {remotedStatsQ.data ? <RawJsonViewer data={remotedStatsQ.data as Record<string, unknown>} title="Remoted Stats" /> : null}
+                </div>
+              </div>
+              {remotedStatsQ.isLoading ? (
+                <div className="animate-pulse space-y-2">
+                  {[...Array(4)].map((_, i) => <div key={i} className="h-4 bg-white/5 rounded" />)}
+                </div>
+              ) : remotedStatsQ.isError ? (
+                <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                  <p className="text-xs text-red-300">Failed to load remoted stats</p>
+                </div>
+              ) : remotedStatsQ.data ? (
+                <ManagerStatsTable data={remotedStatsQ.data} />
+              ) : null}
+            </GlassPanel>
+          </div>
+        )}
       </div>
     </WazuhGuard>
+  );
+}
+
+/** Renders manager/remoted stats as a key-value table */
+function ManagerStatsTable({ data }: { data: unknown }) {
+  const raw = data as Record<string, unknown>;
+  const items = (raw?.data as Record<string, unknown>)?.affected_items as Array<Record<string, unknown>> | undefined;
+  if (!items?.length) {
+    return <p className="text-xs text-muted-foreground">No stats data available.</p>;
+  }
+  const stats = items[0];
+  const entries = Object.entries(stats).filter(([k]) => k !== "timestamp");
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-border/30">
+            <th className="text-left py-2 px-2 text-muted-foreground font-medium">Metric</th>
+            <th className="text-right py-2 px-2 text-muted-foreground font-medium">Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map(([key, val]) => (
+            <tr key={key} className="border-b border-border/10 hover:bg-white/5">
+              <td className="py-1.5 px-2 font-mono text-violet-300">{key}</td>
+              <td className="py-1.5 px-2 text-right text-slate-300">{typeof val === "object" ? JSON.stringify(val) : String(val)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
