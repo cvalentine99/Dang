@@ -2939,3 +2939,10 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [ ] Wire apiInfo endpoint into System Status page — API version/info panel
 - [ ] Wire listsFileContent endpoint into Ruleset Explorer — CDB list file viewer
 - [ ] Wire groupFileContent endpoint into Fleet Command groups — group file content viewer
+
+## P1 Obj4 Proof Trail Fix (Mar 5, 2026)
+- [x] Add router-level unauth rejection test: wazuh.securityRbacRules rejects unauthenticated
+- [x] Add router-level unauth rejection test: wazuh.securityActions rejects unauthenticated
+- [x] Add router-level unauth rejection test: wazuh.securityResources rejects unauthenticated
+- [x] Add router-level unauth rejection test: wazuh.securityCurrentUserPolicies rejects unauthenticated
+- [x] Update Gap Closure Matrix to cite correct proof sources (remove overclaims, added expected output, clarified securityAuth.test.ts scope)

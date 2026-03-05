@@ -317,4 +317,46 @@ describe("wazuh router auth gating", () => {
     });
     await expect(unauthCaller.wazuh.securityCurrentUser()).rejects.toThrow();
   });
+
+  // ── Sprint v2 security-family auth-negative tests (P1 Obj4) ──────────────
+
+  it("rejects unauthenticated access to wazuh.securityRbacRules", async () => {
+    const unauthCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+    });
+    await expect(
+      unauthCaller.wazuh.securityRbacRules({ limit: 10, offset: 0 })
+    ).rejects.toThrow();
+  });
+
+  it("rejects unauthenticated access to wazuh.securityActions", async () => {
+    const unauthCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+    });
+    await expect(unauthCaller.wazuh.securityActions({})).rejects.toThrow();
+  });
+
+  it("rejects unauthenticated access to wazuh.securityResources", async () => {
+    const unauthCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+    });
+    await expect(unauthCaller.wazuh.securityResources({})).rejects.toThrow();
+  });
+
+  it("rejects unauthenticated access to wazuh.securityCurrentUserPolicies", async () => {
+    const unauthCaller = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+    });
+    await expect(
+      unauthCaller.wazuh.securityCurrentUserPolicies()
+    ).rejects.toThrow();
+  });
 });

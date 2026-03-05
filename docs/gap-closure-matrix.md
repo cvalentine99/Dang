@@ -3,7 +3,7 @@
 **Version:** 1.0.0  
 **Date:** March 4, 2026  
 **Spec baseline:** Wazuh OpenAPI v4.14.3-rc3  
-**Test suite:** 2,000 tests passing across 69 files (1 pre-existing network-dependent timeout)  
+**Test suite:** 2,061 tests passing across 70 files (1 pre-existing network-dependent timeout)  
 **TypeScript:** Clean (0 errors)  
 **Author:** Manus AI
 
@@ -20,7 +20,7 @@ This document records every gap identified in the Sprint v2 Correction Sprint (`
 | **P0** | Obj 1 — Close Remaining Phase 3 Endpoint Gaps | **CLOSED** | 43 | 26 |
 | **P1** | Obj 2 — Dashboard Parameter Propagation | **CLOSED** | 8 | 0 |
 | **P1** | Obj 3 — Agent Introspection Parity | **CLOSED** | 10 | 0 |
-| **P1** | Obj 4 — Auth/RBAC Negative Tests | **CLOSED** | 4 | 0 |
+| **P1** | Obj 4 — Auth/RBAC Negative Tests | **CLOSED** | 4 (router-level, in wazuhRouter.test.ts) | 0 |
 | **P1** | Obj 5 — Regression Fixture | **CLOSED** | 10 | 0 |
 | **P2** | Obj 6 — KG Schema Versioning | **DEFERRED** | 0 | 0 |
 | **P2** | Obj 7 — Full Error Contract Parity | **DEFERRED** | 0 | 0 |
@@ -35,8 +35,8 @@ This document records every gap identified in the Sprint v2 Correction Sprint (`
 | KG responses | 1,126 |
 | tRPC wazuh procedures | 113 |
 | Broker-wired procedures | 18 |
-| Test files | 69 |
-| Passing tests | 2,000 |
+| Test files | 70 |
+| Passing tests | 2,061 |
 | Risk levels: SAFE / MUTATING / DESTRUCTIVE | 119 / 40 / 23 |
 | LLM-allowed endpoints | 119 |
 
@@ -186,22 +186,32 @@ pnpm test -- --reporter=verbose server/graph/agentIntrospection.test.ts
 
 ## 5. P1 Objective 4 — Auth/RBAC Negative Tests
 
-This objective added negative authentication tests for the four new security family endpoints.
+This objective added negative authentication tests for the four new security family endpoints, exercised against the real `appRouter` via `appRouter.createCaller({ user: null, ... })`.
 
 ### 5.1 Test Matrix
 
-| Endpoint | Test | Expected Behavior |
-|----------|------|-------------------|
-| `securityRbacRules` | Unauthenticated call | Returns `UNAUTHORIZED` TRPCError |
-| `securityActions` | Unauthenticated call | Returns `UNAUTHORIZED` TRPCError |
-| `securityResources` | Unauthenticated call | Returns `UNAUTHORIZED` TRPCError |
-| `securityCurrentUserPolicies` | Unauthenticated call | Returns `UNAUTHORIZED` TRPCError |
+| Endpoint | Test Description | File | Expected Behavior |
+|----------|-----------------|------|-------------------|
+| `securityRbacRules` | "rejects unauthenticated access to wazuh.securityRbacRules" | `server/wazuh/wazuhRouter.test.ts` | Throws TRPCError (UNAUTHORIZED) |
+| `securityActions` | "rejects unauthenticated access to wazuh.securityActions" | `server/wazuh/wazuhRouter.test.ts` | Throws TRPCError (UNAUTHORIZED) |
+| `securityResources` | "rejects unauthenticated access to wazuh.securityResources" | `server/wazuh/wazuhRouter.test.ts` | Throws TRPCError (UNAUTHORIZED) |
+| `securityCurrentUserPolicies` | "rejects unauthenticated access to wazuh.securityCurrentUserPolicies" | `server/wazuh/wazuhRouter.test.ts` | Throws TRPCError (UNAUTHORIZED) |
 
-**Proof:** All four tests are in `wazuhRouter.test.ts` under the "Auth/RBAC negative tests" describe block. Each test creates a caller without session context and asserts the procedure throws with code `UNAUTHORIZED`.
+**Proof:** All four tests live in `server/wazuh/wazuhRouter.test.ts` inside the `"wazuh router auth gating"` describe block (lines 321–361). Each test instantiates an unauthenticated caller via `appRouter.createCaller({ user: null, ... })` and asserts the procedure rejects with a thrown error. This is the same pattern used for the existing `status`, `agents`, `managerInfo`, and `securityCurrentUser` auth-negative tests in the same block.
+
+**Note on `server/wazuh/securityAuth.test.ts`:** That file tests the generic `protectedProcedure` middleware in isolation using a simulated `initTRPC` router. It confirms the middleware pattern works, but it is **not** endpoint-level coverage of the real app router. The four tests above provide that endpoint-level coverage.
 
 **Verification:**
 ```bash
-pnpm test -- --reporter=verbose server/wazuh/wazuhRouter.test.ts 2>&1 | grep -i "rbac\|unauthorized\|negative"
+pnpm test -- --reporter=verbose server/wazuh/wazuhRouter.test.ts 2>&1 | grep -E "securityRbacRules|securityActions|securityResources|securityCurrentUserPolicies"
+```
+
+**Expected output (4 lines, all passing):**
+```
+ ✓ server/wazuh/wazuhRouter.test.ts > wazuh router auth gating > rejects unauthenticated access to wazuh.securityRbacRules
+ ✓ server/wazuh/wazuhRouter.test.ts > wazuh router auth gating > rejects unauthenticated access to wazuh.securityActions
+ ✓ server/wazuh/wazuhRouter.test.ts > wazuh router auth gating > rejects unauthenticated access to wazuh.securityResources
+ ✓ server/wazuh/wazuhRouter.test.ts > wazuh router auth gating > rejects unauthenticated access to wazuh.securityCurrentUserPolicies
 ```
 
 ---
