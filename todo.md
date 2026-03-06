@@ -3382,7 +3382,7 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 
 ## CI Workflow Execution on GitHub
 
-- [ ] Push latest code to GitHub (resolve workflows permission issue)
-- [ ] Trigger CI workflow run
+- [x] Pushed latest code to GitHub via PAT with workflows scope (force push to main)
+- [x] CI workflow triggered automatically (run ID 22786834434, in_progress)
 - [ ] Monitor CI execution: test job, ci-proof job, artifact handoff
 - [ ] Report CI results

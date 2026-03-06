@@ -57,7 +57,7 @@ jobs:
 
     services:
       mysql:
-        image: mysql:8.0
+        image: mysql:8.0.36
         env:
           MYSQL_ROOT_PASSWORD: testpassword
           MYSQL_DATABASE: dang_test
@@ -253,12 +253,19 @@ jobs:
 
       - name: Verify parity report is committed (no drift)
         run: |
-          echo "Checking for uncommitted parity report changes..."
-          if ! git diff --exit-code docs/ui-param-parity-report.md docs/ui-param-parity.json; then
-            echo "::error::Parity report is stale. Run 'pnpm audit:ui-parity' locally and commit the updated docs/ui-param-parity-report.md and docs/ui-param-parity.json."
+          echo "Checking for uncommitted parity report changes (ignoring timestamps)..."
+          # Strip generated timestamps before diffing — they change every run
+          git diff -- docs/ui-param-parity-report.md docs/ui-param-parity.json \
+            | grep -v '"generated"' \
+            | grep -v '\*\*Generated:\*\*' \
+            | grep '^[+-]' \
+            | grep -v '^[+-][+-][+-]' > /tmp/parity-diff-filtered.txt || true
+          if [ -s /tmp/parity-diff-filtered.txt ]; then
+            echo "::error::Parity report has structural drift (beyond timestamps). Run 'pnpm audit:ui-parity' locally and commit."
+            cat /tmp/parity-diff-filtered.txt
             exit 1
           fi
-          echo "✓ Parity report is up-to-date"
+          echo "✓ Parity report is up-to-date (timestamp-only changes ignored)"
 
       - name: Parity audit summary
         if: always()
@@ -325,17 +332,22 @@ jobs:
 
       - name: Verify proof artifact is committed (no drift)
         run: |
-          echo "Checking for uncommitted CI proof changes..."
-          if ! git diff --exit-code docs/ci-proof-artifact.md; then
-            echo "::error::CI proof artifact is stale. Run the following locally and commit:"
+          echo "Checking for uncommitted CI proof changes (ignoring timestamps)..."
+          # Strip generated timestamps and duration lines before diffing
+          git diff -- docs/ci-proof-artifact.md \
+            | grep '^[+-]' \
+            | grep -v '^[+-][+-][+-]' \
+            | grep -v 'Generated:' \
+            | grep -v 'Duration:' \
+            | grep -v 'Start at:' > /tmp/proof-diff-filtered.txt || true
+          if [ -s /tmp/proof-diff-filtered.txt ]; then
+            echo "::error::CI proof artifact has structural drift (beyond timestamps). Run locally and commit:"
             echo "  pnpm test -- --run --reporter=json --outputFile.json=test-output/vitest.json"
             echo "  pnpm proof:generate"
-            echo ""
-            echo "Diff:"
-            git diff docs/ci-proof-artifact.md
+            cat /tmp/proof-diff-filtered.txt
             exit 1
           fi
-          echo "✓ CI proof artifact is up-to-date"
+          echo "✓ CI proof artifact is up-to-date (timestamp-only changes ignored)"
 
       - name: Proof summary
         if: always()
