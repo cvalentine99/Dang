@@ -5,7 +5,7 @@
 > `client/src/**/*.{ts,tsx}` for `trpc.wazuh.*.useQuery` callsites.
 > To regenerate: `node scripts/generate-wiring-ledger.mjs`
 
-Generated: 2026-03-06T23:38:14.130Z
+Generated: 2026-03-06T23:45:30.564Z
 
 ## Summary
 

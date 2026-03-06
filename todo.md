@@ -3371,3 +3371,11 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 ### Issue 2: Deliverable archive contains .manus/ artifacts
 - [x] Repackaged zip excluding .manus/ and .manus-logs/ directories
 - [x] Verified: 0 .manus/ entries in archive (grep -c confirms)
+
+## Wiring Sprint: Gap-Closure Matrix §14 Stale Documentation
+
+### Audit findings
+- [x] Verified: gap-closure matrix §14 claims 49 backend-only procedures — but wiring ledger shows 113/113 wired
+- [x] Cross-checked: independent grep confirms all 113 procedures have at least 1 UI callsite in client/src/
+- [x] Updated gap-closure matrix to v1.2.0: §12.3 parity summary (168 callsites, 113/113), §14 all 49 procedures marked as wired with file locations
+- [x] Proof artifacts regenerated: 79 files, 2,413 tests, 0 failures; wiring 113/113; parity 168 callsites, 0 violations
