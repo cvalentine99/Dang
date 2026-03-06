@@ -10,8 +10,8 @@
 | Field | Value |
 |-------|-------|
 | JSON artifact | `test-output/vitest.json` |
-| Generated at | 2026-03-06T20:26:16.139Z |
-| Test run started | 2026-03-06T20:25:44.456Z |
+| Generated at | 2026-03-06T23:38:14.036Z |
+| Test run started | 2026-03-06T23:34:36.200Z |
 | Overall success | true |
 
 ## Summary
@@ -24,8 +24,8 @@
 | Describe blocks (vitest suites) | 659 |
 | Passed suites | 659 |
 | Failed suites | 0 |
-| Total tests | 2403 |
-| Passed tests | 2403 |
+| Total tests | 2413 |
+| Passed tests | 2413 |
 | Failed tests | 0 |
 
 ## Per-File Breakdown
@@ -88,7 +88,7 @@
 | PASS | `server/pipelineHandoff.test.ts` | 110 | 110 | 0 |
 | PASS | `server/responseActions.test.ts` | 44 | 44 | 0 |
 | PASS | `server/savedSearches/savedSearches.integration.test.ts` | 13 | 13 | 0 |
-| PASS | `server/savedSearches/savedSearchesRouter.integration.test.ts` | 15 | 15 | 0 |
+| PASS | `server/savedSearches/savedSearchesRouter.integration.test.ts` | 25 | 25 | 0 |
 | PASS | `server/savedSearches/savedSearchesRouter.test.ts` | 15 | 15 | 0 |
 | PASS | `server/securityHardening.test.ts` | 19 | 19 | 0 |
 | PASS | `server/soundEngine.test.ts` | 11 | 11 | 0 |

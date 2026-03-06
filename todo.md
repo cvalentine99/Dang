@@ -3345,18 +3345,29 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 
 ### Follow-up 3: Router-level real-DB integration test for savedSearchesRouter
 - [x] Created server/savedSearches/savedSearchesRouter.integration.test.ts
-- [x] Tests create/list/delete via appRouter.createCaller() against real MySQL
-- [x] Covers all 3 new types: alerts, vulnerabilities, fleet
-- [x] Ownership enforcement: cross-user delete/update rejection
+- [x] Tests create/list/update/delete via appRouter.createCaller() against real MySQL
+- [x] create: 3 tests (one per new type: alerts, vulnerabilities, fleet)
+- [x] list: 3 filtered tests (one per type) + 1 unfiltered
+- [x] update: 3 tests (one per type, verifies persistence) + 3 cross-user rejection tests
+- [x] delete: 3 tests (one per type) + 3 cross-user rejection tests + 3 idempotency tests
 - [x] Input validation: invalid searchType, empty name, name >256 chars
-- [x] 15 tests, all passing (3.66s)
+- [x] 25 tests, all passing
 - [x] Gated by describe.skipIf(!HAS_DB) — skips gracefully without MySQL
-- [x] Verified: create returns valid ID, list filters by type, delete removes record, update persists changes
 
 ### Acceptance Criteria
 - [x] No overclaimed SSOT wording in any shipped doc (verified by grep + manual audit)
 - [x] CI workflow consumes vitest.json artifact from MySQL-backed test job (no redundant re-run)
-- [x] Router-level integration test passes with real DB (15 tests, all passing)
-- [x] Full suite: 79 files, 2,403 tests, 0 failures
-- [x] Proof artifacts regenerated: ci-proof-artifact.md, wiring-ledger.md/json, ui-param-parity-report.md/json
-- [x] TypeScript: 0 errors
+- [x] Router-level integration test covers create/list/update/delete for all 3 new types (25 tests, all passing)
+- [x] Full suite: 79 files, 2,413 tests, 0 failures. Proof artifacts regenerated.
+- [x] Deliverable zip excludes .manus/ directory (verified: 0 .manus/ entries, 524 files, 1.6 MB)
+
+## Correction: Router Integration Coverage + Deliverable Hygiene
+
+### Issue 1: Router integration test coverage overstated
+- [x] Extended update tests to cover all 3 new types (alerts, vulnerabilities, fleet)
+- [x] Extended delete tests to cover all 3 new types (alerts, vulnerabilities, fleet)
+- [x] Fixed wording in todo.md Follow-up 3 to match actual scope (25 tests)
+
+### Issue 2: Deliverable archive contains .manus/ artifacts
+- [x] Repackaged zip excluding .manus/ and .manus-logs/ directories
+- [x] Verified: 0 .manus/ entries in archive (grep -c confirms)

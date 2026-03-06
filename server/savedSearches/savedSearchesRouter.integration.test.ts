@@ -1,11 +1,15 @@
 /**
  * Saved Searches Router — Real-DB Integration Tests
  *
- * Tests the actual tRPC router procedures (create, list, delete) against
- * a real MySQL database. Uses the appRouter.createCaller() pattern with
- * a synthetic authenticated context.
+ * Tests the actual tRPC router procedures (create, list, update, delete)
+ * against a real MySQL database. Uses the appRouter.createCaller() pattern
+ * with a synthetic authenticated context.
  *
- * Covers the three new search types: alerts, vulnerabilities, fleet.
+ * Coverage for all 3 new search types (alerts, vulnerabilities, fleet):
+ *   - create: 3 tests (one per type)
+ *   - list:   3 tests (filtered by type) + 1 unfiltered
+ *   - update: 3 tests (one per type) + 3 ownership rejection tests
+ *   - delete: 3 tests (one per type) + 3 ownership rejection tests + 3 idempotency tests
  *
  * Gated by DATABASE_URL — skips gracefully when no DB is available.
  */
@@ -84,10 +88,11 @@ afterAll(async () => {
 
 describe.skipIf(!HAS_DB)("savedSearchesRouter — Real DB Integration", () => {
   const caller = appRouter.createCaller(createTestContext());
+  const newTypes = ["alerts", "vulnerabilities", "fleet"] as const;
 
-  describe("create + list roundtrip for new search types", () => {
-    const newTypes = ["alerts", "vulnerabilities", "fleet"] as const;
+  // ── CREATE + LIST ──────────────────────────────────────────────────────────
 
+  describe("create + list roundtrip for each new type", () => {
     for (const searchType of newTypes) {
       it(`creates a saved search with searchType='${searchType}'`, async () => {
         const result = await caller.savedSearches.create({
@@ -107,10 +112,8 @@ describe.skipIf(!HAS_DB)("savedSearchesRouter — Real DB Integration", () => {
 
         expect(result).toHaveProperty("searches");
         expect(Array.isArray(result.searches)).toBe(true);
-        // We just created one above, so at least 1 should exist
         expect(result.searches.length).toBeGreaterThanOrEqual(1);
 
-        // Every returned row must have the correct searchType
         for (const row of result.searches) {
           expect(row.searchType).toBe(searchType);
         }
@@ -121,7 +124,6 @@ describe.skipIf(!HAS_DB)("savedSearchesRouter — Real DB Integration", () => {
       const result = await caller.savedSearches.list({});
       expect(result.searches.length).toBeGreaterThanOrEqual(3);
 
-      // Should contain at least one of each new type
       const types = new Set(result.searches.map((s) => s.searchType));
       expect(types.has("alerts")).toBe(true);
       expect(types.has("vulnerabilities")).toBe(true);
@@ -129,82 +131,99 @@ describe.skipIf(!HAS_DB)("savedSearchesRouter — Real DB Integration", () => {
     });
   });
 
-  describe("delete with ownership enforcement", () => {
-    let deleteTargetId: number;
+  // ── UPDATE (per-type) ──────────────────────────────────────────────────────
+
+  describe("update for each new type", () => {
+    /** IDs created specifically for update tests */
+    const updateTargets: Record<string, number> = {};
 
     beforeAll(async () => {
-      // Create a search to delete
-      const result = await caller.savedSearches.create({
-        name: `${TEST_PREFIX}delete_target_${Date.now()}`,
-        searchType: "fleet",
-        filters: { deleteTest: true },
+      for (const searchType of newTypes) {
+        const result = await caller.savedSearches.create({
+          name: `${TEST_PREFIX}update_${searchType}_${Date.now()}`,
+          searchType,
+          filters: { original: true, type: searchType },
+          description: `Update target for ${searchType}`,
+        });
+        updateTargets[searchType] = result.id;
+        createdIds.push(result.id);
+      }
+    });
+
+    for (const searchType of newTypes) {
+      it(`updates name and filters of a '${searchType}' search`, async () => {
+        const id = updateTargets[searchType];
+        const result = await caller.savedSearches.update({
+          id,
+          name: `${TEST_PREFIX}updated_${searchType}`,
+          filters: { updated: true, level: 7 },
+        });
+        expect(result).toEqual({ success: true });
+
+        // Verify the update persisted
+        const listed = await caller.savedSearches.list({ searchType: searchType as any });
+        const updated = listed.searches.find((s) => s.id === id);
+        expect(updated).toBeDefined();
+        expect(updated!.name).toBe(`${TEST_PREFIX}updated_${searchType}`);
       });
-      deleteTargetId = result.id;
-      createdIds.push(deleteTargetId);
-    });
 
-    it("rejects delete from a different user (ownership check)", async () => {
-      const otherCaller = appRouter.createCaller(createOtherUserContext());
-      await expect(
-        otherCaller.savedSearches.delete({ id: deleteTargetId }),
-      ).rejects.toThrow("Saved search not found");
-    });
-
-    it("deletes an owned saved search", async () => {
-      const result = await caller.savedSearches.delete({ id: deleteTargetId });
-      expect(result).toEqual({ success: true });
-
-      // Remove from cleanup list since it's already deleted
-      const idx = createdIds.indexOf(deleteTargetId);
-      if (idx >= 0) createdIds.splice(idx, 1);
-    });
-
-    it("rejects delete of already-deleted search", async () => {
-      await expect(
-        caller.savedSearches.delete({ id: deleteTargetId }),
-      ).rejects.toThrow("Saved search not found");
-    });
+      it(`rejects update of a '${searchType}' search from a different user`, async () => {
+        const otherCaller = appRouter.createCaller(createOtherUserContext());
+        await expect(
+          otherCaller.savedSearches.update({
+            id: updateTargets[searchType],
+            name: "Hijacked",
+          }),
+        ).rejects.toThrow("Saved search not found");
+      });
+    }
   });
 
-  describe("update with ownership enforcement", () => {
-    let updateTargetId: number;
+  // ── DELETE (per-type) ──────────────────────────────────────────────────────
+
+  describe("delete for each new type", () => {
+    /** IDs created specifically for delete tests */
+    const deleteTargets: Record<string, number> = {};
 
     beforeAll(async () => {
-      const result = await caller.savedSearches.create({
-        name: `${TEST_PREFIX}update_target_${Date.now()}`,
-        searchType: "alerts",
-        filters: { original: true },
-        description: "Original description",
+      for (const searchType of newTypes) {
+        const result = await caller.savedSearches.create({
+          name: `${TEST_PREFIX}delete_${searchType}_${Date.now()}`,
+          searchType,
+          filters: { deleteTest: true, type: searchType },
+        });
+        deleteTargets[searchType] = result.id;
+        createdIds.push(result.id);
+      }
+    });
+
+    for (const searchType of newTypes) {
+      it(`rejects delete of a '${searchType}' search from a different user`, async () => {
+        const otherCaller = appRouter.createCaller(createOtherUserContext());
+        await expect(
+          otherCaller.savedSearches.delete({ id: deleteTargets[searchType] }),
+        ).rejects.toThrow("Saved search not found");
       });
-      updateTargetId = result.id;
-      createdIds.push(updateTargetId);
-    });
 
-    it("updates name and filters of an owned search", async () => {
-      const result = await caller.savedSearches.update({
-        id: updateTargetId,
-        name: `${TEST_PREFIX}updated_name`,
-        filters: { updated: true, level: 5 },
+      it(`deletes an owned '${searchType}' saved search`, async () => {
+        const id = deleteTargets[searchType];
+        const result = await caller.savedSearches.delete({ id });
+        expect(result).toEqual({ success: true });
+
+        // Remove from cleanup list since it's already deleted
+        const idx = createdIds.indexOf(id);
+        if (idx >= 0) createdIds.splice(idx, 1);
       });
-      expect(result).toEqual({ success: true });
 
-      // Verify the update persisted
-      const listed = await caller.savedSearches.list({ searchType: "alerts" });
-      const updated = listed.searches.find((s) => s.id === updateTargetId);
-      expect(updated).toBeDefined();
-      expect(updated!.name).toBe(`${TEST_PREFIX}updated_name`);
-    });
-
-    it("rejects update from a different user", async () => {
-      const otherCaller = appRouter.createCaller(createOtherUserContext());
-      await expect(
-        otherCaller.savedSearches.update({
-          id: updateTargetId,
-          name: "Hijacked",
-        }),
-      ).rejects.toThrow("Saved search not found");
-    });
+      it(`rejects delete of already-deleted '${searchType}' search`, async () => {
+        await expect(
+          caller.savedSearches.delete({ id: deleteTargets[searchType] }),
+        ).rejects.toThrow("Saved search not found");
+      });
+    }
   });
+
+  // ── INPUT VALIDATION ───────────────────────────────────────────────────────
 
   describe("input validation", () => {
     it("rejects invalid searchType at Zod level", async () => {
