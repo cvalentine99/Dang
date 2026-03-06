@@ -17,6 +17,7 @@ import type {
   CorrelationBundle,
   LivingCaseObject,
 } from "../shared/agenticSchemas";
+import { SAVED_SEARCH_TYPES } from "../shared/searchTypes";
 
 /**
  * Core user table backing auth flow.
@@ -99,8 +100,8 @@ export const savedSearches = mysqlTable("saved_searches", {
   userId: int("userId").notNull(),
   /** Human-readable name for the saved search */
   name: varchar("name", { length: 256 }).notNull(),
-  /** Type of search: 'siem' or 'hunting' */
-  searchType: mysqlEnum("searchType", ["siem", "hunting", "alerts", "vulnerabilities", "fleet"]).notNull(),
+  /** Type of search — derived from shared/searchTypes.ts */
+  searchType: mysqlEnum("searchType", [...SAVED_SEARCH_TYPES]).notNull(),
   /** Serialized filter state (JSON) */
   filters: json("filters").$type<Record<string, unknown>>().notNull(),
   /** Optional description */

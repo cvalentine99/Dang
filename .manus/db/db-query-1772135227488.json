@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE `alert_queue` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `alertId` varchar(128) NOT NULL,\n  `ruleId` varchar(32) NOT NULL,\n  `ruleDescription` text,\n  `ruleLevel` int NOT NULL DEFAULT 0,\n  `agentId` varchar(16),\n  `agentName` varchar(128),\n  `alertTimestamp` varchar(64),\n  `rawJson` json,\n  `status` enum('queued','processing','completed','failed','dismissed') NOT NULL DEFAULT 'queued',\n  `triageResult` json,\n  `queuedBy` int,\n  `queuedAt` timestamp NOT NULL DEFAULT (now()),\n  `processedAt` timestamp,\n  `completedAt` timestamp,\n  CONSTRAINT `alert_queue_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `aq_status_idx` ON `alert_queue` (`status`);\nCREATE INDEX `aq_alertId_idx` ON `alert_queue` (`alertId`);\nCREATE INDEX `aq_queuedAt_idx` ON `alert_queue` (`queuedAt`);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute CREATE TABLE `alert_queue` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `alertId` varchar(128) NOT NULL,\n  `ruleId` varchar(32) NOT NULL,\n  `ruleDescription` text,\n  `ruleLevel` int NOT NULL DEFAULT 0,\n  `agentId` varchar(16),\n  `agentName` varchar(128),\n  `alertTimestamp` varchar(64),\n  `rawJson` json,\n  `status` enum('queued','processing','completed','failed','dismissed') NOT NULL DEFAULT 'queued',\n  `triageResult` json,\n  `queuedBy` int,\n  `queuedAt` timestamp NOT NULL DEFAULT (now()),\n  `processedAt` timestamp,\n  `completedAt` timestamp,\n  CONSTRAINT `alert_queue_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `aq_status_idx` ON `alert_queue` (`status`);\nCREATE INDEX `aq_alertId_idx` ON `alert_queue` (`alertId`);\nCREATE INDEX `aq_queuedAt_idx` ON `alert_queue` (`queuedAt`);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 2158
-}

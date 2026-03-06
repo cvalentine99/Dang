@@ -1,9 +1,0 @@
-{
-  "query": "\nINSERT INTO graph_sync_status (entityType, lastSyncAt, entityCount, status, errorMessage, durationMs, updatedAt) VALUES\n('endpoints', UTC_TIMESTAMP(), 8, 'completed', NULL, 1250, UTC_TIMESTAMP()),\n('processes', UTC_TIMESTAMP(), 32, 'completed', NULL, 3400, UTC_TIMESTAMP()),\n('network_ports', UTC_TIMESTAMP(), 29, 'completed', NULL, 2100, UTC_TIMESTAMP()),\n('software_packages', UTC_TIMESTAMP(), 24, 'completed', NULL, 2800, UTC_TIMESTAMP()),\n('identities', UTC_TIMESTAMP(), 25, 'completed', NULL, 1900, UTC_TIMESTAMP()),\n('vulnerabilities', UTC_TIMESTAMP(), 20, 'completed', NULL, 4200, UTC_TIMESTAMP()),\n('security_events', UTC_TIMESTAMP(), 20, 'completed', NULL, 5600, UTC_TIMESTAMP());\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute \nINSERT INTO graph_sync_status (entityType, lastSyncAt, entityCount, status, errorMessage, durationMs, updatedAt) VALUES\n('endpoints', UTC_TIMESTAMP(), 8, 'completed', NULL, 1250, UTC_TIMESTAMP()),\n('processes', UTC_TIMESTAMP(), 32, 'completed', NULL, 3400, UTC_TIMESTAMP()),\n('network_ports', UTC_TIMESTAMP(), 29, 'completed', NULL, 2100, UTC_TIMESTAMP()),\n('software_packages', UTC_TIMESTAMP(), 24, 'completed', NULL, 2800, UTC_TIMESTAMP()),\n('identities', UTC_TIMESTAMP(), 25, 'completed', NULL, 1900, UTC_TIMESTAMP()),\n('vulnerabilities', UTC_TIMESTAMP(), 20, 'completed', NULL, 4200, UTC_TIMESTAMP()),\n('security_events', UTC_TIMESTAMP(), 20, 'completed', NULL, 5600, UTC_TIMESTAMP());\n",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 82
-}

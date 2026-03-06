@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE `saved_searches` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`name` varchar(256) NOT NULL,\n\t`searchType` enum('siem','hunting') NOT NULL,\n\t`filters` json NOT NULL,\n\t`description` text,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `saved_searches_id` PRIMARY KEY(`id`)\n);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute CREATE TABLE `saved_searches` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`name` varchar(256) NOT NULL,\n\t`searchType` enum('siem','hunting') NOT NULL,\n\t`filters` json NOT NULL,\n\t`description` text,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `saved_searches_id` PRIMARY KEY(`id`)\n);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 246
-}

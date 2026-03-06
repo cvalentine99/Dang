@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE IF NOT EXISTS `sensitive_access_audit` (\n  `id` int AUTO_INCREMENT PRIMARY KEY,\n  `userId` int NOT NULL,\n  `resourceType` varchar(64) NOT NULL,\n  `resourceId` varchar(128) NOT NULL,\n  `action` varchar(32) NOT NULL,\n  `ipAddress` varchar(45),\n  `userAgent` text,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  INDEX `saa_userId_idx` (`userId`),\n  INDEX `saa_resourceType_idx` (`resourceType`),\n  INDEX `saa_resourceId_idx` (`resourceId`),\n  INDEX `saa_createdAt_idx` (`createdAt`)\n);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute CREATE TABLE IF NOT EXISTS `sensitive_access_audit` (\n  `id` int AUTO_INCREMENT PRIMARY KEY,\n  `userId` int NOT NULL,\n  `resourceType` varchar(64) NOT NULL,\n  `resourceId` varchar(128) NOT NULL,\n  `action` varchar(32) NOT NULL,\n  `ipAddress` varchar(45),\n  `userAgent` text,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  INDEX `saa_userId_idx` (`userId`),\n  INDEX `saa_resourceType_idx` (`resourceType`),\n  INDEX `saa_resourceId_idx` (`resourceId`),\n  INDEX `saa_createdAt_idx` (`createdAt`)\n);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 246
-}

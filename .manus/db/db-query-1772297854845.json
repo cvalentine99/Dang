@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE IF NOT EXISTS `response_action_audit` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `actionId` int NOT NULL,\n  `actionIdStr` varchar(64) NOT NULL,\n  `fromState` varchar(20) NOT NULL,\n  `toState` varchar(20) NOT NULL,\n  `performedBy` varchar(128) NOT NULL,\n  `reason` text,\n  `metadata` json,\n  `performedAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `response_action_audit_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `raa_actionId_idx` ON `response_action_audit` (`actionId`);\nCREATE INDEX `raa_actionIdStr_idx` ON `response_action_audit` (`actionIdStr`);\nCREATE INDEX `raa_performedAt_idx` ON `response_action_audit` (`performedAt`);\nCREATE INDEX `raa_toState_idx` ON `response_action_audit` (`toState`);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute CREATE TABLE IF NOT EXISTS `response_action_audit` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `actionId` int NOT NULL,\n  `actionIdStr` varchar(64) NOT NULL,\n  `fromState` varchar(20) NOT NULL,\n  `toState` varchar(20) NOT NULL,\n  `performedBy` varchar(128) NOT NULL,\n  `reason` text,\n  `metadata` json,\n  `performedAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `response_action_audit_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `raa_actionId_idx` ON `response_action_audit` (`actionId`);\nCREATE INDEX `raa_actionIdStr_idx` ON `response_action_audit` (`actionIdStr`);\nCREATE INDEX `raa_performedAt_idx` ON `response_action_audit` (`performedAt`);\nCREATE INDEX `raa_toState_idx` ON `response_action_audit` (`toState`);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 2348
-}

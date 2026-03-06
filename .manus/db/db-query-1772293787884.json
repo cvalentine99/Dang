@@ -1,9 +1,0 @@
-{
-  "query": "ALTER TABLE alert_queue\n  ADD COLUMN pipelineTriageId VARCHAR(64) NULL DEFAULT NULL,\n  ADD COLUMN autoTriageStatus VARCHAR(20) NULL DEFAULT 'pending';",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute ALTER TABLE alert_queue\n  ADD COLUMN pipelineTriageId VARCHAR(64) NULL DEFAULT NULL,\n  ADD COLUMN autoTriageStatus VARCHAR(20) NULL DEFAULT 'pending';",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 791
-}

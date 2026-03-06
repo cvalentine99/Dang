@@ -1,8 +1,10 @@
 /**
- * Saved Searches Router — Persists SIEM and Threat Hunting search filters.
+ * Saved Searches Router — Persists analyst search filters across sessions.
  *
  * Allows analysts to save, name, load, and delete search queries
  * for reuse across sessions.
+ *
+ * Search types are derived from shared/searchTypes.ts — the single source of truth.
  */
 
 import { requireDb } from "../dbGuard";
@@ -12,13 +14,17 @@ import { eq, desc, and } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { savedSearches } from "../../drizzle/schema";
+import { SAVED_SEARCH_TYPES } from "@shared/searchTypes";
+
+/** Zod enum derived from the shared constant — never duplicate these strings */
+const searchTypeEnum = z.enum(SAVED_SEARCH_TYPES);
 
 export const savedSearchesRouter = router({
   /** List saved searches for the current user, optionally filtered by type */
   list: protectedProcedure
     .input(
       z.object({
-        searchType: z.enum(["siem", "hunting", "alerts", "vulnerabilities", "fleet"]).optional(),
+        searchType: searchTypeEnum.optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -44,7 +50,7 @@ export const savedSearchesRouter = router({
     .input(
       z.object({
         name: z.string().min(1).max(256),
-        searchType: z.enum(["siem", "hunting", "alerts", "vulnerabilities", "fleet"]),
+        searchType: searchTypeEnum,
         filters: z.record(z.string(), z.unknown()),
         description: z.string().max(1000).optional(),
       })

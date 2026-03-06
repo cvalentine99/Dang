@@ -1,14 +1,14 @@
 {
-  "numTotalTestSuites": 77,
-  "numPassedTestSuites": 77,
+  "numTotalTestSuites": 78,
+  "numPassedTestSuites": 78,
   "numFailedTestSuites": 0,
-  "numTotalTests": 2375,
-  "numPassedTests": 2375,
+  "numTotalTests": 2388,
+  "numPassedTests": 2388,
   "numFailedTests": 0,
   "numSkippedTests": 0,
   "success": true,
-  "startTime": "2026-03-06T09:33:13.277Z",
-  "duration": 25500,
+  "startTime": "2026-03-06T17:26:33.823Z",
+  "duration": 24900,
   "testResults": [
     {
       "name": "server/agenticPipeline.test.ts",
@@ -26,13 +26,13 @@
       "status": "passed"
     },
     {
-      "name": "server/directions8-10.test.ts",
-      "numTests": 43,
+      "name": "server/pipelineHandoff.test.ts",
+      "numTests": 110,
       "status": "passed"
     },
     {
-      "name": "server/pipelineHandoff.test.ts",
-      "numTests": 110,
+      "name": "server/directions8-10.test.ts",
+      "numTests": 43,
       "status": "passed"
     },
     {
@@ -86,11 +86,6 @@
       "status": "passed"
     },
     {
-      "name": "server/agenticPipeline/hypothesisAgent.test.ts",
-      "numTests": 11,
-      "status": "passed"
-    },
-    {
       "name": "server/indexer/indexerClient.test.ts",
       "numTests": 37,
       "status": "passed"
@@ -101,8 +96,8 @@
       "status": "passed"
     },
     {
-      "name": "server/agenticReadiness/readinessService.test.ts",
-      "numTests": 34,
+      "name": "server/agenticPipeline/hypothesisAgent.test.ts",
+      "numTests": 11,
       "status": "passed"
     },
     {
@@ -113,6 +108,11 @@
     {
       "name": "server/final-wiring-sprint.test.ts",
       "numTests": 63,
+      "status": "passed"
+    },
+    {
+      "name": "server/agenticReadiness/readinessService.test.ts",
+      "numTests": 34,
       "status": "passed"
     },
     {
@@ -131,11 +131,6 @@
       "status": "passed"
     },
     {
-      "name": "server/agenticPipeline/resumePipelineHelper.test.ts",
-      "numTests": 9,
-      "status": "passed"
-    },
-    {
       "name": "server/baselines/driftAnalytics.test.ts",
       "numTests": 15,
       "status": "passed"
@@ -143,6 +138,11 @@
     {
       "name": "server/workflowTruth.test.ts",
       "numTests": 23,
+      "status": "passed"
+    },
+    {
+      "name": "server/agenticPipeline/resumePipelineHelper.test.ts",
+      "numTests": 9,
       "status": "passed"
     },
     {
@@ -176,13 +176,13 @@
       "status": "passed"
     },
     {
-      "name": "server/partialRunContinuation.test.ts",
-      "numTests": 26,
+      "name": "server/baselines/anomalyDetection.test.ts",
+      "numTests": 28,
       "status": "passed"
     },
     {
-      "name": "server/baselines/anomalyDetection.test.ts",
-      "numTests": 28,
+      "name": "server/partialRunContinuation.test.ts",
+      "numTests": 26,
       "status": "passed"
     },
     {
@@ -196,8 +196,8 @@
       "status": "passed"
     },
     {
-      "name": "server/graph/graph.test.ts",
-      "numTests": 23,
+      "name": "server/graph/investigations.schema.test.ts",
+      "numTests": 32,
       "status": "passed"
     },
     {
@@ -206,8 +206,8 @@
       "status": "passed"
     },
     {
-      "name": "server/graph/investigations.schema.test.ts",
-      "numTests": 32,
+      "name": "server/graph/graph.test.ts",
+      "numTests": 23,
       "status": "passed"
     },
     {
@@ -216,13 +216,18 @@
       "status": "passed"
     },
     {
-      "name": "server/wazuh/paramPropagation.test.ts",
-      "numTests": 8,
+      "name": "server/audit-sprint-features.test.ts",
+      "numTests": 36,
       "status": "passed"
     },
     {
       "name": "server/admin/connectionSettings.test.ts",
       "numTests": 15,
+      "status": "passed"
+    },
+    {
+      "name": "server/wazuh/paramPropagation.test.ts",
+      "numTests": 8,
       "status": "passed"
     },
     {
@@ -236,23 +241,13 @@
       "status": "passed"
     },
     {
-      "name": "server/llm/llmService.test.ts",
-      "numTests": 13,
-      "status": "passed"
-    },
-    {
       "name": "server/baselines/baselinesRouter.test.ts",
       "numTests": 14,
       "status": "passed"
     },
     {
-      "name": "server/audit-sprint-features.test.ts",
-      "numTests": 36,
-      "status": "passed"
-    },
-    {
-      "name": "server/hunt-persistence.test.ts",
-      "numTests": 11,
+      "name": "server/llm/llmService.test.ts",
+      "numTests": 13,
       "status": "passed"
     },
     {
@@ -261,13 +256,18 @@
       "status": "passed"
     },
     {
+      "name": "server/hunt-persistence.test.ts",
+      "numTests": 11,
+      "status": "passed"
+    },
+    {
       "name": "server/kg-enhancements.test.ts",
       "numTests": 13,
       "status": "passed"
     },
     {
-      "name": "server/securityHardening.test.ts",
-      "numTests": 19,
+      "name": "server/kg-multiselect.test.ts",
+      "numTests": 7,
       "status": "passed"
     },
     {
@@ -281,8 +281,8 @@
       "status": "passed"
     },
     {
-      "name": "server/kg-multiselect.test.ts",
-      "numTests": 7,
+      "name": "server/kg-context-menu-export.test.ts",
+      "numTests": 8,
       "status": "passed"
     },
     {
@@ -293,11 +293,6 @@
     {
       "name": "server/alertQueue/queueNotifier.test.ts",
       "numTests": 20,
-      "status": "passed"
-    },
-    {
-      "name": "server/kg-context-menu-export.test.ts",
-      "numTests": 8,
       "status": "passed"
     },
     {
@@ -326,18 +321,13 @@
       "status": "passed"
     },
     {
-      "name": "server/soundEngine.test.ts",
-      "numTests": 11,
-      "status": "passed"
-    },
-    {
       "name": "server/wazuh/perUserRateLimit.test.ts",
       "numTests": 10,
       "status": "passed"
     },
     {
-      "name": "server/baselines/baselineSchedules.test.ts",
-      "numTests": 27,
+      "name": "server/soundEngine.test.ts",
+      "numTests": 11,
       "status": "passed"
     },
     {
@@ -351,18 +341,18 @@
       "status": "passed"
     },
     {
+      "name": "server/savedSearches/savedSearches.integration.test.ts",
+      "numTests": 13,
+      "status": "passed"
+    },
+    {
       "name": "server/admin/hostValidation.test.ts",
       "numTests": 19,
       "status": "passed"
     },
     {
-      "name": "server/enhancedLLM/priorityQueue.test.ts",
-      "numTests": 4,
-      "status": "passed"
-    },
-    {
-      "name": "server/hybridrag/hybridragRouter.test.ts",
-      "numTests": 6,
+      "name": "server/baselines/baselineSchedules.test.ts",
+      "numTests": 27,
       "status": "passed"
     },
     {
@@ -371,8 +361,18 @@
       "status": "passed"
     },
     {
-      "name": "server/wazuh/wazuhConnectivity.test.ts",
+      "name": "server/enhancedLLM/priorityQueue.test.ts",
       "numTests": 4,
+      "status": "passed"
+    },
+    {
+      "name": "server/securityHardening.test.ts",
+      "numTests": 19,
+      "status": "passed"
+    },
+    {
+      "name": "server/auth.logout.test.ts",
+      "numTests": 1,
       "status": "passed"
     },
     {
@@ -381,8 +381,13 @@
       "status": "passed"
     },
     {
-      "name": "server/auth.logout.test.ts",
-      "numTests": 1,
+      "name": "server/hybridrag/hybridragRouter.test.ts",
+      "numTests": 6,
+      "status": "passed"
+    },
+    {
+      "name": "server/wazuh/wazuhConnectivity.test.ts",
+      "numTests": 4,
       "status": "passed"
     },
     {

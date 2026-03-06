@@ -3282,3 +3282,44 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] 0 TypeScript errors (webdev_check_status confirmed)
 - [x] Parity audit 113/113, 0 violations
 - [x] All proof artifacts regenerated: vitest.json, ci-proof-artifact.md, wiring-ledger.md/.json, ui-param-parity-report.md/.json
+
+## Saved-Search Contract Drift Fix — Correction Order
+
+### Item 1: Shared source of truth for saved-search types
+- [x] Created shared/searchTypes.ts with SAVED_SEARCH_TYPES const + SavedSearchType union type
+- [x] Updated SavedSearchPanel.tsx to import SavedSearchType from shared constant
+- [x] Updated savedSearchesRouter.ts — Zod enum derived from SAVED_SEARCH_TYPES (no duplicated strings)
+- [x] Updated drizzle/schema.ts — mysqlEnum spread from [...SAVED_SEARCH_TYPES]
+- [x] All 3 layers now derive from single source — 0 TS errors
+
+### Item 2: Real Drizzle migration for enum change
+- [x] Created drizzle/0014_saved_search_types.sql — ALTER TABLE MODIFY COLUMN enum expansion
+- [x] Updated journal (idx 14) + created snapshots 0012-0014 with correct enum type
+- [x] Applied migration to live DB via webdev_execute_sql (232ms, 0 errors)
+- [x] Verified snapshot chain: 0014_snapshot.json shows enum('siem','hunting','alerts','vulnerabilities','fleet')
+
+### Item 3: Fix backend router Zod enums
+- [x] list.input.searchType — uses searchTypeEnum derived from SAVED_SEARCH_TYPES (line 27)
+- [x] create.input.searchType — uses searchTypeEnum derived from SAVED_SEARCH_TYPES (line 53)
+- [x] No duplicated enum strings — single z.enum(SAVED_SEARCH_TYPES) at line 20
+
+### Item 4: DB-backed integration tests for new values
+- [x] server/savedSearches/savedSearches.integration.test.ts — DB-backed tests
+- [x] CREATE roundtrip for all 5 types (siem, hunting, alerts, vulnerabilities, fleet)
+- [x] LIST filtered by each type — verifies DB enum accepts all 5 values
+- [x] DELETE for each type — cleanup verified
+- [x] REJECT invalid searchType — DB-level enum constraint tested
+- [x] Shared constant assertion — SAVED_SEARCH_TYPES has exactly 5 entries
+- [x] Full suite: 78 files, 2388 tests, 0 failures
+
+### Item 5: Remove .manus/db artifacts from repo
+- [x] Removed .manus/db/ directory (90 JSON files)
+- [x] Added .manus/ and .manus-logs/ to .gitignore
+- [x] No .env files, no connection strings in source, no generated artifacts outside test-output/
+- [x] .manus/ directory is now empty and gitignored
+
+### Item 6: Regenerate proof artifacts after fixes
+- [x] test-output/vitest.json — 78 files, 2388 tests, 0 failures
+- [x] docs/ci-proof-artifact.md — generated from vitest.json, counts match
+- [x] docs/wiring-ledger.md + docs/wiring-ledger.json — 113/113 wired, 0 unwired
+- [x] docs/ui-param-parity-report.md + docs/ui-param-parity.json — 168 callsites, 113/113, 0 violations

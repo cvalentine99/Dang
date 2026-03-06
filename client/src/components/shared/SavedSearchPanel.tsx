@@ -3,10 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Bookmark, BookmarkPlus, Save, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import type { SavedSearchType } from "@shared/searchTypes";
 
 interface SavedSearchPanelProps {
-  /** The search type key for this page (e.g., "alerts", "vulnerabilities", "fleet") */
-  searchType: "siem" | "hunting" | "alerts" | "vulnerabilities" | "fleet";
+  /** The search type key for this page — derived from shared/searchTypes.ts */
+  searchType: SavedSearchType;
   /** Label shown in the UI (e.g., "Alerts", "Vulnerability", "Fleet") */
   label: string;
   /** Returns the current filter state as a serializable object */

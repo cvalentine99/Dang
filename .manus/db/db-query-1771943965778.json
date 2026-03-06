@@ -1,9 +1,0 @@
-{
-  "query": "\nDELETE FROM graph_security_events;\nDELETE FROM graph_vulnerabilities;\nDELETE FROM graph_network_ports;\nDELETE FROM graph_software_packages;\nDELETE FROM graph_identities;\nDELETE FROM graph_processes;\nDELETE FROM graph_endpoints;\nDELETE FROM graph_sync_status;\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3xenzgJ3NGNThF2.96bc46f6ec2f --database 9n2ukZGVgWAjZMdS2ZS3BU --execute \nDELETE FROM graph_security_events;\nDELETE FROM graph_vulnerabilities;\nDELETE FROM graph_network_ports;\nDELETE FROM graph_software_packages;\nDELETE FROM graph_identities;\nDELETE FROM graph_processes;\nDELETE FROM graph_endpoints;\nDELETE FROM graph_sync_status;\n",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 162
-}

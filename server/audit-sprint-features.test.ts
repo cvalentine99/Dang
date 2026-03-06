@@ -82,8 +82,10 @@ describe("Task 3: Saved Searches on 3 Pages", () => {
       expect(src).toMatch(/trpc\.savedSearches\.delete\.useMutation/);
     });
 
-    it("accepts typed searchType prop (not generic string)", () => {
-      expect(src).toMatch(/searchType:\s*"siem"\s*\|\s*"hunting"\s*\|\s*"alerts"\s*\|\s*"vulnerabilities"\s*\|\s*"fleet"/);
+    it("accepts typed searchType prop (derived from shared constant)", () => {
+      // Now uses SavedSearchType from shared/searchTypes.ts instead of inline union
+      expect(src).toMatch(/import.*SavedSearchType.*from.*searchTypes/);
+      expect(src).toMatch(/searchType:\s*SavedSearchType/);
     });
   });
 
@@ -131,19 +133,24 @@ describe("Task 3: Saved Searches on 3 Pages", () => {
     });
   });
 
-  describe("Schema enum extension", () => {
+  describe("Schema enum — shared constant", () => {
     const schema = readFileSync(join(__dirname, "..", "drizzle", "schema.ts"), "utf-8");
 
-    it("searchType enum includes 'alerts'", () => {
-      expect(schema).toMatch(/searchType.*alerts/);
+    it("schema imports SAVED_SEARCH_TYPES from shared constant", () => {
+      expect(schema).toMatch(/import.*SAVED_SEARCH_TYPES.*from.*searchTypes/);
     });
 
-    it("searchType enum includes 'vulnerabilities'", () => {
-      expect(schema).toMatch(/searchType.*vulnerabilities/);
+    it("schema uses spread of SAVED_SEARCH_TYPES for enum", () => {
+      expect(schema).toMatch(/mysqlEnum.*searchType.*SAVED_SEARCH_TYPES/);
     });
 
-    it("searchType enum includes 'fleet'", () => {
-      expect(schema).toMatch(/searchType.*fleet/);
+    const sharedConst = readFileSync(join(__dirname, "..", "shared", "searchTypes.ts"), "utf-8");
+    it("shared constant includes all 5 search types", () => {
+      expect(sharedConst).toMatch(/siem/);
+      expect(sharedConst).toMatch(/hunting/);
+      expect(sharedConst).toMatch(/alerts/);
+      expect(sharedConst).toMatch(/vulnerabilities/);
+      expect(sharedConst).toMatch(/fleet/);
     });
   });
 });
