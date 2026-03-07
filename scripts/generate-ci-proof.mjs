@@ -15,7 +15,7 @@
  *   pnpm proof:generate
  */
 
-import { readFileSync, writeFileSync, lstatSync } from "fs";
+import { readFileSync, writeFileSync, lstatSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -57,6 +57,17 @@ let raw;
 try {
   raw = readFileSync(JSON_PATH, "utf-8");
 } catch {
+  // Chain-of-custody guard: if the markdown proof exists but the JSON source is missing,
+  // the proof is unverifiable. Fail loudly.
+  if (existsSync(MD_PATH)) {
+    console.error("PROOF FAIL: docs/ci-proof-artifact.md exists but test-output/vitest.json is missing.");
+    console.error("The proof document claims machine-generated counts from vitest.json.");
+    console.error("Without the JSON, the chain of custody is broken.");
+    console.error("Fix: run tests first, then regenerate proof:");
+    console.error("  pnpm test -- --run --reporter=json --outputFile.json=test-output/vitest.json");
+    console.error("  pnpm proof:generate");
+    process.exit(1);
+  }
   console.error("ERROR: test-output/vitest.json not found.");
   console.error("Run: pnpm test -- --run --reporter=json --outputFile.json=test-output/vitest.json");
   process.exit(1);

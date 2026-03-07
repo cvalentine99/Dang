@@ -3659,3 +3659,8 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] AUDIT-4: endpointIds type contract documented in kgTypes.ts + 3 type contract tests in etl.test.ts
 - [x] AUDIT-5: generate-ci-proof.mjs now verifies symlink + checks for hardcoded magic numbers before generating proof
 - [x] AUDIT-6: All counts below pulled from machine-generated ci-proof-artifact.md
+
+## ETL Recovery Sprint — Final Closeout
+
+- [x] CLOSE-1: Include test-output/vitest.json in the source archive (chain-of-custody for ci-proof-artifact.md)
+- [x] CLOSE-2: Added chain-of-custody guard to generate-ci-proof.mjs — fails with PROOF FAIL if markdown exists but JSON source is missing
