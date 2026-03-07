@@ -3681,5 +3681,5 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Review and update README.md for Beta 2 (test counts, new pages, new scripts, deploy notes, CHANGELOG ref)
 - [x] Review and update deploy instructions (Dockerfile: copy shared KG modules, entrypoint: npx tsx)
 - [x] Create CHANGELOG.md with Beta 2 changes
-- [ ] Push all changes to GitHub repo (cvalentine99/Dang-)
-- [ ] Tag Beta 2 release
+- [x] Push all changes to GitHub repo (cvalentine99/Dang-) — 186 objects, db4015b..92d16da
+- [x] Tag Beta 2 release — v0.2.0-beta.2
