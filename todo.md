@@ -3711,3 +3711,39 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Root cause: (1) journal only had 1 entry, (2) timestamps for 0012-0014 were out-of-order, (3) entrypoint swallowed errors
 - [x] Backfilled all 15 migration journal entries, fixed timestamps, created backfill-migrations.mjs script
 - [x] Verified all tables, indexes, and enum changes exist; drizzle-kit migrate exits cleanly
+
+## ROLLBACK: Correlation bundle normalization patch (reverted)
+
+**Status:** Rolled back cleanly. No code from the patch remains in the working tree.
+
+**What happened:**
+- 9 uploaded fix files were applied to the working tree (never committed)
+- Files: normalizeCorrelationBundle.ts (NEW), correlationAgent.ts, stateMachine.ts, hypothesisAgent.ts, schema.ts, TriagePipeline.tsx, PipelineInspector.tsx, AutoQueueRules.tsx, FeedbackAnalytics.tsx
+- The patch introduced a Zod-validated normalization boundary (LLM raw → canonical CorrelationBundle)
+- 4 test files still used the old canonical mock shape, causing 16+ test failures
+- The schema.ts change (autoTriageStatus varchar→mysqlEnum) had no migration SQL generated
+
+**Rollback method:**
+- `git restore .` — restored all 10 modified files to HEAD (dfc37ad)
+- `git clean -fd` — removed untracked normalizeCorrelationBundle.ts
+- No commits were made, no history rewriting needed
+- No DB changes were applied — pure code rollback
+
+**Verification:**
+- `git status --short` — empty (clean tree)
+- Grep for normalizer remnants — zero hits
+- Full test suite: 87 files, 2706 tests, 0 failures (matches pre-patch baseline)
+
+## OPEN BUG: CorrelationBundle LLM output ↔ persistence type mismatch (needs contract-alignment sprint)
+
+The underlying bugs reported by the user are still present:
+- [ ] blastRadius.affectedHosts/affectedUsers: LLM returns string[], persistence expects int
+- [ ] bundle.confidence: LLM returns top-level, code reads bundle.synthesis.confidence (always 0)
+- [ ] MySQL UPDATE parameter cascade failure from type mismatch corrupts entire row
+
+These need a proper contract-alignment sprint, not a hot patch:
+- [ ] Align the LLM JSON schema prompt with the CorrelationBundle TypeScript interface
+- [ ] OR build a validated normalization boundary (the intent of the reverted patch, but done correctly)
+- [ ] Update ALL test mocks to match the chosen contract (LLM raw or canonical)
+- [ ] Add runtime validation at the LLM→persistence boundary
+- [ ] Ensure no partial normalization code remains after the fix
