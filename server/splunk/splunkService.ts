@@ -133,6 +133,37 @@ export interface SplunkTicketPayload {
   suggestedFollowUps: string[];
   rawAlertJson?: Record<string, unknown>;
   createdBy: string;
+  // ── Enriched fields from TriageObject ──────────────────────────────────
+  /** Normalized alert type/family (e.g., "brute_force", "malware_execution") */
+  alertFamily?: string;
+  /** AI-assigned severity (may differ from ruleLevel) */
+  severity?: string;
+  /** Confidence in the severity assignment (0.0–1.0) */
+  severityConfidence?: number;
+  /** Evidence-backed reasoning for the severity */
+  severityReasoning?: string;
+  /** Recommended pipeline route */
+  route?: string;
+  /** Why this route was chosen */
+  routeReasoning?: string;
+  /** Extracted entities (IPs, users, hashes, etc.) */
+  entities?: Array<{ type: string; value: string; context?: string }>;
+  /** Key evidence items that informed the triage */
+  keyEvidence?: Array<{ type: string; value: string; relevance?: string }>;
+  /** Deduplication assessment */
+  dedup?: { isDuplicate: boolean; similarityScore: number; reasoning: string };
+  /** Uncertainties the triage agent flagged */
+  uncertainties?: Array<{ area: string; detail: string; impact?: string }>;
+  /** Case link suggestion */
+  caseLink?: { shouldLink: boolean; suggestedCaseTitle?: string; reasoning: string };
+  /** Agent OS, groups, IP from triage */
+  agentOs?: string;
+  agentIp?: string;
+  agentGroups?: string[];
+  /** Triage ID for cross-referencing */
+  triageId?: string;
+  /** When the triage was performed */
+  triagedAt?: string;
 }
 
 // ── HEC Client ────────────────────────────────────────────────────────────
@@ -283,6 +314,8 @@ export async function createSplunkTicket(payload: SplunkTicketPayload): Promise<
       ticket_type: "agentic_triage",
       created_by: payload.createdBy,
       created_at: new Date().toISOString(),
+      triage_id: payload.triageId ?? null,
+      triaged_at: payload.triagedAt ?? null,
 
       // Alert details
       alert_id: payload.alertId,
@@ -292,7 +325,16 @@ export async function createSplunkTicket(payload: SplunkTicketPayload): Promise<
       urgency,
       agent_id: payload.agentId,
       agent_name: payload.agentName,
+      agent_os: payload.agentOs ?? null,
+      agent_ip: payload.agentIp ?? null,
+      agent_groups: payload.agentGroups ?? [],
       alert_timestamp: payload.alertTimestamp,
+
+      // Normalized classification
+      alert_family: payload.alertFamily ?? null,
+      ai_severity: payload.severity ?? null,
+      severity_confidence: payload.severityConfidence ?? null,
+      severity_reasoning: payload.severityReasoning ?? null,
 
       // Agentic triage analysis
       triage_summary: payload.triageSummary,
@@ -300,6 +342,25 @@ export async function createSplunkTicket(payload: SplunkTicketPayload): Promise<
       trust_score: payload.trustScore,
       confidence: payload.confidence,
       safety_status: payload.safetyStatus,
+
+      // Pipeline routing
+      route: payload.route ?? null,
+      route_reasoning: payload.routeReasoning ?? null,
+
+      // Extracted entities (IPs, users, hashes, domains)
+      entities: payload.entities ?? [],
+
+      // Key evidence items
+      key_evidence: payload.keyEvidence ?? [],
+
+      // Deduplication assessment
+      dedup: payload.dedup ?? null,
+
+      // Uncertainties flagged by triage agent
+      uncertainties: payload.uncertainties ?? [],
+
+      // Case link suggestion
+      case_link: payload.caseLink ?? null,
 
       // MITRE ATT&CK
       mitre_technique_ids: payload.mitreIds,

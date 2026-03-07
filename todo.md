@@ -3420,3 +3420,15 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Updated Dockerfile: copies seed-kg.mjs, spec-v4.14.3.yaml, scripts/docker-pre-migrate.mjs into production image
 - [x] Verified js-yaml and mysql2 are in production dependencies
 - [x] Full test suite: 79 files, 2,413 tests, 0 failures
+
+## Bug: Splunk Ticketing Broken in Mission Control
+
+- [x] Audited UI callsite — QueueItemCard.tsx calls splunk.createTicket with queueItemId
+- [x] Audited router — splunkRouter.ts extracts triage data from queue item and builds payload
+- [x] Root cause: pipeline stores triage in triage_objects.triageData (via pipelineTriageId), but createTicket read from alertQueue.triageResult which is never populated by the pipeline
+- [x] Created server/splunk/resolveTriageData.ts — resolves triage from triage_objects (canonical) → alertQueueItemId fallback → legacy triageResult
+- [x] Fixed createTicket to use resolveTriageData instead of item.triageResult
+- [x] Fixed batchCreateTickets: broadened eligibility filter + uses resolveTriageData
+- [x] Enriched SplunkTicketPayload with entities, key evidence, dedup, uncertainties, case link, severity reasoning, route, alert family, agent metadata, triage ID
+- [x] HEC event payload includes all enriched fields
+- [x] 129 Splunk tests pass, 2,413 total tests pass, 0 failures

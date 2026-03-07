@@ -35,6 +35,7 @@ import {
 import { getDb } from "../db";
 import { alertQueue, ticketArtifacts, pipelineRuns } from "../../drizzle/schema";
 import { eq, and, inArray, isNull, sql } from "drizzle-orm";
+import { resolveTriageData } from "./resolveTriageData";
 
 /**
  * In-memory batch progress tracker.
@@ -178,39 +179,18 @@ export const splunkRouter = router({
         });
       }
 
-      const triage = item.triageResult as Record<string, unknown> | null;
-      if (!triage) {
+      // Resolve triage data from triage_objects (canonical) or legacy triageResult
+      const resolved = await resolveTriageData(item);
+      if (!resolved.found) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "No triage result available for this queue item",
+          message: "No triage result available for this queue item (checked triage_objects and legacy triageResult)",
         });
       }
 
-      // Extract MITRE data from raw alert JSON
-      const rawJson = (item.rawJson as Record<string, unknown>) ?? {};
-      const rule = (rawJson.rule as Record<string, unknown>) ?? {};
-      const mitre = (rule.mitre as Record<string, unknown>) ?? {};
-      const mitreIds = Array.isArray(mitre.id) ? (mitre.id as string[]) : [];
-      const mitreTactics = Array.isArray(mitre.tactic) ? (mitre.tactic as string[]) : [];
-
-      // Create the Splunk ticket
+      // Create the Splunk ticket with the full enriched payload
       const result = await createSplunkTicket({
-        alertId: item.alertId,
-        ruleId: item.ruleId,
-        ruleDescription: item.ruleDescription ?? "Unknown",
-        ruleLevel: item.ruleLevel,
-        agentId: item.agentId ?? "Unknown",
-        agentName: item.agentName ?? "Unknown",
-        alertTimestamp: item.alertTimestamp ?? new Date().toISOString(),
-        triageSummary: (triage.answer as string) ?? "No summary available",
-        triageReasoning: (triage.reasoning as string) ?? "",
-        trustScore: (triage.trustScore as number) ?? 0,
-        confidence: (triage.confidence as number) ?? 0,
-        safetyStatus: (triage.safetyStatus as string) ?? "unknown",
-        mitreIds,
-        mitreTactics,
-        suggestedFollowUps: (triage.suggestedFollowUps as string[]) ?? [],
-        rawAlertJson: rawJson,
+        ...resolved.payload,
         createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
       });
 
@@ -232,14 +212,14 @@ export const splunkRouter = router({
         system: "splunk_es",
         queueItemId: input.queueItemId,
         pipelineRunId: associatedRun?.id ?? null,
-        triageId: associatedRun?.triageId ?? item.pipelineTriageId ?? null,
+        triageId: resolved.triageId ?? associatedRun?.triageId ?? item.pipelineTriageId ?? null,
         alertId: item.alertId,
         ruleId: item.ruleId,
         ruleLevel: item.ruleLevel,
         createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
         success: result.success === true && !!result.ticketId,
         statusMessage: result.message,
-        rawResponse: { ticketId: result.ticketId, message: result.message },
+        rawResponse: { ticketId: result.ticketId, message: result.message, triageSource: resolved.source },
         httpStatusCode: null,
       });
 
@@ -251,6 +231,7 @@ export const splunkRouter = router({
           splunkTicketId: result.ticketId,
           splunkTicketCreatedAt: new Date().toISOString(),
           splunkTicketCreatedBy: ctx.user?.name ?? ctx.user?.email,
+          triageSource: resolved.source,
         } as unknown as typeof item.triageResult;
         await db
           .update(alertQueue)
@@ -357,12 +338,15 @@ export const splunkRouter = router({
         .from(alertQueue)
         .where(eq(alertQueue.status, "completed"));
 
-      // Filter to items that have triage results but no existing Splunk ticket
+      // Filter to items that have triage data (pipeline or legacy) and no existing Splunk ticket
+      // Note: we can't async-filter, so we check pipelineTriageId OR triageResult presence,
+      // then resolve full triage data inside the loop
       const eligibleItems = completedItems.filter((item) => {
         const triage = item.triageResult as Record<string, unknown> | null;
-        if (!triage || !triage.answer) return false;
-        if (triage.splunkTicketId) return false;
-        return true;
+        // Skip if already ticketed via legacy stamp
+        if (triage?.splunkTicketId) return false;
+        // Eligible if pipeline-triaged OR has legacy triage
+        return !!item.pipelineTriageId || !!(triage?.answer);
       });
 
       if (eligibleItems.length === 0) {
@@ -405,30 +389,21 @@ export const splunkRouter = router({
         currentBatch.updatedAt = Date.now();
 
         try {
-          const triage = item.triageResult as Record<string, unknown>;
-          const rawJson = (item.rawJson as Record<string, unknown>) ?? {};
-          const rule = (rawJson.rule as Record<string, unknown>) ?? {};
-          const mitre = (rule.mitre as Record<string, unknown>) ?? {};
-          const mitreIds = Array.isArray(mitre.id) ? (mitre.id as string[]) : [];
-          const mitreTactics = Array.isArray(mitre.tactic) ? (mitre.tactic as string[]) : [];
+          // Resolve triage data from triage_objects (canonical) or legacy triageResult
+          const resolved = await resolveTriageData(item);
+          if (!resolved.found) {
+            // Skip items where triage data couldn't be resolved
+            results.push({ id: item.id, alertId: item.alertId, error: "No triage data resolved" });
+            failed++;
+            currentBatch.failed = failed;
+            currentBatch.completed = i + 1;
+            currentBatch.results = results;
+            currentBatch.updatedAt = Date.now();
+            continue;
+          }
 
           const result = await createSplunkTicket({
-            alertId: item.alertId,
-            ruleId: item.ruleId,
-            ruleDescription: item.ruleDescription ?? "Unknown",
-            ruleLevel: item.ruleLevel,
-            agentId: item.agentId ?? "Unknown",
-            agentName: item.agentName ?? "Unknown",
-            alertTimestamp: item.alertTimestamp ?? new Date().toISOString(),
-            triageSummary: (triage.answer as string) ?? "No summary available",
-            triageReasoning: (triage.reasoning as string) ?? "",
-            trustScore: (triage.trustScore as number) ?? 0,
-            confidence: (triage.confidence as number) ?? 0,
-            safetyStatus: (triage.safetyStatus as string) ?? "unknown",
-            mitreIds,
-            mitreTactics,
-            suggestedFollowUps: (triage.suggestedFollowUps as string[]) ?? [],
-            rawAlertJson: rawJson,
+            ...resolved.payload,
             createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
           });
 
@@ -446,7 +421,7 @@ export const splunkRouter = router({
             system: "splunk_es",
             queueItemId: item.id,
             pipelineRunId: associatedRun?.id ?? null,
-            triageId: associatedRun?.triageId ?? item.pipelineTriageId ?? null,
+            triageId: resolved.triageId ?? associatedRun?.triageId ?? item.pipelineTriageId ?? null,
             alertId: item.alertId,
             ruleId: item.ruleId,
             ruleLevel: item.ruleLevel,
@@ -458,11 +433,13 @@ export const splunkRouter = router({
           });
 
           if (result.success && result.ticketId) {
+            const existingTriage = (item.triageResult as Record<string, unknown>) ?? {};
             const updatedTriage = {
-              ...triage,
+              ...existingTriage,
               splunkTicketId: result.ticketId,
               splunkTicketCreatedAt: new Date().toISOString(),
               splunkTicketCreatedBy: ctx.user?.name ?? ctx.user?.email,
+              triageSource: resolved.source,
             } as unknown as typeof item.triageResult;
             await db
               .update(alertQueue)
