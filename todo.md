@@ -3694,4 +3694,11 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 
 - [x] Identified: /fleet-compare → AgentCompare.tsx — 3 root causes found
 - [x] Fixed: (1) useMemo→useEffect for onSlotReady, (2) baseSlot guard for undefined, (3) safe data extractors for all slot access
-- [ ] Push fix to GitHub
+- [x] Pushed fix to GitHub (a74a429 → main, bypassed branch protection)
+
+## BUG: Security page — [object Object] rendering in multiple tabs
+
+- [x] Fixed RBAC Rules tab: rule.rule rendered via InlineJson component (handles object + string)
+- [x] Fixed Actions tab: extractDescription() pulls .description from complex objects; ActionDetailCell renders resources/endpoints as colored badges
+- [x] Fixed Resources tab: extractDescription() pulls .description from {description: "..."} objects
+- [x] Fixed My Policies tab: PolicyEffectBadges renders allow/deny as colored badges per resource; rbac_mode filtered out

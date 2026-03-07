@@ -1692,11 +1692,11 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/SecurityExplorer.tsx
 
-### Line 51: `wazuh.status`
+### Line 156: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 54: `wazuh.securityRbacRules`
+### Line 159: `wazuh.securityRbacRules`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1709,35 +1709,35 @@ Input: void (no parameters) — **OK**
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 55: `wazuh.securityActions`
+### Line 160: `wazuh.securityActions`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `endpoint` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 56: `wazuh.securityResources`
+### Line 161: `wazuh.securityResources`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `resource` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 57: `wazuh.securityCurrentUserPolicies`
+### Line 162: `wazuh.securityCurrentUserPolicies`
 
 Input: void (no parameters) — **OK**
 
-### Line 58: `wazuh.securityRoles`
+### Line 163: `wazuh.securityRoles`
 
 Input: void (no parameters) — **OK**
 
-### Line 59: `wazuh.securityUsers`
+### Line 164: `wazuh.securityUsers`
 
 Input: void (no parameters) — **OK**
 
-### Line 60: `wazuh.securityPolicies`
+### Line 165: `wazuh.securityPolicies`
 
 Input: void (no parameters) — **OK**
 
-### Line 61: `wazuh.securityCurrentUser`
+### Line 166: `wazuh.securityCurrentUser`
 
 Input: void (no parameters) — **OK**
 

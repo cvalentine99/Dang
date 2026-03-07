@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-07T19:47:04.864Z",
+  "generated": "2026-03-07T19:57:23.239Z",
   "callsiteCount": 169,
   "procedureCount": 123,
   "consumedProcedures": [
@@ -1378,14 +1378,14 @@
     },
     {
       "file": "client/src/pages/SecurityExplorer.tsx",
-      "line": 51,
+      "line": 156,
       "procedure": "status",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/SecurityExplorer.tsx",
-      "line": 54,
+      "line": 159,
       "procedure": "securityRbacRules",
       "passedKeys": {
         "limit": "500",
@@ -1395,49 +1395,49 @@
     },
     {
       "file": "client/src/pages/SecurityExplorer.tsx",
-      "line": 55,
+      "line": 160,
       "procedure": "securityActions",
       "passedKeys": {},
       "isVoid": false
     },
     {
       "file": "client/src/pages/SecurityExplorer.tsx",
-      "line": 56,
+      "line": 161,
       "procedure": "securityResources",
       "passedKeys": {},
       "isVoid": false
     },
     {
       "file": "client/src/pages/SecurityExplorer.tsx",
-      "line": 57,
+      "line": 162,
       "procedure": "securityCurrentUserPolicies",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/SecurityExplorer.tsx",
-      "line": 58,
+      "line": 163,
       "procedure": "securityRoles",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/SecurityExplorer.tsx",
-      "line": 59,
+      "line": 164,
       "procedure": "securityUsers",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/SecurityExplorer.tsx",
-      "line": 60,
+      "line": 165,
       "procedure": "securityPolicies",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/SecurityExplorer.tsx",
-      "line": 61,
+      "line": 166,
       "procedure": "securityCurrentUser",
       "passedKeys": {},
       "isVoid": true

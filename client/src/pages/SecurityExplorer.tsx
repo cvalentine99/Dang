@@ -34,11 +34,116 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
 function extractItems(raw: unknown): { items: Array<Record<string, unknown>>; total: number } {
   const d = (raw as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
   const items = (d?.affected_items as Array<Record<string, unknown>>) ?? [];
   const total = Number(d?.total_affected_items ?? items.length);
   return { items, total };
+}
+
+/** Safely render any value — objects become formatted JSON, primitives become strings */
+function safeDisplay(val: unknown): string {
+  if (val === null || val === undefined) return "—";
+  if (typeof val === "object") return JSON.stringify(val);
+  return String(val);
+}
+
+/** Extract a human-readable description from an action/resource value object.
+ *  Wazuh actions API returns: { description: "...", resources: [...], example: {...}, related_endpoints: [...] }
+ *  Wazuh resources API returns: { description: "..." }
+ */
+function extractDescription(val: unknown): string {
+  if (val === null || val === undefined) return "—";
+  if (typeof val === "string") return val;
+  if (typeof val === "object" && val !== null) {
+    const obj = val as Record<string, unknown>;
+    if (typeof obj.description === "string") return obj.description;
+    return JSON.stringify(val);
+  }
+  return String(val);
+}
+
+/** Render a compact inline JSON badge for small objects (RBAC rule bodies, policy effects) */
+function InlineJson({ value, maxLen = 120 }: { value: unknown; maxLen?: number }) {
+  if (value === null || value === undefined) return <span className="text-muted-foreground">—</span>;
+  const str = typeof value === "string" ? value : JSON.stringify(value);
+  const truncated = str.length > maxLen ? str.slice(0, maxLen) + "…" : str;
+  return (
+    <code className="text-[10px] leading-relaxed font-mono text-foreground/80 bg-white/[0.03] px-1.5 py-0.5 rounded border border-white/5 break-all">
+      {truncated}
+    </code>
+  );
+}
+
+/** Render policy effect entries: {"*:*:*": "allow", "agent:id:001": "deny"} as colored badges */
+function PolicyEffectBadges({ value }: { value: unknown }) {
+  if (value === null || value === undefined) return <span className="text-muted-foreground">—</span>;
+  if (typeof value !== "object") return <span className="font-mono text-muted-foreground">{String(value)}</span>;
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length === 0) return <span className="text-muted-foreground">—</span>;
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {entries.map(([resource, effect], i) => {
+        const effectStr = String(effect ?? "");
+        const isAllow = effectStr.toLowerCase() === "allow";
+        const isDeny = effectStr.toLowerCase() === "deny";
+        return (
+          <span
+            key={i}
+            className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono border ${
+              isAllow
+                ? "bg-green-500/10 text-green-300 border-green-500/20"
+                : isDeny
+                  ? "bg-red-500/10 text-red-300 border-red-500/20"
+                  : "bg-white/5 text-muted-foreground border-white/10"
+            }`}
+          >
+            <span className="opacity-70">{resource}</span>
+            <span className="font-semibold">{effectStr}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Render action detail sub-fields (resources, related_endpoints) */
+function ActionDetailCell({ value }: { value: unknown }) {
+  if (value === null || value === undefined || typeof value === "string") {
+    return <span className="text-muted-foreground">{extractDescription(value)}</span>;
+  }
+  const obj = value as Record<string, unknown>;
+  const desc = typeof obj.description === "string" ? obj.description : null;
+  const resources = Array.isArray(obj.resources) ? obj.resources : null;
+  const endpoints = Array.isArray(obj.related_endpoints) ? obj.related_endpoints : null;
+
+  return (
+    <div className="space-y-1.5">
+      {desc && <p className="text-muted-foreground">{desc}</p>}
+      {resources && resources.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {resources.map((r, i) => (
+            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-mono">
+              {String(r)}
+            </span>
+          ))}
+        </div>
+      )}
+      {endpoints && endpoints.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {endpoints.map((ep, i) => (
+            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20 font-mono">
+              {String(ep)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 type TabKey = "rules" | "actions" | "resources" | "policies" | "roles" | "users" | "allPolicies" | "currentUser";
@@ -61,25 +166,34 @@ export default function SecurityExplorer() {
   const securityCurrentUserQ = trpc.wazuh.securityCurrentUser.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
 
   const rulesData = useMemo(() => extractItems(rulesQ.data), [rulesQ.data]);
+
+  // ── Actions parser ─────────────────────────────────────────────────────
+  // Wazuh GET /security/actions returns a flat dict:
+  //   { "agent:create": { description: "...", resources: [...], example: {...}, related_endpoints: [...] }, ... }
   const actionsData = useMemo(() => {
-    // Actions endpoint may return a flat object of action→description, not affected_items
     const d = (actionsQ.data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
     if (d?.affected_items) {
       return extractItems(actionsQ.data);
     }
-    // Flat object format
     if (d && typeof d === "object") {
       const entries = Object.entries(d).filter(([k]) =>
         !["affected_items", "total_affected_items", "total_failed_items", "failed_items"].includes(k)
       );
       return {
-        items: entries.map(([action, desc]) => ({ action, description: String(desc ?? "") })),
+        items: entries.map(([action, val]) => ({
+          action,
+          description: extractDescription(val),
+          _raw: val, // preserve full object for detail rendering
+        })),
         total: entries.length,
       };
     }
     return { items: [], total: 0 };
   }, [actionsQ.data]);
 
+  // ── Resources parser ───────────────────────────────────────────────────
+  // Wazuh GET /security/resources returns a flat dict:
+  //   { "agent:id": { description: "..." }, "agent:group": { description: "..." }, ... }
   const resourcesData = useMemo(() => {
     const d = (resourcesQ.data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
     if (d?.affected_items) {
@@ -90,7 +204,10 @@ export default function SecurityExplorer() {
         !["affected_items", "total_affected_items", "total_failed_items", "failed_items"].includes(k)
       );
       return {
-        items: entries.map(([resource, desc]) => ({ resource, description: String(desc ?? "") })),
+        items: entries.map(([resource, val]) => ({
+          resource,
+          description: extractDescription(val),
+        })),
         total: entries.length,
       };
     }
@@ -106,15 +223,17 @@ export default function SecurityExplorer() {
     return items[0] ?? (d && typeof d === "object" ? d : {});
   }, [securityCurrentUserQ.data]);
 
+  // ── My Policies parser ─────────────────────────────────────────────────
+  // Wazuh GET /security/user/policies returns a flat dict:
+  //   { "agent:create": { "*:*:*": "allow" }, "agent:delete": { "*:*:*": "deny" }, ... }
   const policiesData = useMemo(() => {
     const d = (policiesQ.data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
     if (d?.affected_items) {
       return extractItems(policiesQ.data);
     }
-    // May be a flat policies object
     if (d && typeof d === "object") {
       const entries = Object.entries(d).filter(([k]) =>
-        !["affected_items", "total_affected_items", "total_failed_items", "failed_items"].includes(k)
+        !["affected_items", "total_affected_items", "total_failed_items", "failed_items", "rbac_mode"].includes(k)
       );
       return {
         items: entries.map(([key, val]) => ({ key, value: val })),
@@ -126,12 +245,12 @@ export default function SecurityExplorer() {
 
   const handleRefresh = useCallback(() => { utils.wazuh.invalidate(); }, [utils]);
 
-  // Filter items by search
+  // Filter items by search — uses safeDisplay for object-safe stringification
   const filterItems = useCallback((items: Array<Record<string, unknown>>) => {
     if (!search) return items;
     const lower = search.toLowerCase();
     return items.filter(item =>
-      Object.values(item).some(v => String(v ?? "").toLowerCase().includes(lower))
+      Object.values(item).some(v => safeDisplay(v).toLowerCase().includes(lower))
     );
   }, [search]);
 
@@ -200,7 +319,11 @@ export default function SecurityExplorer() {
             </TabsTrigger>
           </TabsList>
 
-          {/* RBAC Rules */}
+          {/* ═══════════════════════════════════════════════════════════════
+              RBAC Rules Tab
+              API shape: affected_items[].{ id, name, rule: {FIND: {...}}, body: {...}, roles: [...] }
+              FIX: rule.rule is an object — must JSON.stringify it, not String() it
+              ═══════════════════════════════════════════════════════════════ */}
           <TabsContent value="rules" className="mt-4">
             <GlassPanel>
               <div className="flex items-center justify-between mb-3">
@@ -225,7 +348,8 @@ export default function SecurityExplorer() {
                           <td className="py-2 px-3 font-mono text-primary">{String(rule.id ?? i)}</td>
                           <td className="py-2 px-3 text-foreground font-medium">{String(rule.name ?? "—")}</td>
                           <td className="py-2 px-3 font-mono text-muted-foreground max-w-[400px]">
-                            <span className="truncate block">{typeof rule.body === "object" ? JSON.stringify(rule.body) : String(rule.rule ?? rule.body ?? "—")}</span>
+                            {/* FIX: both rule.body AND rule.rule can be objects */}
+                            <InlineJson value={rule.rule ?? rule.body} />
                           </td>
                           <td className="py-2 px-3 text-muted-foreground">
                             {Array.isArray(rule.roles) ? (rule.roles as Array<unknown>).map((r, j) => (
@@ -249,7 +373,12 @@ export default function SecurityExplorer() {
             </GlassPanel>
           </TabsContent>
 
-          {/* Actions */}
+          {/* ═══════════════════════════════════════════════════════════════
+              Actions Tab
+              API shape: flat dict { "agent:create": { description, resources, example, related_endpoints }, ... }
+              FIX: each value is a complex object — extract .description for display,
+                   show resources/endpoints as colored badges
+              ═══════════════════════════════════════════════════════════════ */}
           <TabsContent value="actions" className="mt-4">
             <GlassPanel>
               <div className="flex items-center justify-between mb-3">
@@ -258,21 +387,28 @@ export default function SecurityExplorer() {
                 </h3>
                 {actionsQ.data ? <RawJsonViewer data={actionsQ.data as Record<string, unknown>} title="Actions JSON" /> : null}
               </div>
-              {actionsQ.isLoading ? <TableSkeleton columns={2} rows={8} /> : (
+              {actionsQ.isLoading ? <TableSkeleton columns={3} rows={8} /> : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-border/30">
-                        {["Action", "Description"].map(h => (
+                        {["Action", "Description", "Resources / Endpoints"].map(h => (
                           <th key={h} className="text-left py-2 px-3 text-muted-foreground font-medium">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {filterItems(actionsData.items).map((item, i) => (
-                        <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
-                          <td className="py-2 px-3 font-mono text-primary">{String(item.action ?? item.name ?? Object.keys(item)[0] ?? "—")}</td>
-                          <td className="py-2 px-3 text-muted-foreground">{String(item.description ?? Object.values(item)[0] ?? "—")}</td>
+                        <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors align-top">
+                          <td className="py-2 px-3 font-mono text-primary whitespace-nowrap">
+                            {String(item.action ?? item.name ?? "—")}
+                          </td>
+                          <td className="py-2 px-3 text-muted-foreground max-w-[400px]">
+                            {String(item.description ?? "—")}
+                          </td>
+                          <td className="py-2 px-3">
+                            <ActionDetailCell value={(item as any)._raw} />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -288,7 +424,11 @@ export default function SecurityExplorer() {
             </GlassPanel>
           </TabsContent>
 
-          {/* Resources */}
+          {/* ═══════════════════════════════════════════════════════════════
+              Resources Tab
+              API shape: flat dict { "agent:id": { description: "..." }, ... }
+              FIX: each value is { description: "..." } — extract .description
+              ═══════════════════════════════════════════════════════════════ */}
           <TabsContent value="resources" className="mt-4">
             <GlassPanel>
               <div className="flex items-center justify-between mb-3">
@@ -310,8 +450,8 @@ export default function SecurityExplorer() {
                     <tbody>
                       {filterItems(resourcesData.items).map((item, i) => (
                         <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
-                          <td className="py-2 px-3 font-mono text-primary">{String(item.resource ?? item.name ?? Object.keys(item)[0] ?? "—")}</td>
-                          <td className="py-2 px-3 text-muted-foreground">{String(item.description ?? Object.values(item)[0] ?? "—")}</td>
+                          <td className="py-2 px-3 font-mono text-primary">{String(item.resource ?? item.name ?? "—")}</td>
+                          <td className="py-2 px-3 text-muted-foreground">{String(item.description ?? "—")}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -327,7 +467,11 @@ export default function SecurityExplorer() {
             </GlassPanel>
           </TabsContent>
 
-          {/* Current User Policies */}
+          {/* ═══════════════════════════════════════════════════════════════
+              My Policies Tab
+              API shape: flat dict { "agent:create": { "*:*:*": "allow" }, ... }
+              FIX: render effect entries as colored allow/deny badges
+              ═══════════════════════════════════════════════════════════════ */}
           <TabsContent value="policies" className="mt-4">
             <GlassPanel>
               <div className="flex items-center justify-between mb-3">
@@ -342,19 +486,19 @@ export default function SecurityExplorer() {
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-border/30">
-                          {["Policy / Key", "Value / Effect"].map(h => (
+                          {["Action / Key", "Resource → Effect"].map(h => (
                             <th key={h} className="text-left py-2 px-3 text-muted-foreground font-medium">{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {filterItems(policiesData.items).map((item, i) => (
-                          <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
-                            <td className="py-2 px-3 font-mono text-primary">{String(item.key ?? item.name ?? item.id ?? "—")}</td>
-                            <td className="py-2 px-3 font-mono text-muted-foreground max-w-[500px]">
-                              <span className="truncate block">
-                                {typeof item.value === "object" ? JSON.stringify(item.value) : String(item.value ?? item.effect ?? "—")}
-                              </span>
+                          <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors align-top">
+                            <td className="py-2 px-3 font-mono text-primary whitespace-nowrap">
+                              {String(item.key ?? item.name ?? item.id ?? "—")}
+                            </td>
+                            <td className="py-2 px-3">
+                              <PolicyEffectBadges value={item.value} />
                             </td>
                           </tr>
                         ))}
@@ -370,6 +514,7 @@ export default function SecurityExplorer() {
               )}
             </GlassPanel>
           </TabsContent>
+
           {/* Roles */}
           <TabsContent value="roles" className="mt-4">
             <GlassPanel>
@@ -394,20 +539,20 @@ export default function SecurityExplorer() {
                       {filterItems(securityRolesData.items).map((role, i) => (
                         <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
                           <td className="py-2 px-3 font-mono text-primary">{String(role.id ?? i)}</td>
-                          <td className="py-2 px-3 text-foreground font-medium">{String(role.name ?? "\u2014")}</td>
+                          <td className="py-2 px-3 text-foreground font-medium">{String(role.name ?? "—")}</td>
                           <td className="py-2 px-3 text-muted-foreground">
                             {Array.isArray(role.policies) ? (role.policies as Array<unknown>).map((p, j) => (
                               <span key={j} className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary mr-1 mb-0.5">
                                 {String(typeof p === "object" && p !== null ? (p as Record<string, unknown>).id ?? JSON.stringify(p) : p)}
                               </span>
-                            )) : "\u2014"}
+                            )) : "—"}
                           </td>
                           <td className="py-2 px-3 text-muted-foreground">
                             {Array.isArray(role.rules) ? (role.rules as Array<unknown>).map((r, j) => (
                               <span key={j} className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-secondary/30 text-foreground mr-1 mb-0.5">
                                 {String(typeof r === "object" && r !== null ? (r as Record<string, unknown>).id ?? JSON.stringify(r) : r)}
                               </span>
-                            )) : "\u2014"}
+                            )) : "—"}
                           </td>
                         </tr>
                       ))}
@@ -448,15 +593,15 @@ export default function SecurityExplorer() {
                       {filterItems(securityUsersData.items).map((user, i) => (
                         <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
                           <td className="py-2 px-3 font-mono text-primary">{String(user.id ?? i)}</td>
-                          <td className="py-2 px-3 text-foreground font-medium">{String(user.username ?? "\u2014")}</td>
+                          <td className="py-2 px-3 text-foreground font-medium">{String(user.username ?? "—")}</td>
                           <td className="py-2 px-3 text-muted-foreground">
                             {Array.isArray(user.roles) ? (user.roles as Array<unknown>).map((r, j) => (
                               <span key={j} className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary mr-1 mb-0.5">
                                 {String(typeof r === "object" && r !== null ? (r as Record<string, unknown>).id ?? JSON.stringify(r) : r)}
                               </span>
-                            )) : "\u2014"}
+                            )) : "—"}
                           </td>
-                          <td className="py-2 px-3 text-muted-foreground">{String(user.allow_run_as ?? "\u2014")}</td>
+                          <td className="py-2 px-3 text-muted-foreground">{String(user.allow_run_as ?? "—")}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -496,16 +641,16 @@ export default function SecurityExplorer() {
                       {filterItems(securityPoliciesData.items).map((pol, i) => (
                         <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
                           <td className="py-2 px-3 font-mono text-primary">{String(pol.id ?? i)}</td>
-                          <td className="py-2 px-3 text-foreground font-medium">{String(pol.name ?? "\u2014")}</td>
+                          <td className="py-2 px-3 text-foreground font-medium">{String(pol.name ?? "—")}</td>
                           <td className="py-2 px-3 font-mono text-muted-foreground max-w-[400px]">
-                            <span className="truncate block">{typeof pol.policy === "object" ? JSON.stringify(pol.policy) : String(pol.policy ?? "\u2014")}</span>
+                            <InlineJson value={pol.policy} />
                           </td>
                           <td className="py-2 px-3 text-muted-foreground">
                             {Array.isArray(pol.roles) ? (pol.roles as Array<unknown>).map((r, j) => (
                               <span key={j} className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-secondary/30 text-foreground mr-1 mb-0.5">
                                 {String(typeof r === "object" && r !== null ? (r as Record<string, unknown>).id ?? JSON.stringify(r) : r)}
                               </span>
-                            )) : "\u2014"}
+                            )) : "—"}
                           </td>
                         </tr>
                       ))}
@@ -538,7 +683,7 @@ export default function SecurityExplorer() {
                     <div key={k} className="flex items-start gap-3 py-1.5 border-b border-border/10">
                       <span className="text-[11px] font-mono text-primary min-w-[160px] shrink-0">{k}</span>
                       <span className="text-[11px] font-mono text-foreground break-all">
-                        {typeof v === "object" && v !== null ? JSON.stringify(v, null, 2) : String(v ?? "\u2014")}
+                        {typeof v === "object" && v !== null ? JSON.stringify(v, null, 2) : String(v ?? "—")}
                       </span>
                     </div>
                   ))}
