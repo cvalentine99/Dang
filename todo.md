@@ -3683,3 +3683,8 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Create CHANGELOG.md with Beta 2 changes
 - [x] Push all changes to GitHub repo (cvalentine99/Dang-) — 186 objects, db4015b..92d16da
 - [x] Tag Beta 2 release — v0.2.0-beta.2
+
+## BUG: Analytics script placeholder in production
+
+- [x] client/index.html: removed dead `%VITE_ANALYTICS_ENDPOINT%/umami` placeholder
+- [x] Fix: runtime injection in main.tsx — only creates script tag when VITE_ANALYTICS_ENDPOINT and VITE_ANALYTICS_WEBSITE_ID are set

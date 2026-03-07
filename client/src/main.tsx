@@ -54,6 +54,18 @@ const trpcClient = trpc.createClient({
   ],
 });
 
+// --- Umami analytics: inject at runtime only when env vars are configured ---
+(function injectAnalytics() {
+  const endpoint = import.meta.env.VITE_ANALYTICS_ENDPOINT;
+  const websiteId = import.meta.env.VITE_ANALYTICS_WEBSITE_ID;
+  if (!endpoint || !websiteId) return;
+  const s = document.createElement("script");
+  s.defer = true;
+  s.src = `${endpoint}/umami`;
+  s.dataset.websiteId = websiteId;
+  document.head.appendChild(s);
+})();
+
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>
     <QueryClientProvider client={queryClient}>
