@@ -287,13 +287,24 @@ describe("ETL — Canonical Spec Source", () => {
     expect(SPEC_EXISTS).toBe(true);
   });
 
-  it.skipIf(!SPEC_EXISTS)("spec/wazuh-api-v4.14.3.yaml is identical to root spec", () => {
+  it.skipIf(!SPEC_EXISTS)("spec/wazuh-api-v4.14.3.yaml is identical to root spec (symlink or same content)", () => {
+    const { lstatSync } = require("fs");
     const altPath = resolve(__dirname, "../../spec/wazuh-api-v4.14.3.yaml");
     if (!existsSync(altPath)) return; // OK if only one copy exists
 
-    const rootSpec = readFileSync(SPEC_PATH, "utf8");
-    const altSpec = readFileSync(altPath, "utf8");
-    expect(rootSpec).toBe(altSpec);
+    // Prefer symlink (single source of truth)
+    const stat = lstatSync(altPath);
+    if (stat.isSymbolicLink()) {
+      // Good — it's a symlink, no duplicate data
+      const { readlinkSync } = require("fs");
+      const target = readlinkSync(altPath);
+      expect(target).toContain("spec-v4.14.3.yaml");
+    } else {
+      // Fallback: at least verify content is identical
+      const rootSpec = readFileSync(SPEC_PATH, "utf8");
+      const altSpec = readFileSync(altPath, "utf8");
+      expect(rootSpec).toBe(altSpec);
+    }
   });
 
   it.skipIf(!SPEC_EXISTS)("spec has valid OpenAPI structure", () => {

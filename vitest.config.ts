@@ -16,5 +16,6 @@ export default defineConfig({
     environment: "node",
     include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
     testTimeout: 15_000,
+    fileParallelism: false, // DB-dependent tests must not race (ETL integration truncates tables)
   },
 });

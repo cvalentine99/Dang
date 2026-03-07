@@ -3629,3 +3629,24 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] tests prove full sync, repeatability, and failure handling (20 tests in etl.test.ts)
 - [x] docs/UI wording no longer exaggerate capabilities
 - [x] no duplicate ETL logic between CLI and runtime (seed-kg.mjs mirrors kgExtractor/kgLoader pattern)
+
+## CRITICAL: Duplicate App Tree in Archive (reported by user)
+
+- [x] Investigate duplicate dang/ nested inside dang/ project root (stale webdev checkpoint files in zip)
+- [x] Verify canonical root has all ETL recovery changes (confirmed)
+- [x] Remove any duplicate nested subtree (recreated zip from inside project dir)
+- [x] Verify seed-kg.mjs at canonical root is the thin wrapper (486 lines, confirmed)
+- [x] Verify etlService.ts at canonical root has real rebuild (204 lines, confirmed)
+- [x] Verify error_failure is gone from canonical root (only in test assertions)
+- [x] Verify layer_name references are fixed in canonical root (none found)
+- [x] Regenerate proof artifacts: 85 files, 2664 tests, 0 failures (corrected in Round 2)
+- [x] Repackage zip with single app tree only (540 files, 1.8MB)
+- [x] Provide changed files list, runtime ETL proof, test proof (dang-etl-recovery-report.md)
+
+## ETL Recovery Sprint — Defect Corrections (Round 2)
+
+- [x] DEFECT-1: seed-kg.mjs refactored to true thin wrapper (59 lines, imports kgExtractor+kgLoader via tsx, zero inline extraction/load logic)
+- [x] DEFECT-2: Proof counts corrected — actual: 85 test files, 2664 tests, 0 failures (sequential execution with fileParallelism:false)
+- [x] DEFECT-3: etl-integration.test.ts added with 8 real DB tests: truncate→sync→verify rows, sync status metadata, rerun stability, invalid layer failure, per-layer sync, metadata contract verification
+- [x] DEFECT-4: Metadata contract narrowed in etlService.ts header comments — explicitly states what IS returned (specVersion, totalRecords, durationMs, per-layer results) and what is NOT (specHash, row-level diffs, incremental change sets)
+- [x] DEFECT-5: Single canonical spec: spec-v4.14.3.yaml at project root. spec/wazuh-api-v4.14.3.yaml is now a symlink. etlService.ts, seed-kg.mjs, etl.test.ts, and etl-integration.test.ts all use the root path.

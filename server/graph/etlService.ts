@@ -11,15 +11,26 @@
  *   3. Call kgLoader.loadAll() or kgLoader.loadLayer() to truncate-and-reload
  *   4. kgLoader updates kg_sync_status with truthful metadata per layer
  *
- * For live Wazuh data (agents, alerts, vulnerabilities), the app queries
- * the Wazuh REST API directly through the existing tRPC procedures.
- * The KG is about the API itself — its structure, safety, and semantics.
+ * Canonical spec path: spec-v4.14.3.yaml at the project root.
+ * Both seed-kg.mjs (CLI) and this runtime service use the same file.
+ * The spec/wazuh-api-v4.14.3.yaml is a symlink to the canonical copy.
+ *
+ * Metadata contract:
+ *   runFullSync() returns KgLoadResult with:
+ *     - success: boolean
+ *     - specVersion: string (from spec info.version)
+ *     - totalRecords: number (sum of all entity counts)
+ *     - durationMs: number (wall-clock time for the full rebuild)
+ *     - layers: Record<KgLayerName, KgSyncLayerResult>
+ *       Each layer has: layer, status, entityCount, durationMs, errorMessage
+ *
+ *   It does NOT return: specHash, row-level diffs, or incremental change sets.
+ *   The sync is always a full truncate-and-reload, not incremental.
  */
 
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import yaml from "js-yaml";
-import { sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { kgSyncStatus } from "../../drizzle/schema";
 import { extract } from "./kgExtractor";
@@ -28,43 +39,51 @@ import type { KgExtractionResult, KgLayerName, KgLoadResult, KgSyncLayerResult }
 import type { SqlExecutor } from "./kgLoader";
 
 // ── Canonical spec path ────────────────────────────────────────────────────
-// Both seed-kg.mjs and this runtime service use the same spec file.
-// In Docker, the Dockerfile copies spec-v4.14.3.yaml to the project root.
-// In dev, it lives at the project root.
+// Single source of truth: spec-v4.14.3.yaml at the project root.
+// In Docker, the Dockerfile copies it to the same relative path.
 
 function getSpecPath(): string {
-  // Try project root first (works in both dev and Docker)
   const projectRoot = resolve(__dirname, "../..");
   return resolve(projectRoot, "spec-v4.14.3.yaml");
 }
 
-// ── Drizzle → SqlExecutor adapter ──────────────────────────────────────────
-// kgLoader expects a SqlExecutor interface: { execute(sql, params?) }
+// ── Drizzle → mysql2 pool adapter ────────────────────────────────────────
+// kgLoader expects a SqlExecutor: { execute(sql, params?) → Promise<any> }
 // Drizzle's db.execute() uses tagged template literals, not (sql, params).
-// We need a raw mysql2 connection for the loader.
+//
+// The Drizzle mysql2 adapter stores the underlying pool at:
+//   db.session.client.pool  (callback-based mysql2 Pool)
+//
+// We call .promise() on it to get the promise-based PromisePool,
+// which has .execute(sql, params) returning [rows, fields].
 
-async function getRawExecutor(): Promise<SqlExecutor | null> {
-  const db = await getDb();
-  if (!db) return null;
+function getPromisePool(db: any): any | null {
+  // Path: db.session.client.pool.promise()
+  // db.session.client is a PromisePoolConnection wrapper with a .pool property
+  // .pool is the raw callback-based Pool, .pool.promise() gives PromisePool
+  const client = db?.session?.client;
+  if (!client) return null;
 
-  // Access the underlying mysql2 pool from Drizzle
-  // Drizzle stores the session/pool in the internal structure
-  // We use db.execute with sql`` for raw queries
+  // If client has a pool property with a promise() method, use that
+  if (client.pool?.promise) {
+    return client.pool.promise();
+  }
+
+  // Fallback: client itself might be a promise pool
+  if (typeof client.execute === "function") {
+    return client;
+  }
+
+  return null;
+}
+
+function makeSqlExecutor(promisePool: any): SqlExecutor {
   return {
     async execute(query: string, params?: any[]): Promise<any> {
       if (params && params.length > 0) {
-        // Use Drizzle's raw sql execution with parameter binding
-        // Build a tagged template-like call
-        const result = await db.execute(sql.raw(`${query.replace(/\?/g, () => {
-          const val = params!.shift();
-          if (val === null || val === undefined) return "NULL";
-          if (typeof val === "number") return String(val);
-          // Escape single quotes in strings
-          return `'${String(val).replace(/'/g, "''")}'`;
-        })}`));
-        return result;
+        return promisePool.execute(query, params);
       }
-      return db.execute(sql.raw(query));
+      return promisePool.execute(query);
     },
   };
 }
@@ -94,9 +113,15 @@ export function extractFromSpec(specPath?: string): KgExtractionResult {
 
 /**
  * Run a full re-extraction of the KG from the OpenAPI spec.
- * This is a real rebuild: parse spec → extract → truncate all KG tables → reload.
+ * This is a full truncate-and-reload: parse spec → extract → truncate all KG tables → reload.
  *
- * Returns per-layer results with truthful metadata (entity counts, duration, errors).
+ * Returns per-layer results with truthful metadata:
+ *   - specVersion (from spec info.version, e.g. "4.14.3")
+ *   - totalRecords (sum of entity counts across all layers)
+ *   - durationMs (wall-clock time for the full rebuild)
+ *   - per-layer: status, entityCount, durationMs, errorMessage
+ *
+ * Does NOT return: specHash, row-level diffs, or incremental change sets.
  */
 export async function runFullSync(): Promise<{
   success: boolean;
@@ -111,23 +136,13 @@ export async function runFullSync(): Promise<{
     const specPath = getSpecPath();
     const data = extractFromSpec(specPath);
 
-    // Step 2: Get a raw SQL executor for kgLoader
-    // kgLoader uses raw SQL with ? placeholders, not Drizzle tagged templates.
-    // We need to use the underlying mysql2 pool directly.
-    const mysql2Pool = (db as any)._.session?.client;
-    if (!mysql2Pool) {
-      // Fallback: try to get pool from session
-      return { success: false, message: "Cannot access raw database connection for KG loader" };
+    // Step 2: Get a promise-based mysql2 pool from Drizzle
+    const promisePool = getPromisePool(db);
+    if (!promisePool) {
+      return { success: false, message: "Cannot access mysql2 pool from Drizzle. Check Drizzle version compatibility." };
     }
 
-    const exec: SqlExecutor = {
-      async execute(query: string, params?: any[]): Promise<any> {
-        if (params && params.length > 0) {
-          return mysql2Pool.execute(query, params);
-        }
-        return mysql2Pool.execute(query);
-      },
-    };
+    const exec = makeSqlExecutor(promisePool);
 
     // Step 3: Load all layers (truncate + insert)
     const result = await loadAll(exec, data);
@@ -154,6 +169,8 @@ export async function runFullSync(): Promise<{
 /**
  * Sync a single KG layer.
  * Re-extracts from spec and reloads only the specified layer.
+ *
+ * Returns the layer result with: layer, status, entityCount, durationMs, errorMessage.
  */
 export async function syncLayer(layerName: string): Promise<{
   success: boolean;
@@ -172,20 +189,13 @@ export async function syncLayer(layerName: string): Promise<{
     // Step 1: Read and parse spec
     const data = extractFromSpec();
 
-    // Step 2: Get raw SQL executor
-    const mysql2Pool = (db as any)._.session?.client;
-    if (!mysql2Pool) {
-      return { success: false, message: "Cannot access raw database connection for KG loader" };
+    // Step 2: Get promise-based mysql2 pool from Drizzle
+    const promisePool = getPromisePool(db);
+    if (!promisePool) {
+      return { success: false, message: "Cannot access mysql2 pool from Drizzle. Check Drizzle version compatibility." };
     }
 
-    const exec: SqlExecutor = {
-      async execute(query: string, params?: any[]): Promise<any> {
-        if (params && params.length > 0) {
-          return mysql2Pool.execute(query, params);
-        }
-        return mysql2Pool.execute(query);
-      },
-    };
+    const exec = makeSqlExecutor(promisePool);
 
     // Step 3: Load single layer
     const result = await loadLayer(exec, data, layerName as KgLayerName);

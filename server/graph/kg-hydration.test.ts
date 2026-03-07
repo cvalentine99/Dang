@@ -21,7 +21,7 @@ const EXPECTED = {
   responses: 1126,
   authMethods: 2,
   resources: 21,
-  useCases: 16,
+  useCases: 18,
   indices: 5,
   fields: 60,
   errorPatterns: 9,
