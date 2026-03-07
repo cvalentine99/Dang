@@ -207,19 +207,29 @@ export const splunkRouter = router({
 
       // Record the ticket artifact — both success and failure get recorded
       // This is the first-class audit trail for ticket creation
+      // IMPORTANT: Drizzle passes `undefined` as empty string to MySQL, which breaks
+      // nullable int/varchar columns. Explicitly coerce to `null`.
+      const effectiveTriageId = resolved.triageId || associatedRun?.triageId || item.pipelineTriageId || null;
+      const effectivePipelineRunId = associatedRun?.id ?? null;
       await db.insert(ticketArtifacts).values({
         ticketId: result.ticketId ?? `failed-${Date.now()}`,
         system: "splunk_es",
         queueItemId: input.queueItemId,
-        pipelineRunId: associatedRun?.id ?? null,
-        triageId: resolved.triageId ?? associatedRun?.triageId ?? item.pipelineTriageId ?? null,
+        pipelineRunId: effectivePipelineRunId === undefined ? null : effectivePipelineRunId,
+        triageId: effectiveTriageId === undefined ? null : effectiveTriageId,
         alertId: item.alertId,
-        ruleId: item.ruleId,
+        ruleId: item.ruleId ?? null,
         ruleLevel: item.ruleLevel,
         createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
         success: result.success === true && !!result.ticketId,
-        statusMessage: result.message,
-        rawResponse: { ticketId: result.ticketId, message: result.message, triageSource: resolved.source },
+        statusMessage: result.message ?? null,
+        rawResponse: {
+          ticketId: result.ticketId,
+          message: result.message,
+          triageSource: resolved.source,
+          triageFound: resolved.found,
+          payloadFields: Object.keys(resolved.payload),
+        },
         httpStatusCode: null,
       });
 
@@ -416,19 +426,27 @@ export const splunkRouter = router({
             .limit(1);
 
           // Record ticket artifact — both success and failure, with full workflow lineage
+          // Coerce undefined → null to prevent Drizzle from sending empty strings to MySQL
+          const batchTriageId = resolved.triageId || associatedRun?.triageId || item.pipelineTriageId || null;
+          const batchRunId = associatedRun?.id ?? null;
           await db.insert(ticketArtifacts).values({
             ticketId: result.ticketId ?? `failed-${Date.now()}`,
             system: "splunk_es",
             queueItemId: item.id,
-            pipelineRunId: associatedRun?.id ?? null,
-            triageId: resolved.triageId ?? associatedRun?.triageId ?? item.pipelineTriageId ?? null,
+            pipelineRunId: batchRunId === undefined ? null : batchRunId,
+            triageId: batchTriageId === undefined ? null : batchTriageId,
             alertId: item.alertId,
-            ruleId: item.ruleId,
+            ruleId: item.ruleId ?? null,
             ruleLevel: item.ruleLevel,
             createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
             success: result.success === true && !!result.ticketId,
-            statusMessage: result.message,
-            rawResponse: { ticketId: result.ticketId, message: result.message },
+            statusMessage: result.message ?? null,
+            rawResponse: {
+              ticketId: result.ticketId,
+              message: result.message,
+              triageSource: resolved.source,
+              triageFound: resolved.found,
+            },
             httpStatusCode: null,
           });
 
@@ -462,9 +480,9 @@ export const splunkRouter = router({
               system: "splunk_es",
               queueItemId: item.id,
               pipelineRunId: null,
-              triageId: item.pipelineTriageId ?? null,
+              triageId: item.pipelineTriageId || null,
               alertId: item.alertId,
-              ruleId: item.ruleId,
+              ruleId: item.ruleId ?? null,
               ruleLevel: item.ruleLevel,
               createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
               success: false,

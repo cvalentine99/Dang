@@ -19,7 +19,7 @@ import { eq, desc } from "drizzle-orm";
 import type { TriageObject } from "../../shared/agenticSchemas";
 import type { SplunkTicketPayload } from "./splunkService";
 
-interface QueueItem {
+export interface QueueItem {
   id: number;
   alertId: string;
   ruleId: string;
@@ -44,18 +44,32 @@ export interface ResolvedTriagePayload {
   payload: Omit<SplunkTicketPayload, "createdBy">;
 }
 
+/** Base fields extracted from the queue item itself (always available). */
+interface BaseFields {
+  alertId: string;
+  ruleId: string;
+  ruleDescription: string;
+  ruleLevel: number;
+  agentId: string;
+  agentName: string;
+  alertTimestamp: string;
+  mitreIds: string[];
+  mitreTactics: string[];
+  rawAlertJson: Record<string, unknown>;
+}
+
 /**
- * Resolve triage data for a queue item, preferring triage_objects over legacy.
+ * Build the base fields from a queue item. These are always available
+ * regardless of triage source.
  */
-export async function resolveTriageData(item: QueueItem): Promise<ResolvedTriagePayload> {
+function buildBaseFields(item: QueueItem): BaseFields {
   const rawJson = (item.rawJson as Record<string, unknown>) ?? {};
   const rule = (rawJson.rule as Record<string, unknown>) ?? {};
   const mitre = (rule.mitre as Record<string, unknown>) ?? {};
   const mitreIds = Array.isArray(mitre.id) ? (mitre.id as string[]) : [];
   const mitreTactics = Array.isArray(mitre.tactic) ? (mitre.tactic as string[]) : [];
 
-  // Base fields from the queue item itself (always available)
-  const base = {
+  return {
     alertId: item.alertId,
     ruleId: item.ruleId,
     ruleDescription: item.ruleDescription ?? "Unknown",
@@ -67,6 +81,13 @@ export async function resolveTriageData(item: QueueItem): Promise<ResolvedTriage
     mitreTactics,
     rawAlertJson: rawJson,
   };
+}
+
+/**
+ * Resolve triage data for a queue item, preferring triage_objects over legacy.
+ */
+export async function resolveTriageData(item: QueueItem): Promise<ResolvedTriagePayload> {
+  const base = buildBaseFields(item);
 
   // ── Strategy 1: triage_objects via pipelineTriageId ──────────────────────
   const db = await getDb();
@@ -134,14 +155,21 @@ export async function resolveTriageData(item: QueueItem): Promise<ResolvedTriage
 
 // ── Helper: build enriched payload from a full TriageObject ──────────────────
 
-function buildFromTriageObject(
+/**
+ * Build a fully enriched SplunkTicketPayload from a canonical TriageObject.
+ *
+ * This function maps every field from the TriageObject contract into the
+ * SplunkTicketPayload structure. The mapping is intentionally explicit
+ * (no spread operators) to make it auditable.
+ */
+export function buildFromTriageObject(
   t: TriageObject,
-  base: ReturnType<typeof buildBase>,
+  base: BaseFields,
   source: "triage_objects",
 ): ResolvedTriagePayload {
   // Merge MITRE from both Wazuh raw alert and triage agent's inference
-  const triageMitreIds = t.mitreMapping?.map((m) => m.techniqueId) ?? [];
-  const triageMitreTactics = t.mitreMapping?.flatMap((m) => m.tactic ? [m.tactic] : []) ?? [];
+  const triageMitreIds = (t.mitreMapping ?? []).map((m) => m.techniqueId);
+  const triageMitreTactics = (t.mitreMapping ?? []).flatMap((m) => m.tactic ? [m.tactic] : []);
   const allMitreIds = Array.from(new Set([...base.mitreIds, ...triageMitreIds]));
   const allMitreTactics = Array.from(new Set([...base.mitreTactics, ...triageMitreTactics]));
 
@@ -150,33 +178,51 @@ function buildFromTriageObject(
     source,
     triageId: t.triageId,
     payload: {
-      ...base,
+      // ── Base fields (from queue item) ──────────────────────────────────
+      alertId: base.alertId,
+      ruleId: base.ruleId,
+      ruleDescription: base.ruleDescription,
+      ruleLevel: base.ruleLevel,
+      agentId: base.agentId,
+      agentName: base.agentName,
+      alertTimestamp: base.alertTimestamp,
+      rawAlertJson: base.rawAlertJson,
+
+      // ── MITRE ATT&CK (merged from raw alert + triage inference) ────────
       mitreIds: allMitreIds,
       mitreTactics: allMitreTactics,
-      // Core triage fields
+
+      // ── Core triage fields ─────────────────────────────────────────────
       triageSummary: t.summary ?? "No summary available",
       triageReasoning: t.severityReasoning ?? "",
-      trustScore: 0, // TriageObject doesn't have trustScore; use confidence
+      trustScore: 0, // TriageObject doesn't have trustScore; use confidence instead
       confidence: typeof t.severityConfidence === "number" ? t.severityConfidence : 0,
       safetyStatus: t.severity ?? "unknown",
       suggestedFollowUps: [],
-      // Enriched fields from TriageObject
-      alertFamily: t.alertFamily,
-      severity: t.severity,
-      severityConfidence: typeof t.severityConfidence === "number" ? t.severityConfidence : 0,
-      severityReasoning: t.severityReasoning,
-      route: t.route,
-      routeReasoning: t.routeReasoning,
-      entities: t.entities?.map((e) => ({
+
+      // ── Enriched fields from TriageObject ──────────────────────────────
+      alertFamily: t.alertFamily ?? undefined,
+      severity: t.severity ?? undefined,
+      severityConfidence: typeof t.severityConfidence === "number" ? t.severityConfidence : undefined,
+      severityReasoning: t.severityReasoning ?? undefined,
+      route: t.route ?? undefined,
+      routeReasoning: t.routeReasoning ?? undefined,
+
+      // ── Entities ───────────────────────────────────────────────────────
+      entities: (t.entities ?? []).map((e) => ({
         type: e.type,
         value: e.value,
         context: e.metadata ? JSON.stringify(e.metadata) : undefined,
       })),
-      keyEvidence: t.keyEvidence?.map((e) => ({
+
+      // ── Key Evidence ───────────────────────────────────────────────────
+      keyEvidence: (t.keyEvidence ?? []).map((e) => ({
         type: e.type,
         value: e.label,
-        relevance: e.source as string,
+        relevance: typeof e.relevance === "number" ? String(e.relevance) : (e.source as string),
       })),
+
+      // ── Deduplication ──────────────────────────────────────────────────
       dedup: t.dedup
         ? {
             isDuplicate: t.dedup.isDuplicate,
@@ -184,11 +230,15 @@ function buildFromTriageObject(
             reasoning: t.dedup.reasoning,
           }
         : undefined,
-      uncertainties: t.uncertainties?.map((u) => ({
+
+      // ── Uncertainties ──────────────────────────────────────────────────
+      uncertainties: (t.uncertainties ?? []).map((u) => ({
         area: u.description,
         detail: u.impact,
         impact: u.suggestedAction,
       })),
+
+      // ── Case Link ──────────────────────────────────────────────────────
       caseLink: t.caseLink
         ? {
             shouldLink: t.caseLink.shouldLink,
@@ -196,29 +246,15 @@ function buildFromTriageObject(
             reasoning: t.caseLink.reasoning,
           }
         : undefined,
-      agentOs: t.agent?.os,
-      agentIp: t.agent?.ip,
-      agentGroups: t.agent?.groups,
+
+      // ── Agent metadata from triage ─────────────────────────────────────
+      agentOs: t.agent?.os ?? undefined,
+      agentIp: t.agent?.ip ?? undefined,
+      agentGroups: t.agent?.groups ?? undefined,
+
+      // ── Triage provenance ──────────────────────────────────────────────
       triageId: t.triageId,
       triagedAt: t.triagedAt,
     },
   };
-}
-
-// Type helper for the base object
-type BaseFields = {
-  alertId: string;
-  ruleId: string;
-  ruleDescription: string;
-  ruleLevel: number;
-  agentId: string;
-  agentName: string;
-  alertTimestamp: string;
-  mitreIds: string[];
-  mitreTactics: string[];
-  rawAlertJson: Record<string, unknown>;
-};
-
-function buildBase(_: never): BaseFields {
-  throw new Error("Not callable — type helper only");
 }

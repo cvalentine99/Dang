@@ -3432,3 +3432,15 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Enriched SplunkTicketPayload with entities, key evidence, dedup, uncertainties, case link, severity reasoning, route, alert family, agent metadata, triage ID
 - [x] HEC event payload includes all enriched fields
 - [x] 129 Splunk tests pass, 2,413 total tests pass, 0 failures
+
+## Bug: Splunk Ticket Artifacts INSERT Failure + Empty Metadata
+
+- [x] Diagnose ticket_artifacts INSERT failure — column mismatch between code and DB table
+- [x] Diagnose empty ticket metadata in Splunk — resolveTriageData may not be finding triage data
+- [x] Fix ticket_artifacts schema/code mismatch
+- [x] Fix triage data resolution so metadata flows into HEC payload
+- [x] Verify fix end-to-end
+- [x] Rewrote resolveTriageData.ts with proper type annotations (ResolvedTriagePayload, QueueItem, BaseFields interfaces)
+- [x] buildFromTriageObject now exported and independently testable
+- [x] Added 73 new tests in resolveTriageData.test.ts covering all field mappings, MITRE merging, entity extraction, null coercion
+- [x] Full test suite: 80 files, 2,486 tests, 0 failures
