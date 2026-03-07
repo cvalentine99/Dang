@@ -32,8 +32,8 @@ for (let i = 1; i < configBlocks.length; i += 2) {
   }
   const paramsBlock = block.substring(paramsStart, pos - 1);
   
-  // Count top-level param keys (4-space indented keys)
-  const paramKeys = paramsBlock.match(/^\s{4}\w+:/gm) || [];
+  // Count top-level param keys (4-space indented keys, including quoted dotted keys)
+  const paramKeys = paramsBlock.match(/^\s{4}(?:"[^"]+"|\w+):/gm) || [];
   configParamCounts.set(configName, paramKeys.length);
 }
 

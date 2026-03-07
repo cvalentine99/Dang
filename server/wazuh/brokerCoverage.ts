@@ -103,6 +103,7 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "managerStatus", wazuhPath: "/manager/status", wiringLevel: "broker", brokerConfig: "MANAGER_CONFIG", paramCount: 4, category: "Manager" },
   { procedure: "managerConfiguration", wazuhPath: "/manager/configuration", wiringLevel: "broker", brokerConfig: "MANAGER_CONFIG", paramCount: 4, category: "Manager" },
   { procedure: "managerConfigValidation", wazuhPath: "/manager/configuration/validation", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
+  { procedure: "clusterConfigValidation", wazuhPath: "/cluster/configuration/validation", wiringLevel: "passthrough", paramCount: 0, category: "Cluster" },
   { procedure: "managerStats", wazuhPath: "/manager/stats", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
   { procedure: "statsHourly", wazuhPath: "/manager/stats/hourly", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
   { procedure: "statsWeekly", wazuhPath: "/manager/stats/weekly", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
@@ -137,7 +138,7 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "clusterNodeStatsWeekly", wazuhPath: "/cluster/{node_id}/stats/weekly", wiringLevel: "passthrough", paramCount: 1, category: "Cluster" },
 
   // ── Agents ──
-  { procedure: "agents", wazuhPath: "/agents", wiringLevel: "broker", brokerConfig: "AGENTS_CONFIG", paramCount: 18, category: "Agents" },
+  { procedure: "agents", wazuhPath: "/agents", wiringLevel: "broker", brokerConfig: "AGENTS_CONFIG", paramCount: 21, category: "Agents" },
   { procedure: "agentSummaryStatus", wazuhPath: "/agents/summary/status", wiringLevel: "passthrough", paramCount: 0, category: "Agents" },
   { procedure: "agentSummaryOs", wazuhPath: "/agents/summary/os", wiringLevel: "passthrough", paramCount: 0, category: "Agents" },
   { procedure: "agentsSummary", wazuhPath: "/agents/summary", wiringLevel: "passthrough", paramCount: 0, category: "Agents" },
@@ -148,7 +149,7 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "agentConfig", wazuhPath: "/agents/{agent_id}/config/{component}/{configuration}", wiringLevel: "passthrough", paramCount: 3, category: "Agents" },
   { procedure: "agentsUpgradeResult", wazuhPath: "/agents/upgrade_result", wiringLevel: "passthrough", paramCount: 0, category: "Agents" },
   { procedure: "agentsUninstallPermission", wazuhPath: "N/A (permission check)", wiringLevel: "passthrough", paramCount: 0, category: "Agents" },
-  { procedure: "agentGroupSync", wazuhPath: "/agents/group/{group_id}/sync", wiringLevel: "manual", paramCount: 1, category: "Agents" },
+  { procedure: "agentGroupSync", wazuhPath: "/agents/{agent_id}/group/is_sync", wiringLevel: "manual", paramCount: 1, category: "Agents" },
   { procedure: "apiInfo", wazuhPath: "/", wiringLevel: "manual", paramCount: 0, category: "Agents" },
   { procedure: "agentGroups", wazuhPath: "/groups", wiringLevel: "broker", brokerConfig: "GROUPS_CONFIG", paramCount: 9, category: "Agents" },
   { procedure: "agentsOutdated", wazuhPath: "/agents/outdated", wiringLevel: "manual", paramCount: 6, category: "Agents" },
@@ -160,10 +161,10 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "agentOs", wazuhPath: "/syscollector/{agent_id}/os", wiringLevel: "manual", paramCount: 2, category: "Syscollector" },
   { procedure: "agentHardware", wazuhPath: "/syscollector/{agent_id}/hardware", wiringLevel: "manual", paramCount: 2, category: "Syscollector" },
   { procedure: "agentPackages", wazuhPath: "/syscollector/{agent_id}/packages", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_PACKAGES_CONFIG", paramCount: 12, category: "Syscollector" },
-  { procedure: "agentPorts", wazuhPath: "/syscollector/{agent_id}/ports", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_PORTS_CONFIG", paramCount: 12, category: "Syscollector" },
+  { procedure: "agentPorts", wazuhPath: "/syscollector/{agent_id}/ports", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_PORTS_CONFIG", paramCount: 15, category: "Syscollector" },
   { procedure: "agentProcesses", wazuhPath: "/syscollector/{agent_id}/processes", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_PROCESSES_CONFIG", paramCount: 21, category: "Syscollector" },
   { procedure: "agentNetaddr", wazuhPath: "/syscollector/{agent_id}/netaddr", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_NETADDR_CONFIG", paramCount: 12, category: "Syscollector" },
-  { procedure: "agentNetiface", wazuhPath: "/syscollector/{agent_id}/netiface", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_NETIFACE_CONFIG", paramCount: 13, category: "Syscollector" },
+  { procedure: "agentNetiface", wazuhPath: "/syscollector/{agent_id}/netiface", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_NETIFACE_CONFIG", paramCount: 21, category: "Syscollector" },
   { procedure: "agentHotfixes", wazuhPath: "/syscollector/{agent_id}/hotfixes", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_HOTFIXES_CONFIG", paramCount: 8, category: "Syscollector" },
   { procedure: "agentBrowserExtensions", wazuhPath: "/syscollector/{agent_id}/browser_extensions", wiringLevel: "manual", paramCount: 8, category: "Syscollector" },
   { procedure: "agentServices", wazuhPath: "/syscollector/{agent_id}/services", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_SERVICES_CONFIG", paramCount: 7, category: "Syscollector" },
@@ -173,9 +174,9 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "groupFiles", wazuhPath: "/groups/{group_id}/files", wiringLevel: "broker", brokerConfig: "GROUP_FILES_CONFIG", paramCount: 8, category: "Syscollector" },
 
   // ── Experimental Syscollector (cross-agent) ──
-  { procedure: "expSyscollectorPackages", wazuhPath: "/experimental/syscollector/packages", wiringLevel: "manual", paramCount: 7, category: "Experimental" },
-  { procedure: "expSyscollectorProcesses", wazuhPath: "/experimental/syscollector/processes", wiringLevel: "manual", paramCount: 7, category: "Experimental" },
-  { procedure: "expSyscollectorPorts", wazuhPath: "/experimental/syscollector/ports", wiringLevel: "manual", paramCount: 7, category: "Experimental" },
+  { procedure: "expSyscollectorPackages", wazuhPath: "/experimental/syscollector/packages", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_PACKAGES_CONFIG", paramCount: 13, category: "Experimental" },
+  { procedure: "expSyscollectorProcesses", wazuhPath: "/experimental/syscollector/processes", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_PROCESSES_CONFIG", paramCount: 22, category: "Experimental" },
+  { procedure: "expSyscollectorPorts", wazuhPath: "/experimental/syscollector/ports", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_PORTS_CONFIG", paramCount: 16, category: "Experimental" },
   { procedure: "expSyscollectorNetaddr", wazuhPath: "/experimental/syscollector/netaddr", wiringLevel: "manual", paramCount: 11, category: "Experimental" },
   { procedure: "expSyscollectorNetiface", wazuhPath: "/experimental/syscollector/netiface", wiringLevel: "manual", paramCount: 21, category: "Experimental" },
   { procedure: "expSyscollectorNetproto", wazuhPath: "/experimental/syscollector/netproto", wiringLevel: "manual", paramCount: 7, category: "Experimental" },
@@ -185,7 +186,7 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "expCiscatResults", wazuhPath: "/experimental/ciscat/results", wiringLevel: "broker", brokerConfig: "EXPERIMENTAL_CISCAT_RESULTS_CONFIG", paramCount: 16, category: "Experimental" },
 
   // ── Rules ──
-  { procedure: "rules", wazuhPath: "/rules", wiringLevel: "broker", brokerConfig: "RULES_CONFIG", paramCount: 19, category: "Rules" },
+  { procedure: "rules", wazuhPath: "/rules", wiringLevel: "broker", brokerConfig: "RULES_CONFIG", paramCount: 20, category: "Rules" },
   { procedure: "ruleGroups", wazuhPath: "/rules/groups", wiringLevel: "manual", paramCount: 4, category: "Rules" },
   { procedure: "rulesByRequirement", wazuhPath: "/rules/requirement/{requirement}", wiringLevel: "manual", paramCount: 5, category: "Rules" },
   { procedure: "rulesFiles", wazuhPath: "/rules/files", wiringLevel: "broker", brokerConfig: "RULES_FILES_CONFIG", paramCount: 10, category: "Rules" },
@@ -208,7 +209,7 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "ciscatResults", wazuhPath: "/ciscat/{agent_id}/results", wiringLevel: "broker", brokerConfig: "CISCAT_CONFIG", paramCount: 15, category: "CIS-CAT" },
 
   // ── Syscheck / FIM ──
-  { procedure: "syscheckFiles", wazuhPath: "/syscheck/{agent_id}", wiringLevel: "broker", brokerConfig: "SYSCHECK_CONFIG", paramCount: 15, category: "Syscheck" },
+  { procedure: "syscheckFiles", wazuhPath: "/syscheck/{agent_id}", wiringLevel: "broker", brokerConfig: "SYSCHECK_CONFIG", paramCount: 17, category: "FIM" },
   { procedure: "syscheckLastScan", wazuhPath: "/syscheck/{agent_id}/last_scan", wiringLevel: "manual", paramCount: 1, category: "Syscheck" },
 
   // ── Rootcheck ──

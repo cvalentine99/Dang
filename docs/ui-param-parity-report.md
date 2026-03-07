@@ -3,7 +3,7 @@
 **Generated:** 2026-03-07  
 **Script:** `scripts/audit-ui-param-parity.mjs`  
 **Callsites audited:** 169  
-**Unique procedures consumed:** 114 of 122 total  
+**Unique procedures consumed:** 114 of 123 total  
 
 ---
 
@@ -14,7 +14,7 @@
 |--------|-------|
 | Total callsites | 169 |
 | Unique procedures consumed | 114 |
-| Router procedures available | 122 |
+| Router procedures available | 123 |
 | Parameters surfaced in UI | 95 |
 | Parameters hardcoded/constant | 116 |
 | Parameters not supported (classified) | 821 |
@@ -27,6 +27,7 @@
 | Procedure | Input Keys | Disposition |
 |-----------|-----------|-------------|
 | `clusterApiConfig` | (void) | Backend-only / Not yet wired to UI |
+| `clusterConfigValidation` | (void) | Backend-only / Not yet wired to UI |
 | `clusterRulesetSync` | (void) | Backend-only / Not yet wired to UI |
 | `expCiscatResults` | limit, offset, search, q, sort, select, distinct, agents_list, benchmark, profile, pass, fail, error, notchecked, unknown, score | Backend-only / Not yet wired to UI |
 | `managerApiConfig` | (void) | Backend-only / Not yet wired to UI |
@@ -1905,6 +1906,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `status` | Optional | No | Passed | **Constant** (hardcoded: `"active"`) |
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+
 
 
 

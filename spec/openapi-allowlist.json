@@ -1,0 +1,13 @@
+{
+  "_comment": "Endpoints intentionally excluded from the Dang! router. Each must have a reason.",
+  "endpoints": [
+    "/agents/uninstall",
+    "/agents/{agent_id}/key",
+    "/security/user/authenticate"
+  ],
+  "reasons": {
+    "/agents/uninstall": "Write operation — violates read-only-by-default project constraint. Agent uninstall is a destructive action.",
+    "/agents/{agent_id}/key": "Returns agent registration key — sensitive credential exposure. Not needed for read-focused analyst workflows.",
+    "/security/user/authenticate": "Auth is handled by Dang!'s own OAuth layer, not by proxying Wazuh token requests to the browser."
+  }
+}

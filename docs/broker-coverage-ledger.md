@@ -1,18 +1,18 @@
 # Wazuh Parameter Broker — Coverage Ledger
 
 **Spec baseline:** Wazuh REST API OpenAPI v4.14.3-rc3
-**Last updated:** Truth-contract correction pass (2026-03-07)
+**Last updated:** Broker governance closure sprint (2026-03-07)
 
 This document is the single source of truth for which Wazuh API endpoints are broker-wired, what parameters each broker config accepts, and which endpoints remain manually wired or passthrough. Every param count listed here has been machine-verified against the actual `paramBroker.ts` config objects using `scripts/verify-param-counts.mjs`.
 
-## Broker-Wired Endpoints (33 configs)
+## Broker-Wired Endpoints (36 configs)
 
 The following endpoints are fully wired through `paramBroker.ts`. All accepted parameters are forwarded with correct Wazuh outbound names. Unsupported parameters are explicitly rejected.
 
 | Endpoint | Config Name | Total Params | Universal Params | Endpoint-Specific Params |
 |---|---|---|---|---|
-| `GET /agents` | `AGENTS_CONFIG` | 18 | offset, limit, sort, search, select, q, distinct | status, older_than, manager_host, version, group, node_name, name, ip, registerIP, group_config_status, manager |
-| `GET /rules` | `RULES_CONFIG` | 19 | offset, limit, sort, search, select, q, distinct | status, group, level, filename, relative_dirname, pci_dss, gdpr, gpg13, hipaa, tsc, mitre, rule_ids |
+| `GET /agents` | `AGENTS_CONFIG` | 21 | offset, limit, sort, search, select, q, distinct | status, older_than, manager_host, version, group, node_name, name, ip, registerIP, group_config_status, manager, os.platform, os.version, os.name |
+| `GET /rules` | `RULES_CONFIG` | 20 | offset, limit, sort, search, select, q, distinct | status, group, level, filename, relative_dirname, pci_dss, gdpr, gpg13, hipaa, tsc, mitre, nist_800_53, rule_ids |
 | `GET /groups` | `GROUPS_CONFIG` | 9 | offset, limit, sort, search, select, q, distinct | hash, groups_list |
 | `GET /cluster/nodes` | `CLUSTER_NODES_CONFIG` | 9 | offset, limit, sort, search, select, q, distinct | type, nodes_list |
 | `GET /sca/{agent_id}` | `SCA_POLICIES_CONFIG` | 10 | offset, limit, sort, search, select, q, distinct | name, description, references |
@@ -21,7 +21,7 @@ The following endpoints are fully wired through `paramBroker.ts`. All accepted p
 | `GET /manager/logs` | `MANAGER_LOGS_CONFIG` | 9 | offset, limit, sort, search, select, q, distinct | level, tag |
 | `GET /groups/{group_id}/agents` | `GROUP_AGENTS_CONFIG` | 8 | offset, limit, sort, search, select, q, distinct | status |
 | `GET /groups/{group_id}/files` | `GROUP_FILES_CONFIG` | 8 | offset, limit, sort, search, select, q, distinct | hash |
-| `GET /syscheck/{agent_id}` | `SYSCHECK_CONFIG` | 15 | offset, limit, sort, search, select, q, distinct | type, hash, file, arch, summary, md5, sha1, sha256 |
+| `GET /syscheck/{agent_id}` | `SYSCHECK_CONFIG` | 17 | offset, limit, sort, search, select, q, distinct | type, hash, file, arch, summary, md5, sha1, sha256, date, mtime |
 | `GET /rootcheck/{agent_id}` | `ROOTCHECK_CONFIG` | 8 | offset, limit, sort, search, select, q, distinct | status |
 | `GET /decoders` | `DECODERS_CONFIG` | 11 | offset, limit, sort, search, select, q, distinct | decoder_names, filename, relative_dirname, status |
 | `GET /decoders/files` | `DECODERS_FILES_CONFIG` | 10 | offset, limit, sort, search, select, q, distinct | filename, relative_dirname, status |
@@ -37,15 +37,18 @@ The following endpoints are fully wired through `paramBroker.ts`. All accepted p
 | `GET /mitre/groups` | `MITRE_GROUPS_CONFIG` | 8 | offset, limit, sort, search, select, q, distinct | mitre_group_ids |
 | `GET /mitre/references` | `MITRE_REFERENCES_CONFIG` | 6 | offset, limit, sort, search, q | mitre_reference_ids |
 | `GET /syscollector/{agent_id}/packages` | `SYSCOLLECTOR_PACKAGES_CONFIG` | 12 | offset, limit, sort, search, select, q, distinct | vendor, name, architecture, format, version |
-| `GET /syscollector/{agent_id}/ports` | `SYSCOLLECTOR_PORTS_CONFIG` | 12 | offset, limit, sort, search, select, q, distinct | pid, protocol, tx_queue, state, process |
+| `GET /syscollector/{agent_id}/ports` | `SYSCOLLECTOR_PORTS_CONFIG` | 15 | offset, limit, sort, search, select, q, distinct | pid, protocol, tx_queue, state, process, local.ip, local.port, remote.ip |
 | `GET /syscollector/{agent_id}/processes` | `SYSCOLLECTOR_PROCESSES_CONFIG` | 21 | offset, limit, sort, search, select, q, distinct | pid, state, ppid, egroup, euser, fgroup, name, nlwp, pgrp, priority, rgroup, ruser, sgroup, suser |
 | `GET /syscollector/{agent_id}/services` | `SYSCOLLECTOR_SERVICES_CONFIG` | 7 | offset, limit, sort, search, select, q, distinct | (none) |
-| `GET /syscollector/{agent_id}/netiface` | `SYSCOLLECTOR_NETIFACE_CONFIG` | 13 | offset, limit, sort, search, select, q, distinct | name, adapter, type, state, mtu, mac |
+| `GET /syscollector/{agent_id}/netiface` | `SYSCOLLECTOR_NETIFACE_CONFIG` | 21 | offset, limit, sort, search, select, q, distinct | name, adapter, type, state, mtu, tx_packets, rx_packets, tx_bytes, rx_bytes, tx_errors, rx_errors, tx_dropped, rx_dropped, mac |
 | `GET /syscollector/{agent_id}/netaddr` | `SYSCOLLECTOR_NETADDR_CONFIG` | 12 | offset, limit, sort, search, select, q, distinct | iface, proto, address, broadcast, netmask |
 | `GET /syscollector/{agent_id}/hotfixes` | `SYSCOLLECTOR_HOTFIXES_CONFIG` | 8 | offset, limit, sort, search, select, q, distinct | hotfix |
 | `GET /syscollector/{agent_id}/netproto` | `SYSCOLLECTOR_NETPROTO_CONFIG` | 11 | offset, limit, sort, search, select, q, distinct | iface, type, gateway, dhcp |
+| `GET /experimental/syscollector/packages` | `EXP_SYSCOLLECTOR_PACKAGES_CONFIG` | 13 | offset, limit, sort, search, select, q, distinct | agents_list, vendor, name, architecture, format, version |
+| `GET /experimental/syscollector/processes` | `EXP_SYSCOLLECTOR_PROCESSES_CONFIG` | 22 | offset, limit, sort, search, select, q, distinct | agents_list, pid, state, ppid, egroup, euser, fgroup, name, nlwp, pgrp, priority, rgroup, ruser, sgroup, suser |
+| `GET /experimental/syscollector/ports` | `EXP_SYSCOLLECTOR_PORTS_CONFIG` | 16 | offset, limit, sort, search, select, q, distinct | agents_list, pid, protocol, local.ip, local.port, remote.ip, tx_queue, state, process |
 
-## Manual-Param Endpoints (37 procedures)
+## Manual-Param Endpoints (34 procedures)
 
 These endpoints use inline Zod schemas in `wazuhRouter.ts` with manual query parameter forwarding. They are not broker-wired but do forward parameters correctly.
 
@@ -60,7 +63,7 @@ These endpoints use inline Zod schemas in `wazuhRouter.ts` with manual query par
 | `clusterNodeDaemonStats` | `/cluster/{node_id}/daemons/stats` | 2 | node_id, daemons_list |
 | `clusterNodeLogs` | `/cluster/{node_id}/logs` | 7 | node_id, offset, limit, sort, search, tag, level |
 | `agentDaemonStats` | `/agents/{agent_id}/daemons/stats` | 2 | agent_id, daemons_list |
-| `agentGroupSync` | `/agents/group/{group_id}/sync` | 1 | group_id |
+| `agentGroupSync` | `/agents/{agent_id}/group/is_sync` | 1 | agent_id |
 | `apiInfo` | `/` | 0 | — |
 | `agentsOutdated` | `/agents/outdated` | 6 | offset, limit, sort, search, select, q |
 | `agentsNoGroup` | `/agents/no_group` | 6 | offset, limit, sort, search, select, q |
@@ -70,9 +73,6 @@ These endpoints use inline Zod schemas in `wazuhRouter.ts` with manual query par
 | `agentBrowserExtensions` | `/syscollector/{agent_id}/browser_extensions` | 8 | agent_id, offset, limit, sort, search, q, distinct, select |
 | `agentUsers` | `/syscollector/{agent_id}/users` | 8 | agent_id, offset, limit, sort, search, q, distinct, select |
 | `agentGroups2` | `/syscollector/{agent_id}/groups` | 8 | agent_id, offset, limit, sort, search, q, distinct, select |
-| `expSyscollectorPackages` | `/experimental/syscollector/packages` | 7 | offset, limit, sort, search, select, q, agents_list |
-| `expSyscollectorProcesses` | `/experimental/syscollector/processes` | 7 | offset, limit, sort, search, select, q, agents_list |
-| `expSyscollectorPorts` | `/experimental/syscollector/ports` | 7 | offset, limit, sort, search, select, q, agents_list |
 | `expSyscollectorNetaddr` | `/experimental/syscollector/netaddr` | 11 | offset, limit, sort, search, select, q, agents_list, proto, address, broadcast, netmask |
 | `expSyscollectorNetiface` | `/experimental/syscollector/netiface` | 21 | offset, limit, sort, search, select, q, agents_list, name, adapter, type, state, mtu, tx_packets, rx_packets, tx_bytes, rx_bytes, tx_errors, rx_errors, tx_dropped, rx_dropped, mac |
 | `expSyscollectorNetproto` | `/experimental/syscollector/netproto` | 7 | offset, limit, sort, search, select, q, agents_list |
@@ -113,6 +113,7 @@ These endpoints forward to Wazuh with no query parameters (path params only wher
 | `clusterLocalConfig` | `/cluster/local/config` | — |
 | `clusterRulesetSync` | `/cluster/ruleset/synchronization` | — |
 | `clusterApiConfig` | `/cluster/api/config` | — |
+| `clusterConfigValidation` | `/cluster/configuration/validation` | — |
 | `clusterNodeInfo` | `/cluster/{node_id}/info` | node_id |
 | `clusterNodeStats` | `/cluster/{node_id}/stats` | node_id |
 | `clusterNodeStatsHourly` | `/cluster/{node_id}/stats/hourly` | node_id |
@@ -204,4 +205,30 @@ Six issues identified during independent code review. All resolved.
 
 ## Verification
 
-All param counts in this document and in the `ENDPOINT_REGISTRY` in `server/wazuh/brokerCoverage.ts` have been verified using `scripts/verify-param-counts.mjs`, which cross-checks every broker-wired entry's `paramCount` against the actual `Object.keys(config.params).length` from `paramBroker.ts`. The script exits non-zero on any mismatch.
+All param counts in this document and in the `ENDPOINT_REGISTRY` in `server/wazuh/brokerCoverage.ts` have been verified using two independent scripts:
+
+**Broker Param Count Audit** (`scripts/verify-param-counts.mjs`): Cross-checks every broker-wired entry's `paramCount` against the actual `Object.keys(config.params).length` from `paramBroker.ts`. Handles both plain keys and quoted dotted keys (e.g., `"local.ip"`). Exits non-zero on any mismatch.
+
+```bash
+pnpm audit:broker
+```
+
+**OpenAPI Spec Diff** (`scripts/diff-wazuh-openapi.mjs`): Compares all GET endpoints in the Wazuh v4.14.3 OpenAPI spec (`spec/wazuh-api-v4.14.3.yaml`) against the `ENDPOINT_REGISTRY`. Fails if any spec endpoint is neither wired nor allowlisted. Uses `spec/openapi-allowlist.json` for intentional gaps.
+
+```bash
+pnpm audit:openapi
+```
+
+Both checks are enforced in CI via the `broker-registry` and `openapi-diff` jobs in `.github/workflows/ci.yml`. The build job depends on both passing.
+
+## OpenAPI Allowlist
+
+Three spec endpoints are intentionally excluded from the router:
+
+| Endpoint | Reason |
+|---|---|
+| `/agents/uninstall` | Write operation — violates read-only-by-default project constraint |
+| `/agents/{agent_id}/key` | Returns agent registration key — sensitive credential exposure |
+| `/security/user/authenticate` | Auth handled by Dang!'s own OAuth layer, not by proxying Wazuh tokens |
+
+Six registry endpoints are "extra" (not in the spec but supported at runtime): `/`, `/agents/{agent_id}`, and 4 security individual resource GETs (`/security/users/{user_id}`, `/security/roles/{role_id}`, `/security/policies/{policy_id}`, `/security/rules/{rule_id}`). The spec only defines PUT on these paths, but the Wazuh API accepts GET at runtime.

@@ -3529,3 +3529,42 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Ensure script exits non-zero on any mismatch (confirmed: process.exit(1) on mismatches > 0)
 - [x] Verify script runs correctly in CI-like environment (0 mismatches, exit 0)
 - [x] YAML validated: 7 jobs, broker-registry depends on typecheck, build depends on broker-registry
+
+## Sprint: Broker Governance Closure
+
+### Task 1: Promote 3 experimental syscollector endpoints to broker configs
+- [x] Add EXP_SYSCOLLECTOR_PACKAGES_CONFIG to paramBroker.ts (13 params)
+- [x] Add EXP_SYSCOLLECTOR_PROCESSES_CONFIG to paramBroker.ts (22 params)
+- [x] Add EXP_SYSCOLLECTOR_PORTS_CONFIG to paramBroker.ts (16 params)
+- [x] Rewire expSyscollectorPackages router procedure to use broker
+- [x] Rewire expSyscollectorProcesses router procedure to use broker
+- [x] Rewire expSyscollectorPorts router procedure to use broker
+- [x] Add all 3 to ENDPOINT_REGISTRY in brokerCoverage.ts
+- [x] verify-param-counts.mjs shows 0 mismatches (fixed regex for dotted keys, fixed 5 additional pre-existing mismatches)
+
+### Task 2: Tests for promoted endpoints
+- [x] Tests for expSyscollectorPackages broker config (7 tests)
+- [x] Tests for expSyscollectorProcesses broker config (9 tests)
+- [x] Tests for expSyscollectorPorts broker config (13 tests, including dotted key + alias tests)
+- [x] Full test suite passes (83 files, 2636 tests, 0 failures)
+
+### Task 3: Add pnpm audit:broker alias
+- [x] Add "audit:broker" script to package.json
+- [x] Update docs/broker-coverage-ledger.md with command reference + updated param counts + 3 promoted endpoints
+- [x] Verify pnpm audit:broker runs and exits correctly (0 mismatches)
+
+### Task 4: Wazuh OpenAPI spec diff detector
+- [x] Create scripts/diff-wazuh-openapi.mjs
+- [x] Support allowlist file (spec/openapi-allowlist.json) for 3 intentionally unsupported endpoints
+- [x] Output human-readable summary + JSON artifact (spec/openapi-diff-result.json)
+- [x] Fail on spec-only endpoints not in allowlist (exit 1)
+- [x] Wire into CI workflow (openapi-diff job, build depends on it)
+- [x] Add pnpm audit:openapi alias + docs reference in ledger
+- [x] Added clusterConfigValidation endpoint to router + registry
+- [x] Fixed agentGroupSync registry path from /agents/group/{group_id}/sync to /agents/{agent_id}/group/is_sync
+
+### Task 5: Regenerate proof artifacts
+- [x] Regenerate test-output/vitest.json (83 files, 2636 tests)
+- [x] Regenerate docs/ci-proof-artifact.md (matches vitest.json)
+- [x] Update docs/broker-coverage-ledger.md (clusterConfigValidation, agentGroupSync path fix, OpenAPI allowlist section, dual verification)
+- [x] Repackage clean source zip

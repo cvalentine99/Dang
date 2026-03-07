@@ -1,7 +1,7 @@
 {
-  "generated": "2026-03-07T12:14:48.693Z",
+  "generated": "2026-03-07T12:45:38.110Z",
   "callsiteCount": 169,
-  "procedureCount": 122,
+  "procedureCount": 123,
   "consumedProcedures": [
     "agentBrowserExtensions",
     "agentById",
@@ -1826,6 +1826,10 @@
       "keys": {}
     },
     "clusterApiConfig": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "clusterConfigValidation": {
       "inputType": "void",
       "keys": {}
     },

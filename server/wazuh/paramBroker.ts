@@ -1733,3 +1733,229 @@ export const EXPERIMENTAL_CISCAT_RESULTS_CONFIG: EndpointParamConfig = {
     },
   },
 };
+
+
+/**
+ * GET /experimental/syscollector/packages — Cross-agent packages
+ * Spec ref: operationId api.controllers.experimental_controller.get_packages_info
+ *
+ * Mirrors SYSCOLLECTOR_PACKAGES_CONFIG + agents_list for cross-agent queries.
+ */
+export const EXP_SYSCOLLECTOR_PACKAGES_CONFIG: EndpointParamConfig = {
+  endpoint: "/experimental/syscollector/packages",
+  params: {
+    // Universal params
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    // Cross-agent filter
+    agents_list: {
+      wazuhName: "agents_list",
+      description: "Comma-separated list of agent IDs to filter",
+      type: "csv",
+      aliases: ["agent_list"],
+    },
+    // Endpoint-specific field filters
+    vendor: {
+      wazuhName: "vendor",
+      description: "Filter by package vendor",
+      type: "string",
+    },
+    name: {
+      wazuhName: "name",
+      description: "Filter by package name",
+      type: "string",
+    },
+    architecture: {
+      wazuhName: "architecture",
+      description: "Filter by package architecture (e.g. x86_64, amd64)",
+      type: "string",
+    },
+    format: {
+      wazuhName: "format",
+      description: "Filter by package format (e.g. rpm, deb)",
+      type: "string",
+    },
+    version: {
+      wazuhName: "version",
+      description: "Filter by package version",
+      type: "string",
+    },
+  },
+};
+
+/**
+ * GET /experimental/syscollector/processes — Cross-agent processes
+ * Spec ref: operationId api.controllers.experimental_controller.get_processes_info
+ *
+ * Mirrors SYSCOLLECTOR_PROCESSES_CONFIG + agents_list for cross-agent queries.
+ */
+export const EXP_SYSCOLLECTOR_PROCESSES_CONFIG: EndpointParamConfig = {
+  endpoint: "/experimental/syscollector/processes",
+  params: {
+    // Universal params
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    // Cross-agent filter
+    agents_list: {
+      wazuhName: "agents_list",
+      description: "Comma-separated list of agent IDs to filter",
+      type: "csv",
+      aliases: ["agent_list"],
+    },
+    // Endpoint-specific field filters
+    pid: {
+      wazuhName: "pid",
+      description: "Filter by process PID",
+      type: "string",
+      aliases: ["process_pid"],
+    },
+    state: {
+      wazuhName: "state",
+      description: "Filter by process state (e.g. S, R, Z)",
+      type: "string",
+      aliases: ["process_state"],
+    },
+    ppid: {
+      wazuhName: "ppid",
+      description: "Filter by parent process PID",
+      type: "string",
+    },
+    egroup: {
+      wazuhName: "egroup",
+      description: "Filter by effective group",
+      type: "string",
+    },
+    euser: {
+      wazuhName: "euser",
+      description: "Filter by effective user",
+      type: "string",
+    },
+    fgroup: {
+      wazuhName: "fgroup",
+      description: "Filter by filesystem group",
+      type: "string",
+    },
+    name: {
+      wazuhName: "name",
+      description: "Filter by process name",
+      type: "string",
+      aliases: ["process_name"],
+    },
+    nlwp: {
+      wazuhName: "nlwp",
+      description: "Filter by number of lightweight processes (threads)",
+      type: "string",
+    },
+    pgrp: {
+      wazuhName: "pgrp",
+      description: "Filter by process group ID",
+      type: "string",
+    },
+    priority: {
+      wazuhName: "priority",
+      description: "Filter by scheduling priority",
+      type: "string",
+    },
+    rgroup: {
+      wazuhName: "rgroup",
+      description: "Filter by real group",
+      type: "string",
+    },
+    ruser: {
+      wazuhName: "ruser",
+      description: "Filter by real user",
+      type: "string",
+    },
+    sgroup: {
+      wazuhName: "sgroup",
+      description: "Filter by saved group",
+      type: "string",
+    },
+    suser: {
+      wazuhName: "suser",
+      description: "Filter by saved user",
+      type: "string",
+    },
+  },
+};
+
+/**
+ * GET /experimental/syscollector/ports — Cross-agent ports
+ * Spec ref: operationId api.controllers.experimental_controller.get_ports_info
+ *
+ * Mirrors SYSCOLLECTOR_PORTS_CONFIG + agents_list for cross-agent queries.
+ */
+export const EXP_SYSCOLLECTOR_PORTS_CONFIG: EndpointParamConfig = {
+  endpoint: "/experimental/syscollector/ports",
+  params: {
+    // Universal params
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    // Cross-agent filter
+    agents_list: {
+      wazuhName: "agents_list",
+      description: "Comma-separated list of agent IDs to filter",
+      type: "csv",
+      aliases: ["agent_list"],
+    },
+    // Endpoint-specific field filters
+    pid: {
+      wazuhName: "pid",
+      description: "Filter by PID",
+      type: "string",
+    },
+    protocol: {
+      wazuhName: "protocol",
+      description: "Filter by protocol (e.g. tcp, udp)",
+      type: "string",
+    },
+    "local.ip": {
+      wazuhName: "local.ip",
+      description: "Filter by local IP address",
+      type: "string",
+      aliases: ["local_ip"],
+    },
+    "local.port": {
+      wazuhName: "local.port",
+      description: "Filter by local port number",
+      type: "string",
+      aliases: ["local_port"],
+    },
+    "remote.ip": {
+      wazuhName: "remote.ip",
+      description: "Filter by remote IP address",
+      type: "string",
+      aliases: ["remote_ip"],
+    },
+    tx_queue: {
+      wazuhName: "tx_queue",
+      description: "Filter by TX queue",
+      type: "string",
+    },
+    state: {
+      wazuhName: "state",
+      description: "Filter by connection state (e.g. listening, established)",
+      type: "string",
+    },
+    process: {
+      wazuhName: "process",
+      description: "Filter by process name associated with port",
+      type: "string",
+    },
+  },
+};

@@ -48,6 +48,9 @@ import {
   SYSCOLLECTOR_HOTFIXES_CONFIG,
   SYSCOLLECTOR_NETPROTO_CONFIG,
   EXPERIMENTAL_CISCAT_RESULTS_CONFIG,
+  EXP_SYSCOLLECTOR_PACKAGES_CONFIG,
+  EXP_SYSCOLLECTOR_PROCESSES_CONFIG,
+  EXP_SYSCOLLECTOR_PORTS_CONFIG,
 } from "./paramBroker";
 import { generateCoverageReport } from "./brokerCoverage";
 
@@ -317,6 +320,9 @@ export const wazuhRouter = router({
 
   /** GET /cluster/api/config — Cluster API configuration (C-5 gap fill) */
   clusterApiConfig: wazuhProcedure.query(() => proxyGet("/cluster/api/config")),
+
+  /** GET /cluster/configuration/validation — Validate cluster node configs */
+  clusterConfigValidation: wazuhProcedure.query(() => proxyGet("/cluster/configuration/validation")),
 
   /** GET /manager/api/config — Manager API configuration (C-5 gap fill) */
   managerApiConfig: wazuhProcedure.query(() => proxyGet("/manager/api/config")),
@@ -1007,7 +1013,7 @@ export const wazuhRouter = router({
   // EXPERIMENTAL SYSCOLLECTOR — Cross-agent bulk endpoints (Sprint v2 P0)
   // ══════════════════════════════════════════════════════════════════════════════
 
-  /** GET /experimental/syscollector/packages — All packages across all agents */
+  /** GET /experimental/syscollector/packages — All packages across all agents (broker-wired) */
   expSyscollectorPackages: wazuhProcedure
     .input(paginationSchema.extend({
       search: z.string().optional(),
@@ -1023,24 +1029,14 @@ export const wazuhRouter = router({
       version: z.string().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input.limit) params.limit = String(input.limit);
-      if (input.offset) params.offset = String(input.offset);
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      if (input.sort) params.sort = input.sort;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      if (input.distinct !== undefined) params.distinct = String(input.distinct);
-      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
-      if (input.vendor) params.vendor = input.vendor;
-      if (input.name) params.name = input.name;
-      if (input.architecture) params.architecture = input.architecture;
-      if (input.format) params.format = input.format;
-      if (input.version) params.version = input.version;
-      return proxyGet("/experimental/syscollector/packages", params);
+      const { limit, offset, ...rest } = input;
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(EXP_SYSCOLLECTOR_PACKAGES_CONFIG, { limit, offset, ...rest });
+      if (errors.length) throw new TRPCError({ code: "BAD_REQUEST", message: errors.join("; ") });
+      if (unsupportedParams.length) throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params: ${unsupportedParams.join(", ")}` });
+      return proxyGet("/experimental/syscollector/packages", forwardedQuery);
     }),
 
-  /** GET /experimental/syscollector/processes — All processes across all agents */
+  /** GET /experimental/syscollector/processes — All processes across all agents (broker-wired) */
   expSyscollectorProcesses: wazuhProcedure
     .input(paginationSchema.extend({
       search: z.string().optional(),
@@ -1065,33 +1061,14 @@ export const wazuhRouter = router({
       suser: z.string().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input.limit) params.limit = String(input.limit);
-      if (input.offset) params.offset = String(input.offset);
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      if (input.sort) params.sort = input.sort;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      if (input.distinct !== undefined) params.distinct = String(input.distinct);
-      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
-      if (input.pid) params.pid = input.pid;
-      if (input.state) params.state = input.state;
-      if (input.ppid) params.ppid = input.ppid;
-      if (input.egroup) params.egroup = input.egroup;
-      if (input.euser) params.euser = input.euser;
-      if (input.fgroup) params.fgroup = input.fgroup;
-      if (input.name) params.name = input.name;
-      if (input.nlwp) params.nlwp = input.nlwp;
-      if (input.pgrp) params.pgrp = input.pgrp;
-      if (input.priority) params.priority = input.priority;
-      if (input.rgroup) params.rgroup = input.rgroup;
-      if (input.ruser) params.ruser = input.ruser;
-      if (input.sgroup) params.sgroup = input.sgroup;
-      if (input.suser) params.suser = input.suser;
-      return proxyGet("/experimental/syscollector/processes", params);
+      const { limit, offset, ...rest } = input;
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(EXP_SYSCOLLECTOR_PROCESSES_CONFIG, { limit, offset, ...rest });
+      if (errors.length) throw new TRPCError({ code: "BAD_REQUEST", message: errors.join("; ") });
+      if (unsupportedParams.length) throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params: ${unsupportedParams.join(", ")}` });
+      return proxyGet("/experimental/syscollector/processes", forwardedQuery);
     }),
 
-  /** GET /experimental/syscollector/ports — All ports across all agents */
+  /** GET /experimental/syscollector/ports — All ports across all agents (broker-wired) */
   expSyscollectorPorts: wazuhProcedure
     .input(paginationSchema.extend({
       search: z.string().optional(),
@@ -1110,24 +1087,11 @@ export const wazuhRouter = router({
       process: z.string().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input.limit) params.limit = String(input.limit);
-      if (input.offset) params.offset = String(input.offset);
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      if (input.sort) params.sort = input.sort;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      if (input.distinct !== undefined) params.distinct = String(input.distinct);
-      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
-      if (input.pid) params.pid = input.pid;
-      if (input.protocol) params.protocol = input.protocol;
-      if (input["local.ip"]) params["local.ip"] = input["local.ip"];
-      if (input["local.port"]) params["local.port"] = input["local.port"];
-      if (input["remote.ip"]) params["remote.ip"] = input["remote.ip"];
-      if (input.tx_queue) params.tx_queue = input.tx_queue;
-      if (input.state) params.state = input.state;
-      if (input.process) params.process = input.process;
-      return proxyGet("/experimental/syscollector/ports", params);
+      const { limit, offset, ...rest } = input;
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(EXP_SYSCOLLECTOR_PORTS_CONFIG, { limit, offset, ...rest });
+      if (errors.length) throw new TRPCError({ code: "BAD_REQUEST", message: errors.join("; ") });
+      if (unsupportedParams.length) throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params: ${unsupportedParams.join(", ")}` });
+      return proxyGet("/experimental/syscollector/ports", forwardedQuery);
     }),
 
   /** GET /experimental/syscollector/netaddr — All network addresses across all agents (M-17 expanded) */

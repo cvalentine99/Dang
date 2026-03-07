@@ -3,7 +3,8 @@
 #
 # Runs on every push (all branches) and pull request to main.
 # Steps: install → typecheck → test (with MySQL + JSON reporter) →
-#         contract audit → ui parity → ci-proof (consumes test artifact) → build
+#         contract audit → ui parity → broker registry → openapi diff →
+#         ci-proof (consumes test artifact) → build
 #
 # The ci-proof job does NOT re-run tests. It downloads the vitest.json
 # artifact produced by the test job (which has a real MySQL service) and
@@ -320,6 +321,51 @@ jobs:
           echo "- Source of truth: \`server/wazuh/paramBroker.ts\`" >> $GITHUB_STEP_SUMMARY
           echo "- Registry: \`server/wazuh/brokerCoverage.ts\`" >> $GITHUB_STEP_SUMMARY
 
+  # ── OpenAPI Spec Diff Guard ───────────────────────────────────────────────
+  #
+  # Compares all GET endpoints in the Wazuh v4.14.3 OpenAPI spec against
+  # the ENDPOINT_REGISTRY. Fails if any spec endpoint is neither wired
+  # nor allowlisted. Uses spec/openapi-allowlist.json for intentional gaps.
+  # ────────────────────────────────────────────────────────────────────────────
+  openapi-diff:
+    name: OpenAPI Spec Diff
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Verify OpenAPI spec coverage
+        run: node scripts/diff-wazuh-openapi.mjs
+
+      - name: OpenAPI diff summary
+        if: always()
+        run: |
+          echo "## OpenAPI Spec Diff" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> Compares Wazuh v4.14.3 OpenAPI spec GET endpoints against ENDPOINT_REGISTRY" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Script: \`scripts/diff-wazuh-openapi.mjs\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Spec: \`spec/wazuh-api-v4.14.3.yaml\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Allowlist: \`spec/openapi-allowlist.json\`" >> $GITHUB_STEP_SUMMARY
+          if [ -f spec/openapi-diff-result.json ]; then
+            COVERED=$(node -e "console.log(require('./spec/openapi-diff-result.json').covered)")
+            ALLOWLISTED=$(node -e "console.log(require('./spec/openapi-diff-result.json').allowlisted)")
+            MISSING=$(node -e "console.log(require('./spec/openapi-diff-result.json').missing.length)")
+            TOTAL=$(node -e "console.log(require('./spec/openapi-diff-result.json').specEndpoints)")
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Spec GET endpoints | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| Covered | $COVERED |" >> $GITHUB_STEP_SUMMARY
+            echo "| Allowlisted | $ALLOWLISTED |" >> $GITHUB_STEP_SUMMARY
+            echo "| Missing | $MISSING |" >> $GITHUB_STEP_SUMMARY
+          fi
+
   # ── CI Proof Artifact Generation ──────────────────────────────────────────
   #
   # This job does NOT re-run tests. It downloads the vitest.json artifact
@@ -410,7 +456,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [typecheck, test, contract-audit, ui-parity, ci-proof, broker-registry]
+    needs: [typecheck, test, contract-audit, ui-parity, ci-proof, broker-registry, openapi-diff]
     env:
       DATABASE_URL: "mysql://test:test@localhost:3306/test"
       JWT_SECRET: "ci-test-secret-not-for-production"
