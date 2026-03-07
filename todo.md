@@ -3650,3 +3650,12 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] DEFECT-3: etl-integration.test.ts added with 8 real DB tests: truncate→sync→verify rows, sync status metadata, rerun stability, invalid layer failure, per-layer sync, metadata contract verification
 - [x] DEFECT-4: Metadata contract narrowed in etlService.ts header comments — explicitly states what IS returned (specVersion, totalRecords, durationMs, per-layer results) and what is NOT (specHash, row-level diffs, incremental change sets)
 - [x] DEFECT-5: Single canonical spec: spec-v4.14.3.yaml at project root. spec/wazuh-api-v4.14.3.yaml is now a symlink. etlService.ts, seed-kg.mjs, etl.test.ts, and etl-integration.test.ts all use the root path.
+
+## ETL Recovery Sprint — Truth Audit Defects (Round 3)
+
+- [x] AUDIT-1: seed-kg.mjs line 78 hardcoded sync status replaced with `getLayerNames().length` (dynamic)
+- [x] AUDIT-2: spec/wazuh-api-v4.14.3.yaml is a symlink (was already a symlink in filesystem; zip must use --symlinks to preserve)
+- [x] AUDIT-3: Proof regenerated from fresh vitest.json — machine-generated counts: 85 files, 2667 tests, 0 failures
+- [x] AUDIT-4: endpointIds type contract documented in kgTypes.ts + 3 type contract tests in etl.test.ts
+- [x] AUDIT-5: generate-ci-proof.mjs now verifies symlink + checks for hardcoded magic numbers before generating proof
+- [x] AUDIT-6: All counts below pulled from machine-generated ci-proof-artifact.md

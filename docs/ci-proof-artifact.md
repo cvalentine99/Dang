@@ -10,22 +10,22 @@
 | Field | Value |
 |-------|-------|
 | JSON artifact | `test-output/vitest.json` |
-| Generated at | 2026-03-07T12:45:57.727Z |
-| Test run started | 2026-03-07T12:45:21.206Z |
+| Generated at | 2026-03-07T16:55:57.666Z |
+| Test run started | 2026-03-07T16:53:51.098Z |
 | Overall success | true |
 
 ## Summary
 
 | Metric | Count |
 |--------|-------|
-| Test files | 83 |
-| Passed files | 83 |
+| Test files | 85 |
+| Passed files | 85 |
 | Failed files | 0 |
-| Describe blocks (vitest suites) | 704 |
-| Passed suites | 704 |
+| Describe blocks (vitest suites) | 716 |
+| Passed suites | 716 |
 | Failed suites | 0 |
-| Total tests | 2636 |
-| Passed tests | 2636 |
+| Total tests | 2667 |
+| Passed tests | 2667 |
 | Failed tests | 0 |
 
 ## Per-File Breakdown
@@ -66,6 +66,8 @@
 | PASS | `server/final-wiring-sprint.test.ts` | 63 | 63 | 0 |
 | PASS | `server/graph/agenticGates.test.ts` | 37 | 37 | 0 |
 | PASS | `server/graph/agentIntrospection.test.ts` | 10 | 10 | 0 |
+| PASS | `server/graph/etl-integration.test.ts` | 8 | 8 | 0 |
+| PASS | `server/graph/etl.test.ts` | 23 | 23 | 0 |
 | PASS | `server/graph/graph.test.ts` | 23 | 23 | 0 |
 | PASS | `server/graph/investigations.schema.test.ts` | 32 | 32 | 0 |
 | PASS | `server/graph/kg-hydration.test.ts` | 31 | 31 | 0 |

@@ -15,7 +15,7 @@
  *   pnpm proof:generate
  */
 
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, lstatSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -24,7 +24,35 @@ const ROOT = join(__dirname, "..");
 const JSON_PATH = join(ROOT, "test-output", "vitest.json");
 const MD_PATH = join(ROOT, "docs", "ci-proof-artifact.md");
 
-// ── Load vitest.json ────────────────────────────────────────────────────────
+// ── Self-enforcing structural checks ─────────────────────────────────────────────────
+const SPEC_SYMLINK_PATH = join(ROOT, "spec", "wazuh-api-v4.14.3.yaml");
+try {
+  const stat = lstatSync(SPEC_SYMLINK_PATH);
+  if (!stat.isSymbolicLink()) {
+    console.error("PROOF FAIL: spec/wazuh-api-v4.14.3.yaml is NOT a symlink.");
+    console.error("Fix: rm spec/wazuh-api-v4.14.3.yaml && ln -s ../spec-v4.14.3.yaml spec/wazuh-api-v4.14.3.yaml");
+    process.exit(1);
+  }
+  console.log("✓ spec/wazuh-api-v4.14.3.yaml is a symlink (canonical spec source verified)");
+} catch {
+  console.error("PROOF FAIL: spec/wazuh-api-v4.14.3.yaml does not exist.");
+  process.exit(1);
+}
+
+const SEED_PATH = join(ROOT, "seed-kg.mjs");
+try {
+  const seedContent = readFileSync(SEED_PATH, "utf-8");
+  if (seedContent.includes("Sync status:    4") || seedContent.includes("Sync status: 4")) {
+    console.error("PROOF FAIL: seed-kg.mjs contains hardcoded sync status count.");
+    console.error("Fix: replace with dynamic count from getLayerNames().length");
+    process.exit(1);
+  }
+  console.log("✓ seed-kg.mjs has no hardcoded sync status magic numbers");
+} catch {
+  console.error("WARNING: seed-kg.mjs not found (non-fatal for proof generation)");
+}
+
+// ── Load vitest.json ────────────────────────────────────────────────────────────────
 let raw;
 try {
   raw = readFileSync(JSON_PATH, "utf-8");

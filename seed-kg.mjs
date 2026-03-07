@@ -80,10 +80,11 @@ console.log(`[seed-kg] Use cases:      ${data.useCases.length}`);
 console.log(`[seed-kg] Indices:        ${data.indices.length}`);
 console.log(`[seed-kg] Fields:         ${data.fields.length}`);
 console.log(`[seed-kg] Error patterns: ${data.errorPatterns.length}`);
-console.log(`[seed-kg] Sync status:    4`);
+const layerCount = getLayerNames().length;
+console.log(`[seed-kg] Sync status:    ${layerCount}`);
 const total = data.endpoints.length + data.parameters.length + data.responses.length +
   data.authMethods.length + data.resources.length + data.useCases.length +
-  data.indices.length + data.fields.length + data.errorPatterns.length + 4;
+  data.indices.length + data.fields.length + data.errorPatterns.length + layerCount;
 console.log(`[seed-kg] TOTAL:          ${total}`);
 
 if (DRY_RUN) {

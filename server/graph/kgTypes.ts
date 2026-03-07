@@ -96,6 +96,27 @@ export interface KgExtractionResult {
   errorPatterns: KgErrorPattern[];
 }
 
+// ── endpointIds Type Contract ───────────────────────────────────────────────
+//
+// Two tables store "endpointIds" with DIFFERENT types. This is intentional:
+//
+//   kg_use_cases.endpoint_ids: string[]
+//     Stores endpoint PATH identifiers, e.g. ["GET:/agents", "PUT:/agents/{agent_id}"]
+//     Used for semantic/display purposes — maps use cases to human-readable endpoint keys.
+//     Populated by kgExtractor.extract() from static use case definitions.
+//
+//   kg_answer_provenance.endpoint_ids: number[]
+//     Stores DB row IDs (kg_endpoints.id auto-increment integers).
+//     Used for traceability/provenance — links agentic pipeline answers to specific
+//     endpoint records. Populated at runtime by graphQueryService when recording
+//     which endpoints contributed to an answer.
+//
+// The transformation from number (DB id) → string (path) happens in
+// graphQueryService.getEndpointsByIds(). Never assume they're the same type.
+//
+// See also: drizzle/schema.ts (kgUseCases vs kgAnswerProvenance)
+// ────────────────────────────────────────────────────────────────────────────
+
 // ── Sync status (matches kg_sync_status schema) ─────────────────────────────
 
 export type KgLayerName =

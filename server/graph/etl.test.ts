@@ -318,3 +318,52 @@ describe("ETL — Canonical Spec Source", () => {
     expect(Object.keys(spec.paths).length).toBeGreaterThan(50);
   });
 });
+
+// ── 7. endpointIds Type Contract ──────────────────────────────────────────
+
+describe("ETL — endpointIds Type Contract", () => {
+  it("kg_use_cases stores endpoint PATH strings (string[]), not DB row IDs", async () => {
+    const { extract } = await import("./kgExtractor");
+    const specRaw = readFileSync(SPEC_PATH, "utf8");
+    const spec = yaml.load(specRaw) as any;
+    const data = extract(spec);
+
+    // Every use case's endpointIds should be string[]
+    for (const uc of data.useCases) {
+      expect(Array.isArray(uc.endpoint_ids)).toBe(true);
+      for (const id of uc.endpoint_ids) {
+        expect(typeof id).toBe("string");
+        // Should look like "GET:/agents" or "PUT:/agents/{agent_id}"
+        expect(id).toMatch(/^(GET|POST|PUT|DELETE|PATCH):/);
+      }
+    }
+  });
+
+  it("kg_answer_provenance expects DB row IDs (number[]), documented in kgTypes.ts", async () => {
+    // This test validates the documentation exists and the type contract is clear.
+    // kg_answer_provenance.endpoint_ids stores auto-increment integer IDs from kg_endpoints.id.
+    // We verify the Drizzle schema declares number[] for this column.
+    const schemaPath = resolve(__dirname, "../../drizzle/schema.ts");
+    const schemaContent = readFileSync(schemaPath, "utf8");
+
+    // Find the kgAnswerProvenance table definition
+    const provenanceMatch = schemaContent.match(/kgAnswerProvenance[\s\S]*?endpointIds.*?\$type<(.*?)>/);
+    expect(provenanceMatch).not.toBeNull();
+    expect(provenanceMatch![1]).toBe("number[]");
+
+    // Find the kgUseCases table definition
+    const useCaseMatch = schemaContent.match(/kgUseCases[\s\S]*?endpointIds.*?\$type<(.*?)>/);
+    expect(useCaseMatch).not.toBeNull();
+    expect(useCaseMatch![1]).toBe("string[]");
+  });
+
+  it("type contract documentation exists in kgTypes.ts", () => {
+    const typesPath = resolve(__dirname, "./kgTypes.ts");
+    const typesContent = readFileSync(typesPath, "utf8");
+
+    expect(typesContent).toContain("endpointIds Type Contract");
+    expect(typesContent).toContain("kg_use_cases.endpoint_ids: string[]");
+    expect(typesContent).toContain("kg_answer_provenance.endpoint_ids: number[]");
+    expect(typesContent).toContain("Never assume they're the same type");
+  });
+});
