@@ -1,14 +1,14 @@
 {
-  "timestamp": "2026-03-07T12:45:56.950Z",
+  "timestamp": "2026-03-07T13:02:13.164Z",
   "specFile": "/home/ubuntu/dang/spec/wazuh-api-v4.14.3.yaml",
   "specGetEndpoints": 115,
   "registryEndpoints": 118,
-  "allowlistedEndpoints": 3,
   "summary": {
     "covered": 112,
-    "allowlisted": 3,
+    "excluded": 3,
     "missing": 0,
-    "extraInRegistry": 6
+    "documentedExtras": 6,
+    "undocumentedExtras": 0
   },
   "covered": [
     "/agents",
@@ -124,7 +124,7 @@
     "/syscollector/{agent_id}/users",
     "/tasks/status"
   ],
-  "allowlisted": [
+  "excluded": [
     {
       "specPath": "/agents/uninstall",
       "reason": "Write operation — violates read-only-by-default project constraint. Agent uninstall is a destructive action."
@@ -139,12 +139,31 @@
     }
   ],
   "missing": [],
-  "extraInRegistry": [
-    "/",
-    "/agents/{agent_id}",
-    "/security/policies/{policy_id}",
-    "/security/roles/{role_id}",
-    "/security/rules/{rule_id}",
-    "/security/users/{user_id}"
-  ]
+  "documentedExtras": [
+    {
+      "path": "/",
+      "reason": "Root API info endpoint. Returns Wazuh server metadata (version, cluster name). Not in spec but supported at runtime."
+    },
+    {
+      "path": "/agents/{agent_id}",
+      "reason": "Single-agent detail fetch by ID. The spec lists /agents with agent filtering, but the direct ID path works at runtime and is more ergonomic for detail views."
+    },
+    {
+      "path": "/security/policies/{policy_id}",
+      "reason": "Individual policy retrieval. Same pattern — spec has PUT only, runtime supports GET. Added as C-4 convenience endpoint."
+    },
+    {
+      "path": "/security/roles/{role_id}",
+      "reason": "Individual role retrieval. Same as users — spec has PUT only, runtime supports GET. Added as C-4 convenience endpoint."
+    },
+    {
+      "path": "/security/rules/{rule_id}",
+      "reason": "Individual RBAC rule retrieval. Same pattern — spec has PUT only, runtime supports GET. Added as C-4 convenience endpoint."
+    },
+    {
+      "path": "/security/users/{user_id}",
+      "reason": "Individual user retrieval. The spec only defines PUT on this path, but Wazuh accepts GET at runtime. Added as C-4 convenience endpoint."
+    }
+  ],
+  "undocumentedExtras": []
 }

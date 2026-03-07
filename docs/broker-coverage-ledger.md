@@ -3,7 +3,19 @@
 **Spec baseline:** Wazuh REST API OpenAPI v4.14.3-rc3
 **Last updated:** Broker governance closure sprint (2026-03-07)
 
-This document is the single source of truth for which Wazuh API endpoints are broker-wired, what parameters each broker config accepts, and which endpoints remain manually wired or passthrough. Every param count listed here has been machine-verified against the actual `paramBroker.ts` config objects using `scripts/verify-param-counts.mjs`.
+This document is the single source of truth for which Wazuh API endpoints are broker-wired, what parameters each broker config accepts, and which endpoints remain manually wired or passthrough.
+
+## Audit Guarantee Matrix
+
+Three independent checks enforce different layers of correctness. No single check alone proves full per-endpoint spec-param parity.
+
+| Check | Command | What It Proves | What It Does NOT Prove |
+|---|---|---|---|
+| Broker param count audit | `pnpm audit:broker` | Every broker-wired entry's `paramCount` in the registry matches the actual `Object.keys(config.params).length` in `paramBroker.ts` | That every spec-defined parameter for that endpoint is modeled |
+| OpenAPI spec diff | `pnpm audit:openapi` | Every spec GET path is either wired in the registry or explicitly excluded; every extra registry path is documented | That the wired endpoint forwards all spec parameters |
+| Vitest suite | `pnpm test` | Broker configs accept, coerce, and forward parameters correctly; unsupported params are rejected | Full integration parity with a live Wazuh instance |
+
+Together they provide: endpoint inventory coverage (openapi), registry-to-config consistency (broker), and behavioral correctness (vitest). Full per-endpoint spec-param parity would require a fourth check that diffs each endpoint's spec parameters against its broker config — that does not exist yet.
 
 ## Broker-Wired Endpoints (36 configs)
 
@@ -203,9 +215,7 @@ Six issues identified during independent code review. All resolved.
 | 5 | Moderate | `status` CSV array blocked by Zod schema | Agents Zod schema updated to accept `z.array(z.string())` for status. Broker CSV capability now reachable from router. |
 | 6 | Low | `level` in RULES_CONFIG had type `"string"` but accepted numbers | Custom `serialize()` on level handles both number and string input. NaN produces error. |
 
-## Verification
-
-All param counts in this document and in the `ENDPOINT_REGISTRY` in `server/wazuh/brokerCoverage.ts` have been verified using two independent scripts:
+## Verification Scripts
 
 **Broker Param Count Audit** (`scripts/verify-param-counts.mjs`): Cross-checks every broker-wired entry's `paramCount` against the actual `Object.keys(config.params).length` from `paramBroker.ts`. Handles both plain keys and quoted dotted keys (e.g., `"local.ip"`). Exits non-zero on any mismatch.
 
@@ -213,7 +223,7 @@ All param counts in this document and in the `ENDPOINT_REGISTRY` in `server/wazu
 pnpm audit:broker
 ```
 
-**OpenAPI Spec Diff** (`scripts/diff-wazuh-openapi.mjs`): Compares all GET endpoints in the Wazuh v4.14.3 OpenAPI spec (`spec/wazuh-api-v4.14.3.yaml`) against the `ENDPOINT_REGISTRY`. Fails if any spec endpoint is neither wired nor allowlisted. Uses `spec/openapi-allowlist.json` for intentional gaps.
+**OpenAPI Spec Diff** (`scripts/diff-wazuh-openapi.mjs`): Compares all GET endpoints in the Wazuh v4.14.3 OpenAPI spec against the `ENDPOINT_REGISTRY`. Enforces two guarantees: (1) every spec GET path is either wired or excluded, and (2) every extra registry path not in the spec is documented. Exits non-zero on any violation.
 
 ```bash
 pnpm audit:openapi
@@ -221,9 +231,11 @@ pnpm audit:openapi
 
 Both checks are enforced in CI via the `broker-registry` and `openapi-diff` jobs in `.github/workflows/ci.yml`. The build job depends on both passing.
 
-## OpenAPI Allowlist
+## Endpoint Governance
 
-Three spec endpoints are intentionally excluded from the router:
+### Excluded Spec Endpoints (intentionally not wired)
+
+Three spec GET endpoints are intentionally excluded from the router:
 
 | Endpoint | Reason |
 |---|---|
@@ -231,4 +243,27 @@ Three spec endpoints are intentionally excluded from the router:
 | `/agents/{agent_id}/key` | Returns agent registration key — sensitive credential exposure |
 | `/security/user/authenticate` | Auth handled by Dang!'s own OAuth layer, not by proxying Wazuh tokens |
 
-Six registry endpoints are "extra" (not in the spec but supported at runtime): `/`, `/agents/{agent_id}`, and 4 security individual resource GETs (`/security/users/{user_id}`, `/security/roles/{role_id}`, `/security/policies/{policy_id}`, `/security/rules/{rule_id}`). The spec only defines PUT on these paths, but the Wazuh API accepts GET at runtime.
+### Extra Registry Endpoints (not in spec, intentional)
+
+Six registry endpoints exist in the router but are NOT defined as GET in the Wazuh v4.14.3 OpenAPI spec. Each is intentional and documented:
+
+| Endpoint | Reason |
+|---|---|
+| `/` | Root API info endpoint. Returns Wazuh server metadata (version, cluster name). Not in spec but supported at runtime. |
+| `/agents/{agent_id}` | Single-agent detail fetch by ID. The spec lists `/agents` with agent filtering, but the direct ID path works at runtime and is more ergonomic for detail views. |
+| `/security/users/{user_id}` | Individual user retrieval. The spec only defines PUT on this path, but Wazuh accepts GET at runtime. Added as C-4 convenience endpoint. |
+| `/security/roles/{role_id}` | Individual role retrieval. Same as users — spec has PUT only, runtime supports GET. Added as C-4 convenience endpoint. |
+| `/security/policies/{policy_id}` | Individual policy retrieval. Same pattern — spec has PUT only, runtime supports GET. Added as C-4 convenience endpoint. |
+| `/security/rules/{rule_id}` | Individual RBAC rule retrieval. Same pattern — spec has PUT only, runtime supports GET. Added as C-4 convenience endpoint. |
+
+These are governed by `spec/openapi-allowlist.json` under the `"extra"` key. The `pnpm audit:openapi` script fails if any extra registry endpoint is not documented there.
+
+### Current Inventory Summary
+
+| Category | Count |
+|---|---|
+| Spec GET endpoints | 115 |
+| Wired in registry | 112 |
+| Excluded (allowlisted) | 3 |
+| Missing | 0 |
+| Extra (documented) | 6 |

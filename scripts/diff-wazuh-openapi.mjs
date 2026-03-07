@@ -3,12 +3,22 @@
  * diff-wazuh-openapi.mjs
  *
  * Compares the Wazuh OpenAPI spec (GET endpoints only) against the
- * ENDPOINT_REGISTRY in brokerCoverage.ts and the allowlist in
+ * ENDPOINT_REGISTRY in brokerCoverage.ts and the governance file at
  * spec/openapi-allowlist.json.
  *
+ * Guarantees:
+ *   - Endpoint inventory coverage: every spec GET path is either
+ *     wired in the registry OR listed in the "excluded" allowlist.
+ *   - Extra-endpoint governance: every registry path that is NOT in
+ *     the spec must be documented in the "extra" section of the
+ *     allowlist. Undocumented extras fail the check.
+ *
+ * This script does NOT verify per-endpoint parameter parity.
+ * For param-count consistency, see scripts/verify-param-counts.mjs.
+ *
  * Exit codes:
- *   0 — all spec GET endpoints are either wired or allowlisted
- *   1 — one or more spec GET endpoints are missing from both
+ *   0 — all checks pass
+ *   1 — one or more spec endpoints are missing, or undocumented extras exist
  *
  * Usage:
  *   node scripts/diff-wazuh-openapi.mjs [--spec path/to/spec.yaml]
@@ -46,31 +56,26 @@ const specSrc = readFileSync(specPath, "utf8");
 
 // Parse paths from the OpenAPI YAML spec.
 // Paths are at 2-space indent under 'paths:', methods at 4-space indent.
-// We split on lines that start with exactly 2 spaces + '/' (path definitions).
 const specGetPaths = new Set();
 
-// Find the 'paths:' section
 const pathsSectionIdx = specSrc.indexOf("\npaths:");
 if (pathsSectionIdx === -1) {
   console.error("ERROR: Could not find 'paths:' section in spec");
   process.exit(1);
 }
 const pathsSection = specSrc.substring(pathsSectionIdx);
-
-// Split on path definitions (2-space indent + /path:)
 const pathBlocks = pathsSection.split(/\n(?=  \/[^\s])/g);
 
 for (const block of pathBlocks) {
   const pathMatch = block.match(/^  (\/[^\s:]+):/m);
   if (!pathMatch) continue;
   const path = pathMatch[1];
-  // Check if this path block contains a 'get:' method at 4-space indent
   if (/^    get:/m.test(block)) {
     specGetPaths.add(path);
   }
 }
 
-console.log(`\n=== Wazuh OpenAPI Spec Diff ===\n`);
+console.log(`\n=== Wazuh OpenAPI Spec Diff ===`);
 console.log(`Spec: ${specPath}`);
 console.log(`Spec GET endpoints: ${specGetPaths.size}`);
 
@@ -90,22 +95,23 @@ while ((match = registryRegex.exec(coverageSrc)) !== null) {
 
 console.log(`Registry endpoints: ${registryPaths.size}`);
 
-// ── Load allowlist ──────────────────────────────────────────────────────────
+// ── Load governance file ────────────────────────────────────────────────────
 const allowlistPath = resolve(projectRoot, "spec/openapi-allowlist.json");
-let allowlist = { endpoints: [], reasons: {} };
+let governance = { excluded: { endpoints: [], reasons: {} }, extra: { endpoints: [], reasons: {} } };
 if (existsSync(allowlistPath)) {
   try {
-    allowlist = JSON.parse(readFileSync(allowlistPath, "utf8"));
+    governance = JSON.parse(readFileSync(allowlistPath, "utf8"));
   } catch (e) {
     console.error(`WARNING: Could not parse ${allowlistPath}: ${e.message}`);
   }
 }
-const allowedPaths = new Set(allowlist.endpoints || []);
-console.log(`Allowlisted endpoints: ${allowedPaths.size}`);
+
+const excludedPaths = new Set(governance.excluded?.endpoints || []);
+const documentedExtras = new Set(governance.extra?.endpoints || []);
+console.log(`Excluded (allowlisted): ${excludedPaths.size}`);
+console.log(`Documented extras: ${documentedExtras.size}`);
 
 // ── Normalize path params for comparison ────────────────────────────────────
-// Spec uses {agent_id}, registry might use {agent_id} — they should match.
-// But some spec paths use different param names. Normalize all {xxx} to {*}.
 function normalizePath(p) {
   return p.replace(/\{[^}]+\}/g, "{*}");
 }
@@ -115,55 +121,82 @@ for (const p of registryPaths) {
   normalizedRegistry.set(normalizePath(p), p);
 }
 
-const normalizedAllowlist = new Map();
-for (const p of allowedPaths) {
-  normalizedAllowlist.set(normalizePath(p), p);
+const normalizedExcluded = new Map();
+for (const p of excludedPaths) {
+  normalizedExcluded.set(normalizePath(p), p);
 }
 
-// ── Diff ────────────────────────────────────────────────────────────────────
+const normalizedDocExtras = new Map();
+for (const p of documentedExtras) {
+  normalizedDocExtras.set(normalizePath(p), p);
+}
+
+// ── Diff: spec coverage ─────────────────────────────────────────────────────
 const covered = [];
 const allowlisted = [];
 const missing = [];
-const extraInRegistry = [];
 
-for (const specPath of [...specGetPaths].sort()) {
-  const norm = normalizePath(specPath);
+for (const sp of [...specGetPaths].sort()) {
+  const norm = normalizePath(sp);
   if (normalizedRegistry.has(norm)) {
-    covered.push({ specPath, registryPath: normalizedRegistry.get(norm) });
-  } else if (normalizedAllowlist.has(norm)) {
-    const reason = allowlist.reasons?.[specPath] || allowlist.reasons?.[normalizedAllowlist.get(norm)] || "No reason given";
-    allowlisted.push({ specPath, reason });
+    covered.push({ specPath: sp, registryPath: normalizedRegistry.get(norm) });
+  } else if (normalizedExcluded.has(norm)) {
+    const reason = governance.excluded?.reasons?.[sp]
+      || governance.excluded?.reasons?.[normalizedExcluded.get(norm)]
+      || "No reason given";
+    allowlisted.push({ specPath: sp, reason });
   } else {
-    missing.push(specPath);
+    missing.push(sp);
   }
 }
 
-// Check for registry paths not in spec (extra endpoints we added)
+// ── Diff: extra-endpoint governance ─────────────────────────────────────────
+const documentedExtraList = [];
+const undocumentedExtraList = [];
+
 for (const regPath of [...registryPaths].sort()) {
   const norm = normalizePath(regPath);
-  let found = false;
-  for (const specPath of specGetPaths) {
-    if (normalizePath(specPath) === norm) {
-      found = true;
+  let inSpec = false;
+  for (const sp of specGetPaths) {
+    if (normalizePath(sp) === norm) {
+      inSpec = true;
       break;
     }
   }
-  if (!found && !regPath.startsWith("N/A")) {
-    extraInRegistry.push(regPath);
+  if (!inSpec && !regPath.startsWith("N/A")) {
+    if (normalizedDocExtras.has(norm)) {
+      const reason = governance.extra?.reasons?.[regPath]
+        || governance.extra?.reasons?.[normalizedDocExtras.get(norm)]
+        || "No reason given";
+      documentedExtraList.push({ path: regPath, reason });
+    } else {
+      undocumentedExtraList.push(regPath);
+    }
   }
 }
 
 // ── Output ──────────────────────────────────────────────────────────────────
-console.log(`\n--- Coverage Summary ---`);
-console.log(`  Covered by registry: ${covered.length}`);
-console.log(`  Allowlisted (intentionally skipped): ${allowlisted.length}`);
-console.log(`  MISSING (not wired, not allowlisted): ${missing.length}`);
-console.log(`  Extra in registry (not in spec): ${extraInRegistry.length}`);
+console.log(`\n--- Spec Coverage ---`);
+console.log(`  Wired in registry: ${covered.length}`);
+console.log(`  Excluded (allowlisted): ${allowlisted.length}`);
+console.log(`  MISSING (not wired, not excluded): ${missing.length}`);
+
+console.log(`\n--- Extra-Endpoint Governance ---`);
+console.log(`  Documented extras: ${documentedExtraList.length}`);
+console.log(`  UNDOCUMENTED extras: ${undocumentedExtraList.length}`);
 
 if (allowlisted.length > 0) {
-  console.log(`\n--- Allowlisted Endpoints ---`);
-  for (const { specPath, reason } of allowlisted) {
-    console.log(`  ✓ ${specPath}`);
+  console.log(`\n--- Excluded Endpoints (intentionally not wired) ---`);
+  for (const { specPath: sp, reason } of allowlisted) {
+    console.log(`  ✓ ${sp}`);
+    console.log(`    Reason: ${reason}`);
+  }
+}
+
+if (documentedExtraList.length > 0) {
+  console.log(`\n--- Documented Extra Endpoints (not in spec, intentional) ---`);
+  for (const { path, reason } of documentedExtraList) {
+    console.log(`  ✓ ${path}`);
     console.log(`    Reason: ${reason}`);
   }
 }
@@ -175,11 +208,12 @@ if (missing.length > 0) {
   }
 }
 
-if (extraInRegistry.length > 0) {
-  console.log(`\n--- Extra in Registry (INFO) ---`);
-  for (const p of extraInRegistry) {
-    console.log(`  ℹ ${p}`);
+if (undocumentedExtraList.length > 0) {
+  console.log(`\n--- UNDOCUMENTED Extra Endpoints (FAIL) ---`);
+  for (const p of undocumentedExtraList) {
+    console.log(`  ✗ ${p}`);
   }
+  console.log(`  → Add these to spec/openapi-allowlist.json "extra" section with reasons.`);
 }
 
 // ── Write JSON artifact ─────────────────────────────────────────────────────
@@ -188,17 +222,18 @@ const artifact = {
   specFile: specPath,
   specGetEndpoints: specGetPaths.size,
   registryEndpoints: registryPaths.size,
-  allowlistedEndpoints: allowedPaths.size,
   summary: {
     covered: covered.length,
-    allowlisted: allowlisted.length,
+    excluded: allowlisted.length,
     missing: missing.length,
-    extraInRegistry: extraInRegistry.length,
+    documentedExtras: documentedExtraList.length,
+    undocumentedExtras: undocumentedExtraList.length,
   },
   covered: covered.map(c => c.specPath),
-  allowlisted: allowlisted,
+  excluded: allowlisted,
   missing: missing,
-  extraInRegistry: extraInRegistry,
+  documentedExtras: documentedExtraList,
+  undocumentedExtras: undocumentedExtraList,
 };
 
 const artifactPath = resolve(projectRoot, "spec/openapi-diff-result.json");
@@ -206,11 +241,20 @@ writeFileSync(artifactPath, JSON.stringify(artifact, null, 2) + "\n");
 console.log(`\nArtifact written to: ${artifactPath}`);
 
 // ── Exit code ───────────────────────────────────────────────────────────────
+const failures = [];
 if (missing.length > 0) {
-  console.log(`\n❌ FAIL: ${missing.length} spec endpoint(s) not wired and not allowlisted.`);
-  console.log(`   Add them to the router or to spec/openapi-allowlist.json with a reason.`);
+  failures.push(`${missing.length} spec endpoint(s) not wired and not excluded`);
+}
+if (undocumentedExtraList.length > 0) {
+  failures.push(`${undocumentedExtraList.length} extra registry endpoint(s) not documented`);
+}
+
+if (failures.length > 0) {
+  console.log(`\n❌ FAIL: ${failures.join("; ")}.`);
+  console.log(`   Fix: wire missing endpoints or update spec/openapi-allowlist.json.`);
   process.exit(1);
 } else {
-  console.log(`\n✅ PASS: All ${specGetPaths.size} spec GET endpoints are covered or allowlisted.`);
+  console.log(`\n✅ PASS: ${covered.length} wired + ${allowlisted.length} excluded = ${covered.length + allowlisted.length}/${specGetPaths.size} spec endpoints accounted for.`);
+  console.log(`   ${documentedExtraList.length} extra registry endpoint(s) documented.`);
   process.exit(0);
 }

@@ -3568,3 +3568,9 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Regenerate docs/ci-proof-artifact.md (matches vitest.json)
 - [x] Update docs/broker-coverage-ledger.md (clusterConfigValidation, agentGroupSync path fix, OpenAPI allowlist section, dual verification)
 - [x] Repackage clean source zip
+
+## Truth Framing Corrections (accepted with wording correction)
+- [x] Document the 6 "extra in registry" endpoints explicitly in allowlist (spec/openapi-allowlist.json "extra" section) and ledger
+- [x] Clarify audit guarantee framing: added Audit Guarantee Matrix to ledger header with 3-column What It Proves / What It Does NOT Prove table
+- [x] Stop saying "115/115 spec coverage" — diff script now outputs "112 wired + 3 excluded = 115/115 spec endpoints accounted for. 6 extra registry endpoint(s) documented."
+- [x] Repackage clean source zip
