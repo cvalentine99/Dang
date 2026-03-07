@@ -187,6 +187,7 @@ CREATE TABLE IF NOT EXISTS `kg_parameters` (
   `required` int NOT NULL DEFAULT 0,
   `param_type` varchar(32) NOT NULL,
   `description` text,
+  `app_aliases` json,
   `created_at` timestamp NOT NULL DEFAULT (now()),
   CONSTRAINT `kg_parameters_id` PRIMARY KEY(`id`)
 );
@@ -306,6 +307,8 @@ CREATE TABLE IF NOT EXISTS `kg_sync_status` (
   `error_message` text,
   `duration_ms` int,
   `spec_version` varchar(32),
+  `evidence` json,
+  `timeline` json,
   `updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT `kg_sync_status_id` PRIMARY KEY(`id`),
   CONSTRAINT `kg_sync_status_layer_unique` UNIQUE(`layer`)
