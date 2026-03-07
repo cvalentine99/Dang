@@ -42,17 +42,34 @@ fi
 
 # ── Run migrations if requested ──────────────────────────────────────────────
 if [ "$RUN_MIGRATIONS" = "true" ] && [ -n "$DATABASE_URL" ]; then
-  # Pre-migration repair: drop stale indexes from partially-applied migrations
+  # Step 1: Pre-migration repair — drop stale indexes from partially-applied migrations
   # This handles the MySQL 8.0 limitation where CREATE INDEX (without IF NOT EXISTS)
   # fails on re-run if the previous attempt partially completed
   echo "[entrypoint] Running pre-migration repair..."
   node scripts/docker-pre-migrate.mjs 2>&1 || echo "[entrypoint] WARNING: Pre-migration repair had issues, continuing..."
 
-  echo "[entrypoint] Running database migrations..."
-  npx drizzle-kit migrate 2>&1 || echo "[entrypoint] WARNING: Migration failed, continuing..."
-  echo "[entrypoint] Migrations complete."
+  # Step 2: Backfill migration journal — ensures all previously-applied migrations
+  # are recorded in __drizzle_migrations so drizzle-kit doesn't try to re-apply them.
+  # This is idempotent: it only inserts entries that are missing.
+  echo "[entrypoint] Checking migration journal integrity..."
+  node scripts/backfill-migrations.mjs 2>&1 || echo "[entrypoint] WARNING: Migration journal backfill had issues, continuing..."
 
-  # Seed Knowledge Graph tables if they're empty
+  # Step 3: Run drizzle-kit migrate — apply any genuinely new migrations
+  echo "[entrypoint] Running database migrations..."
+  MIGRATE_EXIT=0
+  npx drizzle-kit migrate 2>&1 || MIGRATE_EXIT=$?
+
+  if [ "$MIGRATE_EXIT" -ne 0 ]; then
+    echo "[entrypoint] ╔═══════════════════════════════════════════════════════════╗"
+    echo "[entrypoint] ║  ERROR: drizzle-kit migrate failed (exit code $MIGRATE_EXIT)       ║"
+    echo "[entrypoint] ║  The server will start, but some features may not work.  ║"
+    echo "[entrypoint] ║  Check the migration SQL for TiDB/MySQL compatibility.   ║"
+    echo "[entrypoint] ╚═══════════════════════════════════════════════════════════╝"
+  else
+    echo "[entrypoint] Migrations applied successfully."
+  fi
+
+  # Step 4: Seed Knowledge Graph tables if they're empty
   # The KG seeder parses the Wazuh OpenAPI spec and populates kg_* tables
   echo "[entrypoint] Checking Knowledge Graph tables..."
   KG_COUNT=$(node -e "

@@ -3702,3 +3702,12 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Fixed Actions tab: extractDescription() pulls .description from complex objects; ActionDetailCell renders resources/endpoints as colored badges
 - [x] Fixed Resources tab: extractDescription() pulls .description from {description: "..."} objects
 - [x] Fixed My Policies tab: PolicyEffectBadges renders allow/deny as colored badges per resource; rbac_mode filtered out
+
+## BUG: Migrations 0012-0014 not applied despite startup log claiming success
+
+- [x] Investigated migration files 0012, 0013, 0014 — SQL is correct and already applied
+- [x] Checked database state — only 1 of 15 migrations was recorded in __drizzle_migrations
+- [x] Checked startup logic — entrypoint swallowed migration errors with || echo
+- [x] Root cause: (1) journal only had 1 entry, (2) timestamps for 0012-0014 were out-of-order, (3) entrypoint swallowed errors
+- [x] Backfilled all 15 migration journal entries, fixed timestamps, created backfill-migrations.mjs script
+- [x] Verified all tables, indexes, and enum changes exist; drizzle-kit migrate exits cleanly
