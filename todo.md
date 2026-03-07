@@ -3677,9 +3677,9 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 
 ## Beta 2 Release Prep
 
-- [ ] Assess current repo state and diff from last GitHub push
-- [ ] Review and update README.md for Beta 2
-- [ ] Review and update deploy instructions (docker-compose, env vars, setup)
-- [ ] Create or update CHANGELOG.md with Beta 2 changes
+- [x] Assess current repo state and diff from last GitHub push (45 files changed, 9039+/1250-)
+- [x] Review and update README.md for Beta 2 (test counts, new pages, new scripts, deploy notes, CHANGELOG ref)
+- [x] Review and update deploy instructions (Dockerfile: copy shared KG modules, entrypoint: npx tsx)
+- [x] Create CHANGELOG.md with Beta 2 changes
 - [ ] Push all changes to GitHub repo (cvalentine99/Dang-)
 - [ ] Tag Beta 2 release

@@ -25,6 +25,7 @@ An analyst-grade security operations platform that visualizes, correlates, and i
 - [Design Language](#design-language)
 - [Backend API Surface](#backend-api-surface)
 - [Project Structure](#project-structure)
+- [Changelog](#changelog)
 - [License](#license)
 
 ---
@@ -130,6 +131,7 @@ The application acts as a **strict read-only proxy** to Wazuh. All API calls flo
 | Page | Route | Description |
 |---|---|---|
 | **Analyst Notes** | `/notes` | Database-backed investigation notes attached to alerts, agents, or CVEs with severity tagging and resolve/delete workflow |
+| **Broker Coverage** | `/broker-coverage` | Parameter broker coverage ledger — shows which Wazuh API endpoints have broker validation, gap analysis against the OpenAPI spec, coverage percentages by domain |
 
 ---
 
@@ -207,7 +209,7 @@ Alert Queue ──► Triage Agent ──► Correlation Agent ──► Hypothe
 | Container | Docker multi-stage, Node 22 slim, tini init |
 | CI/CD | GitHub Actions, GHCR, Dependabot |
 | Proxy | Caddy (auto TLS) or Nginx (manual TLS) |
-| Testing | Vitest — 73 test files, 604 suites, 2208 tests |
+| Testing | Vitest — 85 test files, 716 suites, 2667 tests |
 
 ---
 
@@ -246,7 +248,16 @@ pnpm dev                       # Starts Vite + Express on port 3000
 pnpm test                      # Runs full Vitest suite
 ```
 
+### Source Export (for code review or distribution)
+
+```bash
+bash scripts/export-source.sh              # Creates dang-source.zip via git archive
+bash scripts/verify-archive.sh dang-source.zip  # 11 automated checks (no secrets, no .manus/, etc.)
+```
+
 See **[DOCKER.md](DOCKER.md)** for full deployment documentation including environment variables, HTTPS proxy setup, health checks, GPU overlay, and CI/CD pipeline details.
+
+> **Note:** The KG seeder (`seed-kg.mjs`) imports shared TypeScript modules via `tsx`. The Docker image includes `tsx` in its dependencies. If running the seeder outside Docker, use `npx tsx seed-kg.mjs` instead of `node seed-kg.mjs`.
 
 ---
 
@@ -310,7 +321,7 @@ See **[DOCKER.md](DOCKER.md)** for full deployment documentation including envir
 
 ## Database Schema
 
-The application uses 38 MySQL tables managed by Drizzle ORM with migration files in `drizzle/`. Key table groups:
+The application uses 38 MySQL tables managed by Drizzle ORM with migration files in `drizzle/`. Schema changes are applied via `webdev_execute_sql` (cloud) or `drizzle-kit migrate` (Docker). Key table groups:
 
 | Group | Tables | Purpose |
 |---|---|---|
@@ -327,14 +338,15 @@ The application uses 38 MySQL tables managed by Drizzle ORM with migration files
 
 ## Testing
 
-The test suite uses **Vitest** with 73 test files covering backend procedures, parameter broker validation, UI wiring parity, security auth, and agentic pipeline stages.
+The test suite uses **Vitest** with 85 test files covering backend procedures, parameter broker validation, UI wiring parity, security auth, agentic pipeline stages, KG ETL integration, and broker coverage.
 
 ```bash
 pnpm test                      # Run full suite
 pnpm test -- --reporter=json   # JSON output for CI
+pnpm proof:generate            # Regenerate ci-proof-artifact.md from vitest.json
 ```
 
-**Current status:** 604 suites, 2208 tests, all passing.
+**Current status:** 716 suites, 2667 tests, all passing (machine-generated from `test-output/vitest.json`).
 
 Key test categories:
 
@@ -344,7 +356,9 @@ Key test categories:
 | UI Wiring | `uiWiring.test.ts`, `uiParamParity.test.ts`, `configStatsTab.test.ts`, `trustDocSprint.test.ts` | Every UI callsite maps to a real procedure, parameter shapes match |
 | Security | `securityAuth.test.ts`, `perUserRateLimit.test.ts` | Auth enforcement, rate limiting, RBAC gating |
 | Agentic Pipeline | `triageAgent.test.ts`, `correlationAgent.test.ts`, `hypothesisAgent.test.ts`, `resumePipelineHelper.test.ts`, `stateMachine.test.ts` | Pipeline stages, resume from failure, partial-failure signaling |
-| Knowledge Graph | `kg-hydration.test.ts`, `agentIntrospection.test.ts`, `agenticGates.test.ts` | Graph ETL, introspection, capability gating |
+| Knowledge Graph | `kg-hydration.test.ts`, `agentIntrospection.test.ts`, `agenticGates.test.ts`, `etl.test.ts`, `etl-integration.test.ts` | Graph ETL extraction determinism, DB integration (truncate/sync/verify/rerun/failure), introspection, capability gating |
+| Broker Coverage | `brokerCoverage.test.ts`, `apiContractGap.test.ts`, `expSyscollectorBroker.test.ts` | Broker coverage ledger, API contract gap analysis, experimental syscollector validation |
+| Splunk | `resolveTriageData.test.ts` | Triage data resolution, Splunk ticket creation |
 | Drift Analytics | `readinessService.test.ts` | Baseline comparison, anomaly detection |
 | OTX | `otxRouter.test.ts` | Preflight ping with `skipIf(!canReachOtx)`, API validation, pulse queries |
 
@@ -409,7 +423,7 @@ server/
     paramBroker.ts         ← Parameter validation and normalization
   agenticPipeline/         ← Triage, Correlation, Hypothesis agents + resume helper
   agenticReadiness/        ← Pipeline readiness checks
-  graph/                   ← Knowledge Graph ETL and query
+  graph/                   ← Knowledge Graph ETL (shared kgExtractor/kgLoader/kgTypes) and query
   baselines/               ← Drift analytics engine (baselines, schedules, anomalies,
                               suppression, notifications, export)
   indexer/                 ← Wazuh Indexer (OpenSearch) proxy
@@ -435,10 +449,16 @@ docs/
   ci-proof-artifact.md     ← Test results generated from vitest.json
   gap-closure-matrix.md    ← Wazuh API coverage tracking
   ui-param-parity-report.md ← UI <-> backend parameter parity audit
+  broker-coverage-ledger.md ← Parameter broker coverage by domain
+  incident-2026-03-07-archive-exposure.md ← Security incident documentation
 
 scripts/
-  generate-ci-proof.mjs    ← vitest.json -> ci-proof-artifact.md
+  generate-ci-proof.mjs    ← vitest.json -> ci-proof-artifact.md (with chain-of-custody guard)
   audit-ui-param-parity.mjs ← UI callsite <-> procedure parity checker
+  diff-wazuh-openapi.mjs   ← OpenAPI spec diff tool (compare spec versions)
+  verify-param-counts.mjs  ← Parameter count verification
+  export-source.sh         ← Clean source export via git archive
+  verify-archive.sh        ← Machine-enforced packaging guard (11 checks)
 
 proxy/
   caddy/                   ← Caddy reverse proxy config
@@ -449,7 +469,15 @@ docker-compose.caddy.yml   ← HTTPS with Caddy overlay
 docker-compose.nginx.yml   ← HTTPS with Nginx overlay
 docker-compose.gpu.yml     ← GPU LLM overlay (llama.cpp)
 deploy.sh                  ← One-command deployment script
+seed-kg.mjs                ← KG seeder CLI (thin wrapper over shared ETL modules)
+spec-v4.14.3.yaml          ← Canonical Wazuh OpenAPI spec (single source of truth)
 ```
+
+---
+
+## Changelog
+
+See **[CHANGELOG.md](CHANGELOG.md)** for release history.
 
 ---
 
