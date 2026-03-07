@@ -3522,3 +3522,10 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Remove .manus/db/*.json from deliverable zip (excluded .manus/, .manus-logs/, node_modules/, .git/, dist/)
 - [x] Remove nested dang/ subtree from archive — clean zip uses ./ root, no duplication
 - [x] Verify full test suite passes after all corrections (82 files, 2607 tests, 0 failures)
+
+## CI Hardening: Param Count Drift Guard
+
+- [x] Add verify-param-counts.mjs step to GitHub Actions CI workflow (broker-registry job)
+- [x] Ensure script exits non-zero on any mismatch (confirmed: process.exit(1) on mismatches > 0)
+- [x] Verify script runs correctly in CI-like environment (0 mismatches, exit 0)
+- [x] YAML validated: 7 jobs, broker-registry depends on typecheck, build depends on broker-registry

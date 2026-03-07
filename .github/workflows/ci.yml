@@ -287,6 +287,39 @@ jobs:
             echo "| Violations | $VIOLATIONS |" >> $GITHUB_STEP_SUMMARY
           fi
 
+  # ── Broker Registry Drift Guard ─────────────────────────────────────────
+  #
+  # Verifies that every paramCount in the ENDPOINT_REGISTRY inside
+  # brokerCoverage.ts matches the actual Object.keys(config.params).length
+  # from paramBroker.ts. Exits non-zero on any mismatch.
+  # ────────────────────────────────────────────────────────────────────────────
+  broker-registry:
+    name: Broker Registry Audit
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Verify broker param counts
+        run: node scripts/verify-param-counts.mjs
+
+      - name: Broker registry summary
+        if: always()
+        run: |
+          echo "## Broker Registry Audit" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> Verifies paramCount in ENDPOINT_REGISTRY matches actual broker config param counts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Script: \`scripts/verify-param-counts.mjs\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Source of truth: \`server/wazuh/paramBroker.ts\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Registry: \`server/wazuh/brokerCoverage.ts\`" >> $GITHUB_STEP_SUMMARY
+
   # ── CI Proof Artifact Generation ──────────────────────────────────────────
   #
   # This job does NOT re-run tests. It downloads the vitest.json artifact
@@ -377,7 +410,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [typecheck, test, contract-audit, ui-parity, ci-proof]
+    needs: [typecheck, test, contract-audit, ui-parity, ci-proof, broker-registry]
     env:
       DATABASE_URL: "mysql://test:test@localhost:3306/test"
       JWT_SECRET: "ci-test-secret-not-for-production"
