@@ -6,7 +6,7 @@ import {
   CheckCircle2, XCircle, Wifi, WifiOff, Server, BarChart3, Minus,
   ArrowUp, ArrowDown, Equal,
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import {
@@ -36,6 +36,19 @@ const AGENT_COLORS = [
   "oklch(0.789 0.154 211.53)",
   "oklch(0.705 0.191 47)",
 ];
+
+// ── Safe data extractors ──────────────────────────────────────────────────
+function getAlertHits(slot: AgentSlot | undefined): any[] {
+  return (slot?.alerts as any)?.data?.hits?.hits ?? [];
+}
+
+function getVulnHits(slot: AgentSlot | undefined): any[] {
+  return (slot?.vulns as any)?.data?.hits?.hits ?? [];
+}
+
+function getScaPolicies(slot: AgentSlot | undefined): any[] {
+  return (slot?.sca as any)?.data?.affected_items ?? [];
+}
 
 // ── Agent Selector ─────────────────────────────────────────────────────────
 function AgentSelector({
@@ -148,8 +161,8 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
   const agent = slot.agent;
   const color = AGENT_COLORS[index] ?? AGENT_COLORS[0];
 
-  // Parse alert counts by level
-  const alertHits = (slot.alerts as any)?.data?.hits?.hits ?? [];
+  // Parse alert counts by level — safe extraction
+  const alertHits = getAlertHits(slot);
   const alertLevels = useMemo(() => {
     const counts = { critical: 0, high: 0, medium: 0, low: 0, total: alertHits.length };
     for (const h of alertHits) {
@@ -162,8 +175,8 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
     return counts;
   }, [alertHits]);
 
-  // Parse vulnerability counts
-  const vulnHits = (slot.vulns as any)?.data?.hits?.hits ?? [];
+  // Parse vulnerability counts — safe extraction
+  const vulnHits = getVulnHits(slot);
   const vulnCounts = useMemo(() => {
     const counts = { Critical: 0, High: 0, Medium: 0, Low: 0, total: vulnHits.length };
     for (const h of vulnHits) {
@@ -173,8 +186,8 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
     return counts;
   }, [vulnHits]);
 
-  // Parse SCA compliance
-  const scaPolicies = (slot.sca as any)?.data?.affected_items ?? [];
+  // Parse SCA compliance — safe extraction
+  const scaPolicies = getScaPolicies(slot);
   const scaScore = useMemo(() => {
     if (scaPolicies.length === 0) return { pass: 0, fail: 0, score: 0 };
     let totalPass = 0, totalFail = 0;
@@ -186,8 +199,8 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
     return { pass: totalPass, fail: totalFail, score: total > 0 ? Math.round((totalPass / total) * 100) : 0 };
   }, [scaPolicies]);
 
-  // Baseline for comparison (first agent)
-  const baseSlot = allSlots[0];
+  // Baseline for comparison (first agent) — SAFE: guard against undefined
+  const baseSlot = allSlots.length > 0 ? allSlots[0] : undefined;
   const isBase = index === 0;
 
   // Radar data
@@ -255,7 +268,7 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
           {(["critical", "high", "medium", "low"] as const).map(sev => {
             const count = alertLevels[sev];
             const maxCount = Math.max(...allSlots.map(s => {
-              const hits = ((s.alerts as any)?.data?.hits?.hits ?? []);
+              const hits = getAlertHits(s);
               return hits.filter((h: any) => {
                 const l = Number(h._source?.rule?.level ?? 0);
                 if (sev === "critical") return l >= 12;
@@ -277,9 +290,9 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
                   />
                 </div>
                 <span className="text-[10px] font-mono text-foreground w-6 text-right">{count}</span>
-                {!isBase && (
+                {!isBase && baseSlot && (
                   <DiffArrow value={count} baseline={(() => {
-                    const bHits = ((baseSlot.alerts as any)?.data?.hits?.hits ?? []);
+                    const bHits = getAlertHits(baseSlot);
                     return bHits.filter((h: any) => {
                       const l = Number(h._source?.rule?.level ?? 0);
                       if (sev === "critical") return l >= 12;
@@ -308,7 +321,7 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
           {(["Critical", "High", "Medium", "Low"] as const).map(sev => {
             const count = (vulnCounts as any)[sev] ?? 0;
             const maxCount = Math.max(...allSlots.map(s => {
-              const hits = ((s.vulns as any)?.data?.hits?.hits ?? []);
+              const hits = getVulnHits(s);
               return hits.filter((h: any) => String(h._source?.vulnerability?.severity ?? "") === sev).length;
             }), 1);
             return (
@@ -321,11 +334,11 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
                   />
                 </div>
                 <span className="text-[10px] font-mono text-foreground w-6 text-right">{count}</span>
-                {!isBase && (
+                {!isBase && baseSlot && (
                   <DiffArrow
                     value={count}
                     baseline={(() => {
-                      const bHits = ((baseSlot.vulns as any)?.data?.hits?.hits ?? []);
+                      const bHits = getVulnHits(baseSlot);
                       return bHits.filter((h: any) => String(h._source?.vulnerability?.severity ?? "") === sev).length;
                     })()}
                     inverse
@@ -345,8 +358,8 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
           </h4>
           <div className="flex items-center gap-1.5">
             <span className="text-lg font-mono font-bold" style={{ color }}>{scaScore.score}%</span>
-            {!isBase && <DiffArrow value={scaScore.score} baseline={(() => {
-              const bPolicies = ((baseSlot.sca as any)?.data?.affected_items ?? []);
+            {!isBase && baseSlot && <DiffArrow value={scaScore.score} baseline={(() => {
+              const bPolicies = getScaPolicies(baseSlot);
               let p = 0, f = 0;
               for (const pol of bPolicies) { p += Number(pol.pass ?? 0); f += Number(pol.fail ?? 0); }
               const t = p + f;
@@ -439,8 +452,14 @@ function AgentDataColumn({ agentId, index, allSlots, onSlotReady }: {
     sca: scaQ.data,
   }), [agentId, agent, alertsQ.data, vulnsQ.data, scaQ.data]);
 
-  // Report slot to parent for cross-comparison
-  useMemo(() => { if (!isLoading) onSlotReady(slot); }, [isLoading, slot]);
+  // FIX: Report slot to parent via useEffect (not useMemo) to avoid setState during render
+  const onSlotReadyRef = useRef(onSlotReady);
+  onSlotReadyRef.current = onSlotReady;
+  useEffect(() => {
+    if (!isLoading) {
+      onSlotReadyRef.current(slot);
+    }
+  }, [isLoading, slot]);
 
   if (isLoading) {
     return (

@@ -3689,3 +3689,9 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] client/index.html: removed dead `%VITE_ANALYTICS_ENDPOINT%/umami` placeholder
 - [x] Fix: runtime injection in main.tsx — only creates script tag when VITE_ANALYTICS_ENDPOINT and VITE_ANALYTICS_WEBSITE_ID are set
 - [x] Removed analytics code entirely from main.tsx — zero dead code, user does not use Manus analytics
+
+## BUG: Page crash — Cannot read properties of undefined (reading 'length')
+
+- [x] Identified: /fleet-compare → AgentCompare.tsx — 3 root causes found
+- [x] Fixed: (1) useMemo→useEffect for onSlotReady, (2) baseSlot guard for undefined, (3) safe data extractors for all slot access
+- [ ] Push fix to GitHub

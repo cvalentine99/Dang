@@ -117,7 +117,7 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/AgentCompare.tsx
 
-### Line 53: `wazuh.agents`
+### Line 66: `wazuh.agents`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -141,13 +141,13 @@ Input: void (no parameters) — **OK**
 | `status` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 424: `wazuh.agentById`
+### Line 437: `wazuh.agentById`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 429: `wazuh.scaPolicies`
+### Line 442: `wazuh.scaPolicies`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
