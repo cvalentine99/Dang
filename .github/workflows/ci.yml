@@ -117,6 +117,9 @@ jobs:
       - name: Run database migrations
         run: npx drizzle-kit migrate
 
+      - name: Seed Knowledge Graph tables
+        run: node seed-kg.mjs --drop
+
       - name: Run tests with JSON reporter
         run: |
           mkdir -p test-output

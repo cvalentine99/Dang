@@ -164,6 +164,7 @@ CREATE TABLE IF NOT EXISTS `kg_endpoints` (
   `auth_method` varchar(64),
   `trust_score` varchar(8) NOT NULL DEFAULT '1.0',
   `deprecated` int NOT NULL DEFAULT 0,
+  `broker_validated` int NOT NULL DEFAULT 0,
   `last_verified_at` timestamp NULL,
   `created_at` timestamp NOT NULL DEFAULT (now()),
   `updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,

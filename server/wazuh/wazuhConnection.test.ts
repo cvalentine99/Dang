@@ -5,11 +5,12 @@ import { describe, it, expect } from "vitest";
  * These tests verify the environment variables are configured correctly.
  * The app connects to the Wazuh server at 192.168.50.158 on the local network.
  *
- * Skipped when WAZUH_HOST is not set (e.g. CI sandbox without secrets).
+ * Skipped when CI=true (CI uses stub env values) or WAZUH_HOST is not a real host.
  */
-const HAS_WAZUH = !!process.env.WAZUH_HOST;
+const IS_CI = process.env.CI === "true";
+const HAS_REAL_WAZUH = !!process.env.WAZUH_HOST && process.env.WAZUH_HOST !== "127.0.0.1";
 
-describe.skipIf(!HAS_WAZUH)("Wazuh Connection Secrets", () => {
+describe.skipIf(IS_CI || !HAS_REAL_WAZUH)("Wazuh Connection Secrets", () => {
   it("should have WAZUH_HOST set to 192.168.50.158", () => {
     expect(process.env.WAZUH_HOST).toBe("192.168.50.158");
   });
