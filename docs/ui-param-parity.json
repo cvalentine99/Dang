@@ -1,7 +1,7 @@
 {
-  "generated": "2026-03-07T10:47:34.824Z",
+  "generated": "2026-03-07T11:19:36.090Z",
   "callsiteCount": 168,
-  "procedureCount": 113,
+  "procedureCount": 120,
   "consumedProcedures": [
     "agentBrowserExtensions",
     "agentById",
@@ -1797,14 +1797,31 @@
       }
     },
     "clusterHealthcheck": {
-      "inputType": "void",
-      "keys": {}
+      "inputType": "object",
+      "keys": {
+        "nodes_list": {
+          "required": false,
+          "default": null
+        }
+      }
     },
     "clusterLocalInfo": {
       "inputType": "void",
       "keys": {}
     },
     "clusterLocalConfig": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "clusterRulesetSync": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "clusterApiConfig": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "managerApiConfig": {
       "inputType": "void",
       "keys": {}
     },
@@ -1961,6 +1978,10 @@
         "agentId": {
           "required": true,
           "default": null
+        },
+        "daemons_list": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -2115,6 +2136,22 @@
         "offset": {
           "required": false,
           "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -2128,14 +2165,50 @@
         "offset": {
           "required": false,
           "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
         }
       }
     },
     "agentsStatsDistinct": {
       "inputType": "object",
       "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
         "fields": {
           "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
           "default": null
         }
       }
@@ -2187,6 +2260,10 @@
         "agentId": {
           "required": true,
           "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -2195,6 +2272,10 @@
       "keys": {
         "agentId": {
           "required": true,
+          "default": null
+        },
+        "select": {
+          "required": false,
           "default": null
         }
       }
@@ -2409,8 +2490,56 @@
     "agentNetaddr": {
       "inputType": "object",
       "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
         "agentId": {
           "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "iface": {
+          "required": false,
+          "default": null
+        },
+        "proto": {
+          "required": false,
+          "default": null
+        },
+        "address": {
+          "required": false,
+          "default": null
+        },
+        "broadcast": {
+          "required": false,
+          "default": null
+        },
+        "netmask": {
+          "required": false,
           "default": null
         }
       }
@@ -2418,8 +2547,60 @@
     "agentNetiface": {
       "inputType": "object",
       "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
         "agentId": {
           "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "name": {
+          "required": false,
+          "default": null
+        },
+        "adapter": {
+          "required": false,
+          "default": null
+        },
+        "type": {
+          "required": false,
+          "default": null
+        },
+        "state": {
+          "required": false,
+          "default": null
+        },
+        "mtu": {
+          "required": false,
+          "default": null
+        },
+        "mac": {
+          "required": false,
           "default": null
         }
       }
@@ -2438,6 +2619,71 @@
         "agentId": {
           "required": true,
           "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "hotfix": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "groupFiles": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "groupId": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "hash": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -2454,6 +2700,22 @@
         },
         "agentId": {
           "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
           "default": null
         }
       }
@@ -2509,6 +2771,22 @@
         "agentId": {
           "required": true,
           "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -2526,6 +2804,22 @@
         "agentId": {
           "required": true,
           "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -2542,6 +2836,42 @@
         },
         "agentId": {
           "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "iface": {
+          "required": false,
+          "default": null
+        },
+        "type": {
+          "required": false,
+          "default": null
+        },
+        "gateway": {
+          "required": false,
+          "default": null
+        },
+        "dhcp": {
+          "required": false,
           "default": null
         }
       }
@@ -2787,6 +3117,22 @@
         "agents_list": {
           "required": false,
           "default": null
+        },
+        "proto": {
+          "required": false,
+          "default": null
+        },
+        "address": {
+          "required": false,
+          "default": null
+        },
+        "broadcast": {
+          "required": false,
+          "default": null
+        },
+        "netmask": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -2822,6 +3168,30 @@
           "default": null
         },
         "agents_list": {
+          "required": false,
+          "default": null
+        },
+        "name": {
+          "required": false,
+          "default": null
+        },
+        "adapter": {
+          "required": false,
+          "default": null
+        },
+        "type": {
+          "required": false,
+          "default": null
+        },
+        "state": {
+          "required": false,
+          "default": null
+        },
+        "mtu": {
+          "required": false,
+          "default": null
+        },
+        "mac": {
           "required": false,
           "default": null
         }
@@ -2972,6 +3342,10 @@
         "agents_list": {
           "required": false,
           "default": null
+        },
+        "hotfix": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -3057,14 +3431,47 @@
       }
     },
     "ruleGroups": {
-      "inputType": "void",
-      "keys": {}
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        }
+      }
     },
     "rulesByRequirement": {
       "inputType": "object",
       "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
         "requirement": {
           "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
           "default": null
         }
       }
@@ -3079,6 +3486,38 @@
         "offset": {
           "required": false,
           "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "filename": {
+          "required": false,
+          "default": null
+        },
+        "relative_dirname": {
+          "required": false,
+          "default": null
+        },
+        "status": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -3088,12 +3527,53 @@
         "filename": {
           "required": true,
           "default": null
+        },
+        "raw": {
+          "required": false,
+          "default": null
+        },
+        "get_dirnames_path": {
+          "required": false,
+          "default": null
         }
       }
     },
     "mitreTactics": {
-      "inputType": "void",
-      "keys": {}
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "mitre_tactic_ids": {
+          "required": false,
+          "default": null
+        }
+      }
     },
     "mitreTechniques": {
       "inputType": "object",
@@ -3142,6 +3622,30 @@
         "offset": {
           "required": false,
           "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "mitre_mitigation_ids": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -3155,6 +3659,30 @@
         "offset": {
           "required": false,
           "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "mitre_software_ids": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -3168,6 +3696,30 @@
         "offset": {
           "required": false,
           "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "mitre_group_ids": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -3185,6 +3737,22 @@
         "offset": {
           "required": false,
           "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "mitre_reference_ids": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -3515,14 +4083,6 @@
         "status": {
           "required": false,
           "default": null
-        },
-        "pci_dss": {
-          "required": false,
-          "default": null
-        },
-        "cis": {
-          "required": false,
-          "default": null
         }
       }
     },
@@ -3594,6 +4154,38 @@
         "offset": {
           "required": false,
           "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "filename": {
+          "required": false,
+          "default": null
+        },
+        "relative_dirname": {
+          "required": false,
+          "default": null
+        },
+        "status": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -3611,6 +4203,14 @@
         "search": {
           "required": false,
           "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -3620,13 +4220,65 @@
         "filename": {
           "required": true,
           "default": null
+        },
+        "raw": {
+          "required": false,
+          "default": null
+        },
+        "get_dirnames_path": {
+          "required": false,
+          "default": null
         }
       }
     },
     "taskStatus": {
       "inputType": "object",
       "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
         "taskIds": {
+          "required": false,
+          "default": null
+        },
+        "agents_list": {
+          "required": false,
+          "default": null
+        },
+        "command": {
+          "required": false,
+          "default": null
+        },
+        "node": {
+          "required": false,
+          "default": null
+        },
+        "module": {
+          "required": false,
+          "default": null
+        },
+        "status": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
           "required": false,
           "default": null
         }
@@ -3643,6 +4295,42 @@
     "securityUsers": {
       "inputType": "void",
       "keys": {}
+    },
+    "securityUserById": {
+      "inputType": "object",
+      "keys": {
+        "userId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "securityRoleById": {
+      "inputType": "object",
+      "keys": {
+        "roleId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "securityPolicyById": {
+      "inputType": "object",
+      "keys": {
+        "policyId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "securityRuleById": {
+      "inputType": "object",
+      "keys": {
+        "ruleId": {
+          "required": true,
+          "default": null
+        }
+      }
     },
     "securityConfig": {
       "inputType": "void",
@@ -3721,6 +4409,34 @@
         "offset": {
           "required": false,
           "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "filename": {
+          "required": false,
+          "default": null
+        },
+        "relative_dirname": {
+          "required": false,
+          "default": null
         }
       }
     },
@@ -3734,21 +4450,36 @@
         "offset": {
           "required": false,
           "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "filename": {
+          "required": false,
+          "default": null
+        },
+        "relative_dirname": {
+          "required": false,
+          "default": null
         }
       }
     },
     "groupConfiguration": {
       "inputType": "object",
       "keys": {
-        "groupId": {
-          "required": true,
-          "default": null
-        }
-      }
-    },
-    "groupFiles": {
-      "inputType": "object",
-      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
         "groupId": {
           "required": true,
           "default": null
@@ -3760,6 +4491,10 @@
       "keys": {
         "filename": {
           "required": true,
+          "default": null
+        },
+        "raw": {
+          "required": false,
           "default": null
         }
       }
@@ -3773,6 +4508,14 @@
         },
         "fileName": {
           "required": true,
+          "default": null
+        },
+        "type_agents": {
+          "required": false,
+          "default": null
+        },
+        "raw": {
+          "required": false,
           "default": null
         }
       }
@@ -3817,6 +4560,10 @@
       "keys": {
         "nodeId": {
           "required": true,
+          "default": null
+        },
+        "daemons_list": {
+          "required": false,
           "default": null
         }
       }

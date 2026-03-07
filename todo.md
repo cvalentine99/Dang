@@ -3444,3 +3444,59 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] buildFromTriageObject now exported and independently testable
 - [x] Added 73 new tests in resolveTriageData.test.ts covering all field mappings, MITRE merging, entity extraction, null coercion
 - [x] Full test suite: 80 files, 2,486 tests, 0 failures
+
+## API Contract Gap Report v4.14.3 — Violation Fixes
+
+### Critical Fixes
+- [x] C-1: `/security/resources` — change `resource` to `resource_list` in param forwarding
+- [x] C-2: `/tasks/status` — extend from 1/13 params to full spec (task_list, agents_list, command, node, module, status, offset, limit, sort, search, select, q)
+- [x] C-3: `ROOTCHECK_CONFIG` — audit/remove non-spec `pci_dss` and `cis` params
+- [x] C-4: Add missing security individual resource GETs (users/{id}, roles/{id}, policies/{id}, rules/{id})
+- [x] C-5: Add missing cluster/manager API config GETs (cluster/ruleset/synchronization, cluster/api/config, manager/api/config)
+
+### High Fixes — Missing Broker Configs
+- [x] H-1: `/rules/files` broker config (sort, search, filename, relative_dirname, status, q, select, distinct)
+- [x] H-2: `/decoders/files` broker config (sort, search, filename, relative_dirname, status, q, select, distinct)
+- [x] H-3: `/lists` broker config (sort, search, select, filename, relative_dirname, q, distinct)
+- [x] H-4: `/lists/files` broker config (sort, search, filename, relative_dirname)
+- [x] H-5: `/mitre/tactics` broker config (ALL params: offset, limit, sort, search, select, q, distinct, mitre_tactic_ids)
+- [x] H-6: `/mitre/groups` broker config (sort, search, select, q, distinct, mitre_group_ids)
+- [x] H-7: `/mitre/mitigations` broker config (sort, search, select, q, distinct, mitre_mitigation_ids)
+- [x] H-8: `/mitre/software` broker config (sort, search, select, q, distinct, mitre_software_ids)
+- [x] H-9: `/mitre/references` broker config (sort, search, select, q, mitre_reference_ids)
+- [x] H-10: `/groups/{group_id}/files` broker config (ALL params: offset, limit, sort, search, select, q, distinct, hash)
+- [x] H-11: `/syscollector/{agent_id}/netiface` broker config (pagination, sort, search, 14 field filters)
+- [x] H-12: `/syscollector/{agent_id}/netaddr` broker config (pagination, sort, search, 5 field filters)
+
+### Medium Fixes — Partial Parameter Support
+- [x] M-1: `/agents/outdated` — add sort, search, select, q
+- [x] M-2: `/agents/no_group` — add sort, search, select, q
+- [x] M-3: `/agents/stats/distinct` — add offset, limit, sort, search, q
+- [x] M-4: `/agents/{agent_id}/daemons/stats` — add daemons_list filter
+- [x] M-5: `/cluster/healthcheck` — add nodes_list filter (already present)
+- [x] M-6: `/cluster/{node_id}/daemons/stats` — add daemons_list filter
+- [x] M-7: `/rules/groups` — add offset, limit, sort, search
+- [x] M-8: `/rules/requirement/{requirement}` — add offset, limit, sort, search
+- [x] M-9: `/decoders/parents` — add sort, select
+- [x] M-10: `/groups/{group_id}/configuration` — add offset, limit
+- [x] M-11: `/groups/{group_id}/files/{file_name}` — add type_agents, raw
+- [x] M-12: `/syscollector/{agent_id}/hotfixes` — add sort, search, select, q, distinct, hotfix
+- [x] M-13: `/syscollector/{agent_id}/netproto` — add sort, search, q, distinct, iface, type, gateway, dhcp
+- [x] M-14: `/syscollector/{agent_id}/users` — add sort, search, q, distinct
+- [x] M-15: `/syscollector/{agent_id}/groups` — add sort, search, q, distinct
+- [x] M-16: `/syscollector/{agent_id}/browser_extensions` — add sort, search, q, distinct
+- [x] M-17: `/experimental/syscollector/netaddr` — add proto, address, broadcast, netmask field filters
+- [x] M-18: `/experimental/syscollector/netiface` — add 14 field filters
+
+### Low Fixes — Missing Meta-Params
+- [x] L-1: `/rules/files/{filename}` — add raw, get_dirnames_path
+- [x] L-2: `/decoders/files/{filename}` — add raw, get_dirnames_path
+- [x] L-3: `/lists/files/{filename}` — add raw
+- [x] L-4: `/syscollector/{agent_id}/hardware` — add select
+- [x] L-5: `/syscollector/{agent_id}/os` — add select
+- [x] L-6: `/experimental/syscollector/hotfixes` — add hotfix field filter
+
+### Additional
+- [ ] Add `/experimental/ciscat/results` cross-agent endpoint
+- [x] Write vitest tests for all contract gap fixes (57 tests in apiContractGap.test.ts)
+- [x] Full test suite passes after all fixes (81 files, 2,543 tests, 0 failures)

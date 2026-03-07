@@ -3,7 +3,7 @@
 **Generated:** 2026-03-07  
 **Script:** `scripts/audit-ui-param-parity.mjs`  
 **Callsites audited:** 168  
-**Unique procedures consumed:** 113 of 113 total  
+**Unique procedures consumed:** 113 of 120 total  
 
 ---
 
@@ -14,13 +14,25 @@
 |--------|-------|
 | Total callsites | 168 |
 | Unique procedures consumed | 113 |
-| Router procedures available | 113 |
+| Router procedures available | 120 |
 | Parameters surfaced in UI | 95 |
 | Parameters hardcoded/constant | 116 |
-| Parameters not supported (classified) | 600 |
+| Parameters not supported (classified) | 821 |
 | Violations | 0 |
 
 **No violations found.** All UI callsites pass only schema-valid keys, all required params are present, and every optional param is classified.
+
+### Unconsumed Procedures (not called from any UI page)
+
+| Procedure | Input Keys | Disposition |
+|-----------|-----------|-------------|
+| `clusterApiConfig` | (void) | Backend-only / Not yet wired to UI |
+| `clusterRulesetSync` | (void) | Backend-only / Not yet wired to UI |
+| `managerApiConfig` | (void) | Backend-only / Not yet wired to UI |
+| `securityPolicyById` | policyId | Backend-only / Not yet wired to UI |
+| `securityRoleById` | roleId | Backend-only / Not yet wired to UI |
+| `securityRuleById` | ruleId | Backend-only / Not yet wired to UI |
+| `securityUserById` | userId | Backend-only / Not yet wired to UI |
 
 ## client/src/components/DriftComparison.tsx
 
@@ -84,8 +96,12 @@
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `500`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `0`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ## client/src/components/shared/WazuhGuard.tsx
 
@@ -152,12 +168,14 @@ Input: void (no parameters) — **OK**
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 65: `wazuh.agentHardware`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 66: `wazuh.scaPolicies`
 
@@ -281,13 +299,38 @@ Input: void (no parameters) — **OK**
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `adapter` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `mac` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `mtu` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `name` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `state` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `type` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 655: `wazuh.agentNetaddr`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `address` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `broadcast` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `iface` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `netmask` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `proto` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 803: `wazuh.syscheckFiles`
 
@@ -330,6 +373,7 @@ Input: void (no parameters) — **OK**
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `daemons_list` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 1044: `wazuh.agentKey`
 
@@ -348,11 +392,9 @@ Input: void (no parameters) — **OK**
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
-| `cis` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `PAGE_SIZE`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `page * PAGE_SIZE`) |
-| `pci_dss` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
@@ -444,6 +486,10 @@ Input: void (no parameters) — **OK**
 |-----------|--------|----------|-----------|----------------|
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `1`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `0`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 114: `wazuh.agentsNoGroup`
 
@@ -451,6 +497,10 @@ Input: void (no parameters) — **OK**
 |-----------|--------|----------|-----------|----------------|
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `1`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `0`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 126: `wazuh.agentsUpgradeResult`
 
@@ -480,12 +530,14 @@ Input: void (no parameters) — **OK**
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 133: `wazuh.agentHardware`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ## client/src/pages/AlertsTimeline.tsx
 
@@ -519,6 +571,7 @@ Input: void (no parameters) — **OK**
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `daemons_list` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `nodeId` | Required | Yes | Passed | **Surfaced** (required) |
 
 ### Line 188: `wazuh.clusterNodeLogs`
@@ -630,7 +683,9 @@ Input: void (no parameters) — **OK**
 
 ### Line 525: `wazuh.clusterHealthcheck`
 
-Input: void (no parameters) — **OK**
+| Parameter | Router | Required | UI Status | Classification |
+|-----------|--------|----------|-----------|----------------|
+| `nodes_list` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 526: `wazuh.clusterLocalInfo`
 
@@ -894,6 +949,7 @@ Input: void (no parameters) — **OK**
 |-----------|--------|----------|-----------|----------------|
 | `agents_list` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `hotfix` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Surfaced** |
 | `offset` | Optional | No | Passed | **Surfaced** |
 | `q` | Optional | No | Passed | **Constant** (hardcoded: `dynamic-spread`) |
@@ -905,10 +961,14 @@ Input: void (no parameters) — **OK**
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `address` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `agents_list` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `broadcast` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Surfaced** |
+| `netmask` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `offset` | Optional | No | Passed | **Surfaced** |
+| `proto` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `q` | Optional | No | Passed | **Constant** (hardcoded: `dynamic-spread`) |
 | `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
@@ -918,14 +978,20 @@ Input: void (no parameters) — **OK**
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `adapter` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `agents_list` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Surfaced** |
+| `mac` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `mtu` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `name` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `offset` | Optional | No | Passed | **Surfaced** |
 | `q` | Optional | No | Passed | **Constant** (hardcoded: `dynamic-spread`) |
 | `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `state` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `type` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 172: `wazuh.expSyscollectorNetproto`
 
@@ -966,6 +1032,10 @@ Input: void (no parameters) — **OK**
 |-----------|--------|----------|-----------|----------------|
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `100`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `outdatedPage * 100`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 68: `wazuh.agentsNoGroup`
 
@@ -973,12 +1043,21 @@ Input: void (no parameters) — **OK**
 |-----------|--------|----------|-----------|----------------|
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `100`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `noGroupPage * 100`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 72: `wazuh.agentsStatsDistinct`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `fields` | Required | Yes | Passed | **Surfaced** (required) |
+| `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 76: `wazuh.agentGroupMembers`
 
@@ -999,12 +1078,22 @@ Input: void (no parameters) — **OK**
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `groupId` | Required | Yes | Passed | **Surfaced** (required) |
+| `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 84: `wazuh.groupFiles`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `groupId` | Required | Yes | Passed | **Surfaced** (required) |
+| `hash` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 88: `wazuh.groupFileContent`
 
@@ -1012,6 +1101,8 @@ Input: void (no parameters) — **OK**
 |-----------|--------|----------|-----------|----------------|
 | `fileName` | Required | Yes | Passed | **Surfaced** (required) |
 | `groupId` | Required | Yes | Passed | **Surfaced** (required) |
+| `raw` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `type_agents` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ## client/src/pages/Home.tsx
 
@@ -1085,7 +1176,16 @@ Input: void (no parameters) — **OK**
 
 ### Line 166: `wazuh.mitreTactics`
 
-Input: void (no parameters) — **OK**
+| Parameter | Router | Required | UI Status | Classification |
+|-----------|--------|----------|-----------|----------------|
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `mitre_tactic_ids` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 167: `wazuh.agentOverview`
 
@@ -1206,37 +1306,81 @@ Input: void (no parameters) — **OK**
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `adapter` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `mac` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `mtu` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `name` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `state` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `type` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 126: `wazuh.agentNetaddr`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `address` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `broadcast` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `iface` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `netmask` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `proto` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 130: `wazuh.agentNetproto`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `dhcp` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `gateway` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `iface` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `type` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 134: `wazuh.agentHotfixes`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `hotfix` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `pageSize`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `page * pageSize`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 140: `wazuh.agentBrowserExtensions`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `pageSize`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `page * pageSize`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 146: `wazuh.agentServices`
 
@@ -1256,16 +1400,24 @@ Input: void (no parameters) — **OK**
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `pageSize`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `page * pageSize`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 156: `wazuh.agentGroups2`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `pageSize`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `page * pageSize`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ## client/src/pages/MitreAttack.tsx
 
@@ -1275,7 +1427,16 @@ Input: void (no parameters) — **OK**
 
 ### Line 119: `wazuh.mitreTactics`
 
-Input: void (no parameters) — **OK**
+| Parameter | Router | Required | UI Status | Classification |
+|-----------|--------|----------|-----------|----------------|
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `mitre_tactic_ids` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 120: `wazuh.mitreTechniques`
 
@@ -1294,8 +1455,14 @@ Input: void (no parameters) — **OK**
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `100`) |
+| `mitre_group_ids` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 122: `wazuh.rules`
 
@@ -1329,22 +1496,38 @@ Input: void (no parameters) — **OK**
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `MITRE_PAGE_SIZE`) |
+| `mitre_software_ids` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `softwarePage * MITRE_PAGE_SIZE`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 132: `wazuh.mitreMitigations`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `MITRE_PAGE_SIZE`) |
+| `mitre_mitigation_ids` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `mitigationsPage * MITRE_PAGE_SIZE`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 136: `wazuh.mitreReferences`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `MITRE_PAGE_SIZE`) |
+| `mitre_reference_ids` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `referencesPage * MITRE_PAGE_SIZE`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ## client/src/pages/RulesetExplorer.tsx
 
@@ -1353,12 +1536,16 @@ Input: void (no parameters) — **OK**
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `filename` | Required | Yes | Passed | **Surfaced** (required) |
+| `get_dirnames_path` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `raw` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 87: `wazuh.decoderFileContent`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `filename` | Required | Yes | Passed | **Surfaced** (required) |
+| `get_dirnames_path` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `raw` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 181: `wazuh.status`
 
@@ -1406,35 +1593,67 @@ Input: void (no parameters) — **OK**
 
 ### Line 233: `wazuh.ruleGroups`
 
-Input: void (no parameters) — **OK**
+| Parameter | Router | Required | UI Status | Classification |
+|-----------|--------|----------|-----------|----------------|
+| `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 238: `wazuh.rulesFiles`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `filename` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `500`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `0`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `relative_dirname` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `status` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 242: `wazuh.decoderFiles`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `filename` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `500`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `0`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `relative_dirname` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `status` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 246: `wazuh.lists`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `filename` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `500`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `0`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `relative_dirname` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 250: `wazuh.listsFiles`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `filename` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `500`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `0`) |
+| `relative_dirname` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 259: `wazuh.decoderParents`
 
@@ -1443,18 +1662,25 @@ Input: void (no parameters) — **OK**
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `DP_PAGE_SIZE`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `decoderParentsPage * DP_PAGE_SIZE`) |
 | `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 266: `wazuh.rulesByRequirement`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `requirement` | Required | Yes | Passed | **Surfaced** (required) |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 272: `wazuh.listsFileContent`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `filename` | Required | Yes | Passed | **Surfaced** (required) |
+| `raw` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ## client/src/pages/SecurityExplorer.tsx
 
@@ -1600,6 +1826,17 @@ Input: void (no parameters) — **OK**
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `agents_list` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `command` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `module` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `node` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `status` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `taskIds` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ## client/src/pages/ThreatHunting.tsx
@@ -1661,6 +1898,13 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `status` | Optional | No | Passed | **Constant** (hardcoded: `"active"`) |
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+
+
+
+
+
+
+
 
 
 ---

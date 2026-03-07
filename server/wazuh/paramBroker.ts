@@ -1139,14 +1139,461 @@ export const ROOTCHECK_CONFIG: EndpointParamConfig = {
       description: "Filter by rootcheck status",
       type: "string",
     },
-    pci_dss: {
-      wazuhName: "pci_dss",
-      description: "Filter by PCI DSS requirement",
+    // NOTE: pci_dss and cis were removed — they are NOT in the Wazuh v4.14.3 spec
+    // for GET /rootcheck/{agent_id}. They existed in older versions but were dropped.
+    // Use the 'q' parameter for compliance filtering instead.
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase: API Contract Gap Report v4.14.3 — High Findings Broker Configs
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /rules/files — List rule files (H-1 gap fill)
+ * Spec ref: operationId api.controllers.rule_controller.get_rules_files
+ */
+export const RULES_FILES_CONFIG: EndpointParamConfig = {
+  endpoint: "/rules/files",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    filename: {
+      wazuhName: "filename",
+      description: "Filter by rule filename",
       type: "string",
     },
-    cis: {
-      wazuhName: "cis",
-      description: "Filter by CIS benchmark",
+    relative_dirname: {
+      wazuhName: "relative_dirname",
+      description: "Filter by relative directory name",
+      type: "string",
+      aliases: ["relativeDirname"],
+    },
+    status: {
+      wazuhName: "status",
+      description: "Filter by rule file status (enabled | disabled | all)",
+      type: "string",
+    },
+  },
+};
+
+/**
+ * GET /decoders/files — List decoder files (H-2 gap fill)
+ * Spec ref: operationId api.controllers.decoder_controller.get_decoders_files
+ */
+export const DECODERS_FILES_CONFIG: EndpointParamConfig = {
+  endpoint: "/decoders/files",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    filename: {
+      wazuhName: "filename",
+      description: "Filter by decoder filename",
+      type: "string",
+    },
+    relative_dirname: {
+      wazuhName: "relative_dirname",
+      description: "Filter by relative directory name",
+      type: "string",
+      aliases: ["relativeDirname"],
+    },
+    status: {
+      wazuhName: "status",
+      description: "Filter by decoder file status (enabled | disabled | all)",
+      type: "string",
+    },
+  },
+};
+
+/**
+ * GET /lists — List CDB lists (H-3 gap fill)
+ * Spec ref: operationId api.controllers.cdb_list_controller.get_lists
+ */
+export const LISTS_CONFIG: EndpointParamConfig = {
+  endpoint: "/lists",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    filename: {
+      wazuhName: "filename",
+      description: "Filter by CDB list filename",
+      type: "string",
+    },
+    relative_dirname: {
+      wazuhName: "relative_dirname",
+      description: "Filter by relative directory name",
+      type: "string",
+      aliases: ["relativeDirname"],
+    },
+  },
+};
+
+/**
+ * GET /lists/files — List CDB list files (H-4 gap fill)
+ * Spec ref: operationId api.controllers.cdb_list_controller.get_lists_files
+ */
+export const LISTS_FILES_CONFIG: EndpointParamConfig = {
+  endpoint: "/lists/files",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    filename: {
+      wazuhName: "filename",
+      description: "Filter by CDB list filename",
+      type: "string",
+    },
+    relative_dirname: {
+      wazuhName: "relative_dirname",
+      description: "Filter by relative directory name",
+      type: "string",
+      aliases: ["relativeDirname"],
+    },
+  },
+};
+
+/**
+ * GET /mitre/tactics — MITRE ATT&CK tactics (H-5 gap fill)
+ * Spec ref: operationId api.controllers.mitre_controller.get_tactics
+ */
+export const MITRE_TACTICS_CONFIG: EndpointParamConfig = {
+  endpoint: "/mitre/tactics",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    mitre_tactic_ids: {
+      wazuhName: "tactic_ids",
+      description: "Filter by MITRE tactic IDs (comma-separated)",
+      type: "csv",
+      aliases: ["tacticIds", "tactic_ids"],
+    },
+  },
+};
+
+/**
+ * GET /mitre/groups — MITRE ATT&CK groups (H-6 gap fill)
+ * Spec ref: operationId api.controllers.mitre_controller.get_groups
+ */
+export const MITRE_GROUPS_CONFIG: EndpointParamConfig = {
+  endpoint: "/mitre/groups",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    mitre_group_ids: {
+      wazuhName: "group_ids",
+      description: "Filter by MITRE group IDs (comma-separated)",
+      type: "csv",
+      aliases: ["groupIds", "group_ids"],
+    },
+  },
+};
+
+/**
+ * GET /mitre/mitigations — MITRE ATT&CK mitigations (H-7 gap fill)
+ * Spec ref: operationId api.controllers.mitre_controller.get_mitigations
+ */
+export const MITRE_MITIGATIONS_CONFIG: EndpointParamConfig = {
+  endpoint: "/mitre/mitigations",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    mitre_mitigation_ids: {
+      wazuhName: "mitigation_ids",
+      description: "Filter by MITRE mitigation IDs (comma-separated)",
+      type: "csv",
+      aliases: ["mitigationIds", "mitigation_ids"],
+    },
+  },
+};
+
+/**
+ * GET /mitre/software — MITRE ATT&CK software (H-8 gap fill)
+ * Spec ref: operationId api.controllers.mitre_controller.get_software
+ */
+export const MITRE_SOFTWARE_CONFIG: EndpointParamConfig = {
+  endpoint: "/mitre/software",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    mitre_software_ids: {
+      wazuhName: "software_ids",
+      description: "Filter by MITRE software IDs (comma-separated)",
+      type: "csv",
+      aliases: ["softwareIds", "software_ids"],
+    },
+  },
+};
+
+/**
+ * GET /mitre/references — MITRE ATT&CK references (H-9 gap fill)
+ * Spec ref: operationId api.controllers.mitre_controller.get_references
+ */
+export const MITRE_REFERENCES_CONFIG: EndpointParamConfig = {
+  endpoint: "/mitre/references",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    q: UNIVERSAL_PARAMS.q,
+    mitre_reference_ids: {
+      wazuhName: "reference_ids",
+      description: "Filter by MITRE reference IDs (comma-separated)",
+      type: "csv",
+      aliases: ["referenceIds", "reference_ids"],
+    },
+  },
+};
+
+/**
+ * GET /groups/{group_id}/files — List files in a group (H-10 gap fill)
+ * Spec ref: operationId api.controllers.agent_controller.get_group_files
+ */
+export const GROUP_FILES_CONFIG: EndpointParamConfig = {
+  endpoint: "/groups/{group_id}/files",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    hash: {
+      wazuhName: "hash",
+      description: "Select algorithm to generate the returned checksums",
+      type: "string",
+    },
+  },
+};
+
+/**
+ * GET /syscollector/{agent_id}/netiface — Agent network interfaces (H-11 gap fill)
+ * Spec ref: operationId api.controllers.syscollector_controller.get_network_interface_info
+ */
+export const SYSCOLLECTOR_NETIFACE_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/netiface",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    name: {
+      wazuhName: "name",
+      description: "Filter by interface name",
+      type: "string",
+    },
+    adapter: {
+      wazuhName: "adapter",
+      description: "Filter by adapter",
+      type: "string",
+    },
+    type: {
+      wazuhName: "type",
+      description: "Filter by interface type (e.g. ethernet, wireless)",
+      type: "string",
+    },
+    state: {
+      wazuhName: "state",
+      description: "Filter by interface state (e.g. up, down)",
+      type: "string",
+    },
+    mtu: {
+      wazuhName: "mtu",
+      description: "Filter by MTU",
+      type: "number",
+    },
+    "tx.packets": {
+      wazuhName: "tx.packets",
+      description: "Filter by TX packets",
+      type: "string",
+      aliases: ["tx_packets"],
+    },
+    "rx.packets": {
+      wazuhName: "rx.packets",
+      description: "Filter by RX packets",
+      type: "string",
+      aliases: ["rx_packets"],
+    },
+    "tx.bytes": {
+      wazuhName: "tx.bytes",
+      description: "Filter by TX bytes",
+      type: "string",
+      aliases: ["tx_bytes"],
+    },
+    "rx.bytes": {
+      wazuhName: "rx.bytes",
+      description: "Filter by RX bytes",
+      type: "string",
+      aliases: ["rx_bytes"],
+    },
+    "tx.errors": {
+      wazuhName: "tx.errors",
+      description: "Filter by TX errors",
+      type: "string",
+      aliases: ["tx_errors"],
+    },
+    "rx.errors": {
+      wazuhName: "rx.errors",
+      description: "Filter by RX errors",
+      type: "string",
+      aliases: ["rx_errors"],
+    },
+    "tx.dropped": {
+      wazuhName: "tx.dropped",
+      description: "Filter by TX dropped",
+      type: "string",
+      aliases: ["tx_dropped"],
+    },
+    "rx.dropped": {
+      wazuhName: "rx.dropped",
+      description: "Filter by RX dropped",
+      type: "string",
+      aliases: ["rx_dropped"],
+    },
+    mac: {
+      wazuhName: "mac",
+      description: "Filter by MAC address",
+      type: "string",
+    },
+  },
+};
+
+/**
+ * GET /syscollector/{agent_id}/netaddr — Agent network addresses (H-12 gap fill)
+ * Spec ref: operationId api.controllers.syscollector_controller.get_network_address_info
+ */
+export const SYSCOLLECTOR_NETADDR_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/netaddr",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    iface: {
+      wazuhName: "iface",
+      description: "Filter by interface name",
+      type: "string",
+    },
+    proto: {
+      wazuhName: "proto",
+      description: "Filter by protocol (ipv4 | ipv6)",
+      type: "string",
+    },
+    address: {
+      wazuhName: "address",
+      description: "Filter by IP address",
+      type: "string",
+    },
+    broadcast: {
+      wazuhName: "broadcast",
+      description: "Filter by broadcast address",
+      type: "string",
+    },
+    netmask: {
+      wazuhName: "netmask",
+      description: "Filter by netmask",
+      type: "string",
+    },
+  },
+};
+
+/**
+ * GET /syscollector/{agent_id}/hotfixes — Agent hotfixes (M-12 gap fill)
+ * Spec ref: operationId api.controllers.syscollector_controller.get_hotfixes_info
+ */
+export const SYSCOLLECTOR_HOTFIXES_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/hotfixes",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    hotfix: {
+      wazuhName: "hotfix",
+      description: "Filter by hotfix ID (e.g. KB5000802)",
+      type: "string",
+    },
+  },
+};
+
+/**
+ * GET /syscollector/{agent_id}/netproto — Agent network protocols (M-13 gap fill)
+ * Spec ref: operationId api.controllers.syscollector_controller.get_network_protocol_info
+ */
+export const SYSCOLLECTOR_NETPROTO_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/netproto",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    iface: {
+      wazuhName: "iface",
+      description: "Filter by interface name",
+      type: "string",
+    },
+    type: {
+      wazuhName: "type",
+      description: "Filter by protocol type",
+      type: "string",
+    },
+    gateway: {
+      wazuhName: "gateway",
+      description: "Filter by gateway",
+      type: "string",
+    },
+    dhcp: {
+      wazuhName: "dhcp",
+      description: "Filter by DHCP status",
       type: "string",
     },
   },

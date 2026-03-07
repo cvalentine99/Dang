@@ -1655,16 +1655,18 @@ describe("KG wiring: DECODERS_CONFIG", () => {
 });
 
 describe("KG wiring: ROOTCHECK_CONFIG", () => {
-  it("forwards all field-specific filters", () => {
+  it("forwards valid field-specific filters and rejects non-spec pci_dss/cis (C-3 fix)", () => {
     const result = brokerParams(ROOTCHECK_CONFIG, {
       status: "outstanding",
       pci_dss: "2.2",
       cis: "1.4",
     });
     expect(result.forwardedQuery.status).toBe("outstanding");
-    expect(result.forwardedQuery.pci_dss).toBe("2.2");
-    expect(result.forwardedQuery.cis).toBe("1.4");
-    expect(result.unsupportedParams).toHaveLength(0);
+    // C-3: pci_dss and cis are NOT in the Wazuh v4.14.3 spec for /rootcheck
+    expect(result.unsupportedParams).toContain("pci_dss");
+    expect(result.unsupportedParams).toContain("cis");
+    expect(result.forwardedQuery).not.toHaveProperty("pci_dss");
+    expect(result.forwardedQuery).not.toHaveProperty("cis");
   });
 
   it("includes all universal params", () => {
