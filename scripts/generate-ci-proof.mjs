@@ -53,7 +53,10 @@ const startTime = new Date(report.startTime).toISOString();
 
 // Per-file breakdown
 const files = report.testResults.map((ts) => {
-  const name = (ts.name || "").replace(ROOT + "/", "");
+  // Strip any absolute prefix to get a relative path (handles both local and CI runner paths)
+  let name = ts.name || "";
+  const relMatch = name.match(/((?:server|client|shared|drizzle)\/.*$)/);
+  name = relMatch ? relMatch[1] : name.replace(ROOT + "/", "");
   // Support both native vitest JSON (assertionResults) and parsed format (numTests)
   if (ts.assertionResults && Array.isArray(ts.assertionResults)) {
     const passed = ts.assertionResults.filter((a) => a.status === "passed").length;
@@ -85,7 +88,7 @@ for (const ts of report.testResults) {
     for (const ar of ts.assertionResults) {
       if (ar.status === "failed") {
         failedDetails.push({
-          file: (ts.name || "").replace(ROOT + "/", ""),
+          file: (() => { let n = ts.name || ""; const m = n.match(/((?:server|client|shared|drizzle)\/.*$)/); return m ? m[1] : n.replace(ROOT + "/", ""); })(),
           test: ar.fullName,
           message: (ar.failureMessages || []).join("\n").slice(0, 500),
         });
