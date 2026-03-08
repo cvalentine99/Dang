@@ -1,27 +1,28 @@
 /**
- * Correlation Agent Integration Tests
+ * Correlation Agent Tests — Split-Brain Repair Edition
  *
- * Tests edge cases and normalization logic in the correlation agent:
- *   - Asset criticality normalization (invalid → "unknown")
- *   - Case action normalization (invalid → "defer_to_analyst")
- *   - Empty indexer results handling
- *   - Entity deduplication between Wazuh-native and LLM-discovered
- *   - Blast radius computation
- *   - Campaign assessment with empty technique clusters
- *   - Synthesis narrative with missing evidence
- *   - Token counting
+ * All mock LLM responses now use the RAW LLM shape (as defined by
+ * CORRELATION_JSON_SCHEMA in correlationAgent.ts), NOT the canonical
+ * CorrelationBundle shape. The normalizer converts raw → canonical.
+ *
+ * Test categories:
+ *   1. Normalizer unit tests (no DB required)
+ *   2. Zod validation tests (no DB required)
+ *   3. Integration tests (DB required, mocked LLM/indexer/wazuh/otx)
  *
  * What is real:
- *   - The correlation agent code paths
- *   - The database (real MySQL)
- *   - Normalization functions
+ *   - The normalizer code paths
+ *   - The Zod schema validation
+ *   - The database (real MySQL, for integration tests)
  *
  * What is mocked:
- *   - LLM (returns structured JSON)
+ *   - LLM (returns structured JSON in raw LLM shape)
  *   - Wazuh API, Indexer, OTX
  */
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import type { CorrelationBundle } from "../../shared/agenticSchemas";
+import type { LLMCorrelationRaw } from "./types/LLMCorrelationRaw";
+import { parseLLMCorrelation } from "./types/LLMCorrelationRaw";
+import { normalizeCorrelationBundle } from "./normalizeCorrelationBundle";
 
 // ── Mock external services ──────────────────────────────────────────────────
 const mockLLMResponse = vi.fn();
@@ -51,64 +52,53 @@ vi.mock("../otx/otxClient", () => ({
 
 const HAS_DB = !!process.env.DATABASE_URL;
 
-// ── Shared fixtures ─────────────────────────────────────────────────────────
+// ── Raw LLM Fixture (matches CORRELATION_JSON_SCHEMA) ───────────────────────
 
-const WAZUH_ALERT_FIM = {
-  id: "corr-test-fim-1",
-  timestamp: new Date().toISOString(),
-  rule: { id: "550", level: 7, description: "File integrity monitoring: file modified", mitre: { id: ["T1565.001"], technique: ["Stored Data Manipulation"], tactic: ["Impact"] } },
-  agent: { id: "003", name: "db-server-01", ip: "192.168.1.30" },
-  data: { srcip: "192.168.1.30" },
-  syscheck: { path: "/etc/passwd", md5_after: "abc123def456", sha256_after: "sha256hash789" },
-};
-
-const WAZUH_ALERT_MINIMAL = {
-  id: "corr-test-min-1",
-  timestamp: new Date().toISOString(),
-  rule: { id: "100", level: 3, description: "Minimal alert" },
-  agent: { id: "005", name: "minimal-host" },
-  data: {},
-};
-
-function makeCorrelationLLMResponse(overrides: Partial<CorrelationBundle> = {}) {
+/**
+ * Build a mock LLM response in the RAW shape — string arrays for blastRadius,
+ * campaignName (not campaignLabel), indicators (not clusteredTechniques),
+ * top-level confidence/summary/evidenceSummary/inferenceSummary/uncertainties.
+ */
+function makeRawLLMResponse(overrides: Partial<LLMCorrelationRaw> = {}) {
+  const raw: LLMCorrelationRaw = {
+    correlationId: "will-be-overridden",
+    sourceTriageId: "will-be-overridden",
+    relatedAlerts: overrides.relatedAlerts ?? [],
+    discoveredEntities: overrides.discoveredEntities ?? [],
+    blastRadius: overrides.blastRadius ?? {
+      affectedHosts: ["db-server-01"],
+      affectedUsers: ["root"],
+      affectedServices: ["mysql"],
+      assetCriticality: "medium",
+    },
+    campaignAssessment: overrides.campaignAssessment ?? {
+      likelyCampaign: false,
+      campaignName: null,
+      confidence: 0.2,
+      reasoning: "No campaign indicators",
+      indicators: [],
+    },
+    caseRecommendation: overrides.caseRecommendation ?? {
+      action: "create_new",
+      mergeTargetId: null,
+      mergeTargetTitle: null,
+      reasoning: "New investigation needed",
+      confidence: 0.7,
+    },
+    riskScore: overrides.riskScore ?? 45,
+    summary: overrides.summary ?? "File modification detected on db-server-01",
+    evidenceSummary: overrides.evidenceSummary ?? "FIM alert on /etc/passwd with hash change",
+    inferenceSummary: overrides.inferenceSummary ?? "Likely unauthorized modification",
+    uncertainties: overrides.uncertainties ?? [
+      { description: "No threat intel available", impact: "Cannot assess if this is malicious", suggestedAction: "Check OTX manually" },
+    ],
+    confidence: overrides.confidence ?? 0.65,
+    mitreMapping: overrides.mitreMapping ?? [
+      { techniqueId: "T1565.001", techniqueName: "Stored Data Manipulation", tactic: "Impact", confidence: 0.8 },
+    ],
+  };
   return {
-    choices: [{ message: { content: JSON.stringify({
-      schemaVersion: "1.0",
-      correlationId: "will-be-overridden",
-      correlatedAt: new Date().toISOString(),
-      sourceTriageId: "will-be-overridden",
-      relatedAlerts: [],
-      discoveredEntities: overrides.discoveredEntities ?? [],
-      vulnerabilityContext: overrides.vulnerabilityContext ?? [],
-      fimContext: overrides.fimContext ?? [],
-      threatIntelMatches: overrides.threatIntelMatches ?? [],
-      priorInvestigations: overrides.priorInvestigations ?? [],
-      blastRadius: overrides.blastRadius ?? {
-        affectedHosts: 1,
-        affectedUsers: 0,
-        affectedAgentIds: ["003"],
-        assetCriticality: "medium",
-        confidence: 0.6,
-      },
-      campaignAssessment: overrides.campaignAssessment ?? {
-        likelyCampaign: false,
-        clusteredTechniques: [],
-        confidence: 0.2,
-        reasoning: "No campaign indicators",
-      },
-      caseRecommendation: overrides.caseRecommendation ?? {
-        action: "create_new",
-        confidence: 0.7,
-        reasoning: "New investigation needed",
-      },
-      synthesis: overrides.synthesis ?? {
-        narrative: "File modification detected on db-server-01",
-        supportingEvidence: [{ id: "ev-1", label: "FIM alert", type: "fim_event", source: "wazuh_alert", data: {}, collectedAt: new Date().toISOString(), relevance: 1.0 }],
-        conflictingEvidence: [],
-        missingEvidence: [{ description: "No threat intel available", impact: "Cannot assess if this is malicious" }],
-        confidence: 0.65,
-      },
-    }) } }],
+    choices: [{ message: { content: JSON.stringify(raw) } }],
     usage: { prompt_tokens: 1500, completion_tokens: 500 },
   };
 }
@@ -134,11 +124,374 @@ const TRIAGE_LLM_RESPONSE = {
   usage: { prompt_tokens: 800, completion_tokens: 300 },
 };
 
+const WAZUH_ALERT_FIM = {
+  id: "corr-test-fim-1",
+  timestamp: new Date().toISOString(),
+  rule: { id: "550", level: 7, description: "File integrity monitoring: file modified", mitre: { id: ["T1565.001"], technique: ["Stored Data Manipulation"], tactic: ["Impact"] } },
+  agent: { id: "003", name: "db-server-01", ip: "192.168.1.30" },
+  data: { srcip: "192.168.1.30" },
+  syscheck: { path: "/etc/passwd", md5_after: "abc123def456", sha256_after: "sha256hash789" },
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// TESTS
+// 1. NORMALIZER UNIT TESTS (no DB required)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("runCorrelationAgent — edge cases", () => {
+describe("normalizeCorrelationBundle — deterministic mapping", () => {
+  const fixedDate = new Date("2026-03-07T12:00:00.000Z");
+  const opts = { correlationId: "corr-test-001", triageId: "triage-test-001", now: fixedDate };
+
+  it("maps blastRadius.affectedHosts from string[] to count (number)", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      blastRadius: {
+        affectedHosts: ["Alpha", "Bravo", "Charlie"],
+        affectedUsers: ["cvalentine", "root"],
+        affectedServices: ["mysql", "ssh"],
+        assetCriticality: "high",
+      },
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.blastRadius.affectedHosts).toBe(3);
+    expect(typeof bundle.blastRadius.affectedHosts).toBe("number");
+  });
+
+  it("maps blastRadius.affectedUsers from string[] to count (number)", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      blastRadius: {
+        affectedHosts: ["Alpha"],
+        affectedUsers: ["cvalentine", "root"],
+        affectedServices: [],
+        assetCriticality: "medium",
+      },
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.blastRadius.affectedUsers).toBe(2);
+    expect(typeof bundle.blastRadius.affectedUsers).toBe("number");
+  });
+
+  it("drops affectedServices (not in canonical schema)", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      blastRadius: {
+        affectedHosts: ["Alpha"],
+        affectedUsers: [],
+        affectedServices: ["mysql", "ssh", "nginx"],
+        assetCriticality: "medium",
+      },
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    // affectedServices should not exist on the canonical bundle
+    expect((bundle.blastRadius as any).affectedServices).toBeUndefined();
+  });
+
+  it("sets affectedAgentIds to empty array (not populated from hostnames)", () => {
+    const raw = parseLLMCorrelation(JSON.parse(makeRawLLMResponse().choices[0].message.content));
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.blastRadius.affectedAgentIds).toEqual([]);
+  });
+
+  it("maps campaignAssessment.campaignName → campaignLabel", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      campaignAssessment: {
+        likelyCampaign: true,
+        campaignName: "Operation Midnight",
+        confidence: 0.8,
+        reasoning: "Multiple correlated signals",
+        indicators: ["T1059", "T1053.005"],
+      },
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.campaignAssessment.campaignLabel).toBe("Operation Midnight");
+    expect((bundle.campaignAssessment as any).campaignName).toBeUndefined();
+  });
+
+  it("maps campaignAssessment.indicators → clusteredTechniques (MITRE IDs only)", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      campaignAssessment: {
+        likelyCampaign: true,
+        campaignName: "Test Campaign",
+        confidence: 0.7,
+        reasoning: "Test",
+        indicators: ["T1059", "T1053.005", "not-a-technique", "suspicious-ip"],
+      },
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    // Only valid MITRE technique IDs should be mapped
+    expect(bundle.campaignAssessment.clusteredTechniques).toHaveLength(2);
+    expect(bundle.campaignAssessment.clusteredTechniques[0].techniqueId).toBe("T1059");
+    expect(bundle.campaignAssessment.clusteredTechniques[1].techniqueId).toBe("T1053.005");
+    // Non-technique indicators are dropped
+    expect((bundle.campaignAssessment as any).indicators).toBeUndefined();
+  });
+
+  it("maps top-level confidence → synthesis.confidence", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      confidence: 0.42,
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.synthesis.confidence).toBe(0.42);
+  });
+
+  it("maps top-level summary → synthesis.narrative", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      summary: "Critical file tampering detected across 3 hosts",
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.synthesis.narrative).toBe("Critical file tampering detected across 3 hosts");
+  });
+
+  it("maps top-level evidenceSummary → synthesis.supportingEvidence[0].data.text", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      evidenceSummary: "FIM alert with hash mismatch on /etc/shadow",
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.synthesis.supportingEvidence).toHaveLength(1);
+    expect(bundle.synthesis.supportingEvidence[0].data.text).toBe("FIM alert with hash mismatch on /etc/shadow");
+    expect(bundle.synthesis.supportingEvidence[0].source).toBe("llm_inference");
+  });
+
+  it("maps top-level inferenceSummary → synthesis.conflictingEvidence[0].data.text", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      inferenceSummary: "Likely authorized maintenance window",
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.synthesis.conflictingEvidence).toHaveLength(1);
+    expect(bundle.synthesis.conflictingEvidence[0].data.text).toBe("Likely authorized maintenance window");
+  });
+
+  it("maps top-level uncertainties → synthesis.missingEvidence", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      uncertainties: [
+        { description: "No OTX data", impact: "Cannot verify IOCs", suggestedAction: "Manual lookup" },
+        { description: "Missing FIM baseline", impact: "Cannot determine if change is expected", suggestedAction: "Check baseline" },
+      ],
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.synthesis.missingEvidence).toHaveLength(2);
+    expect(bundle.synthesis.missingEvidence[0].description).toBe("No OTX data");
+    expect(bundle.synthesis.missingEvidence[1].description).toBe("Missing FIM baseline");
+  });
+
+  it("normalizes invalid assetCriticality to 'unknown'", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      blastRadius: {
+        affectedHosts: ["Alpha"],
+        affectedUsers: [],
+        affectedServices: [],
+        assetCriticality: "SUPER_CRITICAL_EXTREME",
+      },
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.blastRadius.assetCriticality).toBe("unknown");
+  });
+
+  it("normalizes invalid caseRecommendation action to 'defer_to_analyst'", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      caseRecommendation: {
+        action: "DESTROY_EVERYTHING",
+        mergeTargetId: null,
+        mergeTargetTitle: null,
+        reasoning: "Test",
+        confidence: 0.5,
+      },
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.caseRecommendation.action).toBe("defer_to_analyst");
+  });
+
+  it("stamps correlationId and triageId from opts, not from LLM output", () => {
+    const raw = parseLLMCorrelation(JSON.parse(makeRawLLMResponse().choices[0].message.content));
+    const bundle = normalizeCorrelationBundle(raw, {
+      correlationId: "corr-authoritative",
+      triageId: "triage-authoritative",
+      now: fixedDate,
+    });
+
+    expect(bundle.correlationId).toBe("corr-authoritative");
+    expect(bundle.sourceTriageId).toBe("triage-authoritative");
+  });
+
+  it("sets schemaVersion to '1.0'", () => {
+    const raw = parseLLMCorrelation(JSON.parse(makeRawLLMResponse().choices[0].message.content));
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.schemaVersion).toBe("1.0");
+  });
+
+  it("handles empty blastRadius arrays correctly", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      blastRadius: {
+        affectedHosts: [],
+        affectedUsers: [],
+        affectedServices: [],
+        assetCriticality: "low",
+      },
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.blastRadius.affectedHosts).toBe(0);
+    expect(bundle.blastRadius.affectedUsers).toBe(0);
+  });
+
+  it("normalizes discoveredEntities with invalid types to 'host'", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      discoveredEntities: [
+        { type: "INVALID_TYPE", value: "test", confidence: 0.5, source: "llm_inference" },
+      ],
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.discoveredEntities[0].type).toBe("host");
+  });
+
+  it("normalizes discoveredEntities with invalid source to 'llm_inference'", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      discoveredEntities: [
+        { type: "ip", value: "10.0.0.1", confidence: 0.5, source: "UNKNOWN_SOURCE" },
+      ],
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.discoveredEntities[0].source).toBe("llm_inference");
+  });
+
+  it("clamps confidence to [0, 1] range", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      discoveredEntities: [
+        { type: "ip", value: "10.0.0.1", confidence: 5.0, source: "llm_inference" },
+      ],
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    // Zod allows any number, normalizer clamps to [0, 1]
+    expect(bundle.discoveredEntities[0].confidence).toBe(1);
+  });
+
+  it("clamps negative confidence to 0", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      discoveredEntities: [
+        { type: "ip", value: "10.0.0.1", confidence: -0.5, source: "llm_inference" },
+      ],
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.discoveredEntities[0].confidence).toBe(0);
+  });
+
+  it("maps null campaignName to undefined campaignLabel", () => {
+    const raw = parseLLMCorrelation({
+      ...JSON.parse(makeRawLLMResponse().choices[0].message.content),
+      campaignAssessment: {
+        likelyCampaign: false,
+        campaignName: null,
+        confidence: 0.1,
+        reasoning: "No campaign",
+        indicators: [],
+      },
+    });
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.campaignAssessment.campaignLabel).toBeUndefined();
+  });
+
+  it("initializes vulnerabilityContext, fimContext, threatIntelMatches, priorInvestigations as empty arrays", () => {
+    const raw = parseLLMCorrelation(JSON.parse(makeRawLLMResponse().choices[0].message.content));
+    const bundle = normalizeCorrelationBundle(raw, opts);
+
+    expect(bundle.vulnerabilityContext).toEqual([]);
+    expect(bundle.fimContext).toEqual([]);
+    expect(bundle.threatIntelMatches).toEqual([]);
+    expect(bundle.priorInvestigations).toEqual([]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 2. ZOD VALIDATION TESTS (no DB required)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("parseLLMCorrelation — Zod validation", () => {
+  it("accepts a valid raw LLM payload", () => {
+    const rawJson = JSON.parse(makeRawLLMResponse().choices[0].message.content);
+    expect(() => parseLLMCorrelation(rawJson)).not.toThrow();
+  });
+
+  it("rejects payload missing required field (blastRadius)", () => {
+    const rawJson = JSON.parse(makeRawLLMResponse().choices[0].message.content);
+    delete rawJson.blastRadius;
+    expect(() => parseLLMCorrelation(rawJson)).toThrow();
+  });
+
+  it("rejects payload where blastRadius.affectedHosts is a number instead of string[]", () => {
+    const rawJson = JSON.parse(makeRawLLMResponse().choices[0].message.content);
+    rawJson.blastRadius.affectedHosts = 3; // number, not string[]
+    expect(() => parseLLMCorrelation(rawJson)).toThrow();
+  });
+
+  it("rejects payload where confidence is a string instead of number", () => {
+    const rawJson = JSON.parse(makeRawLLMResponse().choices[0].message.content);
+    rawJson.confidence = "high"; // string, not number
+    expect(() => parseLLMCorrelation(rawJson)).toThrow();
+  });
+
+  it("rejects payload missing required nested field (campaignAssessment.likelyCampaign)", () => {
+    const rawJson = JSON.parse(makeRawLLMResponse().choices[0].message.content);
+    delete rawJson.campaignAssessment.likelyCampaign;
+    expect(() => parseLLMCorrelation(rawJson)).toThrow();
+  });
+
+  it("rejects payload where relatedAlerts items miss required fields", () => {
+    const rawJson = JSON.parse(makeRawLLMResponse().choices[0].message.content);
+    rawJson.relatedAlerts = [{ alertId: "a1" }]; // missing ruleId, ruleDescription, etc.
+    expect(() => parseLLMCorrelation(rawJson)).toThrow();
+  });
+
+  it("rejects completely empty object", () => {
+    expect(() => parseLLMCorrelation({})).toThrow();
+  });
+
+  it("rejects null", () => {
+    expect(() => parseLLMCorrelation(null)).toThrow();
+  });
+
+  it("rejects string", () => {
+    expect(() => parseLLMCorrelation("not an object")).toThrow();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3. INTEGRATION TESTS (DB required, mocked LLM/indexer/wazuh/otx)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("runCorrelationAgent — integration with normalizer", () => {
   let testTriageId: string;
 
   beforeAll(async () => {
@@ -153,49 +506,122 @@ describe("runCorrelationAgent — edge cases", () => {
   });
 
   it.skipIf(!HAS_DB)(
-    "handles LLM returning invalid assetCriticality by normalizing to 'unknown'",
+    "produces canonical bundle with numeric blastRadius from raw string[] LLM output",
     async () => {
       const { runCorrelationAgent } = await import("./correlationAgent");
 
-      const response = makeCorrelationLLMResponse({
+      const response = makeRawLLMResponse({
         blastRadius: {
-          affectedHosts: 1,
-          affectedUsers: 0,
-          affectedAgentIds: ["003"],
-          assetCriticality: "INVALID_CRITICALITY" as any,
-          confidence: 0.5,
+          affectedHosts: ["Alpha", "Bravo"],
+          affectedUsers: ["cvalentine", "root"],
+          affectedServices: ["mysql"],
+          assetCriticality: "high",
         },
       });
       mockLLMResponse.mockResolvedValueOnce(response);
 
       const result = await runCorrelationAgent({ triageId: testTriageId });
 
-      expect(result.correlationId).toMatch(/^corr-/);
-      // The agent passes LLM values through as-is (no server-side normalization)
-      // so the invalid value will be preserved in the bundle
-      expect(result.bundle.blastRadius.assetCriticality).toBeDefined();
+      // PROOF: blastRadius.affectedHosts is a number (count), not string[]
+      expect(result.bundle.blastRadius.affectedHosts).toBe(2);
+      expect(typeof result.bundle.blastRadius.affectedHosts).toBe("number");
+      expect(result.bundle.blastRadius.affectedUsers).toBe(2);
+      expect(typeof result.bundle.blastRadius.affectedUsers).toBe("number");
     }
   );
 
   it.skipIf(!HAS_DB)(
-    "handles LLM returning invalid caseRecommendation action by normalizing to 'defer_to_analyst'",
+    "produces canonical bundle with synthesis.confidence from raw top-level confidence",
     async () => {
       const { runCorrelationAgent } = await import("./correlationAgent");
 
-      const response = makeCorrelationLLMResponse({
-        caseRecommendation: {
-          action: "INVALID_ACTION" as any,
-          confidence: 0.5,
-          reasoning: "Test invalid action",
+      const response = makeRawLLMResponse({ confidence: 0.88 });
+      mockLLMResponse.mockResolvedValueOnce(response);
+
+      const result = await runCorrelationAgent({ triageId: testTriageId });
+
+      // PROOF: confidence is at synthesis.confidence, not top-level
+      expect(result.bundle.synthesis.confidence).toBe(0.88);
+    }
+  );
+
+  it.skipIf(!HAS_DB)(
+    "produces canonical bundle with synthesis.narrative from raw top-level summary",
+    async () => {
+      const { runCorrelationAgent } = await import("./correlationAgent");
+
+      const response = makeRawLLMResponse({ summary: "Multi-host compromise detected" });
+      mockLLMResponse.mockResolvedValueOnce(response);
+
+      const result = await runCorrelationAgent({ triageId: testTriageId });
+
+      expect(result.bundle.synthesis.narrative).toBe("Multi-host compromise detected");
+    }
+  );
+
+  it.skipIf(!HAS_DB)(
+    "maps campaignName to campaignLabel in canonical bundle",
+    async () => {
+      const { runCorrelationAgent } = await import("./correlationAgent");
+
+      const response = makeRawLLMResponse({
+        campaignAssessment: {
+          likelyCampaign: true,
+          campaignName: "Operation Midnight",
+          confidence: 0.9,
+          reasoning: "Coordinated activity across 3 hosts",
+          indicators: ["T1059", "T1053.005"],
         },
       });
       mockLLMResponse.mockResolvedValueOnce(response);
 
       const result = await runCorrelationAgent({ triageId: testTriageId });
 
-      // The agent passes LLM values through as-is (no server-side normalization)
-      // so the invalid value will be preserved in the bundle
-      expect(result.bundle.caseRecommendation.action).toBeDefined();
+      expect(result.bundle.campaignAssessment.campaignLabel).toBe("Operation Midnight");
+      expect((result.bundle.campaignAssessment as any).campaignName).toBeUndefined();
+    }
+  );
+
+  it.skipIf(!HAS_DB)(
+    "normalizes invalid assetCriticality to 'unknown' in canonical bundle",
+    async () => {
+      const { runCorrelationAgent } = await import("./correlationAgent");
+
+      const response = makeRawLLMResponse({
+        blastRadius: {
+          affectedHosts: ["Alpha"],
+          affectedUsers: [],
+          affectedServices: [],
+          assetCriticality: "INVALID_CRITICALITY",
+        },
+      });
+      mockLLMResponse.mockResolvedValueOnce(response);
+
+      const result = await runCorrelationAgent({ triageId: testTriageId });
+
+      expect(result.bundle.blastRadius.assetCriticality).toBe("unknown");
+    }
+  );
+
+  it.skipIf(!HAS_DB)(
+    "normalizes invalid caseRecommendation action to 'defer_to_analyst'",
+    async () => {
+      const { runCorrelationAgent } = await import("./correlationAgent");
+
+      const response = makeRawLLMResponse({
+        caseRecommendation: {
+          action: "INVALID_ACTION",
+          mergeTargetId: null,
+          mergeTargetTitle: null,
+          reasoning: "Test invalid action",
+          confidence: 0.5,
+        },
+      });
+      mockLLMResponse.mockResolvedValueOnce(response);
+
+      const result = await runCorrelationAgent({ triageId: testTriageId });
+
+      expect(result.bundle.caseRecommendation.action).toBe("defer_to_analyst");
     }
   );
 
@@ -205,7 +631,7 @@ describe("runCorrelationAgent — edge cases", () => {
       const { runCorrelationAgent } = await import("./correlationAgent");
 
       mockIndexerSearch.mockResolvedValue({ hits: { hits: [], total: { value: 0 } } });
-      mockLLMResponse.mockResolvedValueOnce(makeCorrelationLLMResponse());
+      mockLLMResponse.mockResolvedValueOnce(makeRawLLMResponse());
 
       const result = await runCorrelationAgent({
         triageId: testTriageId,
@@ -225,17 +651,16 @@ describe("runCorrelationAgent — edge cases", () => {
     async () => {
       const { runCorrelationAgent } = await import("./correlationAgent");
 
-      const response = makeCorrelationLLMResponse({
+      const response = makeRawLLMResponse({
         discoveredEntities: [
-          { type: "ip", value: "10.20.30.40", source: "llm_inference" as const, confidence: 0.7 },
-          { type: "domain", value: "evil.example.com", source: "llm_inference" as const, confidence: 0.5 },
+          { type: "ip", value: "10.20.30.40", confidence: 0.7, source: "llm_inference" },
+          { type: "domain", value: "evil.example.com", confidence: 0.5, source: "llm_inference" },
         ],
       });
       mockLLMResponse.mockResolvedValueOnce(response);
 
       const result = await runCorrelationAgent({ triageId: testTriageId });
 
-      // The bundle should contain the LLM-discovered entities
       expect(Array.isArray(result.bundle.discoveredEntities)).toBe(true);
       const entityValues = result.bundle.discoveredEntities.map(e => e.value);
       expect(entityValues).toContain("10.20.30.40");
@@ -244,44 +669,14 @@ describe("runCorrelationAgent — edge cases", () => {
   );
 
   it.skipIf(!HAS_DB)(
-    "handles synthesis with missing evidence gracefully",
-    async () => {
-      const { runCorrelationAgent } = await import("./correlationAgent");
-
-      const response = makeCorrelationLLMResponse({
-        synthesis: {
-          narrative: "Minimal correlation — no enrichment available",
-          supportingEvidence: [],
-          conflictingEvidence: [],
-          missingEvidence: [
-            { description: "No indexer data", impact: "Cannot correlate with other alerts" },
-            { description: "No threat intel", impact: "Cannot assess threat level" },
-            { description: "No vulnerability data", impact: "Cannot assess exposure" },
-          ],
-          confidence: 0.3,
-        },
-      });
-      mockLLMResponse.mockResolvedValueOnce(response);
-
-      const result = await runCorrelationAgent({ triageId: testTriageId });
-
-      expect(result.bundle.synthesis.narrative.length).toBeGreaterThan(0);
-      expect(result.bundle.synthesis.missingEvidence.length).toBe(3);
-      expect(result.bundle.synthesis.confidence).toBeLessThanOrEqual(1);
-      expect(result.bundle.synthesis.confidence).toBeGreaterThanOrEqual(0);
-    }
-  );
-
-  it.skipIf(!HAS_DB)(
     "preserves sourceTriageId from input, not from LLM",
     async () => {
       const { runCorrelationAgent } = await import("./correlationAgent");
 
-      mockLLMResponse.mockResolvedValueOnce(makeCorrelationLLMResponse());
+      mockLLMResponse.mockResolvedValueOnce(makeRawLLMResponse());
 
       const result = await runCorrelationAgent({ triageId: testTriageId });
 
-      // The real code overrides the LLM's sourceTriageId with the actual input
       expect(result.bundle.sourceTriageId).toBe(testTriageId);
     }
   );
@@ -291,10 +686,10 @@ describe("runCorrelationAgent — edge cases", () => {
     async () => {
       const { runCorrelationAgent } = await import("./correlationAgent");
 
-      mockLLMResponse.mockResolvedValueOnce(makeCorrelationLLMResponse());
+      mockLLMResponse.mockResolvedValueOnce(makeRawLLMResponse());
       const result1 = await runCorrelationAgent({ triageId: testTriageId });
 
-      mockLLMResponse.mockResolvedValueOnce(makeCorrelationLLMResponse());
+      mockLLMResponse.mockResolvedValueOnce(makeRawLLMResponse());
       const result2 = await runCorrelationAgent({ triageId: testTriageId });
 
       expect(result1.correlationId).not.toBe(result2.correlationId);
@@ -308,44 +703,20 @@ describe("runCorrelationAgent — edge cases", () => {
     async () => {
       const { runCorrelationAgent } = await import("./correlationAgent");
 
-      mockLLMResponse.mockResolvedValueOnce(makeCorrelationLLMResponse());
+      mockLLMResponse.mockResolvedValueOnce(makeRawLLMResponse());
 
       const result = await runCorrelationAgent({ triageId: testTriageId });
 
       expect(result.tokensUsed).toBe(2000); // 1500 prompt + 500 completion
     }
   );
-
-  it.skipIf(!HAS_DB)(
-    "handles campaign assessment with empty clustered techniques",
-    async () => {
-      const { runCorrelationAgent } = await import("./correlationAgent");
-
-      const response = makeCorrelationLLMResponse({
-        campaignAssessment: {
-          likelyCampaign: false,
-          clusteredTechniques: [],
-          confidence: 0.1,
-          reasoning: "Isolated incident, no campaign indicators",
-        },
-      });
-      mockLLMResponse.mockResolvedValueOnce(response);
-
-      const result = await runCorrelationAgent({ triageId: testTriageId });
-
-      expect(result.bundle.campaignAssessment.likelyCampaign).toBe(false);
-      expect(result.bundle.campaignAssessment.clusteredTechniques).toEqual([]);
-    }
-  );
 });
 
 describe("Correlation query helpers", () => {
   it.skipIf(!HAS_DB)(
-    "getCorrelationByTriageId returns the latest correlation for a triage",
+    "getCorrelationByTriageId returns null for non-existent ID",
     async () => {
       const { getCorrelationByTriageId } = await import("./correlationAgent");
-      // We created correlations in the tests above, so there should be at least one
-      // Use a known non-existent ID to test null return
       const result = await getCorrelationByTriageId("nonexistent-triage-id");
       expect(result).toBeNull();
     }

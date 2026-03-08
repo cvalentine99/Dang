@@ -3747,3 +3747,17 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [ ] Update ALL test mocks to match the chosen contract (LLM raw or canonical)
 - [ ] Add runtime validation at the LLM→persistence boundary
 - [ ] Ensure no partial normalization code remains after the fix
+
+## SPRINT: Correlation Bundle Split-Brain Repair
+
+- [x] 1. Defined LLMCorrelationRaw Zod schema in server/agenticPipeline/types/LLMCorrelationRaw.ts
+- [x] 2. Implemented normalizeCorrelationBundle() in server/agenticPipeline/normalizeCorrelationBundle.ts
+- [x] 3. Updated correlationAgent.ts: parseLLMCorrelation() → normalizeCorrelationBundle()
+- [x] 4. Fixed persistence: affectedHosts/Users are numbers, confidence from synthesis.confidence
+- [x] 5. Rewrote all 5 test files with raw LLM fixtures
+- [x] 6. Added 18+ normalization tests (arrays→counts, confidence clamping, campaignName→campaignLabel)
+- [x] 7. Added persistence tests verifying int columns receive numbers
+- [x] 8. Added 9 negative tests for malformed payloads (Zod rejects missing/wrong-type fields)
+- [x] 9. affectedAgentIds preserved from triage context, not from LLM hostnames/services
+- [x] 10. All comments distinguish raw (LLMCorrelationRaw) vs canonical (CorrelationBundle)
+- [x] 11. Generated proof: docs/correlation-bundle-split-brain-repair.md

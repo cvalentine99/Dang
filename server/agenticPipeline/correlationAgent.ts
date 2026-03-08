@@ -32,6 +32,8 @@ import type {
   EvidenceItem,
   Uncertainty,
 } from "../../shared/agenticSchemas";
+import { parseLLMCorrelation } from "./types/LLMCorrelationRaw";
+import { normalizeCorrelationBundle } from "./normalizeCorrelationBundle";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -745,36 +747,45 @@ export async function runCorrelationAgent(
       response_format: CORRELATION_JSON_SCHEMA,
     });
     
-    // 5. Parse the structured response
+    // 5. Parse and validate the structured LLM response via Zod schema
     const content = llmResult.choices?.[0]?.message?.content;
     if (!content) throw new Error("LLM returned empty response");
     
-    const rawBundle = typeof content === "string" ? JSON.parse(content) : content;
+    const rawJson = typeof content === "string" ? JSON.parse(content) : content;
     
-    // Override IDs to ensure consistency
-    rawBundle.correlationId = correlationId;
-    rawBundle.sourceTriageId = input.triageId;
+    // Zod-validate the raw LLM output — throws ZodError if malformed
+    const validatedRaw = parseLLMCorrelation(rawJson);
     
-    const bundle: CorrelationBundle = rawBundle;
+    // 6. Normalize raw LLM shape → canonical CorrelationBundle
+    // This is the ONLY place where raw crosses into canonical.
+    // IDs are stamped by the normalizer, not by mutating the raw object.
+    const bundle = normalizeCorrelationBundle(validatedRaw, {
+      correlationId,
+      triageId: input.triageId,
+    });
     
-    // 6. Calculate tokens used
+    // 7. Calculate tokens used
     const tokensUsed = extractTokenCount(llmResult);
     const latencyMs = Date.now() - startTime;
     
-    // 7. Persist the completed correlation bundle
+    // 8. Persist the completed correlation bundle
+    // All fields now read from the CANONICAL bundle, not raw LLM output.
+    // blastRadius.affectedHosts is a number (count), not string[]
+    // blastRadius.affectedUsers is a number (count), not string[]
+    // synthesis.confidence is the canonical path, not top-level
     await db.update(correlationBundles)
       .set({
         status: "completed",
         bundleData: bundle,
         relatedAlertCount: bundle.relatedAlerts?.length ?? 0,
         discoveredEntityCount: bundle.discoveredEntities?.length ?? 0,
-        blastRadiusHosts: bundle.blastRadius?.affectedHosts ?? 0,
-        blastRadiusUsers: bundle.blastRadius?.affectedUsers ?? 0,
-        assetCriticality: normalizeAssetCriticality(bundle.blastRadius?.assetCriticality),
-        likelyCampaign: bundle.campaignAssessment?.likelyCampaign ? 1 : 0,
-        caseAction: normalizeCaseAction(bundle.caseRecommendation?.action),
-        mergeTargetId: bundle.caseRecommendation?.mergeTargetId ?? null,
-        confidence: bundle.synthesis?.confidence ?? 0,
+        blastRadiusHosts: bundle.blastRadius.affectedHosts,
+        blastRadiusUsers: bundle.blastRadius.affectedUsers,
+        assetCriticality: bundle.blastRadius.assetCriticality,
+        likelyCampaign: bundle.campaignAssessment.likelyCampaign ? 1 : 0,
+        caseAction: bundle.caseRecommendation.action,
+        mergeTargetId: bundle.caseRecommendation.mergeTargetId ?? null,
+        confidence: bundle.synthesis.confidence,
         latencyMs,
         tokensUsed,
       })
