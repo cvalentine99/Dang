@@ -140,12 +140,12 @@ for (const file of runtimeFiles) {
 const corrAgentFiles = runtimeFiles.filter(f => f.endsWith("correlationAgent.ts"));
 for (const file of corrAgentFiles) {
   const content = readFileSync(file, "utf-8");
-  if (!content.includes("parseLLMCorrelation")) {
+  if (!content.includes("parseLLMCorrelation") && !content.includes("parseAndNormalizeCorrelationBundle")) {
     fail(
       "CORRELATION_NORMALIZER",
       file,
       0,
-      `correlationAgent.ts does not import parseLLMCorrelation — normalization boundary missing`
+      `correlationAgent.ts does not import parseLLMCorrelation or parseAndNormalizeCorrelationBundle — normalization boundary missing`
     );
   }
   if (!content.includes("normalizeCorrelationBundle")) {

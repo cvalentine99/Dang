@@ -3772,3 +3772,12 @@ These need a proper contract-alignment sprint, not a hot patch:
 ## NIT: Concurrency test regex case mismatch
 
 - [x] Dropped unreachable `invalid transition` alternative from test 3 regex — `terminal state` already covers the path; avoids latent case mismatch with `Invalid transition:` in stateMachine.ts
+
+## FIXUP: Manual corrections after counter-drift patch application (2026-03-08)
+
+- [x] stateMachine.ts replaced with correct version from patch archive (transaction wrapping, optimistic guard, affectedRows check)
+- [x] audit-splitbrain.mjs: updated parseLLMCorrelation check to also accept parseAndNormalizeCorrelationBundle
+- [x] Verified package.json has audit:splitbrain script entry
+- [x] Verified DbLike type fix (DbRoot | TxLike) is in place — tsc exit 0
+- [x] pnpm audit:splitbrain — all 10 checks pass
+- [x] Full test suite — 88 files, 2747 tests, 0 failures
