@@ -439,7 +439,7 @@ describe.skipIf(!HAS_DB)("Concurrency — bulk approve interleaving", () => {
     if (rejectResult.success && !contestedBulkResult.success) {
       // Path A: reject won the race, bulk failed on the contested action
       // The bulk failure should be a conflict or terminal-state error
-      expect(contestedBulkResult.error).toMatch(/Conflict:|terminal state|invalid transition/);
+      expect(contestedBulkResult.error).toMatch(/Conflict:|terminal state/);
     } else if (rejectResult.success && contestedBulkResult.success) {
       // Path B: both succeeded sequentially (bulk: proposed→approved, reject: approved→rejected)
       // This is valid — approved→rejected is a legal transition

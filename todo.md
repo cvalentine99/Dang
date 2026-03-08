@@ -3768,3 +3768,7 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Test 3: Fixed — accepts both valid outcomes (reject wins → bulk fails, or both succeed sequentially via approved→rejected)
 - [x] Test 1 uses same-terminal-state strategy; Test 3 accepts deterministic final state regardless of race outcome
 - [x] All assertions accept both error patterns: /Conflict:|terminal state|invalid transition/
+
+## NIT: Concurrency test regex case mismatch
+
+- [x] Dropped unreachable `invalid transition` alternative from test 3 regex — `terminal state` already covers the path; avoids latent case mismatch with `Invalid transition:` in stateMachine.ts
