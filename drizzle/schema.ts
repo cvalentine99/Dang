@@ -1488,3 +1488,30 @@ export const sensitiveAccessAudit = mysqlTable("sensitive_access_audit", {
 
 export type SensitiveAccessAuditRow = typeof sensitiveAccessAudit.$inferSelect;
 export type InsertSensitiveAccessAuditRow = typeof sensitiveAccessAudit.$inferInsert;
+
+// ── Threat Intel Cache ──────────────────────────────────────────────────────
+/**
+ * Persistent cache for OTX threat intel API responses.
+ * Two-tier caching: NodeCache (RAM, 5 min) → DB (hours) → OTX API.
+ * Survives container restarts unlike the in-memory NodeCache layer.
+ */
+export const threatIntelCache = mysqlTable("threat_intel_cache", {
+  id: int("id").primaryKey().autoincrement(),
+  cacheKey: varchar("cacheKey", { length: 512 }).notNull().unique(),
+  endpointType: mysqlEnum("endpointType", [
+    "pulse",
+    "indicator",
+    "search",
+    "activity",
+    "status",
+  ]).notNull(),
+  responseData: json("responseData").notNull(),
+  fetchedAt: timestamp("fetchedAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+}, (table) => ([
+  index("tic_cacheKey_idx").on(table.cacheKey),
+  index("tic_expiresAt_idx").on(table.expiresAt),
+  index("tic_endpointType_idx").on(table.endpointType),
+]));
+export type ThreatIntelCacheRow = typeof threatIntelCache.$inferSelect;
+export type InsertThreatIntelCacheRow = typeof threatIntelCache.$inferInsert;

@@ -3808,3 +3808,15 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Skip padding slots in data map builders (agentPackages, agentServicesMap, agentUsersMap)
 - [x] Add regression tests: driftComparison.test.ts (6 tests)
 - [x] Full suite: 90 files, 2762 tests, 0 failures
+
+## FEATURE: Persistent DB cache for OTX threat intel (2026-03-08)
+
+- [x] Add threat_intel_cache table to drizzle/schema.ts (id, cacheKey, endpointType, responseData, fetchedAt, expiresAt)
+- [x] Generate and apply migration via webdev_execute_sql
+- [x] Update otxClient.ts with two-tier caching: RAM (NodeCache 5m) → DB (pulse 6h, indicator 30m, search 15m, activity 30m, status 10m) → OTX API
+- [x] Tune TTLs: 6h pulses, 30m indicators, 15m search, 30m activity, 10m status (DB layer); 5m RAM
+- [x] Add forceRefresh param to otxGet() — skips both RAM and DB tiers
+- [x] Wire forceRefresh through all 6 data endpoints in otxRouter.ts + cacheStats + forceRefreshAll mutation
+- [x] Add Force Refresh button + cache stats badge on /threat-intel page header
+- [x] Write otxCache.test.ts: 23 tests (source regression, schema, frontend integration, unit)
+- [x] Full suite: 91 files, 2785 tests, 0 failures

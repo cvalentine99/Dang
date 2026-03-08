@@ -360,6 +360,27 @@ export default function ThreatIntel() {
 
   const handleRefresh = useCallback(() => { utils.otx.invalidate(); }, [utils]);
 
+  // ── Force refresh mutation (flushes RAM + purges expired DB cache) ────────
+  const forceRefreshMutation = trpc.otx.forceRefreshAll.useMutation({
+    onSuccess: (result) => {
+      utils.otx.invalidate();
+      toast.success(`Cache flushed. ${result.purgedDbEntries} expired DB entries purged.`);
+    },
+    onError: (err) => {
+      toast.error(`Force refresh failed: ${err.message}`);
+    },
+  });
+
+  const handleForceRefresh = useCallback(() => {
+    forceRefreshMutation.mutate();
+  }, [forceRefreshMutation]);
+
+  // ── Cache stats query ────────────────────────────────────────────────────
+  const cacheStatsQuery = trpc.otx.cacheStats.useQuery(undefined, {
+    staleTime: 30_000, // 30 seconds
+    gcTime: 60_000,
+  });
+
   // ── OTX Status (long cache — rarely changes) ─────────────────────────────
   const statusQuery = trpc.otx.status.useQuery(undefined, {
     staleTime: STALE_15M,
@@ -514,6 +535,24 @@ export default function ThreatIntel() {
             </div>
           )}
           <Badge variant="outline" className="text-[10px] border-threat-safe/30 text-threat-safe">OTX Connected</Badge>
+          {cacheStatsQuery.data?.db && (
+            <Badge variant="outline" className="text-[10px] border-primary/30 text-muted-foreground font-mono">
+              DB: {cacheStatsQuery.data.db.totalEntries} cached | RAM: {cacheStatsQuery.data.ram.ramKeys} hot
+            </Badge>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleForceRefresh}
+            disabled={forceRefreshMutation.isPending}
+            className="h-7 text-[10px] border-threat-high/30 text-threat-high hover:bg-threat-high/10"
+          >
+            {forceRefreshMutation.isPending ? (
+              <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Flushing…</>
+            ) : (
+              <><Zap className="w-3 h-3 mr-1" /> Force Refresh</>
+            )}
+          </Button>
           {isFetching && !feedQuery.isLoading && (
             <Badge variant="outline" className="text-[10px] border-primary/30 text-primary animate-pulse">
               <RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Updating…

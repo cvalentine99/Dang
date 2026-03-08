@@ -9,11 +9,20 @@
  * - searchPulses: Full-text pulse search
  * - indicatorLookup: IOC reputation lookup (IPv4, IPv6, domain, hostname, file hash, URL, CVE)
  * - activity: Recent pulse activity feed
+ * - cacheStats: Cache statistics (RAM + DB)
+ * - forceRefreshAll: Flush RAM cache and trigger fresh fetches
  */
 
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { isOtxConfigured, otxGet } from "./otxClient";
+import {
+  isOtxConfigured,
+  otxGet,
+  getCacheStats,
+  getDbCacheStats,
+  flushRamCache,
+  purgeExpiredDbCache,
+} from "./otxClient";
 
 export const otxRouter = router({
   // ── Status / connectivity check ────────────────────────────────────────────
@@ -36,6 +45,7 @@ export const otxRouter = router({
         page: z.number().int().min(1).default(1),
         limit: z.number().int().min(1).max(50).default(10),
         modified_since: z.string().optional(),
+        forceRefresh: z.boolean().optional().default(false),
       })
     )
     .query(async ({ input }) => {
@@ -50,14 +60,20 @@ export const otxRouter = router({
           modified_since: input.modified_since,
         },
         "pulses",
-        300
+        300,
+        input.forceRefresh
       );
       return { configured: true, data };
     }),
 
   // ── Pulse detail ───────────────────────────────────────────────────────────
   pulseDetail: protectedProcedure
-    .input(z.object({ pulseId: z.string().min(1) }))
+    .input(
+      z.object({
+        pulseId: z.string().min(1),
+        forceRefresh: z.boolean().optional().default(false),
+      })
+    )
     .query(async ({ input }) => {
       if (!isOtxConfigured()) {
         return { configured: false, data: null };
@@ -66,7 +82,8 @@ export const otxRouter = router({
         `/api/v1/pulses/${input.pulseId}`,
         {},
         "pulses",
-        300
+        300,
+        input.forceRefresh
       );
       return { configured: true, data };
     }),
@@ -78,6 +95,7 @@ export const otxRouter = router({
         pulseId: z.string().min(1),
         page: z.number().int().min(1).default(1),
         limit: z.number().int().min(1).max(500).default(50),
+        forceRefresh: z.boolean().optional().default(false),
       })
     )
     .query(async ({ input }) => {
@@ -88,7 +106,8 @@ export const otxRouter = router({
         `/api/v1/pulses/${input.pulseId}/indicators`,
         { page: input.page, limit: input.limit },
         "pulses",
-        300
+        300,
+        input.forceRefresh
       );
       return { configured: true, data };
     }),
@@ -100,6 +119,7 @@ export const otxRouter = router({
         query: z.string().min(1),
         page: z.number().int().min(1).default(1),
         limit: z.number().int().min(1).max(50).default(10),
+        forceRefresh: z.boolean().optional().default(false),
       })
     )
     .query(async ({ input }) => {
@@ -110,7 +130,8 @@ export const otxRouter = router({
         "/api/v1/search/pulses",
         { q: input.query, page: input.page, limit: input.limit },
         "search",
-        300
+        300,
+        input.forceRefresh
       );
       return { configured: true, data };
     }),
@@ -124,6 +145,7 @@ export const otxRouter = router({
         section: z
           .enum(["general", "reputation", "geo", "malware", "url_list", "passive_dns", "http_scans", "analysis"])
           .default("general"),
+        forceRefresh: z.boolean().optional().default(false),
       })
     )
     .query(async ({ input }) => {
@@ -140,7 +162,8 @@ export const otxRouter = router({
         `/api/v1/indicators/${input.type}/${encodedValue}/${input.section}`,
         {},
         "indicators",
-        600 // Cache IOC lookups for 10 minutes
+        600, // Cache IOC lookups for 10 minutes in RAM
+        input.forceRefresh
       );
       return { configured: true, data };
     }),
@@ -151,6 +174,7 @@ export const otxRouter = router({
       z.object({
         page: z.number().int().min(1).default(1),
         limit: z.number().int().min(1).max(50).default(20),
+        forceRefresh: z.boolean().optional().default(false),
       })
     )
     .query(async ({ input }) => {
@@ -161,8 +185,23 @@ export const otxRouter = router({
         "/api/v1/pulses/activity",
         { page: input.page, limit: input.limit },
         "pulses",
-        300
+        300,
+        input.forceRefresh
       );
       return { configured: true, data };
     }),
+
+  // ── Cache statistics ──────────────────────────────────────────────────────
+  cacheStats: protectedProcedure.query(async () => {
+    const ram = getCacheStats();
+    const db = await getDbCacheStats();
+    return { ram, db };
+  }),
+
+  // ── Force refresh: flush RAM cache + purge expired DB entries ─────────────
+  forceRefreshAll: protectedProcedure.mutation(async () => {
+    flushRamCache();
+    const purged = await purgeExpiredDbCache();
+    return { flushedRam: true, purgedDbEntries: purged };
+  }),
 });
