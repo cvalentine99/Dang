@@ -62,7 +62,7 @@
 | `status` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 438: `wazuh.agentPackages`
+### Line 446: `wazuh.agentPackages`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -80,7 +80,7 @@
 | `vendor` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 447: `wazuh.agentServices`
+### Line 455: `wazuh.agentServices`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -93,7 +93,7 @@
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 456: `wazuh.agentUsers`
+### Line 464: `wazuh.agentUsers`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|

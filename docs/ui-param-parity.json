@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-08T13:07:20.636Z",
+  "generated": "2026-03-08T13:19:19.784Z",
   "callsiteCount": 169,
   "procedureCount": 123,
   "consumedProcedures": [
@@ -1575,34 +1575,34 @@
     },
     {
       "file": "client/src/components/DriftComparison.tsx",
-      "line": 438,
+      "line": 446,
       "procedure": "agentPackages",
       "passedKeys": {
+        "agentId": "agentId || \"__noop__\"",
         "limit": "500",
-        "offset": "0",
-        "agentId": "shorthand"
+        "offset": "0"
       },
       "isVoid": false
     },
     {
       "file": "client/src/components/DriftComparison.tsx",
-      "line": 447,
+      "line": 455,
       "procedure": "agentServices",
       "passedKeys": {
+        "agentId": "agentId || \"__noop__\"",
         "limit": "500",
-        "offset": "0",
-        "agentId": "shorthand"
+        "offset": "0"
       },
       "isVoid": false
     },
     {
       "file": "client/src/components/DriftComparison.tsx",
-      "line": 456,
+      "line": 464,
       "procedure": "agentUsers",
       "passedKeys": {
+        "agentId": "agentId || \"__noop__\"",
         "limit": "500",
-        "offset": "0",
-        "agentId": "shorthand"
+        "offset": "0"
       },
       "isVoid": false
     },

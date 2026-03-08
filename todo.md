@@ -3800,3 +3800,11 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Verify fix 4: audit-splitbrain.mjs accepts parseAndNormalizeCorrelationBundle
 - [x] Add test coverage: callerParam.test.ts (7 tests) — caller presence, autoTriage fields, audit-splitbrain compat
 - [x] Full suite: 89 files, 2756 tests, 0 failures
+
+## BUG: DriftComparison.tsx hooks-in-map crash on load (2026-03-08)
+
+- [x] Fix hooks-in-map violation: selectedAgents starts as [], useEffect sets it to ["001","002"], hook count changes 0→6
+- [x] Pad agentDataQueries to fixed size of 5 (MAX_COMPARE_AGENTS), add agentId !== "" to enabled flag, __noop__ fallback for input schema
+- [x] Skip padding slots in data map builders (agentPackages, agentServicesMap, agentUsersMap)
+- [x] Add regression tests: driftComparison.test.ts (6 tests)
+- [x] Full suite: 90 files, 2762 tests, 0 failures

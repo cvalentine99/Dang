@@ -430,32 +430,40 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
 
   // Fetch per-agent syscollector data for all selected agents
   // We use individual queries per agent since the Wazuh API requires agentId per call
-  const agentDataQueries = useMemo(() => selectedAgents, [selectedAgents.join(",")]);
+  // IMPORTANT: Pad to a fixed size of 5 (max selectable agents) so the hook count
+  // is always 15 (5 × 3 query types) regardless of selectedAgents.length.
+  // This prevents a rules-of-hooks violation when selectedAgents changes from [] to ["001","002"].
+  const MAX_COMPARE_AGENTS = 5;
+  const agentDataQueries = useMemo(() => {
+    const padded = [...selectedAgents];
+    while (padded.length < MAX_COMPARE_AGENTS) padded.push("");
+    return padded.slice(0, MAX_COMPARE_AGENTS);
+  }, [selectedAgents.join(",")]);
 
-  // Per-agent package queries
+  // Per-agent package queries (always 5 hooks)
   const pkgQueries = agentDataQueries.map((agentId) =>
     // eslint-disable-next-line react-hooks/rules-of-hooks
     trpc.wazuh.agentPackages.useQuery(
-      { agentId, limit: 500, offset: 0 },
-      { enabled: isConnected && selectedAgents.length >= 2, staleTime: 60_000 }
+      { agentId: agentId || "__noop__", limit: 500, offset: 0 },
+      { enabled: agentId !== "" && isConnected && selectedAgents.length >= 2, staleTime: 60_000 }
     )
   );
 
-  // Per-agent service queries
+  // Per-agent service queries (always 5 hooks)
   const svcQueries = agentDataQueries.map((agentId) =>
     // eslint-disable-next-line react-hooks/rules-of-hooks
     trpc.wazuh.agentServices.useQuery(
-      { agentId, limit: 500, offset: 0 },
-      { enabled: isConnected && selectedAgents.length >= 2, staleTime: 60_000 }
+      { agentId: agentId || "__noop__", limit: 500, offset: 0 },
+      { enabled: agentId !== "" && isConnected && selectedAgents.length >= 2, staleTime: 60_000 }
     )
   );
 
-  // Per-agent user queries
+  // Per-agent user queries (always 5 hooks)
   const usrQueries = agentDataQueries.map((agentId) =>
     // eslint-disable-next-line react-hooks/rules-of-hooks
     trpc.wazuh.agentUsers.useQuery(
-      { agentId, limit: 500, offset: 0 },
-      { enabled: isConnected && selectedAgents.length >= 2, staleTime: 60_000 }
+      { agentId: agentId || "__noop__", limit: 500, offset: 0 },
+      { enabled: agentId !== "" && isConnected && selectedAgents.length >= 2, staleTime: 60_000 }
     )
   );
 
@@ -465,6 +473,7 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
   const agentPackages = useMemo(() => {
     const map: Record<string, Array<{ name: string; version: string }>> = {};
     agentDataQueries.forEach((agentId, i) => {
+      if (agentId === "") return; // skip padding slots
       const raw = pkgQueries[i]?.data;
       const d = (raw as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       const items = (d?.affected_items as Array<Record<string, unknown>>) ?? [];
@@ -479,6 +488,7 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
   const agentServicesMap = useMemo(() => {
     const map: Record<string, Array<{ name: string; state: string }>> = {};
     agentDataQueries.forEach((agentId, i) => {
+      if (agentId === "") return; // skip padding slots
       const raw = svcQueries[i]?.data;
       const d = (raw as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       const items = (d?.affected_items as Array<Record<string, unknown>>) ?? [];
@@ -493,6 +503,7 @@ export default function DriftComparison({ isConnected }: DriftComparisonProps) {
   const agentUsersMap = useMemo(() => {
     const map: Record<string, Array<{ name: string; shell: string }>> = {};
     agentDataQueries.forEach((agentId, i) => {
+      if (agentId === "") return; // skip padding slots
       const raw = usrQueries[i]?.data;
       const d = (raw as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       const items = (d?.affected_items as Array<Record<string, unknown>>) ?? [];
