@@ -258,6 +258,18 @@ describe("ETL — Layer Name Consistency", () => {
     expect(typesSource).toContain('"error_graph"');
     expect(typesSource).not.toContain('"error_failure"');
   });
+
+  it("DataPipeline.tsx uses error_graph (not error_failure)", async () => {
+    const pipelineSource = readFileSync(resolve(__dirname, "../../client/src/pages/DataPipeline.tsx"), "utf8");
+    expect(pipelineSource).not.toContain("error_failure");
+    expect(pipelineSource).toContain("error_graph");
+  });
+
+  it("GraphToolbar.tsx uses error_graph (not error_failure)", async () => {
+    const toolbarSource = readFileSync(resolve(__dirname, "../../client/src/pages/knowledge-graph/GraphToolbar.tsx"), "utf8");
+    expect(toolbarSource).not.toContain("error_failure");
+    expect(toolbarSource).toContain("error_graph");
+  });
 });
 
 // ── 6. Use Case Endpoint IDs are Strings ───────────────────────────────────

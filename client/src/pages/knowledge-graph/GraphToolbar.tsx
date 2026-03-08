@@ -107,7 +107,7 @@ export function GraphToolbar({
                 <option value="api_ontology">API Ontology</option>
                 <option value="operational_semantics">Operational Semantics</option>
                 <option value="schema_lineage">Schema Lineage</option>
-                <option value="error_failure">Error & Failure</option>
+                <option value="error_graph">Error & Failure</option>
               </select>
 
               {/* Risk filter */}

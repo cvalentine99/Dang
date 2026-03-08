@@ -3781,3 +3781,13 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Verified DbLike type fix (DbRoot | TxLike) is in place — tsc exit 0
 - [x] pnpm audit:splitbrain — all 10 checks pass
 - [x] Full test suite — 88 files, 2747 tests, 0 failures
+
+## BUG: autoTriageQueueItem success path missing status/processedAt/completedAt (2026-03-08)
+
+- [x] Fixed pipelineRouter.ts line 503: added status, processedAt, completedAt to .set() on success
+- [x] Verified: 88 files, 2747 tests, 0 failures
+
+## BUG: Pipeline page statusMap key mismatch — error_failure vs error_graph (2026-03-08)
+
+- [x] Fix key mismatch: UI uses "error_failure" but DB stores layer as "error_graph" — statusMap lookup fails
+- [x] Verify with tests — 88 files, 2749 tests, 0 failures

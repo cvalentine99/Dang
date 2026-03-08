@@ -503,6 +503,9 @@ export const pipelineRouter = router({
             .set({
               pipelineTriageId: result.triageId,
               autoTriageStatus: "completed",
+              status: "completed",
+              processedAt: new Date(),
+              completedAt: new Date(),
             })
             .where(eq(alertQueue.id, input.queueItemId));
 

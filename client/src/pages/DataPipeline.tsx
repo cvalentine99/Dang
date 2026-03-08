@@ -11,7 +11,7 @@ const LAYER_CONFIG: Record<string, { label: string; icon: typeof Globe; color: s
   api_ontology:           { label: "API Ontology",           icon: Globe,           color: "#818cf8", description: "Endpoints, parameters, responses, auth methods, resources" },
   operational_semantics:  { label: "Operational Semantics",  icon: Activity,        color: "#34d399", description: "Use cases, risk classification, LLM access rules" },
   schema_lineage:         { label: "Schema & Field Lineage", icon: Database,        color: "#fbbf24", description: "Index patterns, fields, data types, endpoint→index mapping" },
-  error_failure:          { label: "Error & Failure",        icon: AlertTriangle,   color: "#f87171", description: "Error codes, causes, mitigations, affected endpoints" },
+  error_graph:             { label: "Error & Failure",        icon: AlertTriangle,   color: "#f87171", description: "Error codes, causes, mitigations, affected endpoints" },
 };
 
 // ── Sync Status Card ────────────────────────────────────────────────────────
