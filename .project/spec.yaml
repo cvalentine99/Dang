@@ -1,0 +1,49 @@
+specVersion: v2
+specMinorVersion: 2
+meta:
+  name: dang
+  image: project-dang
+  description: Dang project converted for NVIDIA AI Workbench
+  labels: []
+  createdOn: "2026-03-08T00:00:00Z"
+  defaultBranch: main
+
+layout:
+  - path: .
+    type: code
+    storage: git
+
+environment:
+  base:
+    registry: nvcr.io
+    image: nvidia/ai-workbench/python-basic:1.0.9
+    build_timestamp: "20260112183658"
+    name: Python Basic
+    description: Python base with JupyterLab
+    labels: [ubuntu, python3, jupyterlab]
+    programming_languages: [python3]
+    image_version: 1.0.9
+    os: linux
+    os_distro: ubuntu
+    os_distro_release: "22.04"
+    schema_version: v2
+  compose_file_path: ""
+
+execution:
+  apps:
+    - name: JupyterLab
+      type: jupyterlab
+      class: webapp
+      start_command: jupyter lab --allow-root --port 8888 --ip 0.0.0.0 --no-browser --NotebookApp.base_url=\$PROXY_PREFIX --NotebookApp.default_url=/lab --NotebookApp.allow_origin='*'
+      health_check_command: "[ $(echo url=$(jupyter lab list | head -n 2 | tail -n 1 | cut -f1 -d' ' | grep -v 'Currently' | sed 's@/?@/lab?@g') | curl -o /dev/null -s -w '%{http_code}' --config -) == '200' ]"
+      stop_command: jupyter lab stop 8888
+      timeout_seconds: 60
+  resources:
+    gpu:
+      requested: 0
+    sharedMemoryMB: 1024
+  mounts:
+    - type: project
+      target: /project/
+      description: Project directory
+      options: rw
