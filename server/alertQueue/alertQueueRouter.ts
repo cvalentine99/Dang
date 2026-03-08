@@ -76,13 +76,13 @@ export const alertQueueRouter = router({
    */
   enqueue: protectedProcedure
     .input(z.object({
-      alertId: z.string().min(1),
-      ruleId: z.string(),
+      alertId: z.string().min(1).max(128),
+      ruleId: z.string().min(1).max(32),
       ruleDescription: z.string().optional(),
       ruleLevel: z.number().int().min(0).max(15).default(0),
-      agentId: z.string().optional(),
-      agentName: z.string().optional(),
-      alertTimestamp: z.string().optional(),
+      agentId: z.string().max(16).optional(),
+      agentName: z.string().max(128).optional(),
+      alertTimestamp: z.string().max(64).optional(),
       rawJson: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
@@ -140,20 +140,34 @@ export const alertQueueRouter = router({
       }
 
       // Insert the new alert
-      const [result] = await db.insert(alertQueue).values({
-        alertId: input.alertId,
-        ruleId: input.ruleId,
-        ruleDescription: input.ruleDescription ?? null,
-        ruleLevel: input.ruleLevel,
-        agentId: input.agentId ?? null,
-        agentName: input.agentName ?? null,
-        alertTimestamp: input.alertTimestamp ?? null,
-        rawJson: input.rawJson ?? null,
-        status: "queued",
-        queuedBy: ctx.user?.id ?? null,
-      });
+      try {
+        const [result] = await db.insert(alertQueue).values({
+          alertId: input.alertId,
+          ruleId: input.ruleId,
+          ruleDescription: input.ruleDescription ?? null,
+          ruleLevel: input.ruleLevel,
+          agentId: input.agentId ?? null,
+          agentName: input.agentName ?? null,
+          alertTimestamp: input.alertTimestamp ?? null,
+          rawJson: input.rawJson ?? null,
+          status: "queued",
+          queuedBy: ctx.user?.id ?? null,
+        });
 
-      return { success: true, message: "Alert queued for structured triage", id: result.insertId };
+        return { success: true, message: "Alert queued for structured triage", id: result.insertId };
+      } catch (err) {
+        const msg = (err as Error).message ?? String(err);
+        console.error("[AlertQueue] INSERT failed:", msg, {
+          alertId: input.alertId,
+          ruleId: input.ruleId,
+          agentId: input.agentId,
+          ruleLevel: input.ruleLevel,
+        });
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to insert alert into queue: ${msg.slice(0, 200)}`,
+        });
+      }
     }),
 
   /**

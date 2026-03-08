@@ -117,13 +117,13 @@ function SendToQueueButton({ alert }: { alert: Record<string, unknown> }) {
     const agent = (alert.agent as Record<string, unknown>) ?? {};
 
     enqueueMutation.mutate({
-      alertId: String(alert._id ?? alert.id ?? `alert-${Date.now()}`),
-      ruleId: String(rule.id ?? "unknown"),
+      alertId: String(alert._id ?? alert.id ?? `alert-${Date.now()}`).slice(0, 128),
+      ruleId: String(rule.id ?? "unknown").slice(0, 32),
       ruleDescription: rule.description ? String(rule.description) : undefined,
       ruleLevel: Number(rule.level ?? 0),
-      agentId: agent.id ? String(agent.id) : undefined,
-      agentName: agent.name ? String(agent.name) : undefined,
-      alertTimestamp: alert.timestamp ? String(alert.timestamp) : undefined,
+      agentId: agent.id ? String(agent.id).slice(0, 16) : undefined,
+      agentName: agent.name ? String(agent.name).slice(0, 128) : undefined,
+      alertTimestamp: alert.timestamp ? String(alert.timestamp).slice(0, 64) : undefined,
       rawJson: alert,
     });
   };

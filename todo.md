@@ -3761,3 +3761,10 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] 9. affectedAgentIds preserved from triage context, not from LLM hostnames/services
 - [x] 10. All comments distinguish raw (LLMCorrelationRaw) vs canonical (CorrelationBundle)
 - [x] 11. Generated proof: docs/correlation-bundle-split-brain-repair.md
+
+## FIX: Concurrency test assertions — mutually exclusive transitions
+
+- [x] Test 1: Fixed — both analysts target proposed→rejected (same terminal state), guaranteeing mutual exclusion
+- [x] Test 3: Fixed — accepts both valid outcomes (reject wins → bulk fails, or both succeed sequentially via approved→rejected)
+- [x] Test 1 uses same-terminal-state strategy; Test 3 accepts deterministic final state regardless of race outcome
+- [x] All assertions accept both error patterns: /Conflict:|terminal state|invalid transition/

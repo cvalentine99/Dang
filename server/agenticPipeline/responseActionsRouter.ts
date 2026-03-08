@@ -40,6 +40,7 @@ import {
   executeAction,
   deferAction,
   reproposeAction,
+  syncCaseSummaryAfterTransition,
 } from "./stateMachine";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -192,6 +193,19 @@ export const responseActionsRouter = router({
     }),
 
   // ── Bulk Approve ── (delegates each to centralized state machine) ─────────
+  //
+  // Concurrency note: This is NOT a single atomic batch. Each action gets its
+  // own transaction with an optimistic concurrency guard. Consequences:
+  //   - Partial success is possible (some approved, some fail on conflict)
+  //   - Another analyst can interleave transitions during the loop
+  //   - The final summary recompute per case IS atomic and derived from
+  //     canonical response_actions, so counters are correct after the batch
+  //
+  // This is intentional: a SOC analyst bulk-approving 10 actions should not
+  // have the entire batch roll back because one action was concurrently rejected
+  // by another analyst. Per-action results are returned so the UI can show
+  // exactly what succeeded and what conflicted.
+  //
   bulkApprove: adminProcedure
     .input(z.object({
       actionIds: z.array(z.string().min(1)).min(1).max(50),
@@ -199,9 +213,28 @@ export const responseActionsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const results: Array<{ actionId: string; success: boolean; error?: string }> = [];
+      const affectedCaseIds = new Set<number>();
+
+      // Transition each action but SKIP per-action case sync
       for (const actionId of input.actionIds) {
-        const result = await approveAction(actionId, ctx.user.id, input.reason ?? "Bulk approved");
+        const result = await transitionActionState({
+          actionId,
+          targetState: "approved",
+          performedBy: `user:${ctx.user.id}`,
+          reason: input.reason ?? "Bulk approved",
+          skipCaseSync: true,
+        });
         results.push({ actionId, success: result.success, error: result.error });
+
+        // Track which cases need a summary recompute
+        if (result.success && result.action?.caseId) {
+          affectedCaseIds.add(result.action.caseId);
+        }
+      }
+
+      // ONE recompute per affected case (not per action)
+      for (const caseId of Array.from(affectedCaseIds)) {
+        await syncCaseSummaryAfterTransition(caseId);
       }
 
       return {

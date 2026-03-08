@@ -231,6 +231,45 @@ jobs:
           echo "| SSE auth middleware | ✓ |" >> $GITHUB_STEP_SUMMARY
           echo "| SSRF host validation | ✓ |" >> $GITHUB_STEP_SUMMARY
 
+  # ── Split-Brain Architecture Audit ──────────────────────────────────────────
+  #
+  # Verifies that the three resolved split-brain vectors have not reappeared:
+  # 1. Walter path (alertQueue must use runTriageAgent, not runAnalystPipeline)
+  # 2. Correlation boundary (normalizer must be mandatory for persistence)
+  # 3. Response action state (canonical through stateMachine, not caseData)
+  # Also: read-only analyst paths stay read-only, transaction wrapping intact.
+  # ────────────────────────────────────────────────────────────────────────────
+  splitbrain-audit:
+    name: Split-Brain Audit
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run split-brain architecture audit
+        run: node scripts/audit-splitbrain.mjs
+
+      - name: Split-brain audit summary
+        if: always()
+        run: |
+          echo "## Split-Brain Architecture Audit" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> Verifies the three resolved split-brain vectors have not reappeared" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Description |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Walter path | alertQueue uses runTriageAgent (not runAnalystPipeline) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Correlation boundary | normalizer required for correlationBundles persistence |" >> $GITHUB_STEP_SUMMARY
+          echo "| Response actions | state flows through stateMachine.ts only |" >> $GITHUB_STEP_SUMMARY
+          echo "| Read-only paths | runAnalystPipeline/enhancedLLM do zero writes |" >> $GITHUB_STEP_SUMMARY
+          echo "| Counter drift | transitionActionState uses db.transaction() |" >> $GITHUB_STEP_SUMMARY
+
   # ── UI → Router Schema Parity Gate ─────────────────────────────────────────
   ui-parity:
     name: UI Parity Audit
@@ -456,7 +495,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [typecheck, test, contract-audit, ui-parity, ci-proof, broker-registry, openapi-diff]
+    needs: [typecheck, test, contract-audit, splitbrain-audit, ui-parity, ci-proof, broker-registry, openapi-diff]
     env:
       DATABASE_URL: "mysql://test:test@localhost:3306/test"
       JWT_SECRET: "ci-test-secret-not-for-production"

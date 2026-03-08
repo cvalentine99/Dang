@@ -22,13 +22,26 @@
  *   approved → executed (terminal)
  */
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   responseActions,
   responseActionAudit,
   livingCaseState,
 } from "../../drizzle/schema";
+
+/**
+ * Database handle type — works with both the root db and a transaction handle.
+ * Every internal function accepts this so the entire transition can run inside
+ * a single transaction.
+ *
+ * The root db has `$client: Pool` but a transaction handle (`MySqlTransaction`)
+ * does not. TxLike is inferred from the transaction callback parameter so it
+ * always matches the actual drizzle-orm version installed.
+ */
+type DbRoot = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type TxLike = Parameters<Parameters<DbRoot['transaction']>[0]>[0];
+type DbLike = DbRoot | TxLike;
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -42,6 +55,12 @@ export interface TransitionRequest {
   performedBy: string;
   reason?: string;
   metadata?: Record<string, unknown>;
+  /**
+   * When true, skip the case-summary recompute after this transition.
+   * Used by bulk operations that recompute once at the end instead of N times.
+   * The caller MUST call syncCaseSummaryAfterTransition() after the batch.
+   */
+  skipCaseSync?: boolean;
 }
 
 export interface TransitionResult {
@@ -149,7 +168,7 @@ export function checkInvariants(
  * Invariant 6: Every state transition writes an audit row. No exceptions.
  */
 async function logAudit(
-  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  db: DbLike,
   opts: {
     actionDbId: number;
     actionIdStr: string;
@@ -178,9 +197,19 @@ async function logAudit(
  * All state changes MUST go through this function.
  *
  * Guarantees:
- *   - All invariants are checked before the transition
- *   - An audit row is written for every transition
+ *   - All invariants are checked INSIDE the transaction (no stale reads)
+ *   - UPDATE uses an optimistic guard: WHERE id = ? AND state = fromState
+ *     so concurrent transitions on the same action fail cleanly instead of stomping
+ *   - An audit row is written for every successful transition
+ *   - Action mutation + audit + case summary recompute are ATOMIC (single transaction)
  *   - The updated action is returned
+ *
+ * Concurrency model:
+ *   InnoDB row locks on the UPDATE mean a second concurrent transaction on the
+ *   same action will block until the first commits. When it resumes, the WHERE
+ *   guard on `state = fromState` no longer matches, affectedRows = 0, and the
+ *   second transaction gets a clean conflict error — no stomping, no silent
+ *   double-transition.
  */
 export async function transitionActionState(
   req: TransitionRequest
@@ -188,98 +217,136 @@ export async function transitionActionState(
   const db = await getDb();
   if (!db) return { success: false, error: "Database not available" };
 
-  // 1. Fetch current action
-  const [action] = await db
-    .select()
-    .from(responseActions)
-    .where(eq(responseActions.actionId, req.actionId))
-    .limit(1);
+  // Everything that reads or writes happens inside one transaction.
+  // The action fetch, invariant check, update, audit, and summary sync are all
+  // serialized under the same tx — no stale-state window.
+  return db.transaction(async (tx) => {
+    // 1. Fetch current action INSIDE the transaction.
+    //    InnoDB's row lock on the subsequent UPDATE guarantees that if two
+    //    transactions race, the second one blocks here until the first commits.
+    const [action] = await tx
+      .select()
+      .from(responseActions)
+      .where(eq(responseActions.actionId, req.actionId))
+      .limit(1);
 
-  if (!action) {
-    return { success: false, error: `Action ${req.actionId} not found` };
-  }
+    if (!action) {
+      return { success: false, error: `Action ${req.actionId} not found` };
+    }
 
-  // 2. Check all invariants
-  const invariantCheck = checkInvariants(action, req.targetState, req.reason);
-  if (!invariantCheck.valid) {
+    // 2. Check all invariants (pure logic, but on fresh data from inside the tx)
+    const invariantCheck = checkInvariants(action, req.targetState, req.reason);
+    if (!invariantCheck.valid) {
+      return {
+        success: false,
+        error: invariantCheck.violation,
+        invariantViolation: invariantCheck.violation,
+        fromState: action.state,
+        toState: req.targetState,
+      };
+    }
+
+    // 3. Build update payload
+    const fromState = action.state;
+    const now = new Date();
+    const updatePayload: Record<string, unknown> = { state: req.targetState };
+
+    switch (req.targetState) {
+      case "approved":
+        updatePayload.approvedBy = req.performedBy;
+        updatePayload.approvedAt = now;
+        updatePayload.decidedBy = req.performedBy;
+        updatePayload.decidedAt = now;
+        break;
+      case "rejected":
+        updatePayload.decidedBy = req.performedBy;
+        updatePayload.decidedAt = now;
+        updatePayload.decisionReason = req.reason ?? null;
+        break;
+      case "executed":
+        updatePayload.executedBy = req.performedBy;
+        updatePayload.executedAt = now;
+        break;
+      case "deferred":
+        updatePayload.decidedBy = req.performedBy;
+        updatePayload.decidedAt = now;
+        updatePayload.decisionReason = req.reason ?? null;
+        break;
+      case "proposed":
+        // Re-propose from deferred — clear previous decision
+        updatePayload.decidedBy = null;
+        updatePayload.decidedAt = null;
+        updatePayload.decisionReason = null;
+        break;
+    }
+
+    // 4. Apply transition with OPTIMISTIC CONCURRENCY GUARD.
+    //    WHERE state = fromState ensures that if another transaction committed
+    //    a state change between our read and this write, we get affectedRows=0
+    //    instead of silently stomping. InnoDB's row-level lock on UPDATE means
+    //    the second transaction blocks until the first commits, then the WHERE
+    //    clause evaluates against the committed state.
+    const updateResult = await tx
+      .update(responseActions)
+      .set(updatePayload as any)
+      .where(
+        and(
+          eq(responseActions.id, action.id),
+          eq(responseActions.state, fromState),
+        )
+      );
+
+    // Check affectedRows — 0 means someone else changed the state first.
+    // drizzle-orm/mysql2 returns [ResultSetHeader, FieldPacket[]] from mysql2.
+    // ResultSetHeader.affectedRows tells us if the WHERE guard matched.
+    const affectedRows = (updateResult as any)?.[0]?.affectedRows ?? 0;
+
+    if (affectedRows === 0) {
+      // Lost the race — another transaction committed a different transition.
+      // Return a clean conflict error; the caller can re-fetch and retry.
+      //
+      // UI CONTRACT: The error string starts with "Conflict:" so the frontend
+      // can distinguish race-lost errors from other failures and show a
+      // "refresh and retry" prompt instead of a generic error toast.
+      // If you change this prefix, update the UI error handler too.
+      return {
+        success: false,
+        error: `Conflict: action ${req.actionId} state changed concurrently (expected "${fromState}"). Refresh and retry.`,
+        fromState,
+        toState: req.targetState,
+      };
+    }
+
+    // 5. Write audit row (ALWAYS, only on successful transition)
+    await logAudit(tx, {
+      actionDbId: action.id,
+      actionIdStr: action.actionId,
+      fromState,
+      toState: req.targetState,
+      performedBy: req.performedBy,
+      reason: req.reason,
+      metadata: req.metadata,
+    });
+
+    // 6. Recompute case summary (unless caller will do it in batch)
+    if (action.caseId && !req.skipCaseSync) {
+      await syncCaseSummaryAtomic(tx, action.caseId);
+    }
+
+    // 7. Return updated action (read inside tx for consistency)
+    const [updated] = await tx
+      .select()
+      .from(responseActions)
+      .where(eq(responseActions.id, action.id))
+      .limit(1);
+
     return {
-      success: false,
-      error: invariantCheck.violation,
-      invariantViolation: invariantCheck.violation,
-      fromState: action.state,
+      success: true,
+      action: updated,
+      fromState,
       toState: req.targetState,
     };
-  }
-
-  // 3. Build update payload
-  const fromState = action.state;
-  const now = new Date();
-  const updatePayload: Record<string, unknown> = { state: req.targetState };
-
-  switch (req.targetState) {
-    case "approved":
-      updatePayload.approvedBy = req.performedBy;
-      updatePayload.approvedAt = now;
-      updatePayload.decidedBy = req.performedBy;
-      updatePayload.decidedAt = now;
-      break;
-    case "rejected":
-      updatePayload.decidedBy = req.performedBy;
-      updatePayload.decidedAt = now;
-      updatePayload.decisionReason = req.reason ?? null;
-      break;
-    case "executed":
-      updatePayload.executedBy = req.performedBy;
-      updatePayload.executedAt = now;
-      break;
-    case "deferred":
-      updatePayload.decidedBy = req.performedBy;
-      updatePayload.decidedAt = now;
-      updatePayload.decisionReason = req.reason ?? null;
-      break;
-    case "proposed":
-      // Re-propose from deferred — clear previous decision
-      updatePayload.decidedBy = null;
-      updatePayload.decidedAt = null;
-      updatePayload.decisionReason = null;
-      break;
-  }
-
-  // 4. Apply transition
-  await db
-    .update(responseActions)
-    .set(updatePayload as any)
-    .where(eq(responseActions.id, action.id));
-
-  // 5. Invariant 6: Write audit row (ALWAYS)
-  await logAudit(db, {
-    actionDbId: action.id,
-    actionIdStr: action.actionId,
-    fromState,
-    toState: req.targetState,
-    performedBy: req.performedBy,
-    reason: req.reason,
-    metadata: req.metadata,
   });
-
-  // 6. Recompute case summary counters from response_actions (eliminates counter drift)
-  if (action.caseId) {
-    await syncCaseSummaryAfterTransition(action.caseId);
-  }
-
-  // 7. Return updated action
-  const [updated] = await db
-    .select()
-    .from(responseActions)
-    .where(eq(responseActions.id, action.id))
-    .limit(1);
-
-  return {
-    success: true,
-    action: updated,
-    fromState,
-    toState: req.targetState,
-  };
 }
 
 // ── Case Summary Recompute ──────────────────────────────────────────────────
@@ -304,8 +371,12 @@ export interface CaseSummary {
   deferred: number;
 }
 
-export async function recomputeCaseSummary(caseId: number): Promise<CaseSummary | null> {
-  const db = await getDb();
+/**
+ * Count actions by state for a case. Accepts a db/tx handle so it can
+ * run inside the caller's transaction.
+ */
+export async function recomputeCaseSummary(caseId: number, tx?: DbLike): Promise<CaseSummary | null> {
+  const db = tx ?? await getDb();
   if (!db) return null;
 
   // Count actions by state for this case — derived from response_actions, not snapshots
@@ -339,18 +410,18 @@ export async function recomputeCaseSummary(caseId: number): Promise<CaseSummary 
 }
 
 /**
- * Updates living_case_state counters and LivingCaseObject.actionSummary
- * from the response_actions table. Called after every state transition.
+ * Atomic case summary sync — runs inside the caller's transaction.
+ * Recomputes counters from response_actions and writes living_case_state
+ * in ONE UPDATE (not two), ensuring counters and caseData.actionSummary
+ * are always coherent.
  */
-export async function syncCaseSummaryAfterTransition(caseId: number): Promise<void> {
-  const db = await getDb();
-  if (!db || !caseId) return;
+async function syncCaseSummaryAtomic(tx: DbLike, caseId: number): Promise<void> {
+  if (!caseId) return;
 
-  const summary = await recomputeCaseSummary(caseId);
+  const summary = await recomputeCaseSummary(caseId, tx);
   if (!summary) return;
 
-  // 1. Update the denormalized counters on living_case_state
-  const [caseRow] = await db
+  const [caseRow] = await tx
     .select()
     .from(livingCaseState)
     .where(eq(livingCaseState.id, caseId))
@@ -358,24 +429,39 @@ export async function syncCaseSummaryAfterTransition(caseId: number): Promise<vo
 
   if (!caseRow) return;
 
-  // 2. Update the counters on the table row
-  await db
+  const approvalRequired = await getApprovalRequiredCount(tx, caseId);
+
+  // Merge caseData.actionSummary update into the same write as the counter update.
+  // This was previously two separate UPDATEs — a drift window between them.
+  const caseData = (caseRow.caseData as any) ?? {};
+  caseData.actionSummary = summary;
+
+  await tx
     .update(livingCaseState)
     .set({
       pendingActionCount: summary.proposed,
-      approvalRequiredCount: await getApprovalRequiredCount(db, caseId),
+      approvalRequiredCount: approvalRequired,
+      caseData,
     })
     .where(eq(livingCaseState.id, caseId));
+}
 
-  // 3. Update the actionSummary inside the caseData JSON
-  const caseData = caseRow.caseData as any;
-  if (caseData) {
-    caseData.actionSummary = summary;
-    await db
-      .update(livingCaseState)
-      .set({ caseData })
-      .where(eq(livingCaseState.id, caseId));
-  }
+/**
+ * Public entry point for case summary sync — used by external callers
+ * (e.g. bulkApprove after its batch loop). Gets its own db handle if
+ * no transaction is provided.
+ *
+ * For single transitions, prefer letting transitionActionState() handle
+ * the sync inside its transaction.
+ */
+export async function syncCaseSummaryAfterTransition(caseId: number): Promise<void> {
+  const db = await getDb();
+  if (!db || !caseId) return;
+
+  // Wrap in its own transaction so the recompute + write are atomic
+  await db.transaction(async (tx) => {
+    await syncCaseSummaryAtomic(tx, caseId);
+  });
 }
 
 /**
@@ -383,7 +469,7 @@ export async function syncCaseSummaryAfterTransition(caseId: number): Promise<vo
  * Derived from response_actions, not from snapshot.
  */
 async function getApprovalRequiredCount(
-  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  db: DbLike,
   caseId: number
 ): Promise<number> {
   const [result] = await db

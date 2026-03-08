@@ -16,7 +16,8 @@
     "audit:ui-parity": "node scripts/audit-ui-param-parity.mjs",
     "audit:broker": "node scripts/verify-param-counts.mjs",
     "audit:openapi": "node scripts/diff-wazuh-openapi.mjs",
-    "proof:generate": "node scripts/generate-ci-proof.mjs"
+    "proof:generate": "node scripts/generate-ci-proof.mjs",
+    "audit:splitbrain": "node scripts/audit-splitbrain.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.999.0",
