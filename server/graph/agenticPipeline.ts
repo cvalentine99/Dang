@@ -251,6 +251,7 @@ async function analyzeIntent(query: string, conversationHistory: AnalystMessage[
     .join("\n");
 
   const response = await invokeLLM({
+    caller: "analyst_chat",
     messages: [
       {
         role: "system",
@@ -857,6 +858,7 @@ async function synthesizeResponse(
     .join("\n");
 
   const response = await invokeLLM({
+    caller: "analyst_chat",
     messages: [
       {
         role: "system",
@@ -939,6 +941,7 @@ Extracted entities: ${JSON.stringify(intent.entities)}`,
   let suggestedFollowUps: string[] = [];
   try {
     const followUpResponse = await invokeLLM({
+      caller: "analyst_chat",
       messages: [
         {
           role: "system",

@@ -3791,3 +3791,12 @@ These need a proper contract-alignment sprint, not a hot patch:
 
 - [x] Fix key mismatch: UI uses "error_failure" but DB stores layer as "error_graph" — statusMap lookup fails
 - [x] Verify with tests — 88 files, 2749 tests, 0 failures
+
+## User-applied production fixes (2026-03-08) — verification pass
+
+- [x] Verify fix 1: pipelineRouter.ts autoTriageQueueItem sets status/processedAt/completedAt
+- [x] Verify fix 2: DataPipeline.tsx error_failure → error_graph (already applied in previous checkpoint)
+- [x] Verify fix 3: Missing `caller` param on LLM invocations — applied to correlationAgent.ts (1 call) and graph/agenticPipeline.ts (3 calls)
+- [x] Verify fix 4: audit-splitbrain.mjs accepts parseAndNormalizeCorrelationBundle
+- [x] Add test coverage: callerParam.test.ts (7 tests) — caller presence, autoTriage fields, audit-splitbrain compat
+- [x] Full suite: 89 files, 2756 tests, 0 failures

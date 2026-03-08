@@ -745,6 +745,7 @@ export async function runCorrelationAgent(
         { role: "user", content: prompt },
       ],
       response_format: CORRELATION_JSON_SCHEMA,
+      caller: "correlation_agent",
     });
     
     // 5. Parse and validate the structured LLM response via Zod schema
