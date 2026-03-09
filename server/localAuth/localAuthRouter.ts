@@ -91,11 +91,12 @@ export const localAuthRouter = router({
       });
 
       const { getSessionCookieOptions } = await import("../_core/cookies");
-      const { COOKIE_NAME, ONE_YEAR_MS } = await import("@shared/const");
+      const { COOKIE_NAME } = await import("@shared/const");
+      const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // Audit #15: 24h cookie lifetime
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.cookie(COOKIE_NAME, loginResult.token, {
         ...cookieOptions,
-        maxAge: ONE_YEAR_MS,
+        maxAge: SESSION_TTL_MS,
       });
 
       return {
@@ -128,11 +129,12 @@ export const localAuthRouter = router({
 
       // Set session cookie
       const { getSessionCookieOptions } = await import("../_core/cookies");
-      const { COOKIE_NAME, ONE_YEAR_MS } = await import("@shared/const");
+      const { COOKIE_NAME } = await import("@shared/const");
+      const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // Audit #15: 24h cookie lifetime
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.cookie(COOKIE_NAME, result.token, {
         ...cookieOptions,
-        maxAge: ONE_YEAR_MS,
+        maxAge: SESSION_TTL_MS,
       });
 
       return {

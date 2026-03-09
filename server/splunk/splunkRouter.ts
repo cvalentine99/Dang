@@ -120,9 +120,21 @@ export const splunkRouter = router({
   /**
    * Test Splunk HEC connectivity.
    */
-  testConnection: protectedProcedure.mutation(async () => {
-    return testSplunkConnection();
-  }),
+  // Audit #29: Accept optional form overrides so the "Test Connection" button
+  // tests the values currently in the form, not just the saved config.
+  testConnection: protectedProcedure
+    .input(
+      z.object({
+        host: z.string().optional(),
+        port: z.string().optional(),
+        hecToken: z.string().optional(),
+        hecPort: z.string().optional(),
+        protocol: z.string().optional(),
+      }).optional()
+    )
+    .mutation(async ({ input }) => {
+      return testSplunkConnection(input);
+    }),
 
   /**
    * Check if Splunk integration is available.

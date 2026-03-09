@@ -15,6 +15,17 @@
 import { getDb } from "../db";
 import { connectionSettings } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
+import { Agent } from "undici";
+import { SKIP_TLS_VERIFY } from "../_core/tlsAgent";
+
+// Audit #28: Use centralized TLS policy for Splunk connections
+function getSplunkDispatcher() {
+  return new Agent({
+    connect: {
+      rejectUnauthorized: !SKIP_TLS_VERIFY,
+    },
+  });
+}
 
 // ── Environment defaults ──────────────────────────────────────────────────
 
@@ -188,7 +199,7 @@ export async function sendHECEvent(event: SplunkHECEvent): Promise<{
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
 
-    // Use Node.js native fetch with TLS skip for self-signed certs
+    // Audit #28: Use centralized TLS agent for self-signed cert support
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -197,6 +208,8 @@ export async function sendHECEvent(event: SplunkHECEvent): Promise<{
       },
       body: JSON.stringify(event),
       signal: controller.signal,
+      // @ts-expect-error -- undici dispatcher is supported in Node 22 native fetch
+      dispatcher: getSplunkDispatcher(),
     });
 
     clearTimeout(timeout);
@@ -224,12 +237,31 @@ export async function sendHECEvent(event: SplunkHECEvent): Promise<{
 /**
  * Test Splunk HEC connectivity by hitting the health endpoint.
  */
-export async function testSplunkConnection(): Promise<{
+/**
+ * Audit #29: Accept optional overrides so the "Test Connection" button
+ * in the settings form can test unsaved values from the form fields.
+ */
+export async function testSplunkConnection(overrides?: {
+  host?: string;
+  port?: string;
+  hecToken?: string;
+  hecPort?: string;
+  protocol?: string;
+}): Promise<{
   success: boolean;
   message: string;
   latencyMs?: number;
 }> {
-  const config = await getEffectiveSplunkConfig();
+  const saved = await getEffectiveSplunkConfig();
+  // Merge form overrides on top of saved config
+  const config = {
+    ...saved,
+    ...(overrides?.host && { host: overrides.host }),
+    ...(overrides?.port && { port: overrides.port }),
+    ...(overrides?.hecToken && { hecToken: overrides.hecToken }),
+    ...(overrides?.hecPort && { hecPort: overrides.hecPort }),
+    ...(overrides?.protocol && { protocol: overrides.protocol }),
+  };
 
   if (!config.host || !config.hecToken) {
     return { success: false, message: "Splunk not configured (missing host or HEC token)" };
@@ -242,10 +274,13 @@ export async function testSplunkConnection(): Promise<{
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
 
+    // Audit #28: Use centralized TLS agent
     const response = await fetch(healthUrl, {
       method: "GET",
       headers: { Authorization: `Splunk ${config.hecToken}` },
       signal: controller.signal,
+      // @ts-expect-error -- undici dispatcher is supported in Node 22 native fetch
+      dispatcher: getSplunkDispatcher(),
     });
 
     clearTimeout(timeout);

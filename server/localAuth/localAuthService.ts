@@ -43,53 +43,58 @@ export async function registerLocalUser(input: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Check if any users exist — first user becomes admin
-  const existingUsers = await db.select({ id: users.id }).from(users).limit(1);
-  const isFirstUser = existingUsers.length === 0;
-
-  // Generate a unique openId for local users
-  const openId = `local_${randomUUID().replace(/-/g, "")}`;
+  // Pre-compute expensive hash outside the transaction to minimize lock time
   const passwordHash = await hashPassword(input.password);
+  const openId = `local_${randomUUID().replace(/-/g, "")}`;
 
-  // Check if username already exists
-  const existing = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.name, input.username))
-    .limit(1);
+  // Audit #3: Wrap the entire check-then-insert in a transaction to prevent
+  // the first-user race condition (two concurrent registrations both seeing
+  // zero users and both becoming admin).
+  return await db.transaction(async (tx) => {
+    // Check if any users exist — first user becomes admin
+    const existingUsers = await tx.select({ id: users.id }).from(users).limit(1);
+    const isFirstUser = existingUsers.length === 0;
 
-  if (existing.length > 0) {
-    throw new Error("Username already exists");
-  }
-
-  // Check if email already exists (if provided)
-  if (input.email) {
-    const existingEmail = await db
+    // Check if username already exists
+    const existing = await tx
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.email, input.email))
+      .where(eq(users.name, input.username))
       .limit(1);
-    if (existingEmail.length > 0) {
-      throw new Error("Email already registered");
+
+    if (existing.length > 0) {
+      throw new Error("Username already exists");
     }
-  }
 
-  const [result] = await db.insert(users).values({
-    openId,
-    name: input.username,
-    email: input.email || null,
-    passwordHash,
-    loginMethod: "local",
-    role: isFirstUser ? "admin" : "user",
-    lastSignedIn: new Date(),
-  }).$returningId();
+    // Check if email already exists (if provided)
+    if (input.email) {
+      const existingEmail = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, input.email))
+        .limit(1);
+      if (existingEmail.length > 0) {
+        throw new Error("Email already registered");
+      }
+    }
 
-  return {
-    id: result.id, // Audit #18: return actual auto-increment PK
-    openId,
-    name: input.username,
-    role: isFirstUser ? "admin" : "user",
-  };
+    const [result] = await tx.insert(users).values({
+      openId,
+      name: input.username,
+      email: input.email || null,
+      passwordHash,
+      loginMethod: "local",
+      role: isFirstUser ? "admin" : "user",
+      lastSignedIn: new Date(),
+    }).$returningId();
+
+    return {
+      id: result.id, // Audit #18: return actual auto-increment PK
+      openId,
+      name: input.username,
+      role: isFirstUser ? "admin" : "user",
+    };
+  });
 }
 
 /**

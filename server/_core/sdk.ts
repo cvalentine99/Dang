@@ -9,7 +9,10 @@
  * No OAuth. No external auth providers.
  */
 
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME } from "@shared/const";
+
+// Audit #15: Reduce session lifetime from 1 year to 24 hours
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 import { ForbiddenError } from "@shared/_core/errors";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
@@ -63,17 +66,22 @@ class SDKServer {
     options: { expiresInMs?: number } = {}
   ): Promise<string> {
     const issuedAt = Date.now();
-    const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
+    const expiresInMs = options.expiresInMs ?? SESSION_TTL_MS;
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
     const secretKey = this.getSessionSecret();
 
+    // Audit #16: Include issuer and audience for JWT binding
+    const appId = payload.appId || ENV.appId || "dang-local";
     return new SignJWT({
       openId: payload.openId,
-      appId: payload.appId,
+      appId,
       name: payload.name,
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuedAt(Math.floor(issuedAt / 1000))
       .setExpirationTime(expirationSeconds)
+      .setIssuer("dang-siem")
+      .setAudience(appId)
       .sign(secretKey);
   }
 
@@ -86,8 +94,12 @@ class SDKServer {
 
     try {
       const secretKey = this.getSessionSecret();
+      // Audit #16: Enforce issuer and audience on verification
+      const expectedAppId = ENV.appId || "dang-local";
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
+        issuer: "dang-siem",
+        audience: expectedAppId,
       });
       const { openId, appId, name } = payload as Record<string, unknown>;
 

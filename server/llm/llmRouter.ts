@@ -11,7 +11,7 @@
 import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { desc, sql, and, gte } from "drizzle-orm";
-import { publicProcedure, router } from "../_core/trpc";
+import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { llmUsage } from "../../drizzle/schema";
 import { getEffectiveLLMConfig } from "./llmService";
@@ -74,14 +74,15 @@ export const llmRouter = router({
    * Health check — ping the custom LLM endpoint.
    * Used by the sidebar indicator for live status.
    */
-  healthCheck: publicProcedure.query(async () => {
+  // Audit #6: All LLM endpoints require authentication
+  healthCheck: protectedProcedure.query(async () => {
     return pingLLM();
   }),
 
   /**
    * Aggregated usage statistics for a given time range.
    */
-  usageStats: publicProcedure
+  usageStats: protectedProcedure
     .input(
       z.object({
         range: z.enum(["today", "7d", "30d", "all"]).default("today"),
@@ -144,7 +145,7 @@ export const llmRouter = router({
   /**
    * Time-series usage data for charts (hourly buckets).
    */
-  usageHistory: publicProcedure
+  usageHistory: protectedProcedure
     .input(
       z.object({
         range: z.enum(["24h", "7d", "30d"]).default("24h"),
@@ -189,7 +190,7 @@ export const llmRouter = router({
   /**
    * Recent LLM calls — paginated list of individual invocations.
    */
-  recentCalls: publicProcedure
+  recentCalls: protectedProcedure
     .input(
       z.object({
         limit: z.number().int().min(1).max(100).default(25),

@@ -3917,3 +3917,23 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Write regression tests for #54 overlap guard (8 source-level tests added to concurrencyGuards.test.ts)
 - [x] Verification pass — all 5 audit fixes (#26, #53, #54, #83, hybridrag caller) confirmed in source
 - [x] Full suite: 93 files, 2817 tests, 0 failures
+
+## Audit Re-verification Sprint (2026-03-09) — 16 Unfixed Findings
+- [x] #6: Make LLM endpoints protected — all 4 procedures now use protectedProcedure
+- [x] #10: Debug collector gated behind MANUS_DEBUG=true env var — disabled by default
+- [x] #2: Already fixed — docker-compose.yml uses :? required syntax, DB bound to 127.0.0.1
+- [x] #3: registerLocalUser now wrapped in db.transaction() — prevents first-user race
+- [x] #18: Already fixed — uses $returningId() to get actual auto-increment PK
+- [x] #12: SameSite hardened to always "lax" — no more SameSite=None
+- [x] #14: JWT_SECRET < 32 chars now hard-fails in production (errors array → process.exit)
+- [x] #15: JWT expiry reduced from 1 year to 24 hours, cookie maxAge updated to match
+- [x] #16: JWT now includes issuer ("dang-siem") and audience (appId), enforced on verify
+- [x] #13: Already fixed — authenticateRequest checks user.isDisabled and throws ForbiddenError
+- [x] #28: Splunk service now uses undici Agent with centralized TLS policy
+- [x] #29: testSplunkConnection accepts optional overrides for form-value testing
+- [x] #4: Already fixed — tlsAgent.ts centralizes TLS policy, no hardcoded rejectUnauthorized:false
+- [x] #7: Already fixed — updateSettings uses validateHost() for host validation
+- [x] #30: Already fixed — DashboardLayout blocks unauthenticated users with UnauthenticatedView
+- [x] #33: Created server/testHelpers/requireDb.ts with describeWithDb helper
+- [x] Full suite: 93 files, 2817 tests, 0 failures
+- [x] tsc: 4 pre-existing errors (stateMachine.ts + otxClient.ts) — no new errors

@@ -198,15 +198,24 @@ export function validateEnvironment(): {
     );
   }
 
-  // JWT_SECRET strength check
+  // Audit #14: JWT_SECRET strength check — hard-fail in production
   const jwtSecret = process.env.JWT_SECRET;
   if (jwtSecret && jwtSecret.length < 32) {
-    warnings.push(
-      "JWT_SECRET is shorter than 32 characters — consider using a stronger secret"
-    );
-    console.log(
-      "  ⚠️  JWT_SECRET is short — run `openssl rand -hex 32` for a strong secret"
-    );
+    if (process.env.NODE_ENV === "production") {
+      errors.push(
+        "JWT_SECRET is shorter than 32 characters — this is a security risk in production. Generate with: openssl rand -hex 32"
+      );
+      console.error(
+        "  ❌  JWT_SECRET is too short for production — run `openssl rand -hex 32`"
+      );
+    } else {
+      warnings.push(
+        "JWT_SECRET is shorter than 32 characters — consider using a stronger secret"
+      );
+      console.log(
+        "  ⚠️  JWT_SECRET is short — run `openssl rand -hex 32` for a strong secret"
+      );
+    }
   }
 
   // Summary

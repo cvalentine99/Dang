@@ -43,10 +43,11 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    // sameSite "none" requires secure=true (HTTPS). On plain HTTP (Docker
-    // self-hosted on localhost), the browser silently rejects the cookie,
-    // causing a login redirect loop. Use "lax" for HTTP connections.
-    sameSite: secure ? "none" : "lax",
+    // Audit #12: Always use SameSite=Lax for CSRF protection.
+    // SameSite=None is only needed for cross-origin iframe embedding,
+    // which this app does not use. Lax allows same-site navigation
+    // while blocking cross-origin POST-based CSRF attacks.
+    sameSite: "lax",
     secure,
   };
 }

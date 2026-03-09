@@ -79,7 +79,8 @@ function vitePluginManusDebugCollector(): Plugin {
     name: "manus-debug-collector",
 
     transformIndexHtml(html) {
-      if (process.env.NODE_ENV === "production") {
+      // Audit #10: Debug collector only loads when MANUS_DEBUG=true AND not production
+      if (process.env.NODE_ENV === "production" || process.env.MANUS_DEBUG !== "true") {
         return html;
       }
       return {
@@ -98,6 +99,8 @@ function vitePluginManusDebugCollector(): Plugin {
     },
 
     configureServer(server: ViteDevServer) {
+      // Audit #10: Only register log endpoint when MANUS_DEBUG=true
+      if (process.env.MANUS_DEBUG !== "true") return;
       // POST /__manus__/logs: Browser sends logs (written directly to files)
       server.middlewares.use("/__manus__/logs", (req, res, next) => {
         if (req.method !== "POST") {
