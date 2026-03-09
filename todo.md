@@ -3937,3 +3937,7 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] #33: Created server/testHelpers/requireDb.ts with describeWithDb helper
 - [x] Full suite: 93 files, 2817 tests, 0 failures
 - [x] tsc: 4 pre-existing errors (stateMachine.ts + otxClient.ts) — no new errors
+
+## Deployment Fix (2026-03-09)
+- [x] Fix JWT_SECRET hard-fail too aggressive — now only hard-fails for well-known defaults or < 16 chars; 16-31 chars is a warning
+- [x] Full suite: 93 files, 2817 tests, 0 failures

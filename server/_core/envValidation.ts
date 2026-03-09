@@ -198,24 +198,34 @@ export function validateEnvironment(): {
     );
   }
 
-  // Audit #14: JWT_SECRET strength check — hard-fail in production
+  // Audit #14: JWT_SECRET strength check
+  // Hard-fail only for obviously weak secrets (common defaults).
+  // Short-but-random secrets (e.g., platform-injected 22-char tokens) get a warning.
   const jwtSecret = process.env.JWT_SECRET;
-  if (jwtSecret && jwtSecret.length < 32) {
-    if (process.env.NODE_ENV === "production") {
-      errors.push(
-        "JWT_SECRET is shorter than 32 characters — this is a security risk in production. Generate with: openssl rand -hex 32"
-      );
-      console.error(
-        "  ❌  JWT_SECRET is too short for production — run `openssl rand -hex 32`"
-      );
-    } else {
-      warnings.push(
-        "JWT_SECRET is shorter than 32 characters — consider using a stronger secret"
-      );
-      console.log(
-        "  ⚠️  JWT_SECRET is short — run `openssl rand -hex 32` for a strong secret"
-      );
-    }
+  const WEAK_SECRETS = ["secret", "changeme", "password", "jwt_secret", "test", "dev", "123456"];
+  if (jwtSecret && WEAK_SECRETS.includes(jwtSecret.toLowerCase())) {
+    errors.push(
+      `JWT_SECRET is a well-known default ("${jwtSecret}") — this MUST be changed. Generate with: openssl rand -hex 32`
+    );
+    console.error(
+      "  ❌  JWT_SECRET is a well-known default — change it immediately"
+    );
+  } else if (jwtSecret && jwtSecret.length < 16) {
+    // Under 16 chars is dangerously short regardless of randomness
+    errors.push(
+      "JWT_SECRET is shorter than 16 characters — this is too weak. Generate with: openssl rand -hex 32"
+    );
+    console.error(
+      "  ❌  JWT_SECRET is too short — run `openssl rand -hex 32`"
+    );
+  } else if (jwtSecret && jwtSecret.length < 32) {
+    // 16-31 chars: warn but don't block (platform-injected secrets may be ~22 chars)
+    warnings.push(
+      "JWT_SECRET is shorter than 32 characters — consider using a stronger secret (openssl rand -hex 32)"
+    );
+    console.log(
+      "  ⚠️  JWT_SECRET is short (< 32 chars) — consider `openssl rand -hex 32` for a stronger secret"
+    );
   }
 
   // Summary
