@@ -127,15 +127,21 @@ function matchesRule(alert: WazuhAlert, rule: AutoQueueRule): boolean {
 /**
  * Check and reset the hourly rate limit counter for a rule.
  * Returns true if the rule can still auto-queue (under limit).
+ *
+ * Audit #53: Uses atomic UPDATE with WHERE guard to prevent race conditions.
+ * Two concurrent calls cannot both read the same count and both increment —
+ * the UPDATE ... WHERE currentHourCount < maxPerHour is a single atomic
+ * statement that only one caller can win per row per count value.
  */
 async function checkRateLimit(rule: AutoQueueRule): Promise<boolean> {
   const db = await requireDb();
-
   const now = new Date();
   const hourStart = rule.currentHourStart;
 
-  // If no hour window or it's expired (>1 hour old), reset
+  // If no hour window or it's expired (>1 hour old), reset atomically
   if (!hourStart || now.getTime() - hourStart.getTime() > 3600_000) {
+    // Atomic reset: SET count=1, hourStart=now WHERE id=rule.id
+    // If two callers race on reset, both set count=1 — safe (worst case: one alert uncounted)
     await db
       .update(autoQueueRules)
       .set({ currentHourCount: 1, currentHourStart: now })
@@ -143,18 +149,22 @@ async function checkRateLimit(rule: AutoQueueRule): Promise<boolean> {
     return true;
   }
 
-  // Within the current hour window — check count
-  if (rule.currentHourCount >= rule.maxPerHour) {
-    return false; // Rate limited
-  }
-
-  // Increment counter
-  await db
+  // Atomic increment: UPDATE SET count = count + 1 WHERE id = ? AND count < maxPerHour
+  // Only succeeds if the current count is still below the limit.
+  // If two concurrent callers race, each gets its own atomic increment —
+  // no read-then-write gap, no double-counting.
+  const result = await db
     .update(autoQueueRules)
-    .set({ currentHourCount: rule.currentHourCount + 1 })
-    .where(eq(autoQueueRules.id, rule.id));
+    .set({ currentHourCount: sql`${autoQueueRules.currentHourCount} + 1` })
+    .where(
+      and(
+        eq(autoQueueRules.id, rule.id),
+        sql`${autoQueueRules.currentHourCount} < ${autoQueueRules.maxPerHour}`,
+      )
+    );
 
-  return true;
+  // If affectedRows === 0, the rule was already at or above maxPerHour
+  return (result as any)[0]?.affectedRows > 0 || (result as any).affectedRows > 0;
 }
 
 /**

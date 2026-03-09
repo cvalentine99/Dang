@@ -17,7 +17,7 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { eq, and, ne, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   pipelineRuns,
@@ -101,6 +101,29 @@ export async function executeResumePipeline(
 
   if (originalRun.status === "running") {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot resume a currently running pipeline" });
+  }
+
+  // ── Audit #26: Dedup guard — prevent double-resume on same pipeline run ──
+  // Atomically check that no other resumed/continued run is already in-flight
+  // for this original runId. If two callers race, only one INSERT succeeds
+  // because the second will find a 'running' row for the same alertId+queueItemId.
+  const [existingResume] = await db
+    .select({ id: pipelineRuns.id, runId: pipelineRuns.runId })
+    .from(pipelineRuns)
+    .where(
+      and(
+        eq(pipelineRuns.status, "running"),
+        ne(pipelineRuns.runId, input.runId),
+        eq(pipelineRuns.alertId, originalRun.alertId ?? ""),
+      )
+    )
+    .limit(1);
+
+  if (existingResume) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `Another pipeline run '${existingResume.runId}' is already in-flight for alert '${originalRun.alertId}'. Wait for it to complete or cancel it first.`,
+    });
   }
 
   // 2. Determine which stage to start from

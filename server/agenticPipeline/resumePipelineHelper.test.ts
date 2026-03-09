@@ -16,7 +16,7 @@
  * What is mocked:
  *   - LLM, Wazuh, Indexer, OTX
  */
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 
 // ── Mock external services ──────────────────────────────────────────────────
 const mockLLMResponse = vi.fn();
@@ -127,6 +127,24 @@ const HYPOTHESIS_LLM_RESPONSE = {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("executeResumePipeline — stage detection and resume", () => {
+  // Audit #26: Clean up stale 'running' test pipeline_runs from previous test runs
+  // to prevent the dedup guard from blocking legitimate test resumes.
+  beforeEach(async () => {
+    if (!HAS_DB) return;
+    const { getDb } = await import("../db");
+    const { pipelineRuns } = await import("../../drizzle/schema");
+    const { eq, and, like } = await import("drizzle-orm");
+    const db = await getDb();
+    if (!db) return;
+    // Mark any stale 'running' test rows as 'failed' so they don't block the dedup guard
+    await db.update(pipelineRuns)
+      .set({ status: "failed", error: "Test cleanup", completedAt: new Date() })
+      .where(and(eq(pipelineRuns.status, "running"), like(pipelineRuns.alertId, "resume-%")));
+  });
+
+  /** Unique suffix per test invocation to avoid cross-run alertId collisions. */
+  const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
   /**
    * Helper: create a partial pipeline run (triage-only) by running triage
    * and inserting a pipeline_runs row with correlation/hypothesis pending.
@@ -211,7 +229,7 @@ describe("executeResumePipeline — stage detection and resume", () => {
     "resumes a partial run from correlation stage (auto-detected)",
     async () => {
       const { executeResumePipeline } = await import("./resumePipelineHelper");
-      const { runId } = await createPartialRun("resume-auto-1");
+      const { runId } = await createPartialRun(`resume-auto-${uid()}`);
 
       // Mock correlation + hypothesis LLM calls
       mockLLMResponse.mockResolvedValueOnce(CORRELATION_LLM_RESPONSE);
@@ -237,7 +255,7 @@ describe("executeResumePipeline — stage detection and resume", () => {
     "resumes a failed run from the failed stage (auto-detected)",
     async () => {
       const { executeResumePipeline } = await import("./resumePipelineHelper");
-      const { runId } = await createFailedCorrelationRun("resume-failed-1");
+      const { runId } = await createFailedCorrelationRun(`resume-failed-${uid()}`);
 
       // Mock correlation + hypothesis LLM calls
       mockLLMResponse.mockResolvedValueOnce(CORRELATION_LLM_RESPONSE);
@@ -261,7 +279,7 @@ describe("executeResumePipeline — stage detection and resume", () => {
     "uses explicit fromStage override when provided",
     async () => {
       const { executeResumePipeline } = await import("./resumePipelineHelper");
-      const { runId } = await createPartialRun("resume-explicit-1");
+      const { runId } = await createPartialRun(`resume-explicit-${uid()}`);
 
       // Mock correlation + hypothesis LLM calls
       mockLLMResponse.mockResolvedValueOnce(CORRELATION_LLM_RESPONSE);
@@ -304,7 +322,7 @@ describe("executeResumePipeline — stage detection and resume", () => {
 
       await db!.insert(pipelineRuns).values({
         runId,
-        alertId: "running-test-1",
+        alertId: `running-test-${uid()}`,
         currentStage: "triage",
         status: "running",
         triggeredBy: "user:1",
@@ -332,7 +350,7 @@ describe("executeResumePipeline — stage detection and resume", () => {
 
       await db!.insert(pipelineRuns).values({
         runId,
-        alertId: "complete-test-1",
+        alertId: `complete-test-${uid()}`,
         currentStage: "completed",
         status: "completed",
         triggeredBy: "user:1",
@@ -365,7 +383,7 @@ describe("executeResumePipeline — stage detection and resume", () => {
 
       await db!.insert(pipelineRuns).values({
         runId,
-        alertId: "no-corr-test-1",
+        alertId: `no-corr-test-${uid()}`,
         currentStage: "hypothesis",
         status: "partial",
         triggeredBy: "user:1",
@@ -389,7 +407,7 @@ describe("executeResumePipeline — stage detection and resume", () => {
     "creates a new pipeline_runs row with correct prefix",
     async () => {
       const { executeResumePipeline } = await import("./resumePipelineHelper");
-      const { runId } = await createPartialRun("resume-prefix-1");
+      const { runId } = await createPartialRun(`resume-prefix-${uid()}`);
 
       mockLLMResponse.mockResolvedValueOnce(CORRELATION_LLM_RESPONSE);
       mockLLMResponse.mockResolvedValueOnce(HYPOTHESIS_LLM_RESPONSE);
@@ -409,7 +427,7 @@ describe("executeResumePipeline — stage detection and resume", () => {
     "replay prefix is used for replay mode",
     async () => {
       const { executeResumePipeline } = await import("./resumePipelineHelper");
-      const { runId } = await createFailedCorrelationRun("resume-replay-prefix-1");
+      const { runId } = await createFailedCorrelationRun(`resume-replay-prefix-${uid()}`);
 
       mockLLMResponse.mockResolvedValueOnce(CORRELATION_LLM_RESPONSE);
       mockLLMResponse.mockResolvedValueOnce(HYPOTHESIS_LLM_RESPONSE);

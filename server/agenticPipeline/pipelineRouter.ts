@@ -844,6 +844,29 @@ export const pipelineRouter = router({
       const alertId = String(input.rawAlert.id ?? input.rawAlert.alertId ?? "unknown");
       const startTime = Date.now();
 
+      // ── Audit #83: Concurrent pipeline guard on same alert ──────────────────
+      // Prevent multiple pipelines from processing the same alert simultaneously.
+      // If another run is already in-flight for this alertId, reject early.
+      if (alertId !== "unknown") {
+        const [existingRun] = await db
+          .select({ id: pipelineRuns.id, runId: pipelineRuns.runId })
+          .from(pipelineRuns)
+          .where(
+            and(
+              eq(pipelineRuns.alertId, alertId),
+              eq(pipelineRuns.status, "running"),
+            )
+          )
+          .limit(1);
+
+        if (existingRun) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: `Pipeline run '${existingRun.runId}' is already processing alert '${alertId}'. Wait for it to complete or cancel it first.`,
+          });
+        }
+      }
+
       // Create pipeline run record
       const [runRow] = await db.insert(pipelineRuns).values({
         runId,

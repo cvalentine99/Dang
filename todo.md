@@ -3850,7 +3850,7 @@ These need a proper contract-alignment sprint, not a hot patch:
 
 ### Medium Severity
 - [x] #18: Fixed registerLocalUser to return actual auto-increment id from insertId
-- [ ] #26: Add dedup guard to resumePipelineHelper.ts:83-152
+- [x] #26: Add dedup guard to resumePipelineHelper.ts:83-152
 - [ ] #35: Prune expired entries from indexerClient.ts rate-limit state
 - [ ] #36: Separate encryption key from JWT_SECRET in encryptionService.ts
 - [ ] #37: Remove DB upsert on every authenticated request in sdk.ts:127-131
@@ -3860,14 +3860,14 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [ ] #45/#46: Fix urgency/normCategory enum mismatch in hypothesisAgent.ts
 - [ ] #48: Move response action metadata inside transaction in responseActionsRouter.ts
 - [ ] #50: Fix SSE off-by-one duplicate delivery in alertStreamService.ts:133
-- [ ] #53: Fix auto-queue non-atomic increment in autoQueueRouter.ts:147-155
+- [x] #53: Fix auto-queue non-atomic increment in autoQueueRouter.ts:147-155
 - [ ] #54: Add overlap guard to auto-queue poller in autoQueueRouter.ts:281-291
 - [ ] #58: Plan FK constraint migration across 25+ tables
 - [ ] #60: Add indexes to ragSessions and savedSearches
 - [ ] #61: Fix stream pause toggle disconnected from SSE in LiveAlertFeed.tsx
 - [ ] #67: Fix 5 endpoints that swallow errors silently in wazuhRouter.ts
 - [ ] #69: Fix ticketing readiness ignores DB in readinessService.ts
-- [ ] #83: Add concurrent pipeline guard on same alert in pipelineRouter.ts
+- [x] #83: Add concurrent pipeline guard on same alert in pipelineRouter.ts
 - [ ] #94: Fix DevDependencies in prod Docker image
 - [ ] #95: Add CSP and Permissions-Policy headers to nginx.conf/Caddyfile
 
@@ -3902,4 +3902,12 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Added missing `caller: "hybridrag_chat"` to hybridragRouter.ts invokeLLMWithFallback call
 - [x] Verified all invokeLLMWithFallback/invokeLLM calls now have caller param (0 missing)
 - [x] Full suite: 92 files, 2794 tests, 0 failures
+- [x] tsc --noEmit: EXIT 0
+
+## Concurrency Fixes Sprint (2026-03-09)
+- [x] #26: Add dedup guard to resumePipelineHelper — prevent double-resume on same pipeline run
+- [x] #53: Fix auto-queue non-atomic increment — race condition in queue counter
+- [x] #83: Add concurrent pipeline guard on same alert — prevent multiple pipelines processing same alert
+- [x] Write regression tests for all 3 concurrency fixes (15 source-level tests + 9 integration tests updated)
+- [x] Full suite: 93 files, 2809 tests, 0 failures
 - [x] tsc --noEmit: EXIT 0
