@@ -201,6 +201,11 @@ export function LiveAlertFeed({
   severityThreshold = 10,
   className = "",
 }: LiveAlertFeedProps) {
+  const [selectedAlert, setSelectedAlert] = useState<StreamedAlert | null>(null);
+  const [isStreamEnabled, setIsStreamEnabled] = useState(enabled);
+
+  // Audit #61: Pass isStreamEnabled (not just the parent prop) to the hook
+  // so the pause toggle actually closes/opens the SSE EventSource connection
   const {
     alerts,
     unreadCount,
@@ -209,10 +214,7 @@ export function LiveAlertFeed({
     acknowledgeAll,
     dismissAlert,
     clearAlerts,
-  } = useAlertStream({ enabled, severityThreshold });
-
-  const [selectedAlert, setSelectedAlert] = useState<StreamedAlert | null>(null);
-  const [isStreamEnabled, setIsStreamEnabled] = useState(enabled);
+  } = useAlertStream({ enabled: isStreamEnabled, severityThreshold });
 
   // Toggle stream on/off
   const toggleStream = () => setIsStreamEnabled((prev) => !prev);

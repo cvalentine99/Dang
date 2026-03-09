@@ -555,7 +555,12 @@ describe("runHypothesisAgent (real function, mocked LLM)", () => {
       if (lc.recommendedActions.length > 0) {
         const action = lc.recommendedActions[0];
         expect(action.action.length).toBeGreaterThan(0);
-        expect(["immediate", "next", "optional"]).toContain(action.category);
+        // Audit #45: category must be a DB-valid enum value
+        expect([
+          "isolate_host", "disable_account", "block_ioc", "escalate_ir",
+          "suppress_alert", "tune_rule", "add_watchlist", "collect_evidence",
+          "notify_stakeholder", "custom",
+        ]).toContain(action.category);
         expect(typeof action.requiresApproval).toBe("boolean");
         expect(action.state).toBe("proposed"); // all new actions start as proposed
       }

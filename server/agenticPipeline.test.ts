@@ -1191,11 +1191,16 @@ describe("Hypothesis Agent — timeline reconstruction", () => {
 });
 
 describe("Hypothesis Agent — recommended actions", () => {
-  const VALID_CATEGORIES = ["immediate", "next", "optional"];
+  // Audit #45: categories must match DB-valid enum values
+  const VALID_CATEGORIES = [
+    "isolate_host", "disable_account", "block_ioc", "escalate_ir",
+    "suppress_alert", "tune_rule", "add_watchlist", "collect_evidence",
+    "notify_stakeholder", "custom",
+  ];
   const VALID_STATES = ["proposed", "approved", "rejected", "deferred"];
 
   it("action categories are correct", () => {
-    expect(VALID_CATEGORIES).toHaveLength(3);
+    expect(VALID_CATEGORIES).toHaveLength(10);
   });
 
   it("action states are correct", () => {
@@ -1205,7 +1210,7 @@ describe("Hypothesis Agent — recommended actions", () => {
   it("action has required structure", () => {
     const action = {
       action: "Block source IP at firewall",
-      category: "immediate",
+      category: "block_ioc",
       evidenceBasis: ["Known malicious IP", "Active brute-force"],
       requiresApproval: true,
       state: "proposed",

@@ -912,7 +912,9 @@ export const wazuhRouter = router({
       if (input.q) params.q = input.q;
       if (input.distinct !== undefined) params.distinct = input.distinct;
       return proxyGet(`/syscollector/${input.agentId}/browser_extensions`, params)
-        .catch(() => ({ data: { affected_items: [], total_affected_items: 0 } }));
+        .catch((err: any) => {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/browser_extensions failed: ${err?.message ?? "unknown"}` });
+        });
     }),
 
   /** System services / daemons (Windows services, systemd units) */
@@ -937,7 +939,9 @@ export const wazuhRouter = router({
         });
       }
       return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/services`, forwardedQuery), errors)
-        .catch(() => ({ data: { affected_items: [], total_affected_items: 0 } }));
+        .catch((err: any) => {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/services failed: ${err?.message ?? "unknown"}` });
+        });
     }),
 
   /** Local users on the agent (M-14 expanded) */
@@ -959,7 +963,9 @@ export const wazuhRouter = router({
       if (input.q) params.q = input.q;
       if (input.distinct !== undefined) params.distinct = input.distinct;
       return proxyGet(`/syscollector/${input.agentId}/users`, params)
-        .catch(() => ({ data: { affected_items: [], total_affected_items: 0 } }));
+        .catch((err: any) => {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/users failed: ${err?.message ?? "unknown"}` });
+        });
     }),
 
   /** Local groups on the agent (M-15 expanded) */
@@ -981,7 +987,9 @@ export const wazuhRouter = router({
       if (input.q) params.q = input.q;
       if (input.distinct !== undefined) params.distinct = input.distinct;
       return proxyGet(`/syscollector/${input.agentId}/groups`, params)
-        .catch(() => ({ data: { affected_items: [], total_affected_items: 0 } }));
+        .catch((err: any) => {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/groups failed: ${err?.message ?? "unknown"}` });
+        });
     }),
 
   /** Network protocol inventory per agent */
@@ -1006,7 +1014,9 @@ export const wazuhRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /syscollector/{agent_id}/netproto: ${unsupportedParams.join(", ")}` });
       }
       return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/netproto`, forwardedQuery), errors)
-        .catch(() => ({ data: { affected_items: [], total_affected_items: 0 } }));
+        .catch((err: any) => {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/netproto failed: ${err?.message ?? "unknown"}` });
+        });
     }),
 
   // ══════════════════════════════════════════════════════════════════════════════

@@ -497,9 +497,27 @@ function assembleLivingCase(
     return valid.includes(v) ? (v as any) : "moderate";
   };
 
-  const normCategory = (v: string): "immediate" | "next" | "optional" => {
-    const valid = ["immediate", "next", "optional"];
-    return valid.includes(v) ? (v as any) : "next";
+  // Audit #45: normCategory must map LLM strings to DB-valid category enum values
+  const CATEGORY_MAP_NORM: Record<string, string> = {
+    immediate: "escalate_ir", next: "collect_evidence", optional: "tune_rule",
+    isolate: "isolate_host", isolate_host: "isolate_host",
+    disable_account: "disable_account", block: "block_ioc", block_ioc: "block_ioc",
+    escalate: "escalate_ir", escalate_ir: "escalate_ir",
+    suppress: "suppress_alert", suppress_alert: "suppress_alert",
+    tune: "tune_rule", tune_rule: "tune_rule",
+    watchlist: "add_watchlist", add_watchlist: "add_watchlist",
+    collect: "collect_evidence", collect_evidence: "collect_evidence",
+    notify: "notify_stakeholder", notify_stakeholder: "notify_stakeholder",
+    custom: "custom",
+  };
+  const VALID_CATEGORIES_NORM = [
+    "isolate_host", "disable_account", "block_ioc", "escalate_ir",
+    "suppress_alert", "tune_rule", "add_watchlist", "collect_evidence",
+    "notify_stakeholder", "custom",
+  ];
+  const normCategory = (v: string): string => {
+    const mapped = CATEGORY_MAP_NORM[v?.toLowerCase() ?? ""] ?? null;
+    return mapped && VALID_CATEGORIES_NORM.includes(mapped) ? mapped : "collect_evidence";
   };
 
   const normSignificance = (v: string): "critical" | "high" | "medium" | "low" => {
@@ -554,7 +572,15 @@ function assembleLivingCase(
     recommendedActions: (llmOutput.recommendedActions ?? []).map((a: any) => ({
       action: a.action ?? "",
       category: normCategory(a.category ?? "next"),
-      urgency: (["immediate", "high", "medium", "low"] as const).includes(a.urgency?.toLowerCase()) ? a.urgency.toLowerCase() as "immediate" | "high" | "medium" | "low" : undefined,
+      // Audit #46: urgency must use DB-valid enum ["immediate", "next", "scheduled", "optional"]
+      urgency: (() => {
+        const URGENCY_MAP_NORM: Record<string, string> = {
+          immediate: "immediate", high: "immediate", next: "next",
+          medium: "next", scheduled: "scheduled", low: "optional", optional: "optional",
+        };
+        const raw = a.urgency?.toLowerCase() ?? "";
+        return URGENCY_MAP_NORM[raw] ?? "next";
+      })(),
       targetType: a.targetType ?? undefined,
       targetValue: a.targetValue ?? undefined,
       requiresApproval: a.requiresApproval ?? true,

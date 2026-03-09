@@ -3857,15 +3857,15 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [ ] #41: Add health probe and retry to DB connection lifecycle in db.ts
 - [ ] #43: Fix invokeLLM ignores caller maxTokens in llm.ts:268-302
 - [ ] #44: Fix tool_choice "required" rejected for multiple tools in llm.ts:190-194
-- [ ] #45/#46: Fix urgency/normCategory enum mismatch in hypothesisAgent.ts
+- [x] #45/#46: Fix urgency/normCategory enum mismatch in hypothesisAgent.ts
 - [x] #48: Move response action metadata inside transaction in responseActionsRouter.ts
 - [x] #50: Fix SSE off-by-one duplicate delivery in alertStreamService.ts:133
 - [x] #53: Fix auto-queue non-atomic increment in autoQueueRouter.ts:147-155
 - [x] #54: Add overlap guard to auto-queue poller in autoQueueRouter.ts:281-291
 - [ ] #58: Plan FK constraint migration across 25+ tables
 - [ ] #60: Add indexes to ragSessions and savedSearches
-- [ ] #61: Fix stream pause toggle disconnected from SSE in LiveAlertFeed.tsx
-- [ ] #67: Fix 5 endpoints that swallow errors silently in wazuhRouter.ts
+- [x] #61: Fix stream pause toggle disconnected from SSE in LiveAlertFeed.tsx
+- [x] #67: Fix 5 endpoints that swallow errors silently in wazuhRouter.ts
 - [ ] #69: Fix ticketing readiness ignores DB in readinessService.ts
 - [x] #83: Add concurrent pipeline guard on same alert in pipelineRouter.ts
 - [ ] #94: Fix DevDependencies in prod Docker image
@@ -3956,3 +3956,10 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] TypeScript errors investigated — tsc --noEmit exits 0; 4 errors are phantom watch-mode artifacts
 - [x] Write regression tests (17 tests in securityAndSSE.test.ts)
 - [x] Full suite: 95 files, 2842 tests, 0 failures
+
+## Error Handling, Enum, and SSE Pause Fixes (2026-03-09)
+- [x] #67: Fix 5 Wazuh endpoints — now throw TRPCError(INTERNAL_SERVER_ERROR) instead of returning empty data
+- [x] #45/#46: Fix enum mismatch — normCategory uses CATEGORY_MAP_NORM with 10 DB-valid values, urgency uses URGENCY_MAP_NORM with 4 DB-valid values
+- [x] #61: Fix pause toggle — isStreamEnabled now passed to useAlertStream hook (not just parent enabled prop)
+- [x] Write regression tests — 19 tests in auditFixes67_45_61.test.ts + updated stageOutput, pipelineHandoff, agenticPipeline tests
+- [x] Full suite: 96 files, 2861 tests, 0 failures

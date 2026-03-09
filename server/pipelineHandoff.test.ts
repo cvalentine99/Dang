@@ -356,7 +356,7 @@ function makeLivingCaseObject(caseId = 1): LivingCaseObject {
     recommendedActions: [
       {
         action: "Isolate web-server-01",
-        category: "immediate",
+        category: "isolate_host",
         urgency: "immediate",
         targetType: "host",
         targetValue: "web-server-01",
@@ -369,8 +369,8 @@ function makeLivingCaseObject(caseId = 1): LivingCaseObject {
       },
       {
         action: "Block 185.220.101.42 at perimeter firewall",
-        category: "immediate",
-        urgency: "high",
+        category: "block_ioc",
+        urgency: "immediate",
         targetType: "ip",
         targetValue: "185.220.101.42",
         requiresApproval: true,
@@ -379,8 +379,8 @@ function makeLivingCaseObject(caseId = 1): LivingCaseObject {
       },
       {
         action: "Patch libcurl on web-server-01",
-        category: "next",
-        urgency: "medium",
+        category: "collect_evidence",
+        urgency: "next",
         targetType: "host",
         targetValue: "web-server-01",
         requiresApproval: false,
@@ -868,7 +868,12 @@ describe("Contract 3: LivingCaseObject (Correlation → Investigation)", () => {
       const lc = makeLivingCaseObject();
       for (const action of lc.recommendedActions) {
         expect(action.action).toBeTruthy();
-        expect(["immediate", "next", "optional"]).toContain(action.category);
+        // Audit #45: category must use DB-valid enum values
+        expect([
+          "isolate_host", "disable_account", "block_ioc", "escalate_ir",
+          "suppress_alert", "tune_rule", "add_watchlist", "collect_evidence",
+          "notify_stakeholder", "custom",
+        ]).toContain(action.category);
         expect(typeof action.requiresApproval).toBe("boolean");
         expect(action.evidenceBasis).toBeInstanceOf(Array);
         expect(["proposed", "approved", "rejected", "executed", "deferred"]).toContain(
@@ -882,7 +887,8 @@ describe("Contract 3: LivingCaseObject (Correlation → Investigation)", () => {
       const actionsWithUrgency = lc.recommendedActions.filter((a) => a.urgency);
       expect(actionsWithUrgency.length).toBeGreaterThan(0);
       for (const action of actionsWithUrgency) {
-        expect(["immediate", "high", "medium", "low"]).toContain(action.urgency);
+        // Audit #46: urgency must use DB-valid enum values
+        expect(["immediate", "next", "scheduled", "optional"]).toContain(action.urgency);
       }
     });
   });
