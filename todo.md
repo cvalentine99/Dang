@@ -3858,8 +3858,8 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [ ] #43: Fix invokeLLM ignores caller maxTokens in llm.ts:268-302
 - [ ] #44: Fix tool_choice "required" rejected for multiple tools in llm.ts:190-194
 - [ ] #45/#46: Fix urgency/normCategory enum mismatch in hypothesisAgent.ts
-- [ ] #48: Move response action metadata inside transaction in responseActionsRouter.ts
-- [ ] #50: Fix SSE off-by-one duplicate delivery in alertStreamService.ts:133
+- [x] #48: Move response action metadata inside transaction in responseActionsRouter.ts
+- [x] #50: Fix SSE off-by-one duplicate delivery in alertStreamService.ts:133
 - [x] #53: Fix auto-queue non-atomic increment in autoQueueRouter.ts:147-155
 - [x] #54: Add overlap guard to auto-queue poller in autoQueueRouter.ts:281-291
 - [ ] #58: Plan FK constraint migration across 25+ tables
@@ -3869,7 +3869,7 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [ ] #69: Fix ticketing readiness ignores DB in readinessService.ts
 - [x] #83: Add concurrent pipeline guard on same alert in pipelineRouter.ts
 - [ ] #94: Fix DevDependencies in prod Docker image
-- [ ] #95: Add CSP and Permissions-Policy headers to nginx.conf/Caddyfile
+- [x] #95: Add CSP and Permissions-Policy headers — Express middleware (securityHeaders.ts)
 
 ### Nice-to-Have Cleanup (Low)
 - [ ] #76/#86: Fix truthiness bugs on numeric inputs (offset=0, limit=0, scheduleId=0)
@@ -3949,3 +3949,10 @@ These need a proper contract-alignment sprint, not a hot patch:
   - removed post-transaction UPDATE from execute router mutation
 - [x] Write regression tests for #48 (8 source-level structural tests in transactionGuards.test.ts)
 - [x] Full suite: 94 files, 2825 tests, 0 failures
+
+## SSE, CSP, and TypeScript Fixes (2026-03-09)
+- [x] #50: Fix SSE off-by-one duplicate delivery — uses gt (not gte) when resuming from lastPollTimestamp
+- [x] #95: Add CSP and Permissions-Policy headers — securityHeaders.ts middleware wired into Express app
+- [x] TypeScript errors investigated — tsc --noEmit exits 0; 4 errors are phantom watch-mode artifacts
+- [x] Write regression tests (17 tests in securityAndSSE.test.ts)
+- [x] Full suite: 95 files, 2842 tests, 0 failures

@@ -8,6 +8,7 @@ import { createContext } from "./context";
 import { sdk } from "./sdk";
 import { serveStatic, setupVite } from "./vite";
 import { startBaselineScheduler } from "../baselines/baselineSchedulerService";
+import { securityHeaders } from "../securityHeaders";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -51,6 +52,9 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Audit #95: Security headers (CSP, Permissions-Policy, X-Frame-Options, etc.)
+  app.use(securityHeaders);
   // Simple health check for Docker / load balancers
   app.get("/api/health", async (_req, res) => {
     try {

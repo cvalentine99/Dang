@@ -18,7 +18,6 @@ import {
   indexerSearch,
   INDEX_PATTERNS,
   boolQuery,
-  timeRangeFilter,
   type ESSearchResponse,
 } from "../indexer/indexerClient";
 
@@ -133,9 +132,18 @@ async function pollForAlerts(): Promise<void> {
     const fromTime = lastPollTimestamp ?? LOOKBACK_WINDOW;
     const toTime = "now";
 
+    // Audit #50: Use `gt` (strictly greater-than) for the lower bound when
+    // resuming from a previous poll timestamp. The old code used `gte` via
+    // timeRangeFilter(), which re-fetched the last alert every cycle.
+    // On the first poll (fromTime is a relative expression like "now-2m"),
+    // `gte` is correct because there's no overlap risk.
+    const timeFilter = lastPollTimestamp
+      ? { range: { timestamp: { gt: fromTime, lte: toTime, format: "strict_date_optional_time" } } }
+      : { range: { timestamp: { gte: fromTime, lte: toTime, format: "strict_date_optional_time" } } };
+
     const query = boolQuery({
       filter: [
-        timeRangeFilter(fromTime, toTime),
+        timeFilter,
         { range: { "rule.level": { gte: minThreshold } } },
       ],
     });
