@@ -72,8 +72,8 @@ export interface CountryAggregation {
   country: string;
   countryCode: string;
   count: number;
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
   cities: string[];
   ips: string[];
 }
@@ -125,8 +125,8 @@ export function aggregateByCountry(
       country,
       countryCode: data.countryCode,
       count: data.count,
-      lat: data.coordCount > 0 ? data.latSum / data.coordCount : 0,
-      lng: data.coordCount > 0 ? data.lngSum / data.coordCount : 0,
+      lat: data.coordCount > 0 ? data.latSum / data.coordCount : null,
+      lng: data.coordCount > 0 ? data.lngSum / data.coordCount : null,
       cities: Array.from(data.cities).slice(0, 10),
       ips: Array.from(data.ips).slice(0, 20),
     }))

@@ -3,6 +3,12 @@ import { useLocation } from "wouter";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
+/** Escape HTML special characters to prevent XSS in tooltip content */
+function escHtml(str: string | number | undefined | null): string {
+  const s = String(str ?? "");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 /** Country centroid coordinates — used when GeoIP response lacks lat/lng */
 const COUNTRY_COORDS: Record<string, { lat: number; lng: number }> = {
   "United States": { lat: 39.8283, lng: -98.5795 },
@@ -138,7 +144,7 @@ export function ThreatMap({ data, className, enableClickFilter = true }: ThreatM
     const maxCount = Math.max(...data.map(d => d.count));
 
     data.forEach(d => {
-      const coords = (d.lat && d.lng && (d.lat !== 0 || d.lng !== 0))
+      const coords = (d.lat != null && d.lng != null)
         ? { lat: d.lat, lng: d.lng }
         : COUNTRY_COORDS[d.country];
       if (!coords) return;
@@ -163,17 +169,17 @@ export function ThreatMap({ data, className, enableClickFilter = true }: ThreatM
       const citiesHtml = d.cities && d.cities.length > 0
         ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;">
             <span style="font-size:11px;color:#9b8bb8;">Cities</span>
-            <span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:#c4b5d8;">${d.cities.slice(0, 3).join(", ")}</span>
+            <span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:#c4b5d8;">${d.cities.slice(0, 3).map(c => escHtml(c)).join(", ")}</span>
           </div>`
         : "";
       const ipsHtml = d.topIps && d.topIps.length > 0
         ? `<div style="margin-top:4px;border-top:1px solid ${colorHex}20;padding-top:4px;">
             <span style="font-size:9px;color:#6b5b8a;">Top IPs:</span>
-            <div style="font-size:9px;font-family:'JetBrains Mono',monospace;color:#c4b5d8;margin-top:2px;">${d.topIps.slice(0, 3).join(", ")}</div>
+            <div style="font-size:9px;font-family:'JetBrains Mono',monospace;color:#c4b5d8;margin-top:2px;">${d.topIps.slice(0, 3).map(ip => escHtml(ip)).join(", ")}</div>
           </div>`
         : "";
       const sourceHtml = d.source
-        ? `<div style="margin-top:4px;font-size:9px;color:#6b5b8a;">Source: ${d.source}</div>`
+        ? `<div style="margin-top:4px;font-size:9px;color:#6b5b8a;">Source: ${escHtml(d.source)}</div>`
         : "";
       const clickHint = enableClickFilter
         ? `<div style="margin-top:6px;font-size:9px;color:#a855f7;text-align:center;">Click to filter alerts</div>`
@@ -190,7 +196,7 @@ export function ThreatMap({ data, className, enableClickFilter = true }: ThreatM
           min-width:200px;
           max-width:280px;
         ">
-          <div style="font-size:13px;font-weight:600;margin-bottom:6px;color:#f0eaf8;">${d.country}</div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px;color:#f0eaf8;">${escHtml(d.country)}</div>
           <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
             <span style="font-size:11px;color:#9b8bb8;">Threat Events</span>
             <span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#f0eaf8;">${d.count.toLocaleString()}</span>

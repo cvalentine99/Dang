@@ -51,9 +51,19 @@ const DEFAULT_PREFS: NotifPrefs = {
 function getNotifPrefs(): NotifPrefs {
   try {
     const stored = localStorage.getItem(NOTIF_PREFS_KEY);
-    if (stored) return { ...DEFAULT_PREFS, ...JSON.parse(stored) };
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Validate structure — only accept boolean fields
+      if (parsed && typeof parsed === "object") {
+        return {
+          critical: typeof parsed.critical === "boolean" ? parsed.critical : DEFAULT_PREFS.critical,
+          high: typeof parsed.high === "boolean" ? parsed.high : DEFAULT_PREFS.high,
+          low: typeof parsed.low === "boolean" ? parsed.low : DEFAULT_PREFS.low,
+        };
+      }
+    }
   } catch {
-    // ignore
+    // ignore JSON parse errors
   }
   return DEFAULT_PREFS;
 }
@@ -81,9 +91,22 @@ interface NotifHistoryItem {
 function getNotifHistory(): NotifHistoryItem[] {
   try {
     const stored = localStorage.getItem(NOTIF_HISTORY_KEY);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Validate it's an array with proper structure
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item): item is NotifHistoryItem =>
+          item &&
+          typeof item === "object" &&
+          typeof item.id === "string" &&
+          typeof item.alertId === "string" &&
+          typeof item.timestamp === "string" &&
+          typeof item.read === "boolean"
+        );
+      }
+    }
   } catch {
-    // ignore
+    // ignore JSON parse errors
   }
   return [];
 }

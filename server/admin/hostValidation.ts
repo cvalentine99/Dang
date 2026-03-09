@@ -75,6 +75,9 @@ export interface HostValidationResult {
   allowed: boolean;
   reason: string;
   resolvedIP?: string;
+  /** The IP that was validated and should be used for the actual connection.
+   *  Callers MUST connect to this IP (not re-resolve the hostname) to prevent DNS rebinding. */
+  pinnedIP?: string;
 }
 
 /**
@@ -158,6 +161,9 @@ export async function validateHost(host: string): Promise<HostValidationResult> 
         ? `Allowed: ${trimmed} resolves to ${resolvedIP} (${ipResult.reason})`
         : `Blocked: ${trimmed} resolves to ${resolvedIP} — ${ipResult.reason}`,
       resolvedIP,
+      // Pin the resolved IP so callers connect to this exact address
+      // instead of re-resolving (which could return a different IP — DNS rebinding)
+      pinnedIP: ipResult.allowed ? resolvedIP : undefined,
     };
   } catch {
     return {

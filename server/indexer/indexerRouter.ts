@@ -346,8 +346,8 @@ export const indexerRouter = router({
         country: string;
         count: number;
         avgLevel: number;
-        lat: number;
-        lng: number;
+        lat: number | null;
+        lng: number | null;
         cities: string[];
         topIps: string[];
         source: "wazuh-geo" | "geoip-lite";
@@ -360,8 +360,8 @@ export const indexerRouter = router({
             country: bucket.key,
             count: bucket.doc_count,
             avgLevel: Math.round((bucket.avg_level?.value ?? 0) * 10) / 10,
-            lat: bucket.avg_lat?.value ?? 0,
-            lng: bucket.avg_lon?.value ?? 0,
+            lat: bucket.avg_lat?.value ?? null,
+            lng: bucket.avg_lon?.value ?? null,
             cities: bucket.cities?.buckets?.map(c => c.key) ?? [],
             topIps: bucket.top_ips?.buckets?.map(ip => ip.key) ?? [],
             source: "wazuh-geo",
@@ -399,7 +399,8 @@ export const indexerRouter = router({
               return lookup?.country === ca.country;
             });
             const totalCount = matchingIps.reduce((sum, b) => sum + b.doc_count, 0);
-            const avgLevel = matchingIps.reduce((sum, b) => sum + (b.avg_level?.value ?? 0), 0) / (matchingIps.length || 1);
+            const totalWeightedLevel = matchingIps.reduce((sum, b) => sum + (b.avg_level?.value ?? 0) * b.doc_count, 0);
+            const avgLevel = totalCount > 0 ? totalWeightedLevel / totalCount : 0;
             enrichedCountries.push({
               country: ca.country,
               count: totalCount,

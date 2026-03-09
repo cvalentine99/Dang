@@ -173,7 +173,8 @@ export async function otxGet(
     if (v !== undefined) cleanParams[k] = v;
   }
 
-  const cacheKey = `otx:${path}:${JSON.stringify(cleanParams)}`;
+  const sortedParams = Object.fromEntries(Object.entries(cleanParams).sort(([a], [b]) => a.localeCompare(b)));
+  const cacheKey = `otx:${path}:${JSON.stringify(sortedParams)}`;
   const endpointType = classifyEndpoint(path);
 
   // ── Tier 1: RAM cache (skip if force refresh) ──────────────────────────

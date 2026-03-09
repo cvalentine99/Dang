@@ -4042,3 +4042,29 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Prepare review payload — 5 chunks (schema/db/auth, wazuh proxy, agentic pipeline, baselines/graph, client)
 - [x] Send to Claude API (claude-sonnet-4-20250514) — 5 review calls, 53,809 chars total response
 - [x] Deliver review report to user (code-review-report.md)
+
+## Code Review Fixes Sprint (2026-03-09)
+
+### Bugs
+- [x] Bug #1 HIGH: hypothesisAgent.ts — completedPivotCount now uses livingCase.completedPivots.length
+- [x] Bug #2 HIGH: hypothesisAgent.ts — normCategory cast fixed to proper enum union type
+- [x] Bug #3 MEDIUM: indexerRouter.ts — weighted average (totalWeightedLevel / totalCount)
+- [x] Bug #4 MEDIUM: ThreatMap.tsx — lat/lng uses explicit != null checks
+- [x] Bug #5 MEDIUM: geoipService.ts — returns null for missing coords, CountryAggregation allows null
+- [x] Bug #6 MEDIUM: alertQueueRouter.ts — typed resultHeader with affectedRows check
+- [x] Bug #7 LOW: otxClient.ts — cache key uses Object.entries().sort() for deterministic keys
+
+### Vulnerabilities
+- [x] Vuln #1 HIGH: localAuthService.ts — DUMMY_HASH constant-time compare prevents user enumeration
+- [x] Vuln #2 MEDIUM: encryptionService.ts — HKDF key derivation with distinct salt/context
+- [x] Vuln #3 HIGH: ThreatMap.tsx — escHtml() escapes all dynamic values in tooltips
+- [x] Vuln #4 HIGH: hypothesisAgent.ts — TARGET_PATTERNS format validation + control char stripping
+- [x] Vuln #5 MEDIUM: correlationAgent.ts — sanitizeForPrompt() strips injection patterns from evidence
+- [x] Vuln #6 MEDIUM: hostValidation.ts — pinnedIP returned for callers to use resolved IP
+- [x] Vuln #7 MEDIUM: connectionSettingsService.ts — onDuplicateKeyUpdate atomic upsert + unique index
+- [x] Vuln #8 LOW: QueueNotifier.tsx — schema validation for all localStorage JSON parsing
+
+### Tests & Verification
+- [x] Regression tests: codeReviewFixes.test.ts (16 tests)
+- [x] Full suite: 101 files, 2,937 tests, 0 failures
+- [x] tsc --noEmit: EXIT 0

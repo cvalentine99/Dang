@@ -169,36 +169,24 @@ export async function saveSettings(
     const isSensitive = SENSITIVE_KEYS.has(key);
     const storedValue = isSensitive ? encrypt(value) : value;
 
-    // Upsert: check if exists, then insert or update
-    const existing = await db
-      .select()
-      .from(connectionSettings)
-      .where(
-        and(
-          eq(connectionSettings.category, category),
-          eq(connectionSettings.settingKey, key)
-        )
-      )
-      .limit(1);
-
-    if (existing.length > 0) {
-      await db
-        .update(connectionSettings)
-        .set({
-          settingValue: storedValue,
-          isEncrypted: isSensitive ? 1 : 0,
-          updatedBy,
-        })
-        .where(eq(connectionSettings.id, existing[0].id));
-    } else {
-      await db.insert(connectionSettings).values({
+    // Atomic upsert: INSERT ... ON DUPLICATE KEY UPDATE
+    // Requires unique index on (category, settingKey)
+    await db
+      .insert(connectionSettings)
+      .values({
         category,
         settingKey: key,
         settingValue: storedValue,
         isEncrypted: isSensitive ? 1 : 0,
         updatedBy,
+      })
+      .onDuplicateKeyUpdate({
+        set: {
+          settingValue: storedValue,
+          isEncrypted: isSensitive ? 1 : 0,
+          updatedBy,
+        },
       });
-    }
   }
 
   // Invalidate cache for this category

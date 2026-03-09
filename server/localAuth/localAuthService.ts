@@ -127,18 +127,25 @@ export async function loginLocalUser(input: {
       .limit(1);
   }
 
+  // Constant-time: always run bcrypt compare to prevent user enumeration via timing
+  const DUMMY_HASH = "$2a$12$LJ3m4ys3Lg2VBe8sFNNmXOYDBGOLBmSKnGJeK1AOyCbHbDSqnGacy";
+
   if (userRows.length === 0) {
+    // Perform dummy bcrypt compare to normalize response timing
+    await verifyPassword(input.password, DUMMY_HASH);
     throw new Error("Invalid username or password");
   }
 
   const user = userRows[0];
 
-  // Block disabled users
+  // Block disabled users — still run bcrypt to normalize timing
   if (user.isDisabled) {
+    await verifyPassword(input.password, user.passwordHash ?? DUMMY_HASH);
     throw new Error("This account has been disabled. Contact an administrator.");
   }
 
   if (!user.passwordHash) {
+    await verifyPassword(input.password, DUMMY_HASH);
     throw new Error(
       "This account does not have a password set. Contact an administrator."
     );

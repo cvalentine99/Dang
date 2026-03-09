@@ -725,7 +725,7 @@ async function persistLivingCase(
         caseData: livingCase,
         workingTheory: livingCase.workingTheory.statement,
         theoryConfidence: livingCase.workingTheory.confidence,
-        completedPivotCount: 0,
+        completedPivotCount: livingCase.completedPivots?.length ?? 0,
         evidenceGapCount: livingCase.evidenceGaps.length,
         // Counters will be recomputed from response_actions after materialization
         pendingActionCount: 0,
@@ -1119,6 +1119,28 @@ async function materializeResponseActions(
       // Resolve target — prefer LLM-provided targetType/targetValue, then infer from entities
       let targetType = rec.targetType ?? null;
       let targetValue = rec.targetValue ?? null;
+
+      // Sanitize LLM-provided target values: strip control chars, validate format per type
+      if (targetValue) {
+        // Strip control characters and null bytes
+        targetValue = targetValue.replace(/[\x00-\x1f\x7f]/g, "").trim();
+        // Validate format per target type
+        const TARGET_PATTERNS: Record<string, RegExp> = {
+          ip: /^[\d.:a-fA-F]{3,45}$/,           // IPv4 or IPv6
+          hostname: /^[a-zA-Z0-9._-]{1,253}$/,   // DNS hostname
+          hash: /^[a-fA-F0-9]{32,128}$/,          // MD5/SHA1/SHA256/SHA512
+          domain: /^[a-zA-Z0-9.-]{1,253}$/,       // Domain name
+          url: /^https?:\/\/.{1,2048}$/,           // HTTP(S) URL
+          email: /^[^@\s]{1,64}@[^@\s]{1,253}$/,  // Basic email format
+          user: /^[a-zA-Z0-9._@\\/-]{1,256}$/,    // Username/account
+          rule: /^[a-zA-Z0-9._:-]{1,256}$/,        // Rule ID
+        };
+        const pattern = targetType ? TARGET_PATTERNS[targetType.toLowerCase()] : null;
+        if (pattern && !pattern.test(targetValue)) {
+          console.warn(`[HypothesisAgent] Target value failed format validation for type '${targetType}': '${targetValue.slice(0, 50)}'`);
+          targetValue = targetValue.slice(0, 512); // Keep but truncate; semantic warning will flag it
+        }
+      }
       if (!targetType || !targetValue) {
         // Fallback: infer from triage entities based on category
         const entities = ctx.triage.entities ?? [];

@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  uniqueIndex,
   int,
   bigint,
   mysqlEnum,
@@ -726,7 +727,7 @@ export const connectionSettings = mysqlTable("connection_settings", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => ([
-  index("cs_category_key_idx").on(table.category, table.settingKey),
+  uniqueIndex("cs_category_key_uniq").on(table.category, table.settingKey),
 ]));
 
 export type ConnectionSetting = typeof connectionSettings.$inferSelect;
