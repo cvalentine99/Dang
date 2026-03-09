@@ -33,6 +33,25 @@ let lastPollResult: { matched: number; queued: number; skipped: number; errors: 
 const POLL_INTERVAL_MS = 60_000; // 60 seconds
 const MAX_QUEUE_DEPTH = 10;
 
+/**
+ * Audit #54: Overlap guard — prevents concurrent poller invocations from
+ * double-processing the same batch of alerts.
+ *
+ * Without this guard, if a poll cycle takes longer than POLL_INTERVAL_MS
+ * (e.g., slow Indexer response), the next setInterval tick fires while the
+ * previous one is still running. Both would query the same time window,
+ * match the same alerts, and attempt to enqueue duplicates.
+ *
+ * The guard uses a simple boolean lock:
+ *   - Set to `true` at the start of pollAndEnqueue()
+ *   - Set to `false` in the finally block (guaranteed cleanup)
+ *   - If already `true` when a new poll starts, the new poll is skipped
+ *
+ * This is safe in Node.js single-threaded event loop — no race between
+ * the check and the set because they execute synchronously before any await.
+ */
+let _pollInFlight = false;
+
 // ── Rule matching logic ────────────────────────────────────────────────────
 
 interface WazuhAlert {
@@ -170,8 +189,17 @@ async function checkRateLimit(rule: AutoQueueRule): Promise<boolean> {
 /**
  * Core polling function — queries Wazuh Indexer for recent alerts
  * and auto-enqueues those matching enabled rules.
+ *
+ * Audit #54: Protected by _pollInFlight overlap guard.
  */
 async function pollAndEnqueue(): Promise<{ matched: number; queued: number; skipped: number; errors: string[] }> {
+  // Audit #54: Overlap guard — skip if a previous poll is still running
+  if (_pollInFlight) {
+    console.log("[AutoQueue] Poll skipped — previous cycle still in-flight");
+    return { matched: 0, queued: 0, skipped: 0, errors: ["Skipped: previous poll still in-flight"] };
+  }
+
+  _pollInFlight = true;
   const result = { matched: 0, queued: 0, skipped: 0, errors: [] as string[] };
 
   try {
@@ -277,11 +305,19 @@ async function pollAndEnqueue(): Promise<{ matched: number; queued: number; skip
     }
   } catch (err) {
     result.errors.push(`Poll error: ${(err as Error).message}`);
+  } finally {
+    // Audit #54: Always release the overlap guard, even on error
+    _pollInFlight = false;
   }
 
   lastPollTime = new Date().toISOString();
   lastPollResult = result;
   return result;
+}
+
+/** Expose _pollInFlight for testing (read-only). */
+export function __test_isPollInFlight(): boolean {
+  return _pollInFlight;
 }
 
 /**

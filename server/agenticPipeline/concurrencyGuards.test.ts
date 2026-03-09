@@ -1,5 +1,5 @@
 /**
- * Regression tests for audit fixes #26, #53, #83 (concurrency guards).
+ * Regression tests for audit fixes #26, #53, #54, #83 (concurrency guards).
  *
  * These are source-level checks that verify the code patterns are correct,
  * not integration tests (those require a running DB).
@@ -7,6 +7,7 @@
  * #26: Dedup guard in resumePipelineHelper — prevents double-resume on same pipeline run
  * #53: Auto-queue atomic increment — prevents race condition in rate limit counter
  * #83: Concurrent pipeline guard on same alert — prevents multiple pipelines on same alert
+ * #54: Overlap guard on auto-queue poller — prevents concurrent poll cycles from double-processing
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
@@ -163,5 +164,69 @@ describe("Audit #83: Concurrent pipeline guard on same alert", () => {
 
     // Should use and() for compound WHERE
     expect(chunk).toContain("and(");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #54: Overlap guard on auto-queue poller
+// ═══════════════════════════════════════════════════════════════════════════════
+describe("Audit #54: Overlap guard on auto-queue poller", () => {
+  const source = readSource("server/alertQueue/autoQueueRouter.ts");
+
+  it("declares _pollInFlight boolean flag at module level", () => {
+    expect(source).toContain("let _pollInFlight = false;");
+  });
+
+  it("checks _pollInFlight at the start of pollAndEnqueue", () => {
+    const fnIdx = source.indexOf("async function pollAndEnqueue");
+    expect(fnIdx).toBeGreaterThan(-1);
+    const fnBody = source.slice(fnIdx, fnIdx + 500);
+    expect(fnBody).toContain("if (_pollInFlight)");
+  });
+
+  it("returns early with skip message when poll is already in-flight", () => {
+    const fnIdx = source.indexOf("async function pollAndEnqueue");
+    const fnBody = source.slice(fnIdx, fnIdx + 500);
+    expect(fnBody).toContain("previous poll still in-flight");
+    // Should return a result with the skip error, not throw
+    expect(fnBody).toContain("Skipped: previous poll still in-flight");
+  });
+
+  it("sets _pollInFlight = true before the try block", () => {
+    const fnIdx = source.indexOf("async function pollAndEnqueue");
+    const fnBody = source.slice(fnIdx, fnIdx + 600);
+    const setTrueIdx = fnBody.indexOf("_pollInFlight = true");
+    const tryIdx = fnBody.indexOf("try {");
+    expect(setTrueIdx).toBeGreaterThan(-1);
+    expect(tryIdx).toBeGreaterThan(-1);
+    expect(setTrueIdx).toBeLessThan(tryIdx);
+  });
+
+  it("resets _pollInFlight in a finally block for guaranteed cleanup", () => {
+    expect(source).toContain("} finally {");
+    // The finally block should set _pollInFlight = false
+    const finallyIdx = source.indexOf("} finally {");
+    const resetIdx = source.indexOf("_pollInFlight = false", finallyIdx);
+    expect(resetIdx).toBeGreaterThan(finallyIdx);
+    // The reset should be close to the finally (within 200 chars)
+    expect(resetIdx - finallyIdx).toBeLessThan(200);
+  });
+
+  it("overlap guard check appears before _pollInFlight = true", () => {
+    const fnIdx = source.indexOf("async function pollAndEnqueue");
+    const fnBody = source.slice(fnIdx, fnIdx + 500);
+    const guardIdx = fnBody.indexOf("if (_pollInFlight)");
+    const setIdx = fnBody.indexOf("_pollInFlight = true");
+    expect(guardIdx).toBeLessThan(setIdx);
+  });
+
+  it("exposes __test_isPollInFlight for testing", () => {
+    expect(source).toContain("export function __test_isPollInFlight");
+  });
+
+  it("logs a skip message when overlap is detected", () => {
+    const fnIdx = source.indexOf("async function pollAndEnqueue");
+    const fnBody = source.slice(fnIdx, fnIdx + 500);
+    expect(fnBody).toContain('[AutoQueue] Poll skipped');
   });
 });

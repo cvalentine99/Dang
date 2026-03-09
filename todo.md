@@ -3861,7 +3861,7 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [ ] #48: Move response action metadata inside transaction in responseActionsRouter.ts
 - [ ] #50: Fix SSE off-by-one duplicate delivery in alertStreamService.ts:133
 - [x] #53: Fix auto-queue non-atomic increment in autoQueueRouter.ts:147-155
-- [ ] #54: Add overlap guard to auto-queue poller in autoQueueRouter.ts:281-291
+- [x] #54: Add overlap guard to auto-queue poller in autoQueueRouter.ts:281-291
 - [ ] #58: Plan FK constraint migration across 25+ tables
 - [ ] #60: Add indexes to ragSessions and savedSearches
 - [ ] #61: Fix stream pause toggle disconnected from SSE in LiveAlertFeed.tsx
@@ -3911,3 +3911,9 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Write regression tests for all 3 concurrency fixes (15 source-level tests + 9 integration tests updated)
 - [x] Full suite: 93 files, 2809 tests, 0 failures
 - [x] tsc --noEmit: EXIT 0
+
+## Auto-Queue Poller Overlap Guard (2026-03-09)
+- [x] #54: Add overlap guard to auto-queue poller — prevent concurrent poll cycles from double-processing
+- [x] Write regression tests for #54 overlap guard (8 source-level tests added to concurrencyGuards.test.ts)
+- [x] Verification pass — all 5 audit fixes (#26, #53, #54, #83, hybridrag caller) confirmed in source
+- [x] Full suite: 93 files, 2817 tests, 0 failures
