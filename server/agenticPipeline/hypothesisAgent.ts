@@ -28,6 +28,9 @@ import {
 import { eq, desc, and, sql } from "drizzle-orm";
 import { recomputeCaseSummary, syncCaseSummaryAfterTransition } from "./stateMachine";
 import { invokeLLMWithFallback } from "../llm/llmService";
+import type { InvokeResult } from "../_core/llm";
+import type { CorrelationBundleRow, TriageObjectRow } from "../../drizzle/schema";
+import type { LLMHypothesisRaw } from "./types/LLMHypothesisRaw";
 import type {
   TriageObject,
   CorrelationBundle,
@@ -67,8 +70,8 @@ export interface HypothesisAgentResult {
 interface HypothesisContext {
   triage: TriageObject;
   bundle: CorrelationBundle;
-  bundleRow: any;
-  triageRow: any;
+  bundleRow: CorrelationBundleRow;
+  triageRow: TriageObjectRow;
 }
 
 /**
@@ -472,7 +475,7 @@ const HYPOTHESIS_JSON_SCHEMA = {
 function assembleLivingCase(
   sessionId: number,
   ctx: HypothesisContext,
-  llmOutput: any
+  llmOutput: LLMHypothesisRaw
 ): LivingCaseObject {
   // Collect all linked entities from triage + correlation
   const linkedEntities: ExtractedEntity[] = [
@@ -483,18 +486,18 @@ function assembleLivingCase(
   // Collect all linked alert IDs
   const linkedAlertIds: string[] = [
     ctx.triage.alertId,
-    ...(ctx.bundle.relatedAlerts ?? []).map((a: any) => a.alertId).filter(Boolean),
+    ...(ctx.bundle.relatedAlerts ?? []).map((a) => a.alertId).filter(Boolean),
   ];
 
   // Normalize priority values
   const normPriority = (v: string): "critical" | "high" | "medium" | "low" => {
     const valid = ["critical", "high", "medium", "low"];
-    return valid.includes(v) ? (v as any) : "medium";
+    return valid.includes(v) ? (v as "critical" | "high" | "medium" | "low") : "medium";
   };
 
   const normEffort = (v: string): "quick" | "moderate" | "deep_dive" => {
     const valid = ["quick", "moderate", "deep_dive"];
-    return valid.includes(v) ? (v as any) : "moderate";
+    return valid.includes(v) ? (v as "quick" | "moderate" | "deep_dive") : "moderate";
   };
 
   // Audit #45: normCategory must map LLM strings to DB-valid category enum values
@@ -522,7 +525,7 @@ function assembleLivingCase(
 
   const normSignificance = (v: string): "critical" | "high" | "medium" | "low" => {
     const valid = ["critical", "high", "medium", "low"];
-    return valid.includes(v) ? (v as any) : "medium";
+    return valid.includes(v) ? (v as "critical" | "high" | "medium" | "low") : "medium";
   };
 
   const normSource = (v: string): ProvenanceSource => {
@@ -546,7 +549,7 @@ function assembleLivingCase(
       conflictingEvidence: llmOutput.workingTheory?.conflictingEvidence ?? [],
     },
 
-    alternateTheories: (llmOutput.alternateTheories ?? []).map((t: any) => ({
+    alternateTheories: (llmOutput.alternateTheories ?? []).map((t) => ({
       statement: t.statement ?? "",
       confidence: clampConfidence(t.confidence ?? 0.1),
       supportingEvidence: t.supportingEvidence ?? [],
@@ -555,31 +558,31 @@ function assembleLivingCase(
 
     completedPivots: [],
 
-    evidenceGaps: (llmOutput.evidenceGaps ?? []).map((g: any) => ({
+    evidenceGaps: (llmOutput.evidenceGaps ?? []).map((g) => ({
       description: g.description ?? "",
       impact: g.impact ?? "",
       suggestedAction: g.suggestedAction ?? "",
       priority: normPriority(g.priority ?? "medium"),
     })),
 
-    suggestedNextSteps: (llmOutput.suggestedNextSteps ?? []).map((s: any) => ({
+    suggestedNextSteps: (llmOutput.suggestedNextSteps ?? []).map((s) => ({
       action: s.action ?? "",
       rationale: s.rationale ?? "",
       priority: normPriority(s.priority ?? "medium"),
       effort: normEffort(s.effort ?? "moderate"),
     })),
 
-    recommendedActions: (llmOutput.recommendedActions ?? []).map((a: any) => ({
+    recommendedActions: (llmOutput.recommendedActions ?? []).map((a) => ({
       action: a.action ?? "",
-      category: normCategory(a.category ?? "next"),
-      // Audit #46: urgency must use DB-valid enum ["immediate", "next", "scheduled", "optional"]
+      category: normCategory(a.category ?? "next") as "immediate" | "next" | "optional",
+      // Audit #46: urgency must use DB-valid enum ["immediate", "high", "medium", "low"]
       urgency: (() => {
         const URGENCY_MAP_NORM: Record<string, string> = {
-          immediate: "immediate", high: "immediate", next: "next",
-          medium: "next", scheduled: "scheduled", low: "optional", optional: "optional",
+          immediate: "immediate", high: "high", next: "medium",
+          medium: "medium", scheduled: "low", low: "low", optional: "low",
         };
         const raw = a.urgency?.toLowerCase() ?? "";
-        return URGENCY_MAP_NORM[raw] ?? "next";
+        return (URGENCY_MAP_NORM[raw] ?? "medium") as "immediate" | "high" | "medium" | "low";
       })(),
       targetType: a.targetType ?? undefined,
       targetValue: a.targetValue ?? undefined,
@@ -588,7 +591,7 @@ function assembleLivingCase(
       state: "proposed" as const,
     })),
 
-    timelineSummary: (llmOutput.timelineSummary ?? []).map((t: any) => ({
+    timelineSummary: (llmOutput.timelineSummary ?? []).map((t) => ({
       timestamp: t.timestamp ?? new Date().toISOString(),
       event: t.event ?? "",
       source: normSource(t.source ?? "llm_inference"),
@@ -601,11 +604,11 @@ function assembleLivingCase(
     linkedEntities,
 
     draftDocumentation: {
-      shiftHandoff: llmOutput.draftDocumentation?.shiftHandoff ?? null,
-      escalationSummary: llmOutput.draftDocumentation?.escalationSummary ?? null,
+      shiftHandoff: llmOutput.draftDocumentation?.shiftHandoff ?? undefined,
+      escalationSummary: llmOutput.draftDocumentation?.escalationSummary ?? undefined,
       closureRationale: undefined,
-      executiveSummary: llmOutput.draftDocumentation?.executiveSummary ?? null,
-      tuningSuggestions: llmOutput.draftDocumentation?.tuningSuggestions ?? null,
+      executiveSummary: llmOutput.draftDocumentation?.executiveSummary ?? undefined,
+      tuningSuggestions: llmOutput.draftDocumentation?.tuningSuggestions ?? undefined,
     },
   };
 }
@@ -899,7 +902,7 @@ export async function runHypothesisAgent(
 
       // Write back the merged case with action references + fresh summary
       await dbUpdate.update(livingCaseState)
-        .set({ caseData: persistedCase as any })
+        .set({ caseData: persistedCase as LivingCaseObject })
         .where(eq(livingCaseState.id, caseStateId));
 
       // Update the in-memory reference for the return value
@@ -1174,10 +1177,10 @@ async function materializeResponseActions(
 
       await db.insert(responseActions).values({
         actionId,
-        category: category as any,
+        category: category as typeof responseActions.$inferInsert["category"],
         title: (rec.action ?? "Unnamed action").slice(0, 512),
         description: rec.evidenceBasis?.join("; ") ?? null,
-        urgency: urgency as any,
+        urgency: urgency as typeof responseActions.$inferInsert["urgency"],
         requiresApproval: rec.requiresApproval ? 1 : 0,
         state: "proposed",
         proposedBy: "hypothesis_agent",
@@ -1245,7 +1248,7 @@ async function materializeResponseActions(
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function extractTokenCount(result: any): number {
+function extractTokenCount(result: InvokeResult): number {
   const usage = result?.usage;
   if (!usage) return 0;
   return (usage.prompt_tokens ?? 0) + (usage.completion_tokens ?? 0);

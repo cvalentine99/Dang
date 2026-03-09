@@ -912,8 +912,8 @@ export const wazuhRouter = router({
       if (input.q) params.q = input.q;
       if (input.distinct !== undefined) params.distinct = input.distinct;
       return proxyGet(`/syscollector/${input.agentId}/browser_extensions`, params)
-        .catch((err: any) => {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/browser_extensions failed: ${err?.message ?? "unknown"}` });
+        .catch((err: unknown) => {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/browser_extensions failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
     }),
 
@@ -939,8 +939,8 @@ export const wazuhRouter = router({
         });
       }
       return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/services`, forwardedQuery), errors)
-        .catch((err: any) => {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/services failed: ${err?.message ?? "unknown"}` });
+        .catch((err: unknown) => {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/services failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
     }),
 
@@ -963,8 +963,8 @@ export const wazuhRouter = router({
       if (input.q) params.q = input.q;
       if (input.distinct !== undefined) params.distinct = input.distinct;
       return proxyGet(`/syscollector/${input.agentId}/users`, params)
-        .catch((err: any) => {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/users failed: ${err?.message ?? "unknown"}` });
+.catch((err: unknown) => {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/users failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
     }),
 
@@ -987,8 +987,8 @@ export const wazuhRouter = router({
       if (input.q) params.q = input.q;
       if (input.distinct !== undefined) params.distinct = input.distinct;
       return proxyGet(`/syscollector/${input.agentId}/groups`, params)
-        .catch((err: any) => {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/groups failed: ${err?.message ?? "unknown"}` });
+.catch((err: unknown) => {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/groups failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
     }),
 
@@ -1014,8 +1014,8 @@ export const wazuhRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /syscollector/{agent_id}/netproto: ${unsupportedParams.join(", ")}` });
       }
       return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/netproto`, forwardedQuery), errors)
-        .catch((err: any) => {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/netproto failed: ${err?.message ?? "unknown"}` });
+.catch((err: unknown) => {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/netproto failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
     }),
 
@@ -1120,8 +1120,8 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const params: Record<string, string> = {};
-      if (input.limit) params.limit = String(input.limit);
-      if (input.offset) params.offset = String(input.offset);
+      if (input.limit != null) params.limit = String(input.limit);
+      if (input.offset != null) params.offset = String(input.offset);
       if (input.search) params.search = input.search;
       if (input.q) params.q = input.q;
       if (input.sort) params.sort = input.sort;
@@ -1161,8 +1161,8 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const params: Record<string, string> = {};
-      if (input.limit) params.limit = String(input.limit);
-      if (input.offset) params.offset = String(input.offset);
+      if (input.limit != null) params.limit = String(input.limit);
+      if (input.offset != null) params.offset = String(input.offset);
       if (input.search) params.search = input.search;
       if (input.q) params.q = input.q;
       if (input.sort) params.sort = input.sort;
@@ -1198,8 +1198,8 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const params: Record<string, string> = {};
-      if (input.limit) params.limit = String(input.limit);
-      if (input.offset) params.offset = String(input.offset);
+      if (input.limit != null) params.limit = String(input.limit);
+      if (input.offset != null) params.offset = String(input.offset);
       if (input.search) params.search = input.search;
       if (input.q) params.q = input.q;
       if (input.sort) params.sort = input.sort;
@@ -1221,8 +1221,8 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const params: Record<string, string> = {};
-      if (input.limit) params.limit = String(input.limit);
-      if (input.offset) params.offset = String(input.offset);
+      if (input.limit != null) params.limit = String(input.limit);
+      if (input.offset != null) params.offset = String(input.offset);
       if (input.search) params.search = input.search;
       if (input.q) params.q = input.q;
       if (input.sort) params.sort = input.sort;
@@ -1244,8 +1244,8 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const params: Record<string, string> = {};
-      if (input.limit) params.limit = String(input.limit);
-      if (input.offset) params.offset = String(input.offset);
+      if (input.limit != null) params.limit = String(input.limit);
+      if (input.offset != null) params.offset = String(input.offset);
       if (input.search) params.search = input.search;
       if (input.q) params.q = input.q;
       if (input.sort) params.sort = input.sort;
@@ -1268,8 +1268,8 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const params: Record<string, string> = {};
-      if (input.limit) params.limit = String(input.limit);
-      if (input.offset) params.offset = String(input.offset);
+      if (input.limit != null) params.limit = String(input.limit);
+      if (input.offset != null) params.offset = String(input.offset);
       if (input.search) params.search = input.search;
       if (input.q) params.q = input.q;
       if (input.sort) params.sort = input.sort;

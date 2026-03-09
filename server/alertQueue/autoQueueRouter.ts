@@ -183,7 +183,8 @@ async function checkRateLimit(rule: AutoQueueRule): Promise<boolean> {
     );
 
   // If affectedRows === 0, the rule was already at or above maxPerHour
-  return (result as any)[0]?.affectedRows > 0 || (result as any).affectedRows > 0;
+  const resultObj = result as unknown as { affectedRows?: number } | [{ affectedRows?: number }];
+  return Array.isArray(resultObj) ? (resultObj[0]?.affectedRows ?? 0) > 0 : (resultObj?.affectedRows ?? 0) > 0;
 }
 
 /**

@@ -3977,3 +3977,28 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Applied DB migration: ALTER investigation_sessions userId to nullable, FK rule changed to SET NULL
 - [x] Full suite: 97 files, 2870 tests, 0 failures
 - [x] tsc --noEmit: EXIT 0
+
+## Cleanup Sprint: Indexes, Truthiness, and Type Safety (2026-03-09)
+
+### #60: Add indexes to ragSessions and savedSearches
+- [x] Analyze query patterns for ragSessions (sessionId lookups, user queries)
+- [x] Analyze query patterns for savedSearches (userId + searchType filtering)
+- [x] Add indexes to schema and apply migration
+- [x] Write tests to verify index existence
+
+### #76/#86: Fix truthiness bugs on numeric inputs
+- [x] Audit all offset/limit/scheduleId/numeric parameters for falsy-zero bugs
+- [x] Fix 12 instances in wazuhRouter.ts: if(input.limit) → if(input.limit != null) (6 limit + 6 offset)
+- [x] Fix 5 instances in driftAnalyticsRouter.ts: if(input.scheduleId) → if(input.scheduleId != null)
+- [x] exportRouter.ts and notificationHistoryRouter.ts already use !== undefined (safe)
+- [x] Write regression tests for offset=0, limit=0, scheduleId=0 edge cases
+
+### #93: Reduce `any` prevalence
+- [x] Audit all `any` occurrences across server code (excluding _core and test files)
+- [x] Replace `any` with proper types: 69 -> 3 remaining (all intentional Drizzle/mysql2 internals)
+- [x] Files fixed: correlationAgent, hypothesisAgent, triageAgent, stateMachine, pipelineRouter, resumePipelineHelper, responseActionsRouter, kgExtractor, kgLoader, kgMetadata, etlService, attackPathService, graphQueryService, anomalyDetection, alertQueueRouter, autoQueueRouter, huntRouter, hybridragRouter, wazuhRouter, storage
+- [x] Fixed pre-existing TS errors: stateMachine $client (tx cast), otxClient threatIntelCache
+- [x] Fixed mismatched error messages in syscollector catch blocks (users/groups/netproto)
+- [x] Verify tsc --noEmit still passes: EXIT 0
+- [x] Write regression tests: cleanupSprint.test.ts (12 tests)
+- [x] Full suite: 98 files, 2882 tests, 0 failures

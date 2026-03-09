@@ -30,8 +30,11 @@ import type {
  * A minimal SQL executor interface.
  * Both mysql2 pool.execute() and Drizzle db.execute() satisfy this.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw mysql2 result shapes vary
+type SqlResult = any;
+
 export interface SqlExecutor {
-  execute(sql: string, params?: any[]): Promise<any>;
+  execute(sql: string, params?: unknown[]): Promise<SqlResult>;
 }
 
 // ── Layer definitions ───────────────────────────────────────────────────────
@@ -48,7 +51,7 @@ async function batchInsert(
   exec: SqlExecutor,
   table: string,
   columns: string[],
-  rows: any[][],
+  rows: unknown[][],  // eslint-disable-line @typescript-eslint/no-explicit-any
   batchSize = 100,
 ): Promise<number> {
   if (rows.length === 0) return 0;
@@ -81,7 +84,7 @@ async function insertEndpointsWithIdMap(
   let count = 0;
 
   for (const ep of data.endpoints) {
-    const result: any = await exec.execute(
+    const result = await exec.execute(
       `INSERT INTO \`kg_endpoints\` (\`endpoint_id\`, \`path\`, \`method\`, \`summary\`, \`description\`, \`tags\`, \`operation_id\`, \`resource\`, \`operation_type\`, \`risk_level\`, \`allowed_for_llm\`, \`auth_method\`, \`trust_score\`, \`deprecated\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         ep.endpoint_id, ep.path, ep.method, ep.summary, ep.description,
@@ -181,7 +184,7 @@ async function loadSchemaLineage(data: KgExtractionResult, exec: SqlExecutor): P
   const indexIdMap = new Map<number, number>(); // 1-based array index → auto-increment id
   for (let i = 0; i < data.indices.length; i++) {
     const idx = data.indices[i];
-    const result: any = await exec.execute(
+    const result = await exec.execute(
       "INSERT INTO `kg_indices` (`pattern`, `description`) VALUES (?, ?)",
       [idx.pattern, idx.description],
     );
@@ -275,7 +278,7 @@ async function updateSyncStatus(
   specVersion?: string,
 ): Promise<void> {
   // Upsert: try update first, insert if no rows affected
-  const updateResult: any = await exec.execute(
+  const updateResult = await exec.execute(
     `UPDATE \`kg_sync_status\` SET \`status\` = ?, \`entity_count\` = ?, \`error_message\` = ?, \`duration_ms\` = ?, \`spec_version\` = COALESCE(?, \`spec_version\`), \`last_sync_at\` = UTC_TIMESTAMP() WHERE \`layer\` = ?`,
     [result.status, result.entityCount, result.errorMessage, result.durationMs, specVersion ?? null, result.layer],
   );
@@ -338,13 +341,13 @@ export async function loadLayer(
     };
     await updateSyncStatus(exec, result, data.specVersion);
     return result;
-  } catch (err: any) {
+  } catch (err: unknown) {
     const durationMs = Date.now() - start;
     const result: KgSyncLayerResult = {
       layer: layerName,
       entityCount: 0,
       status: "error",
-      errorMessage: err.message || String(err),
+      errorMessage: err instanceof Error ? err.message : String(err),
       durationMs,
     };
     await updateSyncStatus(exec, result, data.specVersion);

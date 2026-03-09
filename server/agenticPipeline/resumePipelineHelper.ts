@@ -208,8 +208,8 @@ export async function executeResumePipeline(
 
       if (!rawAlert && originalRun.triageId) {
         const [triageRow] = await db.select().from(triageObjects).where(eq(triageObjects.triageId, originalRun.triageId)).limit(1);
-        const triageData = triageRow?.triageData as any;
-        rawAlert = triageData?.rawAlert as Record<string, unknown> | null;
+        const triageData = triageRow?.triageData as unknown as Record<string, unknown> | null;
+        rawAlert = (triageData?.rawAlert as Record<string, unknown>) ?? null;
       }
 
       if (!rawAlert) {

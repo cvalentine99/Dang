@@ -18,8 +18,11 @@
 import type { KgLayerName } from "./kgTypes";
 import { getLayerNames } from "./kgLoader";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw mysql2 result shapes vary
+type SqlResult = any;
+
 export interface SqlExecutor {
-  execute(sql: string, params?: any[]): Promise<any>;
+  execute(sql: string, params?: unknown[]): Promise<SqlResult>;
 }
 
 export interface KgSyncStatusRow {

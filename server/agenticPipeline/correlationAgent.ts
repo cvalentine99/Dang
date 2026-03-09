@@ -14,6 +14,7 @@ import { getDb } from "../db";
 import { triageObjects, correlationBundles, investigationSessions } from "../../drizzle/schema";
 import { eq, desc, and, inArray, sql, gte } from "drizzle-orm";
 import { invokeLLMWithFallback } from "../llm/llmService";
+import type { InvokeResult } from "../_core/llm";
 import {
   getEffectiveIndexerConfig,
   indexerSearch,
@@ -21,7 +22,7 @@ import {
   type IndexerConfig,
   type ESSearchBody,
 } from "../indexer/indexerClient";
-import { getEffectiveWazuhConfig } from "../wazuh/wazuhClient";
+import { getEffectiveWazuhConfig, type WazuhConfig } from "../wazuh/wazuhClient";
 import { wazuhGet } from "../wazuh/wazuhClient";
 import { otxGet, isOtxConfigured } from "../otx/otxClient";
 import type {
@@ -57,14 +58,56 @@ export interface CorrelationAgentResult {
 
 // ── Evidence Pack Assembly ───────────────────────────────────────────────────
 
+/** A flattened alert hit from the Wazuh Indexer. */
+interface IndexerAlertHit {
+  _id: string;
+  timestamp?: string;
+  rule?: { id?: string; description?: string; level?: number; mitre?: Record<string, unknown> };
+  agent?: { id?: string; name?: string };
+  data?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** A vulnerability hit from the Wazuh Indexer. */
+interface IndexerVulnHit {
+  vulnerability?: { cve?: string; severity?: string; name?: string; status?: string };
+  package?: { name?: string; version?: string };
+  agent?: { id?: string; name?: string };
+  [key: string]: unknown;
+}
+
+/** A FIM event from the Wazuh REST API. */
+interface FimEvent {
+  file?: string;
+  date?: string;
+  [key: string]: unknown;
+}
+
+/** An OTX threat intel lookup result. */
+interface ThreatIntelResult {
+  type: string;
+  value: string;
+  source: string;
+  data: Record<string, unknown>;
+}
+
+/** A prior investigation session summary. */
+interface PriorInvestigation {
+  id: number;
+  title?: string | null;
+  status?: string | null;
+  createdAt?: Date | null;
+  [key: string]: unknown;
+}
+
 interface EvidencePack {
-  sameHostAlerts: any[];
-  sameUserAlerts: any[];
-  sameIocAlerts: any[];
-  vulnerabilities: any[];
-  fimEvents: any[];
-  threatIntel: any[];
-  priorInvestigations: any[];
+  sameHostAlerts: IndexerAlertHit[];
+  sameUserAlerts: IndexerAlertHit[];
+  sameIocAlerts: IndexerAlertHit[];
+  vulnerabilities: IndexerVulnHit[];
+  fimEvents: FimEvent[];
+  threatIntel: ThreatIntelResult[];
+  priorInvestigations: PriorInvestigation[];
   totalItems: number;
 }
 
@@ -78,10 +121,10 @@ async function fetchSameHostAlerts(
   alertId: string,
   lookbackHours: number,
   limit: number
-): Promise<any[]> {
+): Promise<IndexerAlertHit[]> {
   if (!agentId && !agentName) return [];
   try {
-    const must: any[] = [];
+    const must: Record<string, unknown>[] = [];
     if (agentId) {
       must.push({ match: { "agent.id": agentId } });
     } else if (agentName) {
@@ -110,7 +153,7 @@ async function fetchSameHostAlerts(
       ],
     };
     const result = await indexerSearch(config, INDEX_PATTERNS.ALERTS, body, "correlation");
-    return result.hits.hits.map((h: any) => ({ _id: h._id, ...h._source }));
+    return result.hits.hits.map((h) => ({ _id: h._id, ...h._source } as IndexerAlertHit));
   } catch {
     return [];
   }
@@ -126,7 +169,7 @@ async function fetchSameUserAlerts(
   alertId: string,
   lookbackHours: number,
   limit: number
-): Promise<any[]> {
+): Promise<IndexerAlertHit[]> {
   if (users.length === 0) return [];
   try {
     const should = users.map((u) => ({
@@ -135,12 +178,12 @@ async function fetchSameUserAlerts(
         fields: ["data.srcuser", "data.dstuser", "data.win.eventdata.targetUserName"],
       },
     }));
-    const must: any[] = [
+    const must: Record<string, unknown>[] = [
       { bool: { should, minimum_should_match: 1 } },
       { range: { timestamp: { gte: `now-${lookbackHours}h`, lte: "now" } } },
     ];
     // Exclude same host to find cross-host activity
-    const mustNot: any[] = [{ term: { _id: alertId } }];
+    const mustNot: Record<string, unknown>[] = [{ term: { _id: alertId } }];
     if (agentId) {
       mustNot.push({ term: { "agent.id": agentId } });
     }
@@ -155,7 +198,7 @@ async function fetchSameUserAlerts(
       ],
     };
     const result = await indexerSearch(config, INDEX_PATTERNS.ALERTS, body, "correlation");
-    return result.hits.hits.map((h: any) => ({ _id: h._id, ...h._source }));
+    return result.hits.hits.map((h) => ({ _id: h._id, ...h._source } as IndexerAlertHit));
   } catch {
     return [];
   }
@@ -170,11 +213,11 @@ async function fetchSameIocAlerts(
   alertId: string,
   lookbackHours: number,
   limit: number
-): Promise<any[]> {
+): Promise<IndexerAlertHit[]> {
   const allIocs = [...iocs.ips, ...iocs.hashes, ...iocs.domains];
   if (allIocs.length === 0) return [];
   try {
-    const should: any[] = [];
+    const should: Record<string, unknown>[] = [];
     for (const ip of iocs.ips) {
       should.push({ multi_match: { query: ip, fields: ["data.srcip", "data.dstip", "data.ip"] } });
     }
@@ -203,7 +246,7 @@ async function fetchSameIocAlerts(
       ],
     };
     const result = await indexerSearch(config, INDEX_PATTERNS.ALERTS, body, "correlation");
-    return result.hits.hits.map((h: any) => ({ _id: h._id, ...h._source }));
+    return result.hits.hits.map((h) => ({ _id: h._id, ...h._source } as IndexerAlertHit));
   } catch {
     return [];
   }
@@ -216,7 +259,7 @@ async function fetchVulnerabilities(
   config: IndexerConfig,
   agentId: string | undefined,
   limit: number
-): Promise<any[]> {
+): Promise<IndexerVulnHit[]> {
   if (!agentId) return [];
   try {
     const body: ESSearchBody = {
@@ -234,7 +277,7 @@ async function fetchVulnerabilities(
       ],
     };
     const result = await indexerSearch(config, INDEX_PATTERNS.VULNERABILITIES, body, "correlation");
-    return result.hits.hits.map((h: any) => h._source);
+    return result.hits.hits.map((h) => h._source as IndexerVulnHit);
   } catch {
     return [];
   }
@@ -244,17 +287,17 @@ async function fetchVulnerabilities(
  * Retrieve FIM events for the affected agent.
  */
 async function fetchFimEvents(
-  wazuhConfig: any,
+  wazuhConfig: WazuhConfig,
   agentId: string | undefined,
   limit: number
-): Promise<any[]> {
+): Promise<FimEvent[]> {
   if (!agentId || !wazuhConfig) return [];
   try {
     const result = await wazuhGet(wazuhConfig, {
       path: `/syscheck/${agentId}`,
       params: { limit, sort: "-date" },
       rateLimitGroup: "correlation",
-    }) as any;
+    }) as { data?: { affected_items?: FimEvent[] } };
     return result?.data?.affected_items ?? [];
   } catch {
     return [];
@@ -266,9 +309,9 @@ async function fetchFimEvents(
  */
 async function fetchThreatIntel(
   entities: ExtractedEntity[]
-): Promise<any[]> {
+): Promise<ThreatIntelResult[]> {
   if (!isOtxConfigured()) return [];
-  const results: any[] = [];
+  const results: ThreatIntelResult[] = [];
   // Lookup IPs
   const ips = entities.filter((e) => e.type === "ip").slice(0, 5);
   for (const ip of ips) {
@@ -332,15 +375,23 @@ async function fetchThreatIntel(
   return results;
 }
 
-function summarizeOtxResult(data: any): Record<string, unknown> {
+interface OtxIndicatorResponse {
+  pulse_info?: { count?: number; pulses?: Array<{ name?: string; created?: string; adversary?: string; tags?: string[] }> };
+  reputation?: number;
+  country_name?: string;
+  asn?: string;
+  malware?: { count?: number };
+}
+
+function summarizeOtxResult(data: OtxIndicatorResponse): Record<string, unknown> {
   return {
     pulseCount: data?.pulse_info?.count ?? 0,
     reputation: data?.reputation ?? null,
     country: data?.country_name ?? null,
     asn: data?.asn ?? null,
     malwareCount: data?.malware?.count ?? 0,
-    tags: (data?.pulse_info?.pulses ?? []).slice(0, 5).flatMap((p: any) => p.tags ?? []).slice(0, 10),
-    relatedPulses: (data?.pulse_info?.pulses ?? []).slice(0, 3).map((p: any) => ({
+    tags: (data?.pulse_info?.pulses ?? []).slice(0, 5).flatMap((p) => p.tags ?? []).slice(0, 10),
+    relatedPulses: (data?.pulse_info?.pulses ?? []).slice(0, 3).map((p) => ({
       name: p.name,
       created: p.created,
       adversary: p.adversary,
@@ -427,7 +478,9 @@ async function assembleEvidencePack(
       indexerConfig
         ? fetchVulnerabilities(indexerConfig, triage.agent?.id, maxPerSource)
         : Promise.resolve([]),
-      fetchFimEvents(wazuhConfig, triage.agent?.id, maxPerSource),
+      wazuhConfig
+        ? fetchFimEvents(wazuhConfig, triage.agent?.id, maxPerSource)
+        : Promise.resolve([]),
       includeThreatIntel ? fetchThreatIntel(entities) : Promise.resolve([]),
       fetchPriorInvestigations(entities, triage.agent?.id),
     ]);
@@ -725,7 +778,7 @@ export async function runCorrelationAgent(
     sourceTriageId: input.triageId,
     status: "processing",
     confidence: 0,
-    bundleData: {} as any, // placeholder
+    bundleData: {} as CorrelationBundle, // placeholder — updated after LLM response
   });
   
   try {
@@ -813,7 +866,7 @@ export async function runCorrelationAgent(
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function extractTokenCount(result: any): number {
+function extractTokenCount(result: InvokeResult): number {
   const usage = result?.usage;
   if (!usage) return 0;
   return (usage.prompt_tokens ?? 0) + (usage.completion_tokens ?? 0);
@@ -821,12 +874,12 @@ function extractTokenCount(result: any): number {
 
 function normalizeAssetCriticality(value: string | undefined): "critical" | "high" | "medium" | "low" | "unknown" {
   const valid = ["critical", "high", "medium", "low", "unknown"];
-  return valid.includes(value ?? "") ? (value as any) : "unknown";
+  return valid.includes(value ?? "") ? (value as "critical" | "high" | "medium" | "low" | "unknown") : "unknown";
 }
 
 function normalizeCaseAction(value: string | undefined): "merge_existing" | "create_new" | "defer_to_analyst" {
   const valid = ["merge_existing", "create_new", "defer_to_analyst"];
-  return valid.includes(value ?? "") ? (value as any) : "defer_to_analyst";
+  return valid.includes(value ?? "") ? (value as "merge_existing" | "create_new" | "defer_to_analyst") : "defer_to_analyst";
 }
 
 // ── Query Helpers ────────────────────────────────────────────────────────────
@@ -861,9 +914,11 @@ export async function listCorrelations(opts: {
   const db = await getDb();
   if (!db) return { bundles: [], total: 0 };
   
-  const conditions: any[] = [];
-  if (opts.status) conditions.push(eq(correlationBundles.status, opts.status as any));
-  if (opts.caseAction) conditions.push(eq(correlationBundles.caseAction, opts.caseAction as any));
+  type BundleStatus = "pending" | "processing" | "completed" | "failed";
+  type CaseAction = "merge_existing" | "create_new" | "defer_to_analyst";
+  const conditions: ReturnType<typeof eq>[] = [];
+  if (opts.status) conditions.push(eq(correlationBundles.status, opts.status as BundleStatus));
+  if (opts.caseAction) conditions.push(eq(correlationBundles.caseAction, opts.caseAction as CaseAction));
   
   const where = conditions.length > 0 ? and(...conditions) : undefined;
   

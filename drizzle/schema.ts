@@ -86,7 +86,10 @@ export const ragSessions = mysqlTable("rag_sessions", {
   /** Optional context snapshot injected for this message */
   contextSnapshot: json("contextSnapshot").$type<Record<string, unknown>>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => ([
+  index("rs_sessionId_idx").on(table.sessionId),
+  index("rs_createdAt_idx").on(table.createdAt),
+]));
 
 export type RagSession = typeof ragSessions.$inferSelect;
 export type InsertRagSession = typeof ragSessions.$inferInsert;
@@ -108,7 +111,10 @@ export const savedSearches = mysqlTable("saved_searches", {
   description: text("description"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ([
+  index("ss_userId_searchType_idx").on(table.userId, table.searchType),
+  index("ss_updatedAt_idx").on(table.updatedAt),
+]));
 
 export type SavedSearch = typeof savedSearches.$inferSelect;
 export type InsertSavedSearch = typeof savedSearches.$inferInsert;

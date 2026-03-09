@@ -80,7 +80,7 @@ export async function detectRiskPaths(options?: {
     if (endpoints.length < 1) continue;
 
     // Score: DESTRUCTIVE = 40pts each, MUTATING = 20pts each
-    const score = endpoints.reduce((sum: number, ep: any) => {
+    const score = endpoints.reduce((sum, ep) => {
       return sum + (ep.riskLevel === "DESTRUCTIVE" ? 40 : 20);
     }, 0);
 
@@ -95,7 +95,7 @@ export async function detectRiskPaths(options?: {
       nodeType: "resource",
       label: resource,
       stage: "Resource",
-      riskLevel: endpoints.some((e: any) => e.riskLevel === "DESTRUCTIVE") ? "DESTRUCTIVE" : "MUTATING",
+      riskLevel: endpoints.some((e) => e.riskLevel === "DESTRUCTIVE") ? "DESTRUCTIVE" : "MUTATING",
       properties: { endpointCount: endpoints.length },
     });
 
@@ -117,15 +117,15 @@ export async function detectRiskPaths(options?: {
       });
     }
 
-    const destructiveCount = endpoints.filter((e: any) => e.riskLevel === "DESTRUCTIVE").length;
-    const mutatingCount = endpoints.filter((e: any) => e.riskLevel === "MUTATING").length;
+    const destructiveCount = endpoints.filter((e) => e.riskLevel === "DESTRUCTIVE").length;
+    const mutatingCount = endpoints.filter((e) => e.riskLevel === "MUTATING").length;
 
     paths.push({
       id: `risk-${++pathId}`,
       hops,
       score: normalizedScore,
       riskLevel: destructiveCount > 0 ? "DESTRUCTIVE" : "MUTATING",
-      summary: `${resource}: ${destructiveCount} destructive + ${mutatingCount} mutating endpoints. ${endpoints.some((e: any) => e.llmAllowed) ? "⚠ Some LLM-accessible" : "✓ All LLM-blocked"}.`,
+      summary: `${resource}: ${destructiveCount} destructive + ${mutatingCount} mutating endpoints. ${endpoints.some((e) => e.allowedForLlm) ? "⚠ Some LLM-accessible" : "✓ All LLM-blocked"}.`,
     });
   }
 

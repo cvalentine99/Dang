@@ -43,7 +43,7 @@ export const driftAnalyticsRouter = router({
         gte(driftSnapshots.createdAt, since),
       ];
 
-      if (input.scheduleId) {
+      if (input.scheduleId != null) {
         conditions.push(eq(driftSnapshots.scheduleId, input.scheduleId));
       }
 
@@ -112,7 +112,7 @@ export const driftAnalyticsRouter = router({
         gte(driftSnapshots.createdAt, since),
       ];
 
-      if (input.scheduleId) {
+      if (input.scheduleId != null) {
         conditions.push(eq(driftSnapshots.scheduleId, input.scheduleId));
       }
 
@@ -200,7 +200,7 @@ export const driftAnalyticsRouter = router({
         gte(driftSnapshots.createdAt, since),
       ];
 
-      if (input.scheduleId) {
+      if (input.scheduleId != null) {
         conditions.push(eq(driftSnapshots.scheduleId, input.scheduleId));
       }
 
@@ -341,7 +341,7 @@ export const driftAnalyticsRouter = router({
 
       const conditions = [eq(driftSnapshots.userId, ctx.user.id)];
 
-      if (input.scheduleId) {
+      if (input.scheduleId != null) {
         conditions.push(eq(driftSnapshots.scheduleId, input.scheduleId));
       }
 
@@ -398,7 +398,7 @@ export const driftAnalyticsRouter = router({
         gte(driftSnapshots.createdAt, since),
       ];
 
-      if (input.scheduleId) {
+      if (input.scheduleId != null) {
         conditions.push(eq(driftSnapshots.scheduleId, input.scheduleId));
       }
 

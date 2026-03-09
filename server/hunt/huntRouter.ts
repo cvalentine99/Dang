@@ -292,7 +292,7 @@ export const huntRouter = router({
         totalTimeMs: input.totalTimeMs,
         sourcesWithHits: input.sourcesWithHits,
         agentsSearched: input.agentsSearched ?? [],
-        results: input.results as any,
+        results: input.results as typeof savedHunts.$inferInsert.results,
         tags: input.tags ?? [],
         severity: input.severity,
       });

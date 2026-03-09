@@ -80,10 +80,10 @@ export const responseActionsRouter = router({
       const inserted = await db.transaction(async (tx) => {
         await tx.insert(responseActions).values({
           actionId,
-          category: input.category as any,
+          category: input.category as (typeof RESPONSE_ACTION_CATEGORIES)[number],
           title: input.title,
           description: input.description ?? null,
-          urgency: input.urgency as any,
+          urgency: input.urgency as (typeof RESPONSE_ACTION_URGENCY)[number],
           requiresApproval: input.requiresApproval ? 1 : 0,
           state: "proposed",
           proposedBy,
@@ -270,7 +270,7 @@ export const responseActionsRouter = router({
 
       const conditions = [eq(responseActions.caseId, input.caseId)];
       if (input.state) {
-        conditions.push(eq(responseActions.state, input.state as any));
+        conditions.push(eq(responseActions.state, input.state as (typeof RESPONSE_ACTION_STATES)[number]));
       }
 
       const actions = await db
@@ -300,9 +300,9 @@ export const responseActionsRouter = router({
       const db = await requireDb();
 
       const conditions: ReturnType<typeof eq>[] = [];
-      if (input.state) conditions.push(eq(responseActions.state, input.state as any));
-      if (input.category) conditions.push(eq(responseActions.category, input.category as any));
-      if (input.urgency) conditions.push(eq(responseActions.urgency, input.urgency as any));
+      if (input.state) conditions.push(eq(responseActions.state, input.state as (typeof RESPONSE_ACTION_STATES)[number]));
+      if (input.category) conditions.push(eq(responseActions.category, input.category as (typeof RESPONSE_ACTION_CATEGORIES)[number]));
+      if (input.urgency) conditions.push(eq(responseActions.urgency, input.urgency as (typeof RESPONSE_ACTION_URGENCY)[number]));
       if (input.requiresApproval !== undefined) {
         conditions.push(eq(responseActions.requiresApproval, input.requiresApproval ? 1 : 0));
       }

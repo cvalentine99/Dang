@@ -48,7 +48,7 @@ function getSpecPath(): string {
 }
 
 // ── Drizzle → mysql2 pool adapter ────────────────────────────────────────
-// kgLoader expects a SqlExecutor: { execute(sql, params?) → Promise<any> }
+// kgLoader expects a SqlExecutor: { execute(sql, params?) → Promise<SqlResult> }
 // Drizzle's db.execute() uses tagged template literals, not (sql, params).
 //
 // The Drizzle mysql2 adapter stores the underlying pool at:
@@ -57,6 +57,7 @@ function getSpecPath(): string {
 // We call .promise() on it to get the promise-based PromisePool,
 // which has .execute(sql, params) returning [rows, fields].
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle internals are opaque
 function getPromisePool(db: any): any | null {
   // Path: db.session.client.pool.promise()
   // db.session.client is a PromisePoolConnection wrapper with a .pool property
@@ -77,9 +78,10 @@ function getPromisePool(db: any): any | null {
   return null;
 }
 
-function makeSqlExecutor(promisePool: any): SqlExecutor {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mysql2 PromisePool is untyped at this layer
+function makeSqlExecutor(promisePool: { execute: (...args: unknown[]) => unknown }): SqlExecutor {
   return {
-    async execute(query: string, params?: any[]): Promise<any> {
+    async execute(query: string, params?: unknown[]): Promise<unknown> {
       if (params && params.length > 0) {
         return promisePool.execute(query, params);
       }
@@ -108,7 +110,8 @@ export function extractFromSpec(specPath?: string): KgExtractionResult {
   const path = specPath ?? getSpecPath();
   const specRaw = readFileSync(path, "utf8");
   const spec = yaml.load(specRaw);
-  return extract(spec);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- yaml.load returns unknown
+  return extract(spec as Record<string, any>);
 }
 
 /**
@@ -161,8 +164,8 @@ export async function runFullSync(): Promise<{
         : `KG sync partially failed. ${layerSummary}`,
       result,
     };
-  } catch (error: any) {
-    return { success: false, message: `Sync failed: ${error.message}` };
+  } catch (error: unknown) {
+    return { success: false, message: `Sync failed: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
@@ -207,7 +210,7 @@ export async function syncLayer(layerName: string): Promise<{
         : `Layer "${layerName}" failed: ${result.errorMessage}`,
       result,
     };
-  } catch (error: any) {
-    return { success: false, message: `Sync failed: ${error.message}` };
+  } catch (error: unknown) {
+    return { success: false, message: `Sync failed: ${error instanceof Error ? error.message : String(error)}` };
   }
 }

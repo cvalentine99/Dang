@@ -688,7 +688,7 @@ export const pipelineRouter = router({
 
         if (!row) return { success: false as const, error: "Living case not found" };
 
-        const caseData = row.caseData as any;
+        const caseData = row.caseData as unknown as Record<string, unknown> & { completedPivots?: unknown[]; lastUpdatedAt?: string; lastUpdatedBy?: string };
         if (!caseData.completedPivots) caseData.completedPivots = [];
 
         caseData.completedPivots.push({
@@ -705,8 +705,8 @@ export const pipelineRouter = router({
         await tx
           .update(livingCaseState)
           .set({
-            caseData,
-            completedPivotCount: caseData.completedPivots.length,
+            caseData: caseData as unknown as typeof livingCaseState.$inferInsert.caseData,
+            completedPivotCount: caseData.completedPivots!.length,
             lastUpdatedBy: "analyst_manual",
           })
           .where(eq(livingCaseState.id, input.caseId));

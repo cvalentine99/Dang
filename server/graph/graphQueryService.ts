@@ -606,7 +606,7 @@ export async function getEndpoints(options?: {
   llmAllowed?: boolean;
   limit?: number;
   offset?: number;
-}): Promise<{ endpoints: any[]; total: number }> {
+}): Promise<{ endpoints: (typeof kgEndpoints.$inferSelect)[]; total: number }> {
   const db = await getDb();
   if (!db) return { endpoints: [], total: 0 };
 

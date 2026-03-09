@@ -297,8 +297,8 @@ export async function detectAndRecordAnomaly(
       severity,
       scheduleName,
       agentIds: agentIds,
-      byCategory: snapshot.byCategory as any,
-      topDriftItems: (snapshot.topDriftItems as any) || [],
+      byCategory: snapshot.byCategory,
+      topDriftItems: snapshot.topDriftItems ?? [],
       notificationSent: notified,
     });
 

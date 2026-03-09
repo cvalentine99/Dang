@@ -224,8 +224,7 @@ export const hybridragRouter = router({
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ input }) => {
       const db = await requireDb();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (db.delete(ragSessions) as any).where(eq(ragSessions.sessionId, input.sessionId));
+        await db.delete(ragSessions).where(eq(ragSessions.sessionId, input.sessionId));
       return { success: true };
     }),
 

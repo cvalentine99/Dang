@@ -21,9 +21,12 @@ import type {
   KgResource,
 } from "./kgTypes";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenAPI specs are untyped JSON
+type OpenApiNode = Record<string, any>;
+
 // ── $ref resolution ─────────────────────────────────────────────────────────
 
-function resolveRef(spec: any, ref: string): any {
+function resolveRef(spec: OpenApiNode, ref: string): OpenApiNode | null {
   if (!ref || !ref.startsWith("#/")) return null;
   const parts = ref.replace("#/", "").split("/");
   let obj = spec;
@@ -37,8 +40,8 @@ function resolveRef(spec: any, ref: string): any {
 // ── Body schema flattening ──────────────────────────────────────────────────
 
 function flattenBodySchema(
-  spec: any,
-  schema: any,
+  spec: OpenApiNode,
+  schema: OpenApiNode,
   prefix = "",
   parentRequired: string[] = [],
 ): Array<{ name: string; type: string; required: boolean; description: string }> {
@@ -53,9 +56,10 @@ function flattenBodySchema(
 
   for (const [name, propSchema] of Object.entries(props)) {
     const fullName = prefix ? `${prefix}.${name}` : name;
-    const prop: any = (propSchema as any)["$ref"]
-      ? resolveRef(spec, (propSchema as any)["$ref"])
-      : propSchema;
+    const propObj = propSchema as OpenApiNode;
+    const prop = propObj["$ref"]
+      ? resolveRef(spec, propObj["$ref"])
+      : propObj;
     if (!prop) continue;
 
     if (prop.type === "object" && prop.properties) {
@@ -254,7 +258,7 @@ const ERROR_PATTERNS: KgErrorPattern[] = [
  * @param spec - The parsed YAML OpenAPI spec object
  * @returns A fully typed KgExtractionResult
  */
-export function extract(spec: any): KgExtractionResult {
+export function extract(spec: OpenApiNode): KgExtractionResult {
   const paths = spec.paths || {};
   const endpoints: KgEndpoint[] = [];
   const allParams: KgParameter[] = [];
@@ -263,8 +267,9 @@ export function extract(spec: any): KgExtractionResult {
 
   for (const [path, ops] of Object.entries(paths)) {
     for (const method of ["get", "post", "put", "delete", "patch"]) {
-      if (!(ops as any)[method]) continue;
-      const details = (ops as any)[method];
+      const opsObj = ops as OpenApiNode;
+      if (!opsObj[method]) continue;
+      const details = opsObj[method] as OpenApiNode;
       if (typeof details !== "object") continue;
 
       const tags: string[] = details.tags || [];
@@ -337,9 +342,10 @@ export function extract(spec: any): KgExtractionResult {
       for (const [statusCode, respDetail] of Object.entries(responses)) {
         const httpStatus = parseInt(statusCode, 10);
         if (isNaN(httpStatus)) continue;
-        const resp: any = (respDetail as any).$ref
-          ? resolveRef(spec, (respDetail as any).$ref)
-          : respDetail;
+        const respObj = respDetail as OpenApiNode;
+        const resp = respObj.$ref
+          ? resolveRef(spec, respObj.$ref as string)
+          : respObj;
         allResponses.push({
           endpoint_id: endpointId,
           http_status: httpStatus,

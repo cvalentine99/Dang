@@ -236,7 +236,7 @@ export const alertQueueRouter = router({
         })
         .where(and(eq(alertQueue.id, input.id), eq(alertQueue.status, "queued")));
 
-      if ((claimResult as any).affectedRows === 0) {
+      if ((claimResult as unknown as { affectedRows?: number })?.affectedRows === 0) {
         throw new TRPCError({ code: "CONFLICT", message: "Queue item is already being processed by another session" });
       }
 

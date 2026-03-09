@@ -29,6 +29,7 @@ import {
   responseActionAudit,
   livingCaseState,
 } from "../../drizzle/schema";
+import type { LivingCaseObject } from "../../shared/agenticSchemas";
 
 /**
  * Database handle type — works with both the root db and a transaction handle.
@@ -297,7 +298,7 @@ export async function transitionActionState(
     //    clause evaluates against the committed state.
     const updateResult = await tx
       .update(responseActions)
-      .set(updatePayload as any)
+      .set(updatePayload as Partial<typeof responseActions.$inferInsert>)
       .where(
         and(
           eq(responseActions.id, action.id),
@@ -308,7 +309,7 @@ export async function transitionActionState(
     // Check affectedRows — 0 means someone else changed the state first.
     // drizzle-orm/mysql2 returns [ResultSetHeader, FieldPacket[]] from mysql2.
     // ResultSetHeader.affectedRows tells us if the WHERE guard matched.
-    const affectedRows = (updateResult as any)?.[0]?.affectedRows ?? 0;
+    const affectedRows = (updateResult as unknown as [{ affectedRows: number }])?.[0]?.affectedRows ?? 0;
 
     if (affectedRows === 0) {
       // Lost the race — another transaction committed a different transition.
@@ -339,7 +340,7 @@ export async function transitionActionState(
 
     // 6. Recompute case summary (unless caller will do it in batch)
     if (action.caseId && !req.skipCaseSync) {
-      await syncCaseSummaryAtomic(tx, action.caseId);
+      await syncCaseSummaryAtomic(tx as DbLike, action.caseId);
     }
 
     // 7. Return updated action (read inside tx for consistency)
@@ -411,7 +412,7 @@ export async function recomputeCaseSummary(caseId: number, tx?: DbLike): Promise
     const count = Number(row.count);
     summary.total += count;
     if (row.state in summary) {
-      (summary as any)[row.state] = count;
+      (summary as unknown as Record<string, number>)[row.state] = count;
     }
   }
 
@@ -442,7 +443,7 @@ async function syncCaseSummaryAtomic(tx: DbLike, caseId: number): Promise<void> 
 
   // Merge caseData.actionSummary update into the same write as the counter update.
   // This was previously two separate UPDATEs — a drift window between them.
-  const caseData = (caseRow.caseData as any) ?? {};
+  const caseData = (caseRow.caseData ?? {}) as LivingCaseObject & { actionSummary?: CaseSummary };
   caseData.actionSummary = summary;
 
   await tx
@@ -469,7 +470,7 @@ export async function syncCaseSummaryAfterTransition(caseId: number): Promise<vo
 
   // Wrap in its own transaction so the recompute + write are atomic
   await db.transaction(async (tx) => {
-    await syncCaseSummaryAtomic(tx, caseId);
+    await syncCaseSummaryAtomic(tx as DbLike, caseId);
   });
 }
 

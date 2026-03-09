@@ -15,6 +15,7 @@
  */
 
 import { invokeLLMWithFallback } from "../llm/llmService";
+import type { InvokeResult } from "../_core/llm";
 import { getDb } from "../db";
 import { triageObjects, investigationSessions, correlationBundles } from "../../drizzle/schema";
 import { eq, desc, and, or, like, sql, getTableColumns } from "drizzle-orm";
@@ -296,7 +297,7 @@ export async function runTriageAgent(input: {
         triagedBy: "triage_agent",
         triggeredByUserId: input.userId,
         alertQueueItemId: input.alertQueueItemId ?? null,
-        triageData: {} as any, // will be updated after LLM response
+        triageData: {} as TriageObject, // placeholder — updated after LLM response
       });
       dbId = result[0]?.insertId;
     }
@@ -372,13 +373,13 @@ Agent context:
       severity: validateSeverity(parsed.severity),
       severityConfidence: clampConfidence(parsed.severityConfidence),
       severityReasoning: parsed.severityReasoning || "",
-      entities: (parsed.entities || []).map((e: any) => ({
-        type: e.type,
+      entities: (parsed.entities || []).map((e) => ({
+        type: e.type as ExtractedEntity["type"],
         value: e.value,
         source: "llm_inference" as const,
         confidence: clampConfidence(e.confidence),
       })),
-      mitreMapping: (parsed.mitreMapping || []).map((m: any) => ({
+      mitreMapping: (parsed.mitreMapping || []).map((m) => ({
         techniqueId: m.techniqueId,
         techniqueName: m.techniqueName,
         tactic: m.tactic,
@@ -395,7 +396,7 @@ Agent context:
       routeReasoning: parsed.routeReasoning || "",
       summary: parsed.summary || "",
       keyEvidence: buildKeyEvidence(input.rawAlert, agentInfo),
-      uncertainties: (parsed.uncertainties || []).map((u: any) => ({
+      uncertainties: (parsed.uncertainties || []).map((u) => ({
         description: u.description,
         impact: u.impact,
         suggestedAction: u.suggestedAction,
@@ -512,10 +513,13 @@ export async function listTriages(opts: {
   const db = await getDb();
   if (!db) return { triages: [], total: 0 };
 
-  const conditions: any[] = [];
-  if (opts.severity) conditions.push(eq(triageObjects.severity, opts.severity as any));
-  if (opts.route) conditions.push(eq(triageObjects.route, opts.route as any));
-  if (opts.status) conditions.push(eq(triageObjects.status, opts.status as any));
+  type TriageSeverity = "critical" | "high" | "medium" | "low" | "info";
+  type TriageRoute = "A_DUPLICATE_NOISY" | "B_LOW_CONFIDENCE" | "C_HIGH_CONFIDENCE" | "D_LIKELY_BENIGN";
+  type TriageStatus = "pending" | "processing" | "completed" | "failed";
+  const conditions: ReturnType<typeof eq>[] = [];
+  if (opts.severity) conditions.push(eq(triageObjects.severity, opts.severity as TriageSeverity));
+  if (opts.route) conditions.push(eq(triageObjects.route, opts.route as TriageRoute));
+  if (opts.status) conditions.push(eq(triageObjects.status, opts.status as TriageStatus));
   if (opts.agentId) conditions.push(eq(triageObjects.agentId, opts.agentId));
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -690,7 +694,7 @@ function buildKeyEvidence(raw: Record<string, unknown>, agent: TriageObject["age
   }];
 }
 
-function extractTokenCount(result: any): number {
+function extractTokenCount(result: InvokeResult): number {
   if (result?.usage?.total_tokens) return result.usage.total_tokens;
   const prompt = result?.usage?.prompt_tokens ?? 0;
   const completion = result?.usage?.completion_tokens ?? 0;
