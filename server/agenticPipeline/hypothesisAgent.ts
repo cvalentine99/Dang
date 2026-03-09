@@ -818,7 +818,11 @@ export async function runHypothesisAgent(
   const content = llmResult.choices?.[0]?.message?.content;
   if (!content) throw new Error("LLM returned empty response for hypothesis generation");
 
-  const llmOutput = typeof content === "string" ? JSON.parse(content) : content;
+  // Audit #23: Zod boundary on LLM output
+  const { parseHypothesisOutput } = await import("./types/LLMHypothesisRaw");
+  const llmOutput = parseHypothesisOutput(
+    typeof content === "string" ? JSON.parse(content) : content
+  );
 
   // 5. Assemble the LivingCaseObject
   const livingCase = assembleLivingCase(sessionId, ctx, llmOutput);

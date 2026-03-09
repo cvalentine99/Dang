@@ -157,6 +157,8 @@ function playCriticalAlarm(): void {
       osc.start(now + offset);
       osc.stop(now + offset + 0.14);
     });
+    // Audit #88: Close AudioContext after all oscillators finish to prevent leak
+    setTimeout(() => ctx.close().catch(() => {}), 600);
   } catch {
     // Web Audio not available
   }
@@ -190,6 +192,8 @@ function playHighWarning(): void {
     gain2.connect(ctx.destination);
     osc2.start(now + 0.12);
     osc2.stop(now + 0.36);
+    // Audit #88: Close AudioContext after oscillators finish to prevent leak
+    setTimeout(() => ctx.close().catch(() => {}), 500);
   } catch {
     // Web Audio not available
   }

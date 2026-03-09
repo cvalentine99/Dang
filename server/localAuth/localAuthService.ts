@@ -74,7 +74,7 @@ export async function registerLocalUser(input: {
     }
   }
 
-  await db.insert(users).values({
+  const [result] = await db.insert(users).values({
     openId,
     name: input.username,
     email: input.email || null,
@@ -82,10 +82,10 @@ export async function registerLocalUser(input: {
     loginMethod: "local",
     role: isFirstUser ? "admin" : "user",
     lastSignedIn: new Date(),
-  });
+  }).$returningId();
 
   return {
-    id: 0, // Will be set by auto-increment
+    id: result.id, // Audit #18: return actual auto-increment PK
     openId,
     name: input.username,
     role: isFirstUser ? "admin" : "user",

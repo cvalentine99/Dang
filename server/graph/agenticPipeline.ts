@@ -132,9 +132,13 @@ function validateOutput(text: string): { clean: string; filtered: string[]; stat
   let clean = text;
 
   for (const pattern of BLOCKED_PATTERNS) {
-    if (pattern.test(clean)) {
+    // Audit #24: Use global flag to replace ALL occurrences, not just the first
+    const globalPattern = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g");
+    if (globalPattern.test(clean)) {
       filtered.push(pattern.source);
-      clean = clean.replace(pattern, "[REDACTED — write operation blocked by safety rail]");
+      // Reset lastIndex after test() since global regexes are stateful
+      globalPattern.lastIndex = 0;
+      clean = clean.replace(globalPattern, "[REDACTED — write operation blocked by safety rail]");
     }
   }
 

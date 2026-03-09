@@ -18,7 +18,7 @@ import {
   invalidateCache,
 } from "./connectionSettingsService";
 import axios from "axios";
-import https from "https";
+import { createTlsAgent } from "../_core/tlsAgent";
 import { testLLMConnection } from "../llm/llmService";
 import { testSplunkConnection } from "../splunk/splunkService";
 import { validateHost } from "./hostValidation";
@@ -77,6 +77,18 @@ export const connectionSettingsRouter = router({
           code: "BAD_REQUEST",
           message: "No settings provided",
         });
+      }
+
+      // Audit #7: Validate host fields before persisting to prevent SSRF via config
+      const hostField = filtered.host || filtered.WAZUH_HOST || filtered.WAZUH_INDEXER_HOST;
+      if (hostField) {
+        const hostCheck = await validateHost(hostField);
+        if (!hostCheck.allowed) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Host validation failed: ${hostCheck.reason}`,
+          });
+        }
       }
 
       await saveSettings(input.category, filtered, ctx.user.id);
@@ -154,7 +166,7 @@ export const connectionSettingsRouter = router({
           const instance = axios.create({
             baseURL,
             timeout: 10_000,
-            httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+            httpsAgent: createTlsAgent(),
           });
 
           // CRITICAL: Wazuh /security/user/authenticate requires NO request body.
@@ -188,7 +200,7 @@ export const connectionSettingsRouter = router({
           const instance = axios.create({
             baseURL,
             timeout: 10_000,
-            httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+            httpsAgent: createTlsAgent(),
             auth: { username: user, password: pass },
           });
 

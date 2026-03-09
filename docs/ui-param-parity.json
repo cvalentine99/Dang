@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-08T13:30:34.119Z",
+  "generated": "2026-03-09T12:59:47.623Z",
   "callsiteCount": 169,
   "procedureCount": 123,
   "consumedProcedures": [
@@ -467,7 +467,7 @@
     },
     {
       "file": "client/src/pages/BrokerCoverage.tsx",
-      "line": 140,
+      "line": 142,
       "procedure": "brokerCoverage",
       "passedKeys": {},
       "isVoid": true

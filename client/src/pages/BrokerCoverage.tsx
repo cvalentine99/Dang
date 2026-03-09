@@ -65,6 +65,7 @@ function CoverageRing({ percent, label, size = 120 }: { percent: number; label: 
 
   return (
     <div className="flex flex-col items-center gap-2">
+      <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="transform -rotate-90">
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="oklch(0.25 0.02 280)" strokeWidth={strokeWidth} />
         <circle
@@ -75,8 +76,9 @@ function CoverageRing({ percent, label, size = 120 }: { percent: number; label: 
           className="transition-all duration-700 ease-out"
         />
       </svg>
-      <div className="absolute flex flex-col items-center justify-center" style={{ width: size, height: size }}>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-2xl font-display font-bold text-foreground">{percent}%</span>
+      </div>
       </div>
       <p className="text-xs text-muted-foreground text-center">{label}</p>
     </div>

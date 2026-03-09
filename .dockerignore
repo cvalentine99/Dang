@@ -41,6 +41,10 @@ coverage
 tmp
 temp
 
+# Manus debug collector (must not ship in production images)
+__manus__
+client/public/__manus__
+
 # OS files
 .DS_Store
 Thumbs.db

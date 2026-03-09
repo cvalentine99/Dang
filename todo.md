@@ -3820,3 +3820,76 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Add Force Refresh button + cache stats badge on /threat-intel page header
 - [x] Write otxCache.test.ts: 23 tests (source regression, schema, frontend integration, unit)
 - [x] Full suite: 91 files, 2785 tests, 0 failures
+
+## FIX: stateMachine.ts DbLike type errors (2026-03-08)
+
+- [x] DbLike type already correctly defined as `DbRoot | TxLike` (line 44) — LSP watcher was stale
+- [x] Verified 0 TS errors: `tsc --noEmit` exits with code 0
+- [x] Full suite: 91 files, 2785 tests, 0 failures
+
+## AUDIT: Consolidated Code Review Validation (2026-03-09)
+
+### Immediate Stop-Ship (Critical)
+- [x] #4: Gate `rejectUnauthorized` on env flag (SKIP_TLS_VERIFY), default to `true` — shared tlsAgent.ts module
+- [x] #10: Deleted debug-collector, added __manus__ to .gitignore and .dockerignore
+- [x] #2: Removed hardcoded MySQL defaults, require env vars with `${VAR:?}` syntax, bind 127.0.0.1
+
+### Fix Before External Exposure (High)
+- [x] #7: Added host validation (SSRF protection) to updateSettings via validateHostSafety()
+- [x] #13+#15: Added isDisabled check to authenticateRequest() in sdk.ts
+- [x] #21/#22: Fixed PK-vs-sessionId — pipelineRouter.ts queries by livingCaseState.id, livingCaseReportService.ts queries by id then uses sessionId for sessions
+- [ ] #24/#25/#27: Wrap concurrency-critical paths in transactions (recordPivot, persistLivingCase, alertQueue)
+- [x] #47: Added LLMTriageRawSchema and LLMHypothesisRawSchema with lenient defaults, wired into both agents
+- [x] #84: Fixed replace() → replaceAll() in validateOutput for all BLOCKED_PATTERNS
+- [x] #5: Added in-memory login rate limiter (5 attempts/15min per IP) to localAuthRouter.ts
+- [ ] #52: Fix LLM schema instruction dropped without system message in llmService.ts:131-134
+
+### Medium Severity
+- [x] #18: Fixed registerLocalUser to return actual auto-increment id from insertId
+- [ ] #26: Add dedup guard to resumePipelineHelper.ts:83-152
+- [ ] #35: Prune expired entries from indexerClient.ts rate-limit state
+- [ ] #36: Separate encryption key from JWT_SECRET in encryptionService.ts
+- [ ] #37: Remove DB upsert on every authenticated request in sdk.ts:127-131
+- [ ] #41: Add health probe and retry to DB connection lifecycle in db.ts
+- [ ] #43: Fix invokeLLM ignores caller maxTokens in llm.ts:268-302
+- [ ] #44: Fix tool_choice "required" rejected for multiple tools in llm.ts:190-194
+- [ ] #45/#46: Fix urgency/normCategory enum mismatch in hypothesisAgent.ts
+- [ ] #48: Move response action metadata inside transaction in responseActionsRouter.ts
+- [ ] #50: Fix SSE off-by-one duplicate delivery in alertStreamService.ts:133
+- [ ] #53: Fix auto-queue non-atomic increment in autoQueueRouter.ts:147-155
+- [ ] #54: Add overlap guard to auto-queue poller in autoQueueRouter.ts:281-291
+- [ ] #58: Plan FK constraint migration across 25+ tables
+- [ ] #60: Add indexes to ragSessions and savedSearches
+- [ ] #61: Fix stream pause toggle disconnected from SSE in LiveAlertFeed.tsx
+- [ ] #67: Fix 5 endpoints that swallow errors silently in wazuhRouter.ts
+- [ ] #69: Fix ticketing readiness ignores DB in readinessService.ts
+- [ ] #83: Add concurrent pipeline guard on same alert in pipelineRouter.ts
+- [ ] #94: Fix DevDependencies in prod Docker image
+- [ ] #95: Add CSP and Permissions-Policy headers to nginx.conf/Caddyfile
+
+### Nice-to-Have Cleanup (Low)
+- [ ] #76/#86: Fix truthiness bugs on numeric inputs (offset=0, limit=0, scheduleId=0)
+- [ ] #56: Remove phantom columns from kg_sync_status migration
+- [ ] #62: Fix KG endpoint pagination capped at 200
+- [ ] #77: Fix O(n) user count → use COUNT(*)
+- [x] #80: Fixed error message to reference BUILT_IN_FORGE_API_KEY instead of OPENAI_API_KEY
+- [x] #88: Fixed AudioContext leak — close ctx after oscillators finish via onended callback
+- [x] #89: Fixed AIChatBox useEffect to depend on messages.length
+- [x] #91: Fixed CoverageRing — added relative class to parent container
+- [x] #92: Rewrote NotFound page with Amethyst Nexus dark theme
+- [ ] #93: Reduce 'any' prevalence (69 occurrences)
+
+### False Positives — No Action Needed
+- [x] #1: .manus/db/ does not exist — false positive
+- [x] #8: threat_intel_cache WAS implemented (this session) — stale finding
+- [x] #9: Entrypoint uses docker-pre-migrate.mjs not backfill — false positive
+- [x] #20: DB health check has internal try-catch — false positive
+- [x] #30: DashboardLayout provides implicit auth guard — false positive
+- [x] #31: deploy.sh $2 is correct — false positive
+- [x] #40: Env masking is implemented — false positive
+- [x] #51: e.llmAllowed is correct property — false positive
+- [x] #55: scheduleId exists in schema and migrations — false positive
+- [x] #63: Invalidation delegated via callback — false positive
+- [x] #65: Confidence provenance is UX opinion — false positive
+- [x] #71: wget --spider follows redirects by design — false positive
+- [x] #85: purgeExpiredDbCache WAS implemented (this session) — stale finding

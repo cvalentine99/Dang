@@ -94,23 +94,25 @@ export async function assembleLivingCaseReportData(
   const db = await getDb();
   if (!db) return null;
 
-  // Fetch living case state
+  // Fetch living case state — Audit #22: caseId is the PK (id), not sessionId
   const [caseRow] = await db
     .select()
     .from(livingCaseState)
-    .where(eq(livingCaseState.sessionId, caseId))
+    .where(eq(livingCaseState.id, caseId))
     .limit(1);
 
   if (!caseRow) return null;
 
   const caseData = caseRow.caseData as unknown as LivingCaseObject;
 
-  // Fetch investigation session
-  const [sessionRow] = await db
-    .select()
-    .from(investigationSessions)
-    .where(eq(investigationSessions.id, caseId))
-    .limit(1);
+  // Fetch investigation session — use the sessionId stored on the case row
+  const [sessionRow] = caseRow.sessionId
+    ? await db
+        .select()
+        .from(investigationSessions)
+        .where(eq(investigationSessions.id, caseRow.sessionId))
+        .limit(1)
+    : [undefined];
 
   // ── Direction 2: Exact linkage via sourceTriageId / sourceCorrelationId ────
   // Reports are defensible — we use exact lineage IDs stored on the case row,

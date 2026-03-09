@@ -160,7 +160,7 @@ describe("connectionSettings router", () => {
   it("admin can update wazuh_manager settings", async () => {
     const result = await adminCaller.connectionSettings.updateSettings({
       category: "wazuh_manager",
-      settings: { host: "localhost", port: "55000" },
+      settings: { host: "192.168.50.158", port: "55000" },
     });
     expect(result).toHaveProperty("success", true);
   });
@@ -168,7 +168,7 @@ describe("connectionSettings router", () => {
   it("admin can update wazuh_indexer settings", async () => {
     const result = await adminCaller.connectionSettings.updateSettings({
       category: "wazuh_indexer",
-      settings: { host: "localhost", port: "9200" },
+      settings: { host: "192.168.50.158", port: "9200" },
     });
     expect(result).toHaveProperty("success", true);
   });

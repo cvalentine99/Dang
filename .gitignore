@@ -112,4 +112,6 @@ temp/
 # Manus platform artifacts (logs, db cache, etc.)
 .manus/
 .manus-logs/
+__manus__/
+client/public/__manus__/
 .github/workflows/ci.yml

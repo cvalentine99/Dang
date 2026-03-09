@@ -40,7 +40,7 @@
  */
 
 import axios, { AxiosInstance, AxiosError } from "axios";
-import https from "https";
+import { sharedHttpsAgent } from "../_core/tlsAgent";
 
 /**
  * Extract meaningful error detail from Axios errors instead of losing
@@ -201,12 +201,12 @@ function stripSensitiveFields(obj: unknown): unknown {
   return obj;
 }
 
-// ── Axios instance (skip TLS verification for self-signed certs) ──────────────
+// ── Axios instance — TLS policy controlled by SKIP_TLS_VERIFY env flag ────────
 function createAxiosInstance(baseURL: string): AxiosInstance {
   return axios.create({
     baseURL,
     timeout: 8_000,
-    httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+    httpsAgent: sharedHttpsAgent,
     // NOTE: Do NOT set a default Content-Type here. The /security/user/authenticate
     // endpoint must receive NO body and NO Content-Type. GET requests also don't
     // need one. Axios sets Content-Type automatically when a body is present.

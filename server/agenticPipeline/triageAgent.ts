@@ -351,8 +351,10 @@ Agent context:
       throw new Error("LLM returned empty response");
     }
 
-    // ── Parse and Validate ───────────────────────────────────────────────
-    const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+    // ── Parse and Validate (Audit #23: Zod boundary on LLM output) ────────────────
+    const { parseTriageOutput } = await import("./types/LLMTriageRaw");
+    const rawJson = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+    const parsed = parseTriageOutput(rawJson);
 
     // Build the full TriageObject with provenance
     const triageObject: TriageObject = {

@@ -13,7 +13,7 @@
  */
 
 import axios, { AxiosInstance } from "axios";
-import https from "https";
+import { sharedHttpsAgent } from "../_core/tlsAgent";
 
 // ── Rate-limit state ─────────────────────────────────────────────────────────
 const rateLimitState: Record<string, { count: number; resetAt: number }> = {};
@@ -124,7 +124,7 @@ function createInstance(config: IndexerConfig): AxiosInstance {
   return axios.create({
     baseURL,
     timeout: 10_000, // Indexer queries can be slower than Server API
-    httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+    httpsAgent: sharedHttpsAgent,
     auth: { username: config.user, password: config.pass },
     headers: { "Content-Type": "application/json" },
   });

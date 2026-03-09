@@ -1220,7 +1220,7 @@ export const pipelineRouter = router({
         const [caseRow] = await db
           .select()
           .from(livingCaseState)
-          .where(eq(livingCaseState.sessionId, run.livingCaseId))
+          .where(eq(livingCaseState.id, run.livingCaseId))  // Audit #21: livingCaseId is PK (id), not sessionId
           .limit(1);
         if (caseRow) {
           hypothesisArtifact = {

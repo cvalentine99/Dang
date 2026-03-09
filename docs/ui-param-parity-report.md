@@ -1,6 +1,6 @@
 # UI → Router Schema Parity Report
 
-**Generated:** 2026-03-08  
+**Generated:** 2026-03-09  
 **Script:** `scripts/audit-ui-param-parity.mjs`  
 **Callsites audited:** 169  
 **Unique procedures consumed:** 114 of 123 total  
@@ -557,7 +557,7 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/BrokerCoverage.tsx
 
-### Line 140: `wazuh.brokerCoverage`
+### Line 142: `wazuh.brokerCoverage`
 
 Input: void (no parameters) — **OK**
 

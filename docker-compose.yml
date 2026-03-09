@@ -16,16 +16,16 @@ services:
     restart: unless-stopped
     command: --default-time-zone=+00:00 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-dang_root_secret}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required — generate with openssl rand -hex 16}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-dang}
       MYSQL_USER: ${MYSQL_USER:-dang}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-dang_db_secret}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required — generate with openssl rand -hex 16}
     ports:
-      - "${DB_EXTERNAL_PORT:-3307}:3306"
+      - "127.0.0.1:${DB_EXTERNAL_PORT:-3307}:3306"
     volumes:
       - dang-db-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-dang_root_secret}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -50,7 +50,7 @@ services:
       PORT: 3000
 
       # Database — connects to the db service
-      DATABASE_URL: mysql://${MYSQL_USER:-dang}:${MYSQL_PASSWORD:-dang_db_secret}@db:3306/${MYSQL_DATABASE:-dang}
+      DATABASE_URL: mysql://${MYSQL_USER:-dang}:${MYSQL_PASSWORD}@db:3306/${MYSQL_DATABASE:-dang}
 
       # Run drizzle migrations on startup (set to "true" on first run or after schema changes)
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}

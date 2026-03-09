@@ -8,6 +8,39 @@ import {
   getUserCount,
 } from "./localAuthService";
 
+// ── Audit #25: Login rate limiter ────────────────────────────────────────────
+// In-memory sliding window: max 5 attempts per IP per 15 minutes.
+const LOGIN_ATTEMPTS = new Map<string, { count: number; windowStart: number }>();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkLoginRateLimit(ip: string): void {
+  const now = Date.now();
+  const entry = LOGIN_ATTEMPTS.get(ip);
+  if (!entry || now - entry.windowStart > LOGIN_WINDOW_MS) {
+    LOGIN_ATTEMPTS.set(ip, { count: 1, windowStart: now });
+    return;
+  }
+  entry.count++;
+  if (entry.count > MAX_LOGIN_ATTEMPTS) {
+    const retryAfterSec = Math.ceil((entry.windowStart + LOGIN_WINDOW_MS - now) / 1000);
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `Too many login attempts. Try again in ${retryAfterSec} seconds.`,
+    });
+  }
+}
+
+// Prune stale entries every 10 minutes to prevent memory leak
+setInterval(() => {
+  const now = Date.now();
+  Array.from(LOGIN_ATTEMPTS.entries()).forEach(([ip, entry]) => {
+    if (now - entry.windowStart > LOGIN_WINDOW_MS) {
+      LOGIN_ATTEMPTS.delete(ip);
+    }
+  });
+}, 10 * 60 * 1000).unref();
+
 export const localAuthRouter = router({
   /**
    * Returns the current auth mode and whether registration is available.
@@ -86,6 +119,10 @@ export const localAuthRouter = router({
       if (!isLocalAuthMode()) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Login is currently disabled." });
       }
+
+      // Audit #25: Rate limit login attempts per IP
+      const clientIp = ctx.req.ip || ctx.req.socket.remoteAddress || "unknown";
+      checkLoginRateLimit(clientIp);
 
       const result = await loginLocalUser(input);
 

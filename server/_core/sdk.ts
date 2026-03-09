@@ -124,11 +124,19 @@ class SDKServer {
       throw ForbiddenError("User not found");
     }
 
-    // Update last signed in timestamp
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: new Date(),
-    });
+    // Audit #13: Block disabled users from authenticating
+    if (user.isDisabled) {
+      throw ForbiddenError("Account is disabled");
+    }
+
+    // Update last signed in timestamp (Audit #37: only update if stale > 5 min)
+    const STALE_THRESHOLD_MS = 5 * 60 * 1000;
+    if (!user.lastSignedIn || Date.now() - new Date(user.lastSignedIn).getTime() > STALE_THRESHOLD_MS) {
+      await db.upsertUser({
+        openId: user.openId,
+        lastSignedIn: new Date(),
+      });
+    }
 
     return user;
   }

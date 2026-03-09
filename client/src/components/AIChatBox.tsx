@@ -147,7 +147,7 @@ export function AIChatBox({
 
       setMinHeightForLastMessage(Math.max(0, calculatedHeight));
     }
-  }, []);
+  }, [messages.length]);
 
   // Scroll to bottom helper function with smooth animation
   const scrollToBottom = () => {
