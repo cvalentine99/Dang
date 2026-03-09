@@ -7,7 +7,7 @@
  * These tests hit the real database. Gated by DATABASE_URL.
  * Cleanup: all test rows are deleted in afterAll.
  */
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll, beforeAll } from "vitest";
 import mysql from "mysql2/promise";
 import { SAVED_SEARCH_TYPES } from "../../shared/searchTypes";
 
@@ -28,8 +28,21 @@ const pool = HAS_DB
     })
   : (null as unknown as ReturnType<typeof mysql.createPool>);
 
+/** Test user ID — use a high number unlikely to collide with real data */
+const TEST_USER_ID = 999999;
+const TEST_PREFIX = "__integration_test__";
+
 /** Track IDs we insert so we can clean up */
 const insertedIds: number[] = [];
+
+beforeAll(async () => {
+  if (!HAS_DB || !pool) return;
+  // Ensure test user exists for FK constraints
+  await pool.query(
+    `INSERT IGNORE INTO users (id, openId, name, role) VALUES (?, ?, ?, ?)`,
+    [TEST_USER_ID, "__integration_test_user_999999__", "Integration Test User", "user"]
+  );
+});
 
 afterAll(async () => {
   if (HAS_DB && pool) {
@@ -39,13 +52,11 @@ afterAll(async () => {
         `DELETE FROM saved_searches WHERE id IN (${insertedIds.join(",")})`,
       );
     }
+    // Clean up test user
+    await pool.query(`DELETE FROM users WHERE id = ?`, [TEST_USER_ID]);
     await pool.end();
   }
 });
-
-/** Test user ID — use a high number unlikely to collide with real data */
-const TEST_USER_ID = 999999;
-const TEST_PREFIX = "__integration_test__";
 
 describe.skipIf(!HAS_DB)("Saved Searches — DB Integration", () => {
   describe("shared/searchTypes.ts is the source of truth", () => {

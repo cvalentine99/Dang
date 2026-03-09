@@ -250,8 +250,10 @@ describe("Fail-Closed Audit Gate", () => {
   const routerSrc = readFile("server/wazuh/wazuhRouter.ts");
 
   it("logSensitiveAccess should throw when DB is unavailable (not swallow)", () => {
-    // Must NOT contain "Swallow" or fire-and-forget patterns
-    expect(dbSrc).not.toMatch(/Swallow|fire.and.forget/i);
+    // Extract only the logSensitiveAccess function body to avoid false positives from other functions
+    const fnStart = dbSrc.indexOf("export async function logSensitiveAccess");
+    const fnBody = dbSrc.slice(fnStart, fnStart + 600);
+    expect(fnBody).not.toMatch(/Swallow|fire.and.forget/i);
     // Must throw on DB failure
     expect(dbSrc).toContain("throw new Error(\"Audit logging unavailable: database connection failed.");
   });

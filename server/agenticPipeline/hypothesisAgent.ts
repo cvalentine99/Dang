@@ -158,7 +158,7 @@ async function resolveSession(
     title,
     description: ctx.triage.summary ?? `Investigation triggered by alert ${ctx.triage.alertId}`,
     status: "active",
-    userId: 0, // system-created
+    userId: null, // system-created (no user association)
   }).$returningId();
 
   return { sessionId: result.id, isNew: true };

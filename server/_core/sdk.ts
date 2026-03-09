@@ -141,13 +141,12 @@ class SDKServer {
       throw ForbiddenError("Account is disabled");
     }
 
-    // Update last signed in timestamp (Audit #37: only update if stale > 5 min)
-    const STALE_THRESHOLD_MS = 5 * 60 * 1000;
+    // Audit #37: Lightweight last-signed-in update — only UPDATE (not upsert),
+    // and only if stale > 15 minutes to reduce DB writes on hot auth paths.
+    const STALE_THRESHOLD_MS = 15 * 60 * 1000;
     if (!user.lastSignedIn || Date.now() - new Date(user.lastSignedIn).getTime() > STALE_THRESHOLD_MS) {
-      await db.upsertUser({
-        openId: user.openId,
-        lastSignedIn: new Date(),
-      });
+      // Fire-and-forget — don't block the auth response
+      db.updateLastSignedIn(user.openId).catch(() => {});
     }
 
     return user;

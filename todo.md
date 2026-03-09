@@ -3862,11 +3862,11 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] #50: Fix SSE off-by-one duplicate delivery in alertStreamService.ts:133
 - [x] #53: Fix auto-queue non-atomic increment in autoQueueRouter.ts:147-155
 - [x] #54: Add overlap guard to auto-queue poller in autoQueueRouter.ts:281-291
-- [ ] #58: Plan FK constraint migration across 25+ tables
+- [x] #58: Plan FK constraint migration across 25+ tables — 36 FK constraints added
 - [ ] #60: Add indexes to ragSessions and savedSearches
 - [x] #61: Fix stream pause toggle disconnected from SSE in LiveAlertFeed.tsx
 - [x] #67: Fix 5 endpoints that swallow errors silently in wazuhRouter.ts
-- [ ] #69: Fix ticketing readiness ignores DB in readinessService.ts
+- [x] #69: Fix ticketing readiness ignores DB in readinessService.ts — SELECT 1 verification added
 - [x] #83: Add concurrent pipeline guard on same alert in pipelineRouter.ts
 - [ ] #94: Fix DevDependencies in prod Docker image
 - [x] #95: Add CSP and Permissions-Policy headers — Express middleware (securityHeaders.ts)
@@ -3963,3 +3963,17 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] #61: Fix pause toggle — isStreamEnabled now passed to useAlertStream hook (not just parent enabled prop)
 - [x] Write regression tests — 19 tests in auditFixes67_45_61.test.ts + updated stageOutput, pipelineHandoff, agenticPipeline tests
 - [x] Full suite: 96 files, 2861 tests, 0 failures
+
+## DB Upsert, FK Migration, and Readiness Fixes (2026-03-09)
+- [x] #37: Remove DB upsert on every authenticated request in sdk.ts
+- [x] #58: Plan and execute FK constraint migration across 25+ tables — 36 FK constraints added across 20+ tables
+- [x] #69: Add DB connectivity check to readinessService.ts — SELECT 1 verification
+- [x] Write regression tests for all 3 fixes
+
+## FK Constraint Test Fixes (2026-03-09)
+- [x] Fix investigation_sessions.userId=0 FK violation — made userId nullable, hypothesisAgent uses null for system-created sessions
+- [x] Fix savedSearches integration tests — added beforeAll to create test user (id=999999) for FK constraints
+- [x] Fix resumePipelineHelper tests — hypothesis stage was failing due to userId=0 FK violation
+- [x] Applied DB migration: ALTER investigation_sessions userId to nullable, FK rule changed to SET NULL
+- [x] Full suite: 97 files, 2870 tests, 0 failures
+- [x] tsc --noEmit: EXIT 0

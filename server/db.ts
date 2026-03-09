@@ -77,6 +77,21 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 }
 
+/**
+ * Audit #37: Lightweight last-signed-in update.
+ * Only touches the single column instead of a full INSERT ON DUPLICATE KEY UPDATE.
+ */
+export async function updateLastSignedIn(openId: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.openId, openId));
+  } catch (error) {
+    // Non-critical — log and swallow so auth flow isn't blocked
+    console.warn("[Database] Failed to update lastSignedIn:", error);
+  }
+}
+
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) {

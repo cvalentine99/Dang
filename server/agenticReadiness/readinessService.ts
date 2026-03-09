@@ -22,6 +22,7 @@
  */
 
 import { getDb } from "../db";
+import { sql } from "drizzle-orm";
 import { getEffectiveLLMConfig } from "../llm/llmService";
 import { getEffectiveWazuhConfig, wazuhGet } from "../wazuh/wazuhClient";
 import { getEffectiveIndexerConfig, indexerHealth } from "../indexer/indexerClient";
@@ -65,6 +66,8 @@ async function checkDatabase(): Promise<DependencyStatus> {
   try {
     const db = await getDb();
     if (!db) return { state: "blocked", reason: "Database connection not available", fallbackActive: false, blocksWorkflow: true, lastChecked: now };
+    // Audit #69: Actually probe the DB with a lightweight query instead of just checking the handle
+    await db.execute(sql`SELECT 1`);
     return { state: "ready", reason: null, fallbackActive: false, blocksWorkflow: true, lastChecked: now };
   } catch (err) {
     return { state: "blocked", reason: `Database error: ${(err as Error).message}`, fallbackActive: false, blocksWorkflow: true, lastChecked: now };

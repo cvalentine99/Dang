@@ -653,7 +653,8 @@ export type KgSyncStatus = typeof kgSyncStatus.$inferSelect;
  */
 export const investigationSessions = mysqlTable("investigation_sessions", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  /** Nullable: system-created sessions (e.g. hypothesis agent) use null */
+  userId: int("userId"),
   title: varchar("title", { length: 512 }).notNull(),
   description: text("description"),
   status: mysqlEnum("status", ["active", "closed", "archived"]).default("active").notNull(),

@@ -63,22 +63,45 @@ function createOtherUserContext(): TrpcContext {
   };
 }
 
+let _testPool: any;
+async function getTestPool() {
+  if (_testPool) return _testPool;
+  const mysql = await import("mysql2/promise");
+  const parsed = new URL(process.env.DATABASE_URL!);
+  _testPool = mysql.createPool({
+    host: parsed.hostname,
+    port: Number(parsed.port),
+    user: parsed.username,
+    password: parsed.password,
+    database: parsed.pathname.slice(1),
+    ssl: { rejectUnauthorized: false },
+  });
+  return _testPool;
+}
+
+beforeAll(async () => {
+  if (!HAS_DB) return;
+  const pool = await getTestPool();
+  // Ensure test users exist for FK constraints
+  await pool.query(
+    `INSERT IGNORE INTO users (id, openId, name, role) VALUES (?, ?, ?, ?), (?, ?, ?, ?)`,
+    [TEST_USER_ID, TEST_OPEN_ID, "Test User", "user", TEST_USER_ID + 1, "__other_user__", "Other User", "user"]
+  );
+});
+
 afterAll(async () => {
-  if (!HAS_DB || createdIds.length === 0) return;
-  // Clean up via raw SQL to avoid depending on the router for cleanup
+  if (!HAS_DB) return;
   try {
-    const mysql = await import("mysql2/promise");
-    const parsed = new URL(process.env.DATABASE_URL!);
-    const pool = mysql.createPool({
-      host: parsed.hostname,
-      port: Number(parsed.port),
-      user: parsed.username,
-      password: parsed.password,
-      database: parsed.pathname.slice(1),
-      ssl: { rejectUnauthorized: false },
-    });
+    const pool = await getTestPool();
+    if (createdIds.length > 0) {
+      await pool.query(
+        `DELETE FROM saved_searches WHERE id IN (${createdIds.join(",")})`,
+      );
+    }
+    // Clean up test users
     await pool.query(
-      `DELETE FROM saved_searches WHERE id IN (${createdIds.join(",")})`,
+      `DELETE FROM users WHERE id IN (?, ?)`,
+      [TEST_USER_ID, TEST_USER_ID + 1]
     );
     await pool.end();
   } catch (e) {
