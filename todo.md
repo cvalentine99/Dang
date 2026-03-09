@@ -4002,3 +4002,27 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Verify tsc --noEmit still passes: EXIT 0
 - [x] Write regression tests: cleanupSprint.test.ts (12 tests)
 - [x] Full suite: 98 files, 2882 tests, 0 failures
+
+## Optimization Sprint: Indexes, Dedup Cache, E2E Smoke Tests (2026-03-09)
+
+### Composite indexes on alertQueue and pipelineRuns
+- [x] Analyze alertQueue query patterns (status+ruleLevel for priority sort, status+queuedAt for time-ordered listing)
+- [x] Analyze pipelineRuns query patterns (status+startedAt for filtered listing, queueItemId+startedAt for queue-item lookups)
+- [x] Add composite indexes to schema and apply migration (4 new indexes)
+- [x] Write tests to verify index existence and column order (4 tests in e2eSmoke.test.ts)
+
+### Wazuh proxy request deduplication
+- [x] Implement TTL cache (7s default) in server/wazuh/requestCache.ts with in-flight dedup
+- [x] Add deterministic cache key generation from endpoint + sorted params
+- [x] Add cache management endpoints: cacheStats, cacheClear, cacheSetTtl, cacheSetEnabled (admin-gated)
+- [x] Integrate into proxyGet() — all Wazuh GET requests now go through cachedFetch
+- [x] Write 25 tests for cache hit/miss/expiry/dedup/management (requestCache.test.ts)
+
+### E2E smoke tests for critical tRPC procedures
+- [x] Test alertQueue.list returns valid shape (column types, enum values)
+- [x] Test pipeline.listPipelineRuns returns valid shape with status filtering
+- [x] Test pipeline.pipelineRunStats returns aggregate stats (total = sum of statuses)
+- [x] Test savedSearches full CRUD roundtrip + FK constraint enforcement
+- [x] Test cacheStats returns valid CacheStats shape
+- [x] Test database readiness (SELECT 1 + all 7 critical tables accessible)
+- [x] Full suite: 100 files, 2,921 tests, 0 failures

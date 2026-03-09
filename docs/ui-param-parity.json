@@ -1,7 +1,7 @@
 {
-  "generated": "2026-03-09T20:32:13.284Z",
+  "generated": "2026-03-09T22:04:09.846Z",
   "callsiteCount": 169,
-  "procedureCount": 123,
+  "procedureCount": 127,
   "consumedProcedures": [
     "agentBrowserExtensions",
     "agentById",
@@ -4725,6 +4725,32 @@
     "brokerCoverage": {
       "inputType": "void",
       "keys": {}
+    },
+    "cacheStats": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "cacheClear": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "cacheSetTtl": {
+      "inputType": "object",
+      "keys": {
+        "ttlMs": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "cacheSetEnabled": {
+      "inputType": "object",
+      "keys": {
+        "enabled": {
+          "required": true,
+          "default": null
+        }
+      }
     }
   }
 }

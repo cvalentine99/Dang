@@ -3,7 +3,7 @@
 **Generated:** 2026-03-09  
 **Script:** `scripts/audit-ui-param-parity.mjs`  
 **Callsites audited:** 169  
-**Unique procedures consumed:** 114 of 123 total  
+**Unique procedures consumed:** 114 of 127 total  
 
 ---
 
@@ -14,7 +14,7 @@
 |--------|-------|
 | Total callsites | 169 |
 | Unique procedures consumed | 114 |
-| Router procedures available | 123 |
+| Router procedures available | 127 |
 | Parameters surfaced in UI | 95 |
 | Parameters hardcoded/constant | 116 |
 | Parameters not supported (classified) | 821 |
@@ -26,6 +26,10 @@
 
 | Procedure | Input Keys | Disposition |
 |-----------|-----------|-------------|
+| `cacheClear` | (void) | Backend-only / Not yet wired to UI |
+| `cacheSetEnabled` | enabled | Backend-only / Not yet wired to UI |
+| `cacheSetTtl` | ttlMs | Backend-only / Not yet wired to UI |
+| `cacheStats` | (void) | Backend-only / Not yet wired to UI |
 | `clusterApiConfig` | (void) | Backend-only / Not yet wired to UI |
 | `clusterConfigValidation` | (void) | Backend-only / Not yet wired to UI |
 | `clusterRulesetSync` | (void) | Backend-only / Not yet wired to UI |
@@ -1906,6 +1910,10 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `status` | Optional | No | Passed | **Constant** (hardcoded: `"active"`) |
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+
+
+
+
 
 
 

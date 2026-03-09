@@ -11,6 +11,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import { getWazuhConfig, isWazuhConfigured, wazuhGet, getEffectiveWazuhConfig, isWazuhEffectivelyConfigured } from "./wazuhClient";
+import { makeCacheKey, cachedFetch, getCacheStats, clearCache, setTtl, setCacheEnabled, type CacheStats } from "./requestCache";
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
   brokerParams,
@@ -80,7 +81,14 @@ async function proxyGet(
   const config = await getEffectiveWazuhConfig();
   if (!config) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Wazuh is not configured. Set connection settings in Admin > Connection Settings or via environment variables." });
   const userId = getCurrentUserId();
-  return wazuhGet(config, { path, params, rateLimitGroup: group, userId });
+
+  // Request deduplication: identical GET requests within the TTL window
+  // share a single upstream call. This protects Wazuh from redundant
+  // requests when multiple dashboard panels refresh simultaneously.
+  const cacheKey = makeCacheKey(path, params);
+  return cachedFetch(cacheKey, () =>
+    wazuhGet(config, { path, params, rateLimitGroup: group, userId })
+  );
 }
 
 /**
@@ -2132,5 +2140,36 @@ export const wazuhRouter = router({
   brokerCoverage: protectedProcedure
     .query(() => {
       return generateCoverageReport();
+    }),
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // REQUEST CACHE MANAGEMENT
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  /** Get cache statistics — hits, misses, coalesced, hit rate, TTL */
+  cacheStats: protectedProcedure
+    .query((): CacheStats => getCacheStats()),
+
+  /** Clear all cached responses (admin only) */
+  cacheClear: adminProcedure
+    .mutation(() => {
+      clearCache();
+      return { success: true as const, message: "Cache cleared" };
+    }),
+
+  /** Update cache TTL in milliseconds (admin only, 0-60000ms) */
+  cacheSetTtl: adminProcedure
+    .input(z.object({ ttlMs: z.number().int().min(0).max(60000) }))
+    .mutation(({ input }) => {
+      setTtl(input.ttlMs);
+      return { success: true as const, ttlMs: input.ttlMs };
+    }),
+
+  /** Enable or disable the request cache (admin only) */
+  cacheSetEnabled: adminProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(({ input }) => {
+      setCacheEnabled(input.enabled);
+      return { success: true as const, enabled: input.enabled };
     }),
 });

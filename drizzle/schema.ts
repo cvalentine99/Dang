@@ -819,6 +819,8 @@ export const alertQueue = mysqlTable("alert_queue", {
   index("aq_status_idx").on(table.status),
   index("aq_alertId_idx").on(table.alertId),
   index("aq_queuedAt_idx").on(table.queuedAt),
+  index("aq_status_ruleLevel_idx").on(table.status, table.ruleLevel),
+  index("aq_status_queuedAt_idx").on(table.status, table.queuedAt),
 ]));
 
 export type AlertQueueItem = typeof alertQueue.$inferSelect;
@@ -1380,6 +1382,8 @@ export const pipelineRuns = mysqlTable("pipeline_runs", {
   index("pr_queueItemId_idx").on(table.queueItemId),
   index("pr_alertId_idx").on(table.alertId),
   index("pr_startedAt_idx").on(table.startedAt),
+  index("pr_status_startedAt_idx").on(table.status, table.startedAt),
+  index("pr_queueItemId_startedAt_idx").on(table.queueItemId, table.startedAt),
 ]));
 
 export type PipelineRunRow = typeof pipelineRuns.$inferSelect;
