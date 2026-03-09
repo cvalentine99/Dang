@@ -3941,3 +3941,11 @@ These need a proper contract-alignment sprint, not a hot patch:
 ## Deployment Fix (2026-03-09)
 - [x] Fix JWT_SECRET hard-fail too aggressive — now only hard-fails for well-known defaults or < 16 chars; 16-31 chars is a warning
 - [x] Full suite: 93 files, 2817 tests, 0 failures
+
+## Response Action Metadata Transaction Fix (2026-03-09)
+- [x] #48: Move response action metadata inside transaction to prevent orphaned data
+  - propose mutation: INSERT + SELECT + audit INSERT now wrapped in db.transaction(async (tx))
+  - execute mutation: executionResult/executionSuccess merged into state machine's atomic UPDATE payload
+  - removed post-transaction UPDATE from execute router mutation
+- [x] Write regression tests for #48 (8 source-level structural tests in transactionGuards.test.ts)
+- [x] Full suite: 94 files, 2825 tests, 0 failures

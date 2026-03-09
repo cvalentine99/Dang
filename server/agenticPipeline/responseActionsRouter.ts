@@ -75,48 +75,54 @@ export const responseActionsRouter = router({
       const actionId = `ra-${nanoid(12)}`;
       const proposedBy = input.proposedByAgent ?? `user:${ctx.user.id}`;
 
-      await db.insert(responseActions).values({
-        actionId,
-        category: input.category as any,
-        title: input.title,
-        description: input.description ?? null,
-        urgency: input.urgency as any,
-        requiresApproval: input.requiresApproval ? 1 : 0,
-        state: "proposed",
-        proposedBy,
-        evidenceBasis: input.evidenceBasis ?? null,
-        playbookRef: input.playbookRef ?? null,
-        targetValue: input.targetValue ?? null,
-        targetType: input.targetType ?? null,
-        caseId: input.caseId ?? null,
-        correlationId: input.correlationId ?? null,
-        triageId: input.triageId ?? null,
-        linkedAlertIds: input.linkedAlertIds ?? null,
-        linkedAgentIds: input.linkedAgentIds ?? null,
-      });
+      // Audit #48: Wrap INSERT + SELECT + audit INSERT in a single transaction
+      // to prevent orphaned action rows without audit trails on partial failure.
+      const inserted = await db.transaction(async (tx) => {
+        await tx.insert(responseActions).values({
+          actionId,
+          category: input.category as any,
+          title: input.title,
+          description: input.description ?? null,
+          urgency: input.urgency as any,
+          requiresApproval: input.requiresApproval ? 1 : 0,
+          state: "proposed",
+          proposedBy,
+          evidenceBasis: input.evidenceBasis ?? null,
+          playbookRef: input.playbookRef ?? null,
+          targetValue: input.targetValue ?? null,
+          targetType: input.targetType ?? null,
+          caseId: input.caseId ?? null,
+          correlationId: input.correlationId ?? null,
+          triageId: input.triageId ?? null,
+          linkedAlertIds: input.linkedAlertIds ?? null,
+          linkedAgentIds: input.linkedAgentIds ?? null,
+        });
 
-      // Fetch the inserted row
-      const [inserted] = await db
-        .select()
-        .from(responseActions)
-        .where(eq(responseActions.actionId, actionId))
-        .limit(1);
+        // Fetch the inserted row inside the transaction
+        const [row] = await tx
+          .select()
+          .from(responseActions)
+          .where(eq(responseActions.actionId, actionId))
+          .limit(1);
 
-      // Log creation audit via the centralized state machine's audit pattern
-      await db.insert(responseActionAudit).values({
-        actionId: inserted.id,
-        actionIdStr: actionId,
-        fromState: "none",
-        toState: "proposed",
-        performedBy: proposedBy,
-        reason: "Action proposed",
-        metadata: {
-          category: input.category,
-          urgency: input.urgency,
-          requiresApproval: input.requiresApproval,
-          targetValue: input.targetValue,
-          targetType: input.targetType,
-        },
+        // Log creation audit inside the same transaction
+        await tx.insert(responseActionAudit).values({
+          actionId: row.id,
+          actionIdStr: actionId,
+          fromState: "none",
+          toState: "proposed",
+          performedBy: proposedBy,
+          reason: "Action proposed",
+          metadata: {
+            category: input.category,
+            urgency: input.urgency,
+            requiresApproval: input.requiresApproval,
+            targetValue: input.targetValue,
+            targetType: input.targetType,
+          },
+        });
+
+        return row;
       });
 
       return { success: true as const, actionId, action: inserted };
@@ -143,6 +149,12 @@ export const responseActionsRouter = router({
     }),
 
   // ── Execute ── (delegates to centralized state machine) ───────────────────
+  //
+  // Audit #48: The execution result metadata (executionResult, executionSuccess)
+  // is now stored inside the state machine's transaction via the extraUpdate
+  // field, ensuring atomicity. Previously, a separate UPDATE after the
+  // transaction could fail and leave the action in "executed" state with no
+  // result metadata.
   execute: adminProcedure
     .input(z.object({
       actionId: z.string().min(1),
@@ -154,20 +166,6 @@ export const responseActionsRouter = router({
         executionResult: input.executionResult,
         executionSuccess: input.executionSuccess,
       });
-
-      if (result.success && result.action) {
-        // Also store execution result on the action itself
-        const db = await getDb();
-        if (db) {
-          await db
-            .update(responseActions)
-            .set({
-              executionResult: input.executionResult ?? null,
-              executionSuccess: input.executionSuccess ? 1 : 0,
-            })
-            .where(eq(responseActions.actionId, input.actionId));
-        }
-      }
 
       return result;
     }),

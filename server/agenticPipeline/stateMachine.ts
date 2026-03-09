@@ -266,6 +266,15 @@ export async function transitionActionState(
       case "executed":
         updatePayload.executedBy = req.performedBy;
         updatePayload.executedAt = now;
+        // Audit #48: Merge execution result metadata into the atomic UPDATE
+        // so executionResult/executionSuccess are written in the same transaction
+        // as the state transition — no orphaned "executed" rows without results.
+        if (req.metadata?.executionResult !== undefined) {
+          updatePayload.executionResult = req.metadata.executionResult as string;
+        }
+        if (req.metadata?.executionSuccess !== undefined) {
+          updatePayload.executionSuccess = req.metadata.executionSuccess ? 1 : 0;
+        }
         break;
       case "deferred":
         updatePayload.decidedBy = req.performedBy;
