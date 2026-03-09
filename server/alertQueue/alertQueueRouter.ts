@@ -225,15 +225,20 @@ export const alertQueueRouter = router({
         };
       }
 
-      // Mark as processing
-      await db
+      // Atomic claim: UPDATE with WHERE status='queued' so only one caller wins.
+      // This prevents two analysts from both starting triage on the same item.
+      const [claimResult] = await db
         .update(alertQueue)
         .set({
           status: "processing",
           processedAt: new Date(),
           autoTriageStatus: "running",
         })
-        .where(eq(alertQueue.id, input.id));
+        .where(and(eq(alertQueue.id, input.id), eq(alertQueue.status, "queued")));
+
+      if ((claimResult as any).affectedRows === 0) {
+        throw new TRPCError({ code: "CONFLICT", message: "Queue item is already being processed by another session" });
+      }
 
       // Build the raw alert from queue item (same pattern as autoTriageQueueItem)
       const rawAlert = item.rawJson ?? {

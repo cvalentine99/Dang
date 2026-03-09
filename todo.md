@@ -3838,11 +3838,15 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] #7: Added host validation (SSRF protection) to updateSettings via validateHostSafety()
 - [x] #13+#15: Added isDisabled check to authenticateRequest() in sdk.ts
 - [x] #21/#22: Fixed PK-vs-sessionId — pipelineRouter.ts queries by livingCaseState.id, livingCaseReportService.ts queries by id then uses sessionId for sessions
-- [ ] #24/#25/#27: Wrap concurrency-critical paths in transactions (recordPivot, persistLivingCase, alertQueue)
+- [x] #24: recordPivot wrapped in db.transaction() — InnoDB row lock serializes concurrent pivot writes
+- [x] #25: persistLivingCase wrapped in db.transaction() — prevents check-then-insert race on sessionId
+- [x] #27: alertQueue.process uses atomic claim pattern (UPDATE WHERE status='queued' + affectedRows check, throws CONFLICT)
 - [x] #47: Added LLMTriageRawSchema and LLMHypothesisRawSchema with lenient defaults, wired into both agents
 - [x] #84: Fixed replace() → replaceAll() in validateOutput for all BLOCKED_PATTERNS
 - [x] #5: Added in-memory login rate limiter (5 attempts/15min per IP) to localAuthRouter.ts
-- [ ] #52: Fix LLM schema instruction dropped without system message in llmService.ts:131-134
+- [x] #52: LLM schema instruction now prepends a system message when none exists instead of silently dropping
+- [x] Added concurrency.test.ts: 9 regression tests for all 4 fixes
+- [x] Full suite: 92 files, 2794 tests, 0 failures
 
 ### Medium Severity
 - [x] #18: Fixed registerLocalUser to return actual auto-increment id from insertId

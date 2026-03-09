@@ -677,38 +677,42 @@ export const pipelineRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
-      const [row] = await db
-        .select()
-        .from(livingCaseState)
-        .where(eq(livingCaseState.id, input.caseId))
-        .limit(1);
+      // Wrap in transaction to prevent read-modify-write race on caseData.completedPivots.
+      // InnoDB row lock on the SELECT inside the tx serializes concurrent pivot writes.
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .select()
+          .from(livingCaseState)
+          .where(eq(livingCaseState.id, input.caseId))
+          .limit(1);
 
-      if (!row) return { success: false as const, error: "Living case not found" };
+        if (!row) return { success: false as const, error: "Living case not found" };
 
-      const caseData = row.caseData as any;
-      if (!caseData.completedPivots) caseData.completedPivots = [];
+        const caseData = row.caseData as any;
+        if (!caseData.completedPivots) caseData.completedPivots = [];
 
-      caseData.completedPivots.push({
-        action: input.action,
-        performedAt: new Date().toISOString(),
-        performedBy: `user:${ctx.user.id}`,
-        finding: input.finding,
-        impactedTheory: input.impactedTheory,
+        caseData.completedPivots.push({
+          action: input.action,
+          performedAt: new Date().toISOString(),
+          performedBy: `user:${ctx.user.id}`,
+          finding: input.finding,
+          impactedTheory: input.impactedTheory,
+        });
+
+        caseData.lastUpdatedAt = new Date().toISOString();
+        caseData.lastUpdatedBy = "analyst_manual";
+
+        await tx
+          .update(livingCaseState)
+          .set({
+            caseData,
+            completedPivotCount: caseData.completedPivots.length,
+            lastUpdatedBy: "analyst_manual",
+          })
+          .where(eq(livingCaseState.id, input.caseId));
+
+        return { success: true as const, pivotCount: caseData.completedPivots.length };
       });
-
-      caseData.lastUpdatedAt = new Date().toISOString();
-      caseData.lastUpdatedBy = "analyst_manual";
-
-      await db
-        .update(livingCaseState)
-        .set({
-          caseData,
-          completedPivotCount: caseData.completedPivots.length,
-          lastUpdatedBy: "analyst_manual",
-        })
-        .where(eq(livingCaseState.id, input.caseId));
-
-      return { success: true as const, pivotCount: caseData.completedPivots.length };
     }),
 
   // ═══════════════════════════════════════════════════════════════════════════

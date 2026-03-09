@@ -600,112 +600,117 @@ async function persistLivingCase(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  if (isNew) {
-    // Check if a living case state already exists for this session
-    const [existing] = await db
-      .select({ id: livingCaseState.id })
-      .from(livingCaseState)
-      .where(eq(livingCaseState.sessionId, sessionId))
-      .limit(1);
+  // Wrap in transaction to prevent check-then-insert/update race.
+  // Two concurrent calls for the same sessionId could both see "no existing"
+  // and both insert — the transaction serializes them via InnoDB row locks.
+  return db.transaction(async (tx) => {
+    if (isNew) {
+      // Check if a living case state already exists for this session
+      const [existing] = await tx
+        .select({ id: livingCaseState.id })
+        .from(livingCaseState)
+        .where(eq(livingCaseState.sessionId, sessionId))
+        .limit(1);
 
-    if (existing) {
-      // Update existing
-      await db
-        .update(livingCaseState)
-        .set({
-          caseData: livingCase,
-          workingTheory: livingCase.workingTheory.statement,
-          theoryConfidence: livingCase.workingTheory.confidence,
-          completedPivotCount: livingCase.completedPivots.length,
-          evidenceGapCount: livingCase.evidenceGaps.length,
-          // Counters will be recomputed from response_actions after materialization
-          // (see syncCaseSummaryAfterTransition call below)
-          pendingActionCount: 0,
-          approvalRequiredCount: 0,
-          linkedTriageIds: livingCase.linkedTriageIds,
-          linkedCorrelationIds: livingCase.linkedCorrelationIds,
-          ...(sourceTriageId ? { sourceTriageId } : {}),
-          ...(sourceCorrelationId ? { sourceCorrelationId } : {}),
-          lastUpdatedBy: "hypothesis_agent",
-        })
-        .where(eq(livingCaseState.id, existing.id));
+      if (existing) {
+        // Update existing
+        await tx
+          .update(livingCaseState)
+          .set({
+            caseData: livingCase,
+            workingTheory: livingCase.workingTheory.statement,
+            theoryConfidence: livingCase.workingTheory.confidence,
+            completedPivotCount: livingCase.completedPivots.length,
+            evidenceGapCount: livingCase.evidenceGaps.length,
+            // Counters will be recomputed from response_actions after materialization
+            // (see syncCaseSummaryAfterTransition call below)
+            pendingActionCount: 0,
+            approvalRequiredCount: 0,
+            linkedTriageIds: livingCase.linkedTriageIds,
+            linkedCorrelationIds: livingCase.linkedCorrelationIds,
+            ...(sourceTriageId ? { sourceTriageId } : {}),
+            ...(sourceCorrelationId ? { sourceCorrelationId } : {}),
+            lastUpdatedBy: "hypothesis_agent",
+          })
+          .where(eq(livingCaseState.id, existing.id));
 
-      return existing.id;
+        return existing.id;
+      }
+
+      // Insert new
+      const [result] = await tx.insert(livingCaseState).values({
+        sessionId,
+        caseData: livingCase,
+        workingTheory: livingCase.workingTheory.statement,
+        theoryConfidence: livingCase.workingTheory.confidence,
+        completedPivotCount: livingCase.completedPivots.length,
+        evidenceGapCount: livingCase.evidenceGaps.length,
+        // Counters will be recomputed from response_actions after materialization
+        pendingActionCount: 0,
+        approvalRequiredCount: 0,
+        sourceTriageId: sourceTriageId ?? null,
+        sourceCorrelationId: sourceCorrelationId ?? null,
+        linkedTriageIds: livingCase.linkedTriageIds,
+        linkedCorrelationIds: livingCase.linkedCorrelationIds,
+        lastUpdatedBy: "hypothesis_agent",
+      }).$returningId();
+
+      return result.id;
+    } else {
+      // Merge into existing case — load current, merge, save
+      const [existing] = await tx
+        .select()
+        .from(livingCaseState)
+        .where(eq(livingCaseState.sessionId, sessionId))
+        .limit(1);
+
+      if (existing) {
+        const currentCase = existing.caseData as LivingCaseObject;
+        const merged = mergeLivingCases(currentCase, livingCase);
+
+        await tx
+          .update(livingCaseState)
+          .set({
+            caseData: merged,
+            workingTheory: merged.workingTheory.statement,
+            theoryConfidence: merged.workingTheory.confidence,
+            completedPivotCount: merged.completedPivots.length,
+            evidenceGapCount: merged.evidenceGaps.length,
+            // Counters will be recomputed from response_actions after materialization
+            pendingActionCount: 0,
+            approvalRequiredCount: 0,
+            linkedTriageIds: merged.linkedTriageIds,
+            linkedCorrelationIds: merged.linkedCorrelationIds,
+            ...(sourceTriageId ? { sourceTriageId } : {}),
+            ...(sourceCorrelationId ? { sourceCorrelationId } : {}),
+            lastUpdatedBy: "hypothesis_agent",
+          })
+          .where(eq(livingCaseState.id, existing.id));
+
+        return existing.id;
+      }
+
+      // No existing case state — create new
+      const [result] = await tx.insert(livingCaseState).values({
+        sessionId,
+        caseData: livingCase,
+        workingTheory: livingCase.workingTheory.statement,
+        theoryConfidence: livingCase.workingTheory.confidence,
+        completedPivotCount: 0,
+        evidenceGapCount: livingCase.evidenceGaps.length,
+        // Counters will be recomputed from response_actions after materialization
+        pendingActionCount: 0,
+        approvalRequiredCount: 0,
+        sourceTriageId: sourceTriageId ?? null,
+        sourceCorrelationId: sourceCorrelationId ?? null,
+        linkedTriageIds: livingCase.linkedTriageIds,
+        linkedCorrelationIds: livingCase.linkedCorrelationIds,
+        lastUpdatedBy: "hypothesis_agent",
+      }).$returningId();
+
+      return result.id;
     }
-
-    // Insert new
-    const [result] = await db.insert(livingCaseState).values({
-      sessionId,
-      caseData: livingCase,
-      workingTheory: livingCase.workingTheory.statement,
-      theoryConfidence: livingCase.workingTheory.confidence,
-      completedPivotCount: livingCase.completedPivots.length,
-      evidenceGapCount: livingCase.evidenceGaps.length,
-      // Counters will be recomputed from response_actions after materialization
-      pendingActionCount: 0,
-      approvalRequiredCount: 0,
-      sourceTriageId: sourceTriageId ?? null,
-      sourceCorrelationId: sourceCorrelationId ?? null,
-      linkedTriageIds: livingCase.linkedTriageIds,
-      linkedCorrelationIds: livingCase.linkedCorrelationIds,
-      lastUpdatedBy: "hypothesis_agent",
-    }).$returningId();
-
-    return result.id;
-  } else {
-    // Merge into existing case — load current, merge, save
-    const [existing] = await db
-      .select()
-      .from(livingCaseState)
-      .where(eq(livingCaseState.sessionId, sessionId))
-      .limit(1);
-
-    if (existing) {
-      const currentCase = existing.caseData as LivingCaseObject;
-      const merged = mergeLivingCases(currentCase, livingCase);
-
-      await db
-        .update(livingCaseState)
-        .set({
-          caseData: merged,
-          workingTheory: merged.workingTheory.statement,
-          theoryConfidence: merged.workingTheory.confidence,
-          completedPivotCount: merged.completedPivots.length,
-          evidenceGapCount: merged.evidenceGaps.length,
-          // Counters will be recomputed from response_actions after materialization
-          pendingActionCount: 0,
-          approvalRequiredCount: 0,
-          linkedTriageIds: merged.linkedTriageIds,
-          linkedCorrelationIds: merged.linkedCorrelationIds,
-          ...(sourceTriageId ? { sourceTriageId } : {}),
-          ...(sourceCorrelationId ? { sourceCorrelationId } : {}),
-          lastUpdatedBy: "hypothesis_agent",
-        })
-        .where(eq(livingCaseState.id, existing.id));
-
-      return existing.id;
-    }
-
-    // No existing case state — create new
-    const [result] = await db.insert(livingCaseState).values({
-      sessionId,
-      caseData: livingCase,
-      workingTheory: livingCase.workingTheory.statement,
-      theoryConfidence: livingCase.workingTheory.confidence,
-      completedPivotCount: 0,
-      evidenceGapCount: livingCase.evidenceGaps.length,
-      // Counters will be recomputed from response_actions after materialization
-      pendingActionCount: 0,
-      approvalRequiredCount: 0,
-      sourceTriageId: sourceTriageId ?? null,
-      sourceCorrelationId: sourceCorrelationId ?? null,
-      linkedTriageIds: livingCase.linkedTriageIds,
-      linkedCorrelationIds: livingCase.linkedCorrelationIds,
-      lastUpdatedBy: "hypothesis_agent",
-    }).$returningId();
-
-    return result.id;
-  }
+  });
 }
 
 /**

@@ -126,11 +126,16 @@ async function invokeCustomLLM(params: InvokeParams, config: LLMConfig): Promise
         null,
         2
       );
-      // Prepend schema instruction to the first system message
+      // Prepend schema instruction to the first system message, or create one if none exists.
+      // Without this, the LLM gets json_object format but no schema guidance — #52 fix.
       const messages = payload.messages as Array<{ role: string; content: string }>;
+      const schemaInstruction = `You MUST respond with valid JSON matching this exact schema:\n${schemaStr}`;
       const systemIdx = messages.findIndex(m => m.role === "system");
       if (systemIdx >= 0) {
-        messages[systemIdx].content += `\n\nYou MUST respond with valid JSON matching this exact schema:\n${schemaStr}`;
+        messages[systemIdx].content += `\n\n${schemaInstruction}`;
+      } else {
+        // No system message — prepend one so the schema instruction is never dropped
+        messages.unshift({ role: "system", content: schemaInstruction });
       }
     } else {
       payload.response_format = responseFormat;
