@@ -3897,3 +3897,9 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] #65: Confidence provenance is UX opinion — false positive
 - [x] #71: wget --spider follows redirects by design — false positive
 - [x] #85: purgeExpiredDbCache WAS implemented (this session) — stale finding
+
+## Verification Pass (2026-03-09)
+- [x] Added missing `caller: "hybridrag_chat"` to hybridragRouter.ts invokeLLMWithFallback call
+- [x] Verified all invokeLLMWithFallback/invokeLLM calls now have caller param (0 missing)
+- [x] Full suite: 92 files, 2794 tests, 0 failures
+- [x] tsc --noEmit: EXIT 0

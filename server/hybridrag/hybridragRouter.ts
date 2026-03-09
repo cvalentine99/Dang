@@ -38,6 +38,7 @@ async function callLLM(messages: ChatMessage[]): Promise<string> {
       content: m.content as string,
     })),
     max_tokens: 2048,
+    caller: "hybridrag_chat",
   });
   const rawContent = result.choices?.[0]?.message?.content;
   return typeof rawContent === 'string' ? rawContent : "Unable to generate response.";
