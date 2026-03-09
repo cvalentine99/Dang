@@ -4026,3 +4026,19 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Test cacheStats returns valid CacheStats shape
 - [x] Test database readiness (SELECT 1 + all 7 critical tables accessible)
 - [x] Full suite: 100 files, 2,921 tests, 0 failures
+
+## EXPLAIN Analysis: Composite Index Verification (2026-03-09)
+
+- [x] Identify all queries that should use the 4 new composite indexes (10 queries across 3 router files)
+- [x] Run EXPLAIN on alertQueue queries — aq_status_queuedAt_idx selected for Q4, aq_status_ruleLevel_idx superseded by single-column for LIMIT 1
+- [x] Run EXPLAIN on pipelineRuns queries — pr_status_startedAt_idx selected for Q7, pr_queueItemId_startedAt_idx selected for Q8
+- [x] Run EXPLAIN ANALYZE with actual execution times (all under 3ms)
+- [x] Analyze optimizer decisions — 3/4 composite indexes actively selected, 1 correctly superseded
+- [x] No fixes needed — all optimizer decisions are correct
+- [x] Deliver EXPLAIN analysis report (explain-analysis-report.md)
+
+## Claude Code Review (2026-03-09)
+- [x] Inventory all source files and trust docs (16 trust docs, 96 source files)
+- [x] Prepare review payload — 5 chunks (schema/db/auth, wazuh proxy, agentic pipeline, baselines/graph, client)
+- [x] Send to Claude API (claude-sonnet-4-20250514) — 5 review calls, 53,809 chars total response
+- [x] Deliver review report to user (code-review-report.md)
