@@ -260,7 +260,7 @@ export default function Home() {
     return items.map((item, i) => ({
       hour: `${String(item.hour ?? i).padStart(2, "0")}:00`,
       events: Number(item.totalall ?? item.totalItems ?? item.events ?? 0),
-      alerts: Number(item.alerts ?? Math.round(Number(item.totalall ?? 0) * 0.12)),
+      alerts: item.alerts != null ? Number(item.alerts) : null,
     }));
   }, [statsHourlyQ.data, isConnected]);
 
@@ -864,10 +864,15 @@ export default function Home() {
                 <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
                 <ReTooltip content={<ChartTooltip />} />
                 <Area type="monotone" dataKey="events" stroke={COLORS.purple} fill="url(#gradEvents)" strokeWidth={2} name="Events" />
-                <Area type="monotone" dataKey="alerts" stroke={COLORS.red} fill="url(#gradAlerts)" strokeWidth={2} name="Alerts" />
+                {hourlyData.some(d => d.alerts !== null) ? (
+                  <Area type="monotone" dataKey="alerts" stroke={COLORS.red} fill="url(#gradAlerts)" strokeWidth={2} name="Alerts" />
+                ) : null}
                 <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.65 0.02 286)" }} />
               </AreaChart>
             </ResponsiveContainer>
+            {hourlyData.length > 0 && !hourlyData.some(d => d.alerts !== null) && (
+              <p className="text-xs text-amber-400/70 mt-1 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Alert data unavailable — Wazuh statsHourly does not include alert counts</p>
+            )}
           </GlassPanel>
 
           <GlassPanel>

@@ -321,7 +321,7 @@ export function QueueItemCard({
                     triage.confidence >= 0.4 ? "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" :
                     "text-red-400 bg-red-500/10 border-red-500/20"
                   }`}>
-                    Conf {(triage.confidence * 100).toFixed(0)}%
+                    AI Conf {(triage.confidence * 100).toFixed(0)}%
                   </span>
                 )}
               </div>

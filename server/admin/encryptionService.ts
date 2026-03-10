@@ -14,10 +14,16 @@ const HKDF_SALT = "dang-encryption-key-v1";
 const HKDF_INFO = "aes-256-gcm-connection-settings";
 
 function getEncryptionKey(): Buffer {
+  // S-7: Prefer a dedicated ENCRYPTION_KEY if provided; otherwise derive from JWT_SECRET via HKDF.
+  // Using a separate key is best practice — the HKDF derivation is a safe fallback
+  // that produces a cryptographically independent key from JWT_SECRET.
+  const dedicatedKey = process.env.ENCRYPTION_KEY;
+  if (dedicatedKey && dedicatedKey.length >= 32) {
+    return crypto.createHash("sha256").update(dedicatedKey).digest();
+  }
+
   const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error("JWT_SECRET is required for encryption");
-  // Derive a separate 32-byte key using HKDF with distinct salt and context
-  // This ensures the AES key is cryptographically independent from the JWT signing key
+  if (!secret) throw new Error("JWT_SECRET or ENCRYPTION_KEY is required for encryption");
   const derived = crypto.hkdfSync(
     "sha256",
     secret,

@@ -83,7 +83,9 @@ export function useAlertStream(options: UseAlertStreamOptions = {}) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Acknowledge all alerts (reset unread count)
+  // FT-4: Acknowledge all alerts — browser-only UI state reset.
+  // This does NOT write back to Wazuh or any backend; it only clears the
+  // unread badge in the current browser session.
   const acknowledgeAll = useCallback(() => {
     setState((prev) => ({ ...prev, unreadCount: 0 }));
   }, []);

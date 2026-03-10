@@ -718,9 +718,11 @@ export const indexerRouter = router({
 
       if (input.agentId) filters.push({ term: { "agent.id": input.agentId } });
       if (input.query) {
+        // ES-1: Escape Lucene special characters to prevent query injection
+        const escapedQuery = input.query.replace(/([+\-=&|><!(){}\[\]^"~*?:\\/])/g, "\\$1");
         must.push({
           query_string: {
-            query: input.query,
+            query: escapedQuery,
             default_field: "full_log",
           },
         });

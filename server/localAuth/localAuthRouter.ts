@@ -57,7 +57,26 @@ export const localAuthRouter = router({
   }),
 
   /**
+   * Check if registration is currently open.
+   * Open when: no users exist (first user setup), or REGISTRATION_ENABLED=true.
+   */
+  registrationStatus: publicProcedure.query(async () => {
+    const count = await getUserCount();
+    const envEnabled = process.env.REGISTRATION_ENABLED === "true";
+    return {
+      open: count === 0 || envEnabled,
+      reason: count === 0
+        ? "first_user"
+        : envEnabled
+          ? "env_enabled"
+          : "closed",
+      userCount: count,
+    };
+  }),
+
+  /**
    * Register a new local user (only available in local auth mode).
+   * Registration is gated: open only for the first user, or when REGISTRATION_ENABLED=true.
    */
   register: publicProcedure
     .input(
@@ -80,6 +99,16 @@ export const localAuthRouter = router({
     .mutation(async ({ input, ctx }) => {
       if (!isLocalAuthMode()) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Registration is currently disabled." });
+      }
+
+      // CR-3: Gate registration after first admin unless explicitly enabled
+      const userCount = await getUserCount();
+      const registrationEnabled = process.env.REGISTRATION_ENABLED === "true";
+      if (userCount > 0 && !registrationEnabled) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Registration is closed. Contact an administrator for an account.",
+        });
       }
 
       const result = await registerLocalUser(input);
@@ -121,8 +150,12 @@ export const localAuthRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Login is currently disabled." });
       }
 
-      // Audit #25: Rate limit login attempts per IP
-      const clientIp = ctx.req.ip || ctx.req.socket.remoteAddress || "unknown";
+      // Audit #25 + S-5: Rate limit login attempts per IP (trust x-forwarded-for behind proxy)
+      const forwarded = ctx.req.headers["x-forwarded-for"];
+      const clientIp = (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null)
+        || ctx.req.ip
+        || ctx.req.socket.remoteAddress
+        || "unknown";
       checkLoginRateLimit(clientIp);
 
       const result = await loginLocalUser(input);

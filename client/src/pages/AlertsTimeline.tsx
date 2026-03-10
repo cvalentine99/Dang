@@ -748,7 +748,7 @@ export default function AlertsTimeline() {
                       entityType="alert"
                       entityId={String(rule.id ?? "")}
                       defaultTitle={`Alert: ${String(rule.description ?? rule.id ?? "Unknown")}`}
-                      defaultSeverity={level >= 14 ? "critical" : level >= 10 ? "high" : level >= 7 ? "medium" : level >= 4 ? "low" : "info"}
+                      defaultSeverity={threatLevelFromNumber(level) as "critical" | "high" | "medium" | "low" | "info"}
                       triggerLabel="Annotate Alert"
                     />
                     <RawJsonViewer data={selectedAlert} title="Full Alert JSON" />

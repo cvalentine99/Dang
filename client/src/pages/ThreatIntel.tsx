@@ -217,7 +217,7 @@ function IocResult({ data, type, value }: { data: Record<string, unknown>; type:
   const validation = data.validation as Array<Record<string, unknown>> | undefined;
 
   // Threat assessment
-  const threatScore = pulseCount > 20 ? "Critical" : pulseCount > 5 ? "High" : pulseCount > 0 ? "Medium" : "Clean";
+  const threatScore = pulseCount > 20 ? "Critical" : pulseCount > 5 ? "High" : pulseCount > 0 ? "Medium" : "No OTX References Found";
   const threatColor = threatScore === "Critical" ? "text-threat-critical" : threatScore === "High" ? "text-threat-high" : threatScore === "Medium" ? "text-yellow-400" : "text-threat-low";
   const threatBg = threatScore === "Critical" ? "bg-threat-critical/10 border-threat-critical/30" : threatScore === "High" ? "bg-threat-high/10 border-threat-high/30" : threatScore === "Medium" ? "bg-yellow-500/10 border-yellow-500/30" : "bg-threat-low/10 border-threat-low/30";
 
@@ -228,10 +228,10 @@ function IocResult({ data, type, value }: { data: Record<string, unknown>; type:
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className={`h-14 w-14 rounded-xl flex items-center justify-center ${threatBg}`}>
-              {threatScore === "Clean" ? <CheckCircle className={`h-7 w-7 ${threatColor}`} /> : <AlertTriangle className={`h-7 w-7 ${threatColor}`} />}
+              {threatScore === "No OTX References Found" ? <CheckCircle className={`h-7 w-7 ${threatColor}`} /> : <AlertTriangle className={`h-7 w-7 ${threatColor}`} />}
             </div>
             <div>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Threat Assessment</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">OTX Pulse Activity</p>
               <p className={`text-2xl font-display font-bold ${threatColor}`}>{threatScore}</p>
             </div>
           </div>

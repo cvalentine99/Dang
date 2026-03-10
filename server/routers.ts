@@ -1,5 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
+import { parse as parseCookie } from "cookie";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { wazuhRouter } from "./wazuh/wazuhRouter";
@@ -35,11 +37,28 @@ export const appRouter = router({
   auth: router({
     me: publicProcedure.query(opts => {
       if (!opts.ctx.user) return null;
-      // Never expose passwordHash to the client
-      const { passwordHash, ...safeUser } = opts.ctx.user;
-      return safeUser;
+      // S-8: Allowlist — only expose fields the frontend needs
+      const u = opts.ctx.user;
+      return {
+        id: u.id,
+        openId: u.openId,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        lastSignedIn: u.lastSignedIn,
+        createdAt: u.createdAt,
+      };
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
+      // S-2: Blocklist the token server-side before clearing the cookie
+      const cookieHeader = ctx.req.headers.cookie;
+      if (cookieHeader) {
+        const parsed = parseCookie(cookieHeader);
+        const token = parsed[COOKIE_NAME];
+        if (token) {
+          sdk.blockToken(token);
+        }
+      }
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;

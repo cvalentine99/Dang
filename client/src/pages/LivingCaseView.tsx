@@ -104,8 +104,9 @@ function ConfidenceGauge({ value, size = "md" }: { value: number; size?: "sm" | 
   const sizeClass = size === "sm" ? "w-8 h-8 text-[10px]" : size === "lg" ? "w-16 h-16 text-lg" : "w-12 h-12 text-sm";
 
   return (
-    <div className={`${sizeClass} rounded-full ${bgColor} flex items-center justify-center font-bold font-[Space_Grotesk] ${color}`}>
+    <div className={`${sizeClass} rounded-full ${bgColor} flex flex-col items-center justify-center font-bold font-[Space_Grotesk] ${color}`} title="AI-estimated confidence (LLM hypothesis agent)">
       {pct}%
+      {size !== "sm" && <span className="text-[8px] opacity-50 font-normal">AI</span>}
     </div>
   );
 }

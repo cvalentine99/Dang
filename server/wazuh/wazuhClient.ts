@@ -47,24 +47,29 @@ import { sharedHttpsAgent } from "../_core/tlsAgent";
  * the actual failure reason (ECONNREFUSED, ETIMEDOUT, 401, 403, TLS, etc.).
  */
 export function extractWazuhErrorDetail(err: unknown): string {
+  // S-10: Sanitize error messages — log full detail server-side, return safe summary to client.
+  // Never expose internal hostnames, IPs, or URLs in client-facing error messages.
   if (axios.isAxiosError(err)) {
     const ae = err as AxiosError;
+    const fullUrl = ae.config?.url ?? ae.config?.baseURL ?? "unknown";
+    console.error(`[WazuhClient] Axios error: ${ae.code ?? ae.response?.status} at ${fullUrl}`, ae.message);
+
     if (ae.response) {
       const status = ae.response.status;
       const body = typeof ae.response.data === "object" && ae.response.data !== null
         ? JSON.stringify(ae.response.data).slice(0, 200)
         : String(ae.response.data ?? "").slice(0, 200);
-      return `HTTP ${status} from ${ae.config?.url ?? "unknown"} — ${body}`;
+      return `Wazuh API returned HTTP ${status} — ${body}`;
     }
-    if (ae.code === "ECONNREFUSED") return `Connection refused at ${ae.config?.baseURL ?? "unknown"} — is Wazuh Manager running?`;
-    if (ae.code === "ETIMEDOUT" || ae.code === "ECONNABORTED") return `Connection timed out to ${ae.config?.baseURL ?? "unknown"} — network issue or firewall`;
-    if (ae.code === "ENOTFOUND") return `DNS resolution failed for ${ae.config?.baseURL ?? "unknown"} — check hostname`;
+    if (ae.code === "ECONNREFUSED") return "Connection refused — is Wazuh Manager running?";
+    if (ae.code === "ETIMEDOUT" || ae.code === "ECONNABORTED") return "Connection timed out — network issue or firewall";
+    if (ae.code === "ENOTFOUND") return "DNS resolution failed — check Wazuh hostname in connection settings";
     if (ae.code === "CERT_HAS_EXPIRED" || ae.code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE") return `TLS certificate error: ${ae.code}`;
-    if (ae.code) return `Network error ${ae.code}: ${ae.message}`;
-    return ae.message || "Unknown Axios error";
+    if (ae.code) return `Network error: ${ae.code}`;
+    return "Unknown connection error";
   }
-  const msg = (err as Error)?.message;
-  return msg || "Unknown error (no message)";
+  console.error(`[WazuhClient] Non-Axios error:`, (err as Error)?.message);
+  return "Wazuh API error — check server logs for details";
 }
 
 // ── Token state ───────────────────────────────────────────────────────────────

@@ -51,10 +51,17 @@ export const adminUsersRouter = router({
         ) as typeof query;
       }
 
-      // Get total count
-      const countResult = await db
+      // C-4: Get total count WITH search filter applied (otherwise pagination breaks)
+      let countQuery = db
         .select({ count: sql<number>`COUNT(*)` })
         .from(users);
+      if (input?.search && input.search.trim()) {
+        const term = `%${input.search.trim()}%`;
+        countQuery = countQuery.where(
+          sql`(${users.name} LIKE ${term} OR ${users.email} LIKE ${term} OR ${users.openId} LIKE ${term})`
+        ) as typeof countQuery;
+      }
+      const countResult = await countQuery;
       const total = countResult[0]?.count ?? 0;
 
       // Get paginated results

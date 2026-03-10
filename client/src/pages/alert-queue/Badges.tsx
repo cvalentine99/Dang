@@ -75,8 +75,8 @@ export function TriageRouteBadge({ route }: { route: string }) {
 
 export function TriageSeverityBadge({ severity }: { severity: string }) {
   return (
-    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${SEVERITY_BADGE_COLORS[severity] ?? ""}`}>
-      {severity}
+    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${SEVERITY_BADGE_COLORS[severity] ?? ""}`} title="AI-estimated severity (LLM triage)">
+      <span className="opacity-60 mr-0.5">AI</span> {severity}
     </span>
   );
 }

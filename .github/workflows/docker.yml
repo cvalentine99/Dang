@@ -75,7 +75,7 @@ jobs:
 
       # ── QEMU for multi-platform builds ────────────────────────────────────
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@v3
 
       # ── Docker Buildx ─────────────────────────────────────────────────────
       - name: Set up Docker Buildx
