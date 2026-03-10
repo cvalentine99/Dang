@@ -129,7 +129,7 @@ function extractKeysFromInput(block, paginationKeys, expSyscollectorKeys) {
 
   // Extract explicit keys from z.object({...})
   // Match patterns like: keyName: z.string(), keyName: z.number().optional(), etc.
-  const keyPattern = /(\w+)\s*:\s*(?:z\.\w+|agentIdSchema|paginationSchema)/g;
+  const keyPattern = /(\w+)\s*:\s*(?:z\.\w+|agentIdSchema|nodeIdSchema|pathSegment|filenameSchema|groupIdSchema|componentSchema|configurationSchema|policyIdSchema|requirementSchema|paginationSchema)/g;
   let m;
   while ((m = keyPattern.exec(block)) !== null) {
     const keyName = m[1];

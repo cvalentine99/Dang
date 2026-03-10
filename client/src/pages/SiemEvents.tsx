@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { GlassPanel, StatCard, ThreatBadge, RawJsonViewer, RefreshControl, IndexerLoadingState, IndexerErrorState, StatCardSkeleton } from "@/components/shared";
+import { threatLevelFromNumber } from "@/components/shared/ThreatBadge";
 import { ChartSkeleton } from "@/components/shared/ChartSkeleton";
 import { TableSkeleton } from "@/components/shared/TableSkeleton";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -55,13 +56,8 @@ const SEVERITY_COLORS: Record<string, string> = {
   info: "#6366f1",
 };
 
-const LEVEL_TO_SEVERITY = (level: number): string => {
-  if (level >= 14) return "critical";
-  if (level >= 10) return "high";
-  if (level >= 7) return "medium";
-  if (level >= 4) return "low";
-  return "info";
-};
+/** Use canonical threatLevelFromNumber from ThreatBadge (12/8/4/1 thresholds) */
+const LEVEL_TO_SEVERITY = threatLevelFromNumber;
 
 const DECODER_ICONS: Record<string, typeof Shield> = {
   sshd: Terminal,

@@ -2,7 +2,7 @@ import { GlassPanel } from "@/components/shared/GlassPanel";
 import { RawJsonViewer } from "@/components/shared/RawJsonViewer";
 import { TableSkeleton } from "@/components/shared/TableSkeleton";
 import { ChartSkeleton } from "@/components/shared/ChartSkeleton";
-import { ThreatBadge } from "@/components/shared/ThreatBadge";
+import { ThreatBadge, threatLevelFromNumber } from "@/components/shared/ThreatBadge";
 import { Button } from "@/components/ui/button";
 import { BrokerWarnings } from "@/components/shared/BrokerWarnings";
 import { ExportButton } from "@/components/shared/ExportButton";
@@ -438,7 +438,7 @@ function AlertsTab({ agentId }: { agentId: string }) {
                           {src.timestamp ? new Date(src.timestamp).toLocaleString() : "—"}
                         </td>
                         <td className="py-2 px-3">
-                          <ThreatBadge level={level >= 12 ? "critical" : level >= 7 ? "high" : level >= 4 ? "medium" : "low"} />
+                          <ThreatBadge level={threatLevelFromNumber(level)} />
                         </td>
                         <td className="py-2 px-3 font-mono text-primary">{String(rule.id ?? "—")}</td>
                         <td className="py-2 px-3 text-foreground max-w-[300px] truncate">{String(rule.description ?? "—")}</td>
@@ -828,7 +828,7 @@ function ActivityTimelineTab({ agentId }: { agentId: string }) {
         source: "alert",
         title: String(rule.description ?? "Alert"),
         detail: `Rule ${rule.id ?? "?"} · Level ${level}${rule.mitre?.technique ? ` · ${(rule.mitre.technique as string[]).join(", ")}` : ""}`,
-        severity: level >= 12 ? "critical" : level >= 7 ? "high" : level >= 4 ? "medium" : "low",
+        severity: threatLevelFromNumber(level),
         raw: src,
       });
     }

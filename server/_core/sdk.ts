@@ -30,6 +30,21 @@ export type SessionPayload = {
   name: string;
 };
 
+// S-2: In-memory token blocklist for server-side session invalidation.
+// Tokens are added on logout and checked on every verifySession call.
+// TTL-based cleanup prevents unbounded growth (tokens expire after 24h anyway).
+const tokenBlocklist = new Map<string, number>(); // token → expiresAt (epoch ms)
+
+function pruneBlocklist(): void {
+  const now = Date.now();
+  for (const [token, expiresAt] of Array.from(tokenBlocklist)) {
+    if (now > expiresAt) tokenBlocklist.delete(token);
+  }
+}
+
+// Prune every 10 minutes
+setInterval(pruneBlocklist, 10 * 60 * 1000).unref();
+
 class SDKServer {
   private parseCookies(cookieHeader: string | undefined) {
     if (!cookieHeader) {
@@ -41,6 +56,12 @@ class SDKServer {
 
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
+    if (!secret || secret.length < 16) {
+      throw new Error(
+        "JWT_SECRET is missing or too weak (< 16 chars). " +
+        "Generate a strong secret with: openssl rand -hex 32"
+      );
+    }
     return new TextEncoder().encode(secret);
   }
 
@@ -85,10 +106,20 @@ class SDKServer {
       .sign(secretKey);
   }
 
+  /** Add a token to the blocklist (called on logout). */
+  blockToken(token: string): void {
+    tokenBlocklist.set(token, Date.now() + SESSION_TTL_MS);
+  }
+
   async verifySession(
     cookieValue: string | undefined | null
   ): Promise<{ openId: string; appId: string; name: string } | null> {
     if (!cookieValue) {
+      return null;
+    }
+
+    // S-2: Check blocklist before expensive JWT verification
+    if (tokenBlocklist.has(cookieValue)) {
       return null;
     }
 

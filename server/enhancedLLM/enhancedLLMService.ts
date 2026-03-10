@@ -14,6 +14,7 @@
  *
  * Everything else is transparent infrastructure.
  */
+import { z } from "zod";
 import { invokeLLMWithFallback as invokeLLM } from "../llm/llmService";
 import { getEffectiveLLMConfig, type LLMConfig } from "../llm/llmService";
 import { runAnalystPipeline, type AnalystMessage, type AnalystResponse } from "../graph/agenticPipeline";
@@ -498,16 +499,20 @@ export async function classifyAlert(input: AlertClassifyInput): Promise<AlertCla
   try {
     const rawContent = result.choices?.[0]?.message?.content;
     const content = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent ?? "{}");
-    const parsed = JSON.parse(content) as AlertClassification;
+    const raw = JSON.parse(content);
 
-    // Validate confidence range
-    parsed.confidence = Math.max(0, Math.min(1, parsed.confidence ?? 0.5));
+    // LLM-2: Zod runtime validation instead of `as` cast
+    const AlertClassificationSchema = z.object({
+      severity: z.enum(["critical", "high", "medium", "low", "info"]).catch("medium"),
+      classification: z.string().catch("Unclassified Alert"),
+      iocs: z.array(z.string()).catch([]),
+      recommendedActions: z.array(z.string()).catch([]),
+      mitreATechniques: z.array(z.string()).catch([]),
+      confidence: z.number().min(0).max(1).catch(0.5),
+      reasoning: z.string().catch(""),
+    }).strip();
 
-    // Ensure arrays are actually arrays
-    parsed.iocs = Array.isArray(parsed.iocs) ? parsed.iocs : [];
-    parsed.recommendedActions = Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : [];
-    parsed.mitreATechniques = Array.isArray(parsed.mitreATechniques) ? parsed.mitreATechniques : [];
-
+    const parsed = AlertClassificationSchema.parse(raw);
     return parsed;
   } catch {
     // If structured output fails, return a safe default

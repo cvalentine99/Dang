@@ -82,15 +82,15 @@ describe("Audit #45/#46 — hypothesisAgent enum normalization", () => {
     expect(agentSrc).not.toMatch(oldPattern);
   });
 
-  it("should have CATEGORY_MAP_NORM with DB-valid category values", () => {
-    expect(agentSrc).toContain("CATEGORY_MAP_NORM");
+  it("should have DISPLAY_CATEGORY_MAP mapping LLM output to display categories", () => {
+    // After code review remediation, the living case snapshot uses display-only
+    // categories ("immediate" | "next" | "optional") matching the LivingCaseObject interface.
+    // DB-valid categories are used in the response_actions table, not the frozen snapshot.
+    expect(agentSrc).toContain("DISPLAY_CATEGORY_MAP");
+    // Verify all DB-valid categories are still referenced as mapping keys
     for (const cat of DB_VALID_CATEGORIES) {
-      expect(agentSrc).toContain(`"${cat}"`);
+      expect(agentSrc).toContain(cat);
     }
-  });
-
-  it("should have VALID_CATEGORIES_NORM array with all DB-valid categories", () => {
-    expect(agentSrc).toContain("VALID_CATEGORIES_NORM");
   });
 
   it("should NOT use the old invalid urgency enum [immediate, high, medium, low] for recommendedActions", () => {

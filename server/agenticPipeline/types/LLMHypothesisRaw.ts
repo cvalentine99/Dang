@@ -16,35 +16,35 @@ const WorkingTheorySchema = z.object({
   confidence: z.number().min(0).max(1).optional().default(0.5),
   supportingEvidence: z.array(z.string()).optional().default([]),
   conflictingEvidence: z.array(z.string()).optional().default([]),
-}).passthrough();
+}).strip();
 
 const AlternateTheorySchema = z.object({
   statement: z.string().optional().default(""),
   confidence: z.number().min(0).max(1).optional().default(0.5),
   supportingEvidence: z.array(z.string()).optional().default([]),
   whyLessLikely: z.string().optional().default(""),
-}).passthrough();
+}).strip();
 
 const NextStepSchema = z.object({
   action: z.string().optional().default(""),
   rationale: z.string().optional().default(""),
   priority: z.string().optional().default("medium"),
   effort: z.string().optional().default("unknown"),
-}).passthrough();
+}).strip();
 
 const EvidenceGapSchema = z.object({
   description: z.string().optional().default(""),
   impact: z.string().optional().default(""),
   suggestedAction: z.string().optional().default(""),
   priority: z.string().optional().default("medium"),
-}).passthrough();
+}).strip();
 
 const TimelineEntrySchema = z.object({
   timestamp: z.string().optional().default(""),
   event: z.string().optional().default(""),
   source: z.string().optional().default(""),
   significance: z.string().optional().default(""),
-}).passthrough();
+}).strip();
 
 const RecommendedActionSchema = z.object({
   action: z.string().optional().default(""),
@@ -55,14 +55,14 @@ const RecommendedActionSchema = z.object({
   requiresApproval: z.boolean().optional().default(true),
   evidenceBasis: z.array(z.string()).optional().default([]),
   state: z.string().optional().default("proposed"),
-}).passthrough();
+}).strip();
 
 const DraftDocumentationSchema = z.object({
   shiftHandoff: z.string().optional().default(""),
   escalationSummary: z.string().nullable().optional().default(null),
   executiveSummary: z.string().optional().default(""),
   tuningSuggestions: z.string().nullable().optional().default(null),
-}).passthrough();
+}).strip();
 
 export const LLMHypothesisRawSchema = z.object({
   workingTheory: WorkingTheorySchema.optional().default({
@@ -76,7 +76,7 @@ export const LLMHypothesisRawSchema = z.object({
   draftDocumentation: DraftDocumentationSchema.optional().default({
     shiftHandoff: "", escalationSummary: null, executiveSummary: "", tuningSuggestions: null,
   }),
-}).passthrough();
+}).strip();
 
 export type LLMHypothesisRaw = z.infer<typeof LLMHypothesisRawSchema>;
 

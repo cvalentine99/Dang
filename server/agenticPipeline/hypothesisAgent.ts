@@ -500,27 +500,22 @@ function assembleLivingCase(
     return valid.includes(v) ? (v as "quick" | "moderate" | "deep_dive") : "moderate";
   };
 
-  // Audit #45: normCategory must map LLM strings to DB-valid category enum values
-  const CATEGORY_MAP_NORM: Record<string, string> = {
-    immediate: "escalate_ir", next: "collect_evidence", optional: "tune_rule",
-    isolate: "isolate_host", isolate_host: "isolate_host",
-    disable_account: "disable_account", block: "block_ioc", block_ioc: "block_ioc",
-    escalate: "escalate_ir", escalate_ir: "escalate_ir",
-    suppress: "suppress_alert", suppress_alert: "suppress_alert",
-    tune: "tune_rule", tune_rule: "tune_rule",
-    watchlist: "add_watchlist", add_watchlist: "add_watchlist",
-    collect: "collect_evidence", collect_evidence: "collect_evidence",
-    notify: "notify_stakeholder", notify_stakeholder: "notify_stakeholder",
-    custom: "custom",
+  // LivingCaseObject.recommendedActions[].category uses display-only enum: "immediate" | "next" | "optional"
+  // Map LLM output to these three buckets for the frozen snapshot.
+  type DisplayCategory = "immediate" | "next" | "optional";
+  const DISPLAY_CATEGORY_MAP: Record<string, DisplayCategory> = {
+    immediate: "immediate", isolate: "immediate", isolate_host: "immediate",
+    disable_account: "immediate", block: "immediate", block_ioc: "immediate",
+    escalate: "immediate", escalate_ir: "immediate",
+    next: "next", collect: "next", collect_evidence: "next",
+    notify: "next", notify_stakeholder: "next",
+    optional: "optional", suppress: "optional", suppress_alert: "optional",
+    tune: "optional", tune_rule: "optional",
+    watchlist: "optional", add_watchlist: "optional",
+    custom: "next",
   };
-  const VALID_CATEGORIES_NORM = [
-    "isolate_host", "disable_account", "block_ioc", "escalate_ir",
-    "suppress_alert", "tune_rule", "add_watchlist", "collect_evidence",
-    "notify_stakeholder", "custom",
-  ];
-  const normCategory = (v: string): string => {
-    const mapped = CATEGORY_MAP_NORM[v?.toLowerCase() ?? ""] ?? null;
-    return mapped && VALID_CATEGORIES_NORM.includes(mapped) ? mapped : "collect_evidence";
+  const normCategory = (v: string): DisplayCategory => {
+    return DISPLAY_CATEGORY_MAP[v?.toLowerCase() ?? ""] ?? "next";
   };
 
   const normSignificance = (v: string): "critical" | "high" | "medium" | "low" => {
@@ -574,7 +569,7 @@ function assembleLivingCase(
 
     recommendedActions: (llmOutput.recommendedActions ?? []).map((a) => ({
       action: a.action ?? "",
-      category: normCategory(a.category ?? "next") as "immediate" | "next" | "optional",
+      category: normCategory(a.category ?? "next"),
       // Audit #46: urgency must use DB-valid enum ["immediate", "high", "medium", "low"]
       urgency: (() => {
         const URGENCY_MAP_NORM: Record<string, string> = {
@@ -582,7 +577,8 @@ function assembleLivingCase(
           medium: "medium", scheduled: "low", low: "low", optional: "low",
         };
         const raw = a.urgency?.toLowerCase() ?? "";
-        return (URGENCY_MAP_NORM[raw] ?? "medium") as "immediate" | "high" | "medium" | "low";
+        type Urgency = "immediate" | "high" | "medium" | "low";
+        return (URGENCY_MAP_NORM[raw] ?? "medium") as Urgency;
       })(),
       targetType: a.targetType ?? undefined,
       targetValue: a.targetValue ?? undefined,

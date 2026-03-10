@@ -235,6 +235,8 @@ export async function getUserCount(): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
 
-  const result = await db.select({ id: users.id }).from(users);
-  return result.length;
+  // C-3: Use SQL COUNT(*) instead of fetching all rows
+  const { count } = await import("drizzle-orm");
+  const [result] = await db.select({ count: count() }).from(users);
+  return result?.count ?? 0;
 }

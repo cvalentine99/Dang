@@ -157,12 +157,16 @@ export const connectionSettingsRouter = router({
         };
       }
 
+      // S-1: Use pinnedIP from validation to prevent DNS rebinding.
+      // The hostname was resolved once during validation; connect to that exact IP.
+      const connectHost = hostCheck.pinnedIP || host;
+
       const startTime = Date.now();
 
       try {
         if (category === "wazuh_manager") {
           // Test Wazuh Manager API: POST /security/user/authenticate
-          const baseURL = `https://${host}:${port || "55000"}`;
+          const baseURL = `https://${connectHost}:${port || "55000"}`;
           const instance = axios.create({
             baseURL,
             timeout: 10_000,
@@ -196,7 +200,7 @@ export const connectionSettingsRouter = router({
         } else if (category === "wazuh_indexer") {
           // Test Wazuh Indexer: GET /_cluster/health
           const protocol = merged.protocol || "https";
-          const baseURL = `${protocol}://${host}:${port || "9200"}`;
+          const baseURL = `${protocol}://${connectHost}:${port || "9200"}`;
           const instance = axios.create({
             baseURL,
             timeout: 10_000,

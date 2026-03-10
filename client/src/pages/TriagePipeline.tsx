@@ -218,7 +218,7 @@ function CorrelationBundleCard({ bundle }: { bundle: any }) {
             }`}>{corr.status}</span>
             {campaign.likelyCampaign && (
               <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/15 border border-red-500/30 text-red-400">
-                Campaign Detected
+                Possible Campaign (AI estimate)
               </span>
             )}
           </div>

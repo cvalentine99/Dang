@@ -112,14 +112,14 @@ export const enhancedLLMRouter = router({
    * Queries the LLM server's /health, /metrics, and /v1/models endpoints.
    * Includes local queue stats (active requests, queue depth).
    */
-  dgxHealth: publicProcedure.query(async () => {
+  dgxHealth: protectedProcedure.query(async () => {
     return getDGXHealth();
   }),
 
   /**
    * Queue stats — lightweight endpoint for monitoring request queue.
    */
-  queueStats: publicProcedure.query(() => {
+  queueStats: protectedProcedure.query(() => {
     return getQueueStats();
   }),
 
@@ -127,7 +127,7 @@ export const enhancedLLMRouter = router({
    * Session type metadata — returns context allocation details for all session types.
    * Used by the frontend to display session type descriptions and settings.
    */
-  sessionTypes: publicProcedure.query(() => {
+  sessionTypes: protectedProcedure.query(() => {
     const types: SessionType[] = ["quick_lookup", "alert_triage", "investigation", "deep_dive", "threat_hunt"];
     return types.map((t) => ({
       type: t,

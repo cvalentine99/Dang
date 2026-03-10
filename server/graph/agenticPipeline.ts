@@ -17,6 +17,7 @@
  * when configured, with automatic fallback to the built-in LLM.
  */
 
+import { z } from "zod";
 import { invokeLLMWithFallback as invokeLLM } from "../llm/llmService";
 import { searchGraph, getGraphStats, getRiskAnalysis, getEndpoints, getResourceOverview, getUseCases, getErrorPatterns, recordProvenance } from "./graphQueryService";
 import {
@@ -331,9 +332,27 @@ IMPORTANT: Set confidence to how well you understand the query (0.0 = no idea, 1
   const content = response.choices?.[0]?.message?.content as string | undefined;
   const durationMs = Date.now() - stepStart;
 
+  // LLM-3: Zod runtime validation instead of `as IntentAnalysis` cast
+  const IntentAnalysisSchema = z.object({
+    intent: z.enum(["threat_hunt", "vulnerability_assessment", "endpoint_investigation", "compliance_check", "general_query", "mitre_mapping", "api_exploration"]).catch("general_query"),
+    entities: z.object({
+      agentIds: z.array(z.string()).catch([]),
+      hostnames: z.array(z.string()).catch([]),
+      cveIds: z.array(z.string()).catch([]),
+      ipAddresses: z.array(z.string()).catch([]),
+      ruleIds: z.array(z.string()).catch([]),
+      mitreTactics: z.array(z.string()).catch([]),
+      keywords: z.array(z.string()).catch([query]),
+    }).catch({ agentIds: [], hostnames: [], cveIds: [], ipAddresses: [], ruleIds: [], mitreTactics: [], keywords: [query] }),
+    retrievalStrategy: z.array(z.enum(["graph", "indexer", "both"])).catch(["both"]),
+    timeRange: z.string().optional(),
+    confidence: z.number().min(0).max(1).catch(0.5),
+  }).strip();
+
   let result: IntentAnalysis;
   try {
-    result = content ? JSON.parse(content) as IntentAnalysis : {
+    const raw = content ? JSON.parse(content) : null;
+    result = raw ? IntentAnalysisSchema.parse(raw) : {
       intent: "general_query" as const,
       entities: { agentIds: [], hostnames: [], cveIds: [], ipAddresses: [], ruleIds: [], mitreTactics: [], keywords: [query] },
       retrievalStrategy: ["both" as const],

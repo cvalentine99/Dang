@@ -1,7 +1,7 @@
 /**
- * Security Headers Middleware — Audit #95
+ * Security Headers Middleware — Audit #95 + Code Review S-3, S-4, S-11
  *
- * Adds Content-Security-Policy and Permissions-Policy headers to all responses.
+ * Adds Content-Security-Policy, HSTS, and Permissions-Policy headers to all responses.
  * These headers provide defense-in-depth against XSS, clickjacking, and
  * unauthorized access to browser APIs.
  *
@@ -31,9 +31,10 @@ const scriptSrc = isDev
   ? "'self' 'unsafe-inline' 'unsafe-eval'"
   : "'self' 'unsafe-inline'";
 
+// S-11: Tighten connect-src in production to specific origins instead of blanket https:
 const connectSrc = isDev
   ? "'self' wss: ws: https:"
-  : "'self' wss: https:";
+  : "'self' wss: https://fonts.googleapis.com https://fonts.gstatic.com";
 
 const CSP_DIRECTIVES = [
   `default-src 'self'`,
@@ -65,6 +66,11 @@ const PERMISSIONS_POLICY = [
 export function securityHeaders(_req: Request, res: Response, next: NextFunction): void {
   // Content-Security-Policy
   res.setHeader("Content-Security-Policy", CSP_DIRECTIVES);
+
+  // S-3: Strict-Transport-Security — enforce HTTPS for 1 year, include subdomains
+  if (!isDev) {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  }
 
   // Permissions-Policy (successor to Feature-Policy)
   res.setHeader("Permissions-Policy", PERMISSIONS_POLICY);
