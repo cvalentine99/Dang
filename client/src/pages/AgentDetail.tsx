@@ -19,7 +19,7 @@ import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar,
+  ResponsiveContainer, PieChart, Pie, BarChart, Bar,
 } from "recharts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -356,9 +356,10 @@ function AlertsTab({ agentId }: { agentId: string }) {
 
   const severityData = useMemo(() => {
     const buckets = (severityQ.data as any)?.data?.aggregations?.severity_total?.buckets ?? [];
-    return (buckets as any[]).map((b: any) => ({
+    return (buckets as any[]).map((b: any, i: number) => ({
       name: `Level ${b.key}`,
       value: b.doc_count,
+      fill: PIE_COLORS[i % PIE_COLORS.length],
     }));
   }, [severityQ.data]);
 
@@ -377,9 +378,7 @@ function AlertsTab({ agentId }: { agentId: string }) {
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={severityData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={40} paddingAngle={2}>
-                  {severityData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Pie>
+                <Pie data={severityData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={40} paddingAngle={2} />
                 <ReTooltip content={<ChartTooltip />} />
               </PieChart>
             </ResponsiveContainer>

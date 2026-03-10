@@ -23,7 +23,7 @@ import {
 import { useState, useMemo, useCallback } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend,
+  ResponsiveContainer, PieChart, Pie, Legend,
 } from "recharts";
 
 const COLORS = {
@@ -104,7 +104,7 @@ export default function FileIntegrity() {
   const eventDist = useMemo(() => {
     const counts: Record<string, number> = {};
     files.forEach(f => { const e = String(f.event ?? f.type ?? "unknown"); counts[e] = (counts[e] ?? 0) + 1; });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+    return Object.entries(counts).map(([name, value]) => ({ name, value, fill: EVENT_COLORS[name.toLowerCase()] ?? COLORS.purple }));
   }, [files]);
 
   const extDist = useMemo(() => {
@@ -164,9 +164,7 @@ export default function FileIntegrity() {
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Event Types</h3>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={eventDist} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value" stroke="none">
-                  {eventDist.map((entry, i) => <Cell key={i} fill={EVENT_COLORS[entry.name.toLowerCase()] ?? COLORS.purple} />)}
-                </Pie>
+                <Pie data={eventDist} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value" stroke="none" />
                 <ReTooltip content={<ChartTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.65 0.02 286)" }} />
               </PieChart>
