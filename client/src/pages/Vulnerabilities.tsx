@@ -29,7 +29,7 @@ import {
 import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip,
+  PieChart, Pie, ResponsiveContainer, Tooltip as ReTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
   Treemap,
 } from "recharts";
@@ -167,7 +167,7 @@ export default function Vulnerabilities() {
       const avgCvss = Number((aggs.avg_cvss as Record<string, unknown>)?.value ?? 0);
       const total = sevBuckets.reduce((s, b) => s + Number(b.doc_count ?? 0), 0);
       return {
-        fleetSevDist: sevBuckets.map(b => ({ name: String(b.key), value: Number(b.doc_count ?? 0) })),
+        fleetSevDist: sevBuckets.map(b => ({ name: String(b.key), value: Number(b.doc_count ?? 0), fill: SEV_COLORS[String(b.key)] ?? COLORS.cyan })),
         fleetTotal: total,
         fleetAvgCvss: avgCvss.toFixed(1),
         fleetSource: "indexer" as const,
@@ -401,9 +401,7 @@ export default function Vulnerabilities() {
                 </div>
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
-                    <Pie data={fleetSevDist} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={3} dataKey="value" stroke="none">
-                      {fleetSevDist.map((entry, i) => <Cell key={i} fill={SEV_COLORS[entry.name] ?? COLORS.purple} />)}
-                    </Pie>
+                    <Pie data={fleetSevDist} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={3} dataKey="value" stroke="none" />
                     <ReTooltip content={<ChartTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.65 0.02 286)" }} />
                   </PieChart>
@@ -514,7 +512,7 @@ export default function Vulnerabilities() {
                         );
                       }) as unknown as React.ReactElement}
                     >
-                      <ReTooltip content={({ payload }: { payload?: Array<{ payload?: { fullName?: string; size?: number; avgCvss?: string } }> }) => {
+                      <ReTooltip content={({ payload }: { payload?: ReadonlyArray<{ payload?: { fullName?: string; size?: number; avgCvss?: string } }> }) => {
                         if (!payload?.length) return null;
                         const d = payload[0]?.payload;
                         if (!d) return null;

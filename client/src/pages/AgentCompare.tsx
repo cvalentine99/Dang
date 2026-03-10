@@ -11,7 +11,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip as ReTooltip, PieChart, Pie, Cell, RadarChart, PolarGrid,
+  Tooltip as ReTooltip, PieChart, Pie, RadarChart, PolarGrid,
   PolarAngleAxis, PolarRadiusAxis, Radar, Legend,
 } from "recharts";
 

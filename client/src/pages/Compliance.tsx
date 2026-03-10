@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip,
+  PieChart, Pie, ResponsiveContainer, Tooltip as ReTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area,
   RadialBarChart, RadialBar,
 } from "recharts";
@@ -201,9 +201,9 @@ export default function Compliance() {
   const policyScoreData = useMemo(() => policies.map(p => ({ name: String(p.name ?? "").slice(0, 30), score: Number(p.score ?? 0), pass: Number(p.pass ?? 0), fail: Number(p.fail ?? 0) })), [policies]);
 
   const resultPie = useMemo(() => [
-    { name: "Pass", value: totalPass, color: COLORS.green },
-    { name: "Fail", value: totalFail, color: COLORS.red },
-    { name: "N/A", value: totalNA, color: COLORS.gray },
+    { name: "Pass", value: totalPass, fill: COLORS.green },
+    { name: "Fail", value: totalFail, fill: COLORS.red },
+    { name: "N/A", value: totalNA, fill: COLORS.gray },
   ].filter(d => d.value > 0), [totalPass, totalFail, totalNA]);
 
   const filteredChecks = useMemo(() => {
@@ -314,9 +314,7 @@ export default function Compliance() {
                 <div className="relative">
                   <ResponsiveContainer width="100%" height={200}>
                     <PieChart>
-                      <Pie data={resultPie} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={4} dataKey="value" stroke="none" animationDuration={800}>
-                        {resultPie.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                      </Pie>
+                      <Pie data={resultPie} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={4} dataKey="value" stroke="none" animationDuration={800} />
                       <ReTooltip content={<ChartTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
@@ -332,7 +330,7 @@ export default function Compliance() {
                 <div className="flex justify-center gap-4 mt-2">
                   {resultPie.map((entry, i) => (
                     <div key={i} className="flex items-center gap-1.5">
-                      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.fill }} />
                       <span className="text-[10px] text-muted-foreground">{entry.name} ({entry.value})</span>
                     </div>
                   ))}

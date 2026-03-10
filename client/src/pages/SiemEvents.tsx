@@ -11,7 +11,7 @@ import { ExportButton } from "@/components/shared/ExportButton";
 import { EXPORT_COLUMNS } from "@/lib/exportUtils";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area, CartesianGrid,
+  PieChart, Pie, AreaChart, Area, CartesianGrid,
 } from "recharts";
 import {
   Search, Filter, ChevronDown, ChevronRight, Clock, AlertTriangle,
@@ -315,7 +315,7 @@ export default function SiemEvents() {
 
   const severityPieData = Object.entries(stats.severityCounts)
     .filter(([, v]) => v > 0)
-    .map(([k, v]) => ({ name: k.charAt(0).toUpperCase() + k.slice(1), value: v, color: SEVERITY_COLORS[k] }));
+    .map(([k, v]) => ({ name: k.charAt(0).toUpperCase() + k.slice(1), value: v, color: SEVERITY_COLORS[k], fill: SEVERITY_COLORS[k] }));
 
   const sourceBarData = Object.entries(stats.sourceCounts)
     .sort(([, a], [, b]) => b - a)
@@ -620,11 +620,7 @@ export default function SiemEvents() {
                 outerRadius={70}
                 paddingAngle={3}
                 dataKey="value"
-              >
-                {severityPieData.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} />
-                ))}
-              </Pie>
+              />
               <RTooltip
                 contentStyle={{ background: "#1e1b4b", border: "1px solid #7c3aed40", borderRadius: 8, color: "#e2e8f0" }}
               />

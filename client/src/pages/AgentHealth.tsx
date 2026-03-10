@@ -28,7 +28,7 @@ import {
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip,
+  PieChart, Pie, ResponsiveContainer, Tooltip as ReTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
 } from "recharts";
 
@@ -189,7 +189,7 @@ export default function AgentHealth() {
     { name: "Disconnected", value: agentData.disconnected },
     { name: "Never Connected", value: agentData.never },
     { name: "Pending", value: agentData.pending },
-  ].filter(d => d.value > 0), [agentData]);
+  ].filter(d => d.value > 0).map((entry, index) => ({ ...entry, fill: PIE_COLORS[index % PIE_COLORS.length] })), [agentData]);
 
   // ── Agent detail (real or fallback) ───────────────────────────────────
   const agentDetail = useMemo(() => {
@@ -293,9 +293,7 @@ export default function AgentHealth() {
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /> Connection Status</h3>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={statusPieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value" stroke="none">
-                  {statusPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Pie>
+                <Pie data={statusPieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value" stroke="none" />
                 <ReTooltip content={<ChartTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.65 0.02 286)" }} />
               </PieChart>

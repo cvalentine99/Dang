@@ -10,7 +10,7 @@ import { trpc } from "@/lib/trpc";
 
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
+  PieChart, Pie,
 } from "recharts";
 import {
   Search, Shield, FileText, Terminal, ChevronDown, ChevronRight,
@@ -478,11 +478,7 @@ export default function RulesetExplorer() {
                 outerRadius={75}
                 paddingAngle={3}
                 dataKey="value"
-              >
-                {levelPieData.map((entry) => (
-                  <Cell key={entry.name} fill={entry.color} />
-                ))}
-              </Pie>
+              />
               <RTooltip
                 contentStyle={{
                   background: "#1e1b4b",

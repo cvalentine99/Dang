@@ -53,7 +53,6 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell,
   AreaChart,
   Area,
 } from "recharts";
@@ -332,9 +331,10 @@ export default function ThreatHunting() {
     (huntQ.data?.sources?.find(s => s.source === "indexer_archives")?.count ?? 0);
 
   // Source distribution for pie chart
-  const sourceDistribution = correlationResults.map((r) => ({
+  const sourceDistribution = correlationResults.map((r, i) => ({
     name: r.sourceLabel,
     value: r.count,
+    fill: CHART_COLORS[i % CHART_COLORS.length],
   }));
 
   // Severity distribution from rule hits
@@ -356,9 +356,16 @@ export default function ThreatHunting() {
         else counts.info += 1;
       });
     }
+    const SEVERITY_FILL: Record<string, string> = {
+      critical: "oklch(0.637 0.237 25.331)",
+      high: "oklch(0.705 0.191 22.216)",
+      medium: "oklch(0.795 0.184 86.047)",
+      low: "oklch(0.765 0.177 163.223)",
+      info: "oklch(0.789 0.154 211.53)",
+    };
     return Object.entries(counts)
       .filter(([, v]) => v > 0)
-      .map(([k, v]) => ({ name: k.charAt(0).toUpperCase() + k.slice(1), value: v, level: k }));
+      .map(([k, v]) => ({ name: k.charAt(0).toUpperCase() + k.slice(1), value: v, level: k, fill: SEVERITY_FILL[k] ?? "oklch(0.789 0.154 211.53)" }));
   }, [correlationResults]);
 
   // MITRE tactic distribution from correlated rules
@@ -985,11 +992,7 @@ export default function ThreatHunting() {
                       outerRadius={80}
                       paddingAngle={3}
                       dataKey="value"
-                    >
-                      {sourceDistribution.map((_, i) => (
-                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                      ))}
-                    </Pie>
+                    />
                     <Tooltip
                       contentStyle={{ background: "oklch(0.17 0.025 286)", border: "1px solid oklch(0.3 0.04 286 / 40%)", borderRadius: "8px", color: "oklch(0.93 0.005 286)" }}
                     />
@@ -1023,24 +1026,7 @@ export default function ThreatHunting() {
                     <Tooltip
                       contentStyle={{ background: "oklch(0.17 0.025 286)", border: "1px solid oklch(0.3 0.04 286 / 40%)", borderRadius: "8px", color: "oklch(0.93 0.005 286)" }}
                     />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                      {severityData.map((entry) => (
-                        <Cell
-                          key={entry.name}
-                          fill={
-                            entry.level === "critical"
-                              ? "oklch(0.637 0.237 25.331)"
-                              : entry.level === "high"
-                              ? "oklch(0.705 0.191 22.216)"
-                              : entry.level === "medium"
-                              ? "oklch(0.795 0.184 86.047)"
-                              : entry.level === "low"
-                              ? "oklch(0.765 0.177 163.223)"
-                              : "oklch(0.789 0.154 211.53)"
-                          }
-                        />
-                      ))}
-                    </Bar>
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -1062,7 +1048,7 @@ export default function ThreatHunting() {
                     <YAxis tick={{ fill: "oklch(0.7 0.01 286)", fontSize: 11 }} />
                     <Tooltip
                       contentStyle={{ background: "oklch(0.17 0.025 286)", border: "1px solid oklch(0.3 0.04 286 / 40%)", borderRadius: "8px", color: "oklch(0.93 0.005 286)" }}
-                      formatter={(value: number, _: string, props: { payload?: { fullName?: string } }) => [value, props.payload?.fullName ?? ""]}
+                      formatter={(value, _, props) => [value ?? 0, (props?.payload as Record<string, string> | undefined)?.fullName ?? ""]}
                     />
                     <Bar dataKey="count" fill="oklch(0.72 0.19 295)" radius={[4, 4, 0, 0]} />
                   </BarChart>

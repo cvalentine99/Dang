@@ -22,7 +22,7 @@ import {
 import { useMemo, useCallback, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend,
+  ResponsiveContainer, PieChart, Pie, BarChart, Bar, Legend,
 } from "recharts";
 import { useLocation } from "wouter";
 
