@@ -1,4 +1,5 @@
 export { QueueItemCard } from "./QueueItemCard";
+export { PipelineStageIndicator } from "./PipelineStageIndicator";
 export { TicketArtifactsPanel } from "./TicketArtifactsPanel";
 export { QueueHeader } from "./QueueHeader";
 export {

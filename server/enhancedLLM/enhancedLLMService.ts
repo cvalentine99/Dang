@@ -16,7 +16,12 @@
  */
 import { z } from "zod";
 import { invokeLLMWithFallback as invokeLLM } from "../llm/llmService";
-import { getEffectiveLLMConfig, type LLMConfig } from "../llm/llmService";
+import {
+  getEffectiveLLMConfig,
+  isNemotronModel,
+  buildXmlSchemaReminder,
+  type LLMConfig,
+} from "../llm/llmService";
 import { runAnalystPipeline, type AnalystMessage, type AnalystResponse } from "../graph/agenticPipeline";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -342,7 +347,7 @@ export const WAZUH_TOOLS = [
 
 // ── System Prompts ──────────────────────────────────────────────────────────
 
-function buildSystemPrompt(sessionType: SessionType, includeTools: boolean): string {
+async function buildSystemPrompt(sessionType: SessionType, includeTools: boolean): Promise<string> {
   const base = [
     "You are a security analyst AI assistant integrated into the Dang! SIEM platform.",
     "You analyze Wazuh security telemetry including alerts, vulnerabilities, file integrity events, and compliance data.",
@@ -371,6 +376,13 @@ function buildSystemPrompt(sessionType: SessionType, includeTools: boolean): str
     base.push("");
     base.push("You have access to tools for querying Wazuh data. Use them when you need specific information to answer the analyst's question.");
     base.push("Always prefer tool results over assumptions. If a tool call fails, report the failure and work with available data.");
+
+    // Nemotron-specific: inject XML tool-calling schema reminder (Section 4.3)
+    // Without this, the parser failure rate is 86%
+    const config = await getEffectiveLLMConfig();
+    if (isNemotronModel(config.model)) {
+      base.push(buildXmlSchemaReminder(WAZUH_TOOLS as Array<{ function: { name: string; parameters: unknown } }>));
+    }
   }
 
   return base.join("\n");
@@ -441,8 +453,9 @@ export async function enhancedChat(input: EnhancedChatInput): Promise<AnalystRes
   }
 
   // Build conversation history with system prompt
+  const systemPrompt = await buildSystemPrompt(input.sessionType, input.includeTools);
   const history: AnalystMessage[] = [
-    { role: "system", content: buildSystemPrompt(input.sessionType, input.includeTools) },
+    { role: "system", content: systemPrompt },
     ...input.conversationHistory,
   ];
 

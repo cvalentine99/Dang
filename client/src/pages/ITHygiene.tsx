@@ -86,6 +86,7 @@ export default function ITHygiene() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [comparisonMode, setComparisonMode] = useState(false);
+  const [sort, setSort] = useState("");
   const pageSize = 50;
 
   // ── Wazuh connection status ──────────────────────────────────────────────
@@ -112,7 +113,7 @@ export default function ITHygiene() {
     { retry: 1, staleTime: 30_000, enabled: isConnected && tab === "packages" }
   );
   const portsQ = trpc.wazuh.agentPorts.useQuery(
-    { agentId, limit: pageSize, offset: page * pageSize },
+    { agentId, limit: pageSize, offset: page * pageSize, ...(sort ? { sort } : {}) },
     { retry: 1, staleTime: 30_000, enabled: isConnected && tab === "ports" }
   );
   const processesQ = trpc.wazuh.agentProcesses.useQuery(
@@ -132,29 +133,29 @@ export default function ITHygiene() {
     { retry: 1, staleTime: 60_000, enabled: isConnected && tab === "network" }
   );
   const hotfixesQ = trpc.wazuh.agentHotfixes.useQuery(
-    { agentId, limit: pageSize, offset: page * pageSize },
+    { agentId, limit: pageSize, offset: page * pageSize, ...(search ? { search } : {}), ...(sort ? { sort } : {}) },
     { retry: 1, staleTime: 60_000, enabled: isConnected && tab === "hotfixes" }
   );
 
   // ── Extensions column queries ────────────────────────────────────────────
   const extensionsQ = trpc.wazuh.agentBrowserExtensions.useQuery(
-    { agentId, limit: pageSize, offset: page * pageSize },
+    { agentId, limit: pageSize, offset: page * pageSize, ...(search ? { search } : {}), ...(sort ? { sort } : {}) },
     { retry: 1, staleTime: 60_000, enabled: isConnected && tab === "extensions" }
   );
 
   // ── Services column queries ──────────────────────────────────────────────
   const servicesQ = trpc.wazuh.agentServices.useQuery(
-    { agentId, limit: pageSize, offset: page * pageSize },
+    { agentId, limit: pageSize, offset: page * pageSize, ...(search ? { search } : {}), ...(sort ? { sort } : {}) },
     { retry: 1, staleTime: 60_000, enabled: isConnected && tab === "services" }
   );
 
   // ── Identity column queries ──────────────────────────────────────────────
   const usersQ = trpc.wazuh.agentUsers.useQuery(
-    { agentId, limit: pageSize, offset: page * pageSize },
+    { agentId, limit: pageSize, offset: page * pageSize, ...(search ? { search } : {}), ...(sort ? { sort } : {}) },
     { retry: 1, staleTime: 60_000, enabled: isConnected && tab === "users" }
   );
   const groupsQ = trpc.wazuh.agentGroups2.useQuery(
-    { agentId, limit: pageSize, offset: page * pageSize },
+    { agentId, limit: pageSize, offset: page * pageSize, ...(search ? { search } : {}), ...(sort ? { sort } : {}) },
     { retry: 1, staleTime: 60_000, enabled: isConnected && tab === "groups" }
   );
 
@@ -320,7 +321,7 @@ export default function ITHygiene() {
   };
 
   // ── Shared tab props ─────────────────────────────────────────────────────
-  const tabProps = { page, pageSize, onPageChange: setPage, agentId };
+  const tabProps = { page, pageSize, onPageChange: setPage, agentId, sort, onSort: (s: string) => { setSort(s); setPage(0); } };
 
   return (
     <WazuhGuard>
@@ -429,7 +430,7 @@ export default function ITHygiene() {
         </div>
 
         {/* ── Tab Content Area ─────────────────────────────────────────── */}
-        <Tabs value={tab} onValueChange={(v) => { setTab(v as TabKey); setPage(0); setSearch(""); }}>
+        <Tabs value={tab} onValueChange={(v) => { setTab(v as TabKey); setPage(0); setSearch(""); setSort(""); }}>
           <TabsList className="bg-secondary/30 border border-border/30">
             {columnTabs[activeColumn].map((t) => {
               const TIcon = t.icon;

@@ -9,6 +9,7 @@ import { SavedSearchPanel } from "@/components/shared/SavedSearchPanel";
 import { WazuhGuard } from "@/components/shared/WazuhGuard";
 import { ThreatBadge, threatLevelFromNumber } from "@/components/shared/ThreatBadge";
 import { RawJsonViewer } from "@/components/shared/RawJsonViewer";
+import AlertClassifyButton from "@/components/shared/AlertClassifyButton";
 
 import { ExportButton } from "@/components/shared/ExportButton";
 import { AddNoteDialog } from "@/components/shared/AddNoteDialog";
@@ -566,7 +567,7 @@ export default function AlertsTimeline() {
           <div className="overflow-x-auto" aria-live="polite" aria-label="Alerts table">
             <table className="w-full text-xs">
               <thead><tr className="border-b border-border/30">
-                {["Timestamp", "Level", "Rule ID", "Description", "Agent", "MITRE", "Source", "", ""].map((h, idx) => (
+                {["Timestamp", "Level", "Rule ID", "Description", "Agent", "MITRE", "Source", "", "", ""].map((h, idx) => (
                   <th key={`${h}-${idx}`} className="text-left py-2 px-2 text-muted-foreground font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr></thead>
@@ -614,11 +615,21 @@ export default function AlertsTimeline() {
                       <td className="py-1.5 px-2">
                         <SendToQueueButton alert={a} />
                       </td>
+                      <td className="py-1.5 px-2">
+                        <AlertClassifyButton
+                          alertData={a as Record<string, unknown>}
+                          agentContext={{
+                            agentId: String(agent.id ?? ""),
+                            agentName: String(agent.name ?? ""),
+                          }}
+                          compact
+                        />
+                      </td>
                     </tr>
                   );
                 })}
                 {alerts.length === 0 && (
-                  <tr><td colSpan={9} className="py-12 text-center text-muted-foreground">
+                  <tr><td colSpan={10} className="py-12 text-center text-muted-foreground">
                     {alertsSearchQ.isLoading ? "Loading alerts..." : "No alerts found for the selected filters"}
                   </td></tr>
                 )}

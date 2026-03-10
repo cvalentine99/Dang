@@ -24,23 +24,21 @@ import {
 // ── EXP_SYSCOLLECTOR_PACKAGES_CONFIG ────────────────────────────────────────
 
 describe("EXP_SYSCOLLECTOR_PACKAGES_CONFIG", () => {
-  it("has exactly 13 params", () => {
-    expect(Object.keys(EXP_SYSCOLLECTOR_PACKAGES_CONFIG.params)).toHaveLength(13);
+  it("has exactly 12 params (no q/distinct per spec v4.14.3)", () => {
+    expect(Object.keys(EXP_SYSCOLLECTOR_PACKAGES_CONFIG.params)).toHaveLength(12);
   });
 
   it("targets /experimental/syscollector/packages", () => {
     expect(EXP_SYSCOLLECTOR_PACKAGES_CONFIG.endpoint).toBe("/experimental/syscollector/packages");
   });
 
-  it("forwards all 7 universal params", () => {
+  it("forwards 5 universal params (no q/distinct per spec v4.14.3)", () => {
     const result = brokerParams(EXP_SYSCOLLECTOR_PACKAGES_CONFIG, {
       offset: 0,
       limit: 50,
       sort: "+name",
       search: "openssl",
       select: ["name", "version"],
-      q: "vendor=Canonical",
-      distinct: true,
     });
     expect(result.errors).toHaveLength(0);
     expect(result.forwardedQuery.offset).toBe("0");
@@ -48,8 +46,15 @@ describe("EXP_SYSCOLLECTOR_PACKAGES_CONFIG", () => {
     expect(result.forwardedQuery.sort).toBe("+name");
     expect(result.forwardedQuery.search).toBe("openssl");
     expect(result.forwardedQuery.select).toBe("name,version");
-    expect(result.forwardedQuery.q).toBe("vendor=Canonical");
-    expect(result.forwardedQuery.distinct).toBe("true");
+  });
+
+  it("rejects q and distinct as unsupported (spec v4.14.3)", () => {
+    const result = brokerParams(EXP_SYSCOLLECTOR_PACKAGES_CONFIG, {
+      q: "vendor=Canonical",
+      distinct: true,
+    });
+    expect(result.unsupportedParams).toContain("q");
+    expect(result.unsupportedParams).toContain("distinct");
   });
 
   it("forwards agents_list as csv", () => {
@@ -60,12 +65,12 @@ describe("EXP_SYSCOLLECTOR_PACKAGES_CONFIG", () => {
     expect(result.forwardedQuery.agents_list).toBe("001,002,003");
   });
 
-  it("resolves agent_list alias to agents_list", () => {
+  it("rejects agent_list (no alias - use agents_list directly)", () => {
     const result = brokerParams(EXP_SYSCOLLECTOR_PACKAGES_CONFIG, {
       agent_list: "001,002",
     });
-    expect(result.errors).toHaveLength(0);
-    expect(result.forwardedQuery.agents_list).toBe("001,002");
+    expect(result.unsupportedParams).toContain("agent_list");
+    expect(result.forwardedQuery.agents_list).toBeUndefined();
   });
 
   it("forwards all 5 field filters", () => {
@@ -96,8 +101,8 @@ describe("EXP_SYSCOLLECTOR_PACKAGES_CONFIG", () => {
 // ── EXP_SYSCOLLECTOR_PROCESSES_CONFIG ───────────────────────────────────────
 
 describe("EXP_SYSCOLLECTOR_PROCESSES_CONFIG", () => {
-  it("has exactly 22 params", () => {
-    expect(Object.keys(EXP_SYSCOLLECTOR_PROCESSES_CONFIG.params)).toHaveLength(22);
+  it("has exactly 21 params (no q/distinct per spec v4.14.3)", () => {
+    expect(Object.keys(EXP_SYSCOLLECTOR_PROCESSES_CONFIG.params)).toHaveLength(21);
   });
 
   it("targets /experimental/syscollector/processes", () => {
@@ -196,23 +201,21 @@ describe("EXP_SYSCOLLECTOR_PROCESSES_CONFIG", () => {
 // ── EXP_SYSCOLLECTOR_PORTS_CONFIG ───────────────────────────────────────────
 
 describe("EXP_SYSCOLLECTOR_PORTS_CONFIG", () => {
-  it("has exactly 16 params", () => {
-    expect(Object.keys(EXP_SYSCOLLECTOR_PORTS_CONFIG.params)).toHaveLength(16);
+  it("has exactly 15 params (no q/distinct per spec v4.14.3)", () => {
+    expect(Object.keys(EXP_SYSCOLLECTOR_PORTS_CONFIG.params)).toHaveLength(15);
   });
 
   it("targets /experimental/syscollector/ports", () => {
     expect(EXP_SYSCOLLECTOR_PORTS_CONFIG.endpoint).toBe("/experimental/syscollector/ports");
   });
 
-  it("forwards universal params", () => {
+  it("forwards universal params (no q/distinct per spec v4.14.3)", () => {
     const result = brokerParams(EXP_SYSCOLLECTOR_PORTS_CONFIG, {
       offset: 0,
       limit: 500,
       sort: "+protocol",
       search: "tcp",
       select: "pid,protocol,local.port",
-      q: "state=listening",
-      distinct: true,
     });
     expect(result.errors).toHaveLength(0);
     expect(result.forwardedQuery.offset).toBe("0");
@@ -220,8 +223,15 @@ describe("EXP_SYSCOLLECTOR_PORTS_CONFIG", () => {
     expect(result.forwardedQuery.sort).toBe("+protocol");
     expect(result.forwardedQuery.search).toBe("tcp");
     expect(result.forwardedQuery.select).toBe("pid,protocol,local.port");
-    expect(result.forwardedQuery.q).toBe("state=listening");
-    expect(result.forwardedQuery.distinct).toBe("true");
+  });
+
+  it("rejects q and distinct as unsupported (spec v4.14.3)", () => {
+    const result = brokerParams(EXP_SYSCOLLECTOR_PORTS_CONFIG, {
+      q: "state=listening",
+      distinct: true,
+    });
+    expect(result.unsupportedParams).toContain("q");
+    expect(result.unsupportedParams).toContain("distinct");
   });
 
   it("forwards agents_list cross-agent filter", () => {
@@ -304,15 +314,14 @@ describe("EXP_SYSCOLLECTOR_PORTS_CONFIG", () => {
     expect(result.unsupportedParams).toContain("rx_queue");
   });
 
-  it("handles full cross-agent query with all params", () => {
+  it("handles full cross-agent query with all params (no q/distinct)", () => {
     const result = brokerParams(EXP_SYSCOLLECTOR_PORTS_CONFIG, {
       offset: 0,
       limit: 100,
       sort: "+local.port",
       search: "ssh",
       select: "pid,protocol",
-      q: "state=listening",
-      distinct: true,
+      wait_for_complete: true,
       agents_list: "001,002",
       pid: "22",
       protocol: "tcp",
@@ -325,6 +334,6 @@ describe("EXP_SYSCOLLECTOR_PORTS_CONFIG", () => {
     });
     expect(result.errors).toHaveLength(0);
     expect(result.unsupportedParams).toHaveLength(0);
-    expect(Object.keys(result.forwardedQuery)).toHaveLength(16);
+    expect(Object.keys(result.forwardedQuery)).toHaveLength(15);
   });
 });

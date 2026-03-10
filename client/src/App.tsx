@@ -45,6 +45,8 @@ import SecurityExplorer from "./pages/SecurityExplorer";
 import SensitiveAccessAudit from "./pages/SensitiveAccessAudit";
 import GroupManagement from "./pages/GroupManagement";
 import BrokerCoverage from "./pages/BrokerCoverage";
+import DGXHealth from "./pages/DGXHealth";
+import BrokerPlayground from "./pages/BrokerPlayground";
 
 function Router() {
   return (
@@ -97,6 +99,8 @@ function Router() {
               <Route path="/admin/audit" component={SensitiveAccessAudit} />
               <Route path="/groups" component={GroupManagement} />
               <Route path="/admin/broker-coverage" component={BrokerCoverage} />
+              <Route path="/admin/dgx-health" component={DGXHealth} />
+              <Route path="/admin/broker-playground" component={BrokerPlayground} />
               <Route path="/404" component={NotFound} />
               <Route component={NotFound} />
             </Switch>

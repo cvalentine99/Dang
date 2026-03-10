@@ -171,9 +171,10 @@ describe("Wazuh Router — API Intelligence procedures exist", () => {
     expect(content).toMatch(/securityConfig\s*:/);
   });
 
-  it("securityConfig calls GET /security/config", () => {
+  it("securityConfig calls GET /security/config (broker-wired)", () => {
     const content = fs.readFileSync(routerPath, "utf-8");
-    expect(content).toContain('proxyGet("/security/config")');
+    expect(content).toContain('SECURITY_CONFIG_CONFIG');
+    expect(content).toContain('/security/config');
   });
 });
 

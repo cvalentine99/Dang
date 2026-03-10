@@ -67,6 +67,7 @@ export default function AgentHealth() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [page, setPage] = useState(0);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [upgradeAgentFilter, setUpgradeAgentFilter] = useState("");
   const pageSize = 25;
 
   // ─── Debounce (300ms) for text inputs to reduce Wazuh API calls ──────────
@@ -124,7 +125,9 @@ export default function AgentHealth() {
   }, [noGroupQ.data]);
 
   const upgradeResultQ = trpc.wazuh.agentsUpgradeResult.useQuery(
-    {},
+    {
+      ...(upgradeAgentFilter ? { agents_list: upgradeAgentFilter } : {}),
+    },
     { retry: 1, staleTime: 60_000, enabled: isConnected }
   );
 
@@ -353,6 +356,19 @@ export default function AgentHealth() {
                 compact
               />
             </div>
+          </div>
+          <div className="flex items-center gap-2 mb-3">
+            <Input
+              placeholder="Filter by agent IDs (comma-separated)..."
+              value={upgradeAgentFilter}
+              onChange={(e) => setUpgradeAgentFilter(e.target.value)}
+              className="h-7 w-64 text-xs bg-secondary/20 border-border/30"
+            />
+            {upgradeAgentFilter && (
+              <button onClick={() => setUpgradeAgentFilter("")} className="text-muted-foreground hover:text-foreground">
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </div>
           <BrokerWarnings data={upgradeResultQ.data} context="agentsUpgradeResult" />
           {upgradeResultQ.isLoading ? (

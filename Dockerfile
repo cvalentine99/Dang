@@ -86,6 +86,7 @@ USER dang
 # Default environment
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV SKIP_TLS_VERIFY=true
 
 EXPOSE 3000
 

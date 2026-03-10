@@ -551,6 +551,15 @@ function generateReport(callsites, schemas) {
         continue;
       }
 
+      // Mutations pass params at call time (mutateAsync/mutate), not in the hook declaration.
+      // The first argument to useMutation() is always React Query options ({ onSuccess, onError, ... }),
+      // not procedure input. Exempt all mutation callsites from input validation.
+      if (cs.hookType === "useMutation") {
+        lines.push("Input: mutation (params passed at call time via mutateAsync) — **OK**");
+        lines.push("");
+        continue;
+      }
+
       if (schema.inputType === "void" && !cs.isVoid) {
         lines.push(`Input: void expected but UI passes keys — **VIOLATION**`);
         violations.push({ file, line: cs.line, proc: cs.procedure, issue: "UI passes params to void-input procedure" });

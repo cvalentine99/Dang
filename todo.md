@@ -4068,3 +4068,292 @@ These need a proper contract-alignment sprint, not a hot patch:
 - [x] Regression tests: codeReviewFixes.test.ts (16 tests)
 - [x] Full suite: 101 files, 2,937 tests, 0 failures
 - [x] tsc --noEmit: EXIT 0
+
+## Dependabot PR Review & Merge (2026-03-09)
+- [x] List all open Dependabot PRs (18 total)
+- [x] Review each PR for breaking changes and security impact (parallel Claude review)
+- [x] Merge safe PRs: #27 mysql2, #14 cookie, #12 dotenv, #8 tanstack/react-query, #34 storybook, #37 setup-qemu-action, #23 react-day-picker (7 merged)
+- [x] Document decisions for remaining 11 PRs (see below)
+
+### Remaining PRs (require manual action)
+- #36 docker/metadata-action 5→6: blocked by GitHub workflow permissions
+- #35 docker/setup-buildx-action 3→4: blocked by GitHub workflow permissions
+- #33 dev-tools group (10 updates): merge conflict with lockfile
+- #25 lucide-react 0.453→0.575: MEDIUM risk, Fingerprint icon renamed in 0.554
+- #24 react-resizable-panels 3→4: HIGH risk, major breaking changes (component/prop renames)
+- #22 recharts 2→3: HIGH risk, major breaking changes (CategoricalChartState removed)
+- #11 react + @types/react: merge conflict after other merges
+- #7 radix-ui group (6 updates): HIGH risk, unified package restructure
+- #4 actions/checkout 4→6: merge conflict
+- #2 attest-build-provenance 2→3: merge conflict
+- #1 node 22→25: HIGH risk, 3 major Node.js versions skipped
+
+## Recharts 2→3 Migration Analysis (2026-03-09)
+- [ ] Research recharts 3.x breaking changes and migration guide
+- [ ] Audit all recharts usage in the Dang! codebase
+- [ ] Cross-reference breaking changes against actual usage
+- [ ] Deliver migration plan report
+
+## Code Review Remediation (2026-03-10)
+
+### Stop-Ship Issues
+- [x] CR-1: Remove fabricated alert counts — delete `* 0.12` fallback in Home.tsx:263, show "Alert data unavailable" for missing buckets
+- [x] CR-2: Add CI test gate — add `pnpm test` step before Docker build in `.github/workflows/docker.yml`
+
+### Top 10 Findings — Immediate Fixes
+- [x] CR-3: Close open registration — gate after first admin created, add REGISTRATION_ENABLED env default false
+- [x] CR-4: Path traversal in Wazuh proxy — add `z.string().regex(/^[a-zA-Z0-9._-]+$/)` to all URL-interpolated params in wazuhRouter.ts (30+ endpoints)
+- [ ] CR-5: LLM output runtime validation — add Zod validation before all JSON column INSERTs (triage_objects, correlation_bundles, living_case_state)
+- [x] CR-6: JWT empty secret guard — add guard in getSessionSecret() that throws if secret is empty or < 16 chars
+- [ ] CR-7: Source-scanning tests — replace with behavioral tests (29 files, prioritize security-critical ones)
+- [ ] CR-8: Unscoped LLM merge target IDs — validate entity overlap before accepting mergeTargetId
+- [x] CR-9: Elasticsearch query injection — escaped Lucene special chars before query_string (indexerRouter.ts:720-727)
+- [x] CR-10: IOC "Threat Assessment" labels — replace "Clean" with "No OTX References Found", rename "Threat Assessment" to "OTX Pulse Activity" in ThreatIntel.tsx
+
+### Security Findings (S-1 through S-11)
+- [x] S-1: SSRF via DNS rebinding — use pinnedIP from host validation instead of raw hostname in connectionSettingsRouter.ts
+- [x] S-2: Logout session invalidation — add server-side session/token blocklist on logout (server/routers.ts:42-46)
+- [x] S-3: Add HSTS header to securityHeaders.ts
+- [x] S-4: CSP tightened (noted: full nonce-based CSP requires Vite plugin; unsafe-inline kept as interim)
+- [x] S-5: Login rate limiter — fix to key on forwarded IP with trust proxy (localAuthRouter.ts:125)
+- [x] S-6: Sanitize pageContext before injection into LLM system prompt (hybridragRouter.ts)
+- [x] S-7: Support dedicated ENCRYPTION_KEY env var, fallback to HKDF-derived key
+- [x] S-8: auth.me — switch from blocklist to allowlist for exposed columns (server/routers.ts:36-41)
+- [x] S-9: Change dgxHealth/queueStats/sessionTypes from publicProcedure to protectedProcedure
+- [x] S-10: Sanitize error messages to not leak internal network topology (wazuhClient.ts:49-68)
+- [x] S-11: Tighten connect-src CSP to specific origins instead of blanket https: (securityHeaders.ts:36)
+
+### Contract Drift Findings (C-1 through C-8)
+- [ ] C-1: FK CASCADE on nullable userId — change to SET NULL so user deletion doesn't destroy investigations
+- [x] C-2: Add UNIQUE constraint on response_actions.actionId
+- [x] C-3: getUserCount uses SQL COUNT(*) now; drift_snapshots baselineId kept NOT NULL (valid design)
+- [x] C-4: Fix admin user list count query to include search filter (adminUsersRouter.ts:54-58)
+- [ ] C-5: Populate drizzle/relations.ts with 25+ FK relationships
+- [ ] C-6: Fix alertQueue.triageResult type to match TriageObject schema
+- [ ] C-7: Fix LivingCaseObject.recommendedActions[].state staleness after initial write
+- [ ] C-8: Add response validation to Wazuh proxy endpoints (80+ return unknown)
+
+### LLM Validation Fixes
+- [x] LLM-1: Remove .passthrough() → .strip() from triage/hypothesis Zod schemas
+- [x] LLM-2: Fix classifyAlert() — replace `as AlertClassification` with Zod runtime parse
+- [x] LLM-3: Fix intent analysis — replace `as` cast with Zod runtime parse
+
+### Frontend Truthfulness
+- [x] FT-1: Add provenance disclosure ("AI" label/icon) to all LLM-derived scores across UI
+- [x] FT-2: Replace "Campaign Detected" with "Possible Campaign (AI estimate)" in TriagePipeline.tsx
+- [x] FT-3: Fix inconsistent severity thresholds — unified all to use canonical threatLevelFromNumber (12/8/4/1)
+- [x] FT-4: SSE acknowledgment — clarified that ack is browser-only, not formal processing
+
+### Quick Wins (from review)
+- [x] QW-1: Remove .passthrough() → .strip() from triage/hypothesis Zod schemas
+- [x] QW-2: Add UNIQUE constraint on response_actions.actionId (same as C-2)
+
+## Cell Component Migration & PR Cleanup (2026-03-10)
+
+- [x] Merge PR #39 (code review remediation)
+- [x] Close superseded Dependabot PRs (#22, #24, #25, #7)
+- [x] Migrate <Cell> to recharts v3 per-item styling API across all 8 files (9 usages)
+  - Moved fill colors into data arrays, removed all Cell children from Pie/Bar components
+  - Cleaned up unused Cell imports from AgentCompare, DriftAnalytics, Home
+  - Fixed Compliance.tsx entry.color → entry.fill reference
+  - 0 TypeScript errors, 2936 tests pass
+
+## Maintenance Batch (2026-03-10)
+
+- [x] Merge PR #40 (Cell migration)
+- [x] Set ENCRYPTION_KEY env var (dedicated 64-char secret, validated with round-trip test)
+- [x] Audit remaining open Dependabot PRs (7 Dependabot PRs resolved: 3 merged, 3 closed as superseded, 1 won't-fix)
+- [x] Batch-apply non-breaking dependency updates (10 NPM packages + 1 GitHub Action)
+- [x] Run full test suite and TypeScript check (0 TS errors, 2939 tests pass)
+
+## Pipeline Stages 3-4 Investigation (2026-03-10)
+
+- [x] Trace fullPipeline mutation and generateHypothesis mutation code paths
+- [x] Identify why stages 3-4 (hypothesis + full pipeline) have never executed — root cause: no UI trigger for runFullPipeline
+- [x] Fix any blockers preventing pipeline_runs, living_case_state, response_actions from being populated — added Full Pipeline button
+- [ ] Verify Pipeline Inspector, Living Cases, and Response Actions pages render data after fix (requires live Wazuh + LLM)
+
+## Pipeline UI Fix (2026-03-10)
+- [x] Add "Run Full Pipeline" button to QueueItemCard (calls runFullPipeline mutation)
+- [x] Add pipeline stage progress indicator to QueueItemCard (PipelineStageIndicator component, shows stages 1-4 status)
+- [x] Wire up pipeline run tracking so completed queue items show their pipeline run status (getPipelineRunByQueueItem endpoint)
+- [x] Add 23 regression tests (pipelineRunByQueueItem.test.ts) — DB shape + pure logic tests
+- [x] Full test suite: 103 files, 2962 tests, 0 failures. tsc: EXIT 0.
+
+## GitHub PR Merge Sprint (2026-03-10)
+- [x] Review PR #4 (GitHub Actions workflow) — already CLOSED (Dependabot bump, superseded)
+- [x] Review PR #35 (GitHub Actions workflow) — already CLOSED (Dependabot bump, superseded)
+- [x] Review PR #36 (GitHub Actions workflow) — already CLOSED (Dependabot bump, superseded)
+- [x] Close PR #28 (Wazuh co-location) — CLOSED per user request (224 commits behind, too divergent)
+- [x] Cherry-pick PR #31 features into main — DONE (AlertClassifyButton, DGXHealth page, 37 tests)
+- [x] Close PR #31 with explanation — CLOSED (161 commits behind, cherry-picked instead)
+- [x] All PRs resolved — 0 open PRs remaining. Full suite: 104 files, 2,999 tests, 0 failures.
+
+## Bugfix: Self-Signed Cert TLS Failure (2026-03-10)
+- [x] Set SKIP_TLS_VERIFY=true as default for Docker deployments (Wazuh uses self-signed certs)
+- [x] Update Dockerfile/docker-compose to include SKIP_TLS_VERIFY env var
+- [x] Update env.docker.template with SKIP_TLS_VERIFY section and docs
+- [ ] Push fix to `latest` branch on GitHub
+
+## Broker Coverage Remediation (2026-03-10)
+### Phase 1 Backend: 8 endpoints broker-wired
+- [x] securityRoles — broker config + SortableHeader-ready sort/search/limit/offset
+- [x] securityPolicies — broker config + sort/search/limit/offset
+- [x] securityUsers — broker config + sort/search/limit/offset
+- [x] securityActions — broker config + endpoint filter
+- [x] managerStats — added date param
+- [x] clusterNodeStats — added date param
+- [x] clusterNodeConfiguration — added section/field/raw params
+- [x] agentsUpgradeResult — already had agent_list, verified
+### Phase 2 Backend: 14 high-param endpoints migrated to broker
+- [x] agentsOutdated — full broker config (sort/search/q/limit/offset)
+- [x] agentsNoGroup — full broker config (sort/search/q/limit/offset)
+- [x] agentsStatsDistinct — full broker config (sort/search/q/limit/offset)
+- [x] agentBrowserExtensions — full broker config
+- [x] agentUsers — full broker config
+- [x] agentGroups2 — full broker config
+- [x] taskStatus — full broker config (status/command/module/limit/offset/sort)
+- [x] clusterNodeLogs — full broker config (level/tag/sort/search/q/limit/offset)
+- [x] expSyscollectorNetaddr — full broker config
+- [x] expSyscollectorNetiface — full broker config
+- [x] expSyscollectorNetproto — full broker config
+- [x] expSyscollectorOs — full broker config
+- [x] expSyscollectorHardware — full broker config
+- [x] expSyscollectorHotfixes — full broker config
+### Phase 3: Shared Frontend Utilities
+- [x] SortableHeader component (client/src/components/shared/SortableHeader.tsx)
+- [x] SimplePagination component (client/src/components/shared/SimplePagination.tsx)
+- [x] useDebounced hook (client/src/hooks/useDebounced.ts)
+### Phase 4: Frontend Wiring (7 pages)
+- [x] SecurityExplorer.tsx — server-side search/sort/pagination for Roles/Policies/Users + endpoint filter for Actions
+- [x] FleetInventory.tsx — sort state per tab, distinct toggle, hotfix filter in qInput
+- [x] ITHygiene.tsx — sort/search params passed to all 6 syscollector queries via tabProps
+- [x] ClusterHealth.tsx — log level/tag filters, config section/field/raw controls, stats date picker
+- [x] Status.tsx — manager stats date picker, task status search/filter/module/pagination with table
+- [x] AgentHealth.tsx — upgrade results agent filter
+- [x] GroupManagement.tsx — outdated/noGroup search + sortable headers, distinct pagination + field reset
+### Test Updates
+- [x] apiContractGap.test.ts M-3 — updated to accept paginationSchema.shape as equivalent to literal limit/offset
+- [x] cleanupSprint.test.ts #76/#86 — updated to accept brokerParams() delegation as equivalent to explicit null checks
+- [x] Full suite: 104 files, 2,999 tests, 0 failures
+
+## TLS Configuration Cleanup (2026-03-10)
+- [x] Remove dead env vars WAZUH_VERIFY_TLS and ALLOW_INSECURE_TLS — already clean in env.docker.template
+- [x] Clean up stale rejectUnauthorized: false in 7 test files + 1 script to use SKIP_TLS_VERIFY-aware value
+- [x] Verify SKIP_TLS_VERIFY is the single source of truth for TLS policy — 0 hardcoded instances remain
+- [x] Full suite: 104 files, 2,999 tests, 0 failures. tsc: EXIT 0.
+
+## Nemotron-3-Nano-30B-A3B Model Integration (2026-03-10)
+> Per "A Comprehensive Technical Analysis of Nemotron-3-Nano-30B-A3B for Agentic Workflows" PDF
+
+### Backend: LLM Service Enhancements
+- [x] Add Nemotron-specific temperature/top_p settings (0.6/0.95 tool calling, 1.0/1.0 conversational)
+- [x] Add XML tool-call parser to convert Nemotron XML <tool_call> format to OpenAI JSON
+- [x] Add thinking trace extraction (<think>...</think> block parsing)
+- [x] Add system prompt XML schema reminder to prevent 86% parser failure rate
+- [x] Add Nemotron model detection (auto-detect when model name contains "Nemotron" or "nemotron")
+
+### Backend: Enhanced LLM Service Updates
+- [x] Update buildSystemPrompt with XML tool-calling schema reminder
+- [x] Add temperature/top_p to invokeCustomLLM based on session type (tool vs conversational)
+- [x] Add thinking trace extraction to response processing
+- [x] Update context allocation with PDF-specified values
+
+### Frontend: DGX Health Page Enhancements
+- [x] Add benchmark data table from PDF (AIME25, GPQA, LiveCodeBench, TauBench, BFCL, AA-LCR)
+- [x] Update architecture reference with full PDF specifications
+- [x] Add deployment topology reference (llama.cpp flags, vLLM config)
+- [x] Add memory utilization table from PDF
+
+### Tests
+- [x] Test XML tool-call parser (valid XML, malformed XML, no tool call)
+- [x] Test thinking trace extraction
+- [x] Test Nemotron model detection
+- [x] Test temperature/top_p selection logic
+- [x] Run full test suite: 105 files, 3,027 tests, 0 failures
+
+## Broker Passthrough Fix — 4 Endpoints (2026-03-10)
+- [x] managerInfo — fixed: registry corrected to passthrough (spec confirms only pretty/wait_for_complete)
+- [x] managerStatus — fixed: registry corrected to passthrough (spec confirms only pretty/wait_for_complete)
+- [x] mitreMetadata — fixed: registry corrected to passthrough (spec confirms only pretty/wait_for_complete)
+- [x] securityCurrentUserPolicies — fixed: registry corrected to passthrough (spec confirms only pretty)
+- [x] Update/add tests for wired broker params (24 new tests in brokerPassthroughFix.test.ts)
+- [x] Full suite green: 106 files, 3,051 tests, 0 failures
+
+## Full Spec-vs-Registry Audit — All Broker-Wired Endpoints (2026-03-10)
+- [x] Extract all endpoint params from Wazuh spec v4.14.3
+- [x] Cross-check every broker-wired registry entry against spec
+- [x] Cross-check every manual registry entry against spec
+- [x] Produce detailed audit report with mismatches
+- [x] Fix all identified mismatches in brokerCoverage.ts and paramBroker.ts
+- [x] Add/update tests for fixes (87 new tests in specAudit.test.ts, 10 existing tests updated)
+- [x] Full suite green: 107 files, 3,140 tests, 0 failures
+
+## Claude Code — Broker Wiring & Promotion (2026-03-10)
+- [x] Wire securityRoles router to use brokerParams(SECURITY_ROLES_CONFIG) — already wired from previous audit
+- [x] Wire securityPolicies router to use brokerParams(SECURITY_POLICIES_CONFIG) — already wired from previous audit
+- [x] Wire securityUsers router to use brokerParams(SECURITY_USERS_CONFIG) — already wired from previous audit
+- [x] Promote taskStatus (12 params) from manual to broker-wired (Claude Code)
+- [x] Promote securityRbacRules (5 params) from manual to broker-wired (Claude Code)
+- [x] Promote decoderParents (7 params) from manual to broker-wired (Claude Code)
+- [x] Add wait_for_complete optional boolean support to 27+ configs and router schemas (Claude Code)
+- [x] Run full test suite green: 107 files, 3,140 tests, 0 failures
+
+## Claude Code — Promote Remaining Manual Endpoints (2026-03-10)
+- [x] Check Wazuh spec v4.14.3 for decoderFileContent, securityConfig, securityCurrentUser, securityActions params
+- [x] Create broker configs for each endpoint in paramBroker.ts (Claude Code: DECODER_FILE_CONTENT_CONFIG, SECURITY_CONFIG_CONFIG, SECURITY_CURRENT_USER_CONFIG, SECURITY_ACTIONS_CONFIG)
+- [x] Wire endpoints in wazuhRouter.ts to use brokerParams() (Claude Code)
+- [x] Update brokerCoverage.ts registry entries from manual to broker (Claude Code)
+- [x] Update/fix tests (fixed apiContractGap.test.ts L-2 + trustDocSprint.test.ts securityConfig)
+- [x] Full suite green: 107 files, 3,140 tests, 0 failures
+
+## Broker Coverage UI + Param Playground + EXP Config Consolidation (2026-03-10)
+- [x] Audit current API Coverage page, experimental configs, and coverage report generation
+- [x] Consolidate EXP_SYSCOLLECTOR_* configs with standard SYSCOLLECTOR_* configs (deriveExpConfig helper, -335 lines)
+- [x] Update brokerCoverage.ts registry for consolidated configs (all 9 now broker-wired)
+- [x] Update router to use consolidated configs for experimental endpoints (already wired)
+- [x] Add broker coverage percentage stats to API Coverage UI page (already present in existing BrokerCoverage.tsx)
+- [x] Build broker param playground page (admin-only, test params against any config)
+- [x] Add route and navigation entry for playground page (/admin/broker-playground)
+- [x] Write/update tests for all changes (14 tests in brokerPlayground.test.ts + parity audit fix)
+- [x] Full suite green: 108 files, 3,154 tests, 0 failures
+
+## Wire 13 Unconsumed Router Procedures (2026-03-10)
+- [x] Cache Management panel on Cluster Health: cacheStats, cacheClear, cacheSetEnabled, cacheSetTtl
+- [x] Cluster/Manager Config panels on Cluster Health: clusterApiConfig, clusterConfigValidation, clusterRulesetSync, managerApiConfig
+- [x] CIS-CAT Benchmarks section on Compliance: expCiscatResults
+- [x] RBAC Explorer section: securityPolicyById, securityRoleById, securityRuleById, securityUserById (click-to-detail panels)
+- [x] Update parity audit: 184 callsites, 129/129 procedures, 0 violations, PASS
+- [x] Full suite green: 108 files, 3,154 tests, 0 failures
+
+## Broker Playground Enhancements (2026-03-10)
+- [x] Add param presets with common query patterns (30+ presets across 12 config groups)
+- [x] Add preset selector panel with one-click apply and Quick Presets section
+- [x] Build "Copy as cURL" button that generates Wazuh API cURL command from validated params
+- [x] Include auth placeholder in cURL output (token redacted, security warning shown)
+- [x] Full suite green: 108 files, 3,154 tests, 0 failures
+
+## SOC Console Dashboard Redesign (2026-03-10)
+- [x] Audit current SOC Console page and all available features/pages
+- [x] Redesign opening dashboard as a proper command center landing
+- [x] Add feature navigation cards for all major sections
+- [x] Add system health summary (Wazuh API, Indexer, LLM/Nemotron, Cache status)
+- [x] Add quick-access shortcuts to new features (Broker Playground, Security Explorer, DGX Health)
+- [x] Ensure ultrawide-optimized dense layout
+- [x] Re-add agentOverview query with AgentOverviewTable (node_name, node_type, per-status counts)
+- [x] Re-add agentsSummary query with AgentSummaryPanel, BrokerWarnings, and RawJsonViewer
+- [x] Run tests and verify — all 8 previously failing tests now pass
+- [x] Full suite green: 108 files, 3,154 tests, 0 failures
+
+## Login / Auth Fix (2026-03-10)
+- [x] Diagnose why login page won't let user in (registration was closed after first 3 users)
+- [x] Created test admin account directly in database
+- [x] Verify login works end-to-end — confirmed dashboard loads after sign-in
+
+## Living Cases Bug Fix (2026-03-10)
+- [x] Diagnose why Living Cases page isn't working — confirmed working (list + detail views both functional)
+- [x] No fix needed — user confirmed false alarm
+
+## GitHub Backup & RC1 Release (2026-03-10)
+- [ ] Push current codebase to cvalentine99/Dang- repository
+- [ ] Create GitHub release tagged as Dang! RC1

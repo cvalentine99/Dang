@@ -285,11 +285,11 @@ export const AGENTS_CONFIG: EndpointParamConfig = {
       type: "string",
       aliases: ["olderThan"],
     },
-    manager_host: {
-      wazuhName: "manager_host",
-      description: "Filter by manager host",
-      type: "string",
-      aliases: ["managerHost"],
+    agents_list: {
+      wazuhName: "agents_list",
+      description: "Comma-separated list of agent IDs to filter",
+      type: "csv",
+      aliases: ["agentsList"],
     },
     version: {
       wazuhName: "version",
@@ -333,6 +333,11 @@ export const AGENTS_CONFIG: EndpointParamConfig = {
       wazuhName: "manager",
       description: "Filter by manager hostname the agent reports to",
       type: "string",
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -434,6 +439,11 @@ export const RULES_CONFIG: EndpointParamConfig = {
       description: "Filter by rule IDs (comma-separated list)",
       type: "csv",
       aliases: ["ruleIds"],
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -710,6 +720,11 @@ export const SYSCOLLECTOR_PACKAGES_CONFIG: EndpointParamConfig = {
       type: "string",
       aliases: ["package_version"],
     },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -772,6 +787,11 @@ export const SYSCOLLECTOR_PORTS_CONFIG: EndpointParamConfig = {
       wazuhName: "process",
       description: "Filter by process name associated with port",
       type: "string",
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -873,6 +893,11 @@ export const SYSCOLLECTOR_PROCESSES_CONFIG: EndpointParamConfig = {
       wazuhName: "suser",
       description: "Filter by saved user",
       type: "string",
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -1037,6 +1062,11 @@ export const SYSCHECK_CONFIG: EndpointParamConfig = {
       description: "Filter by SHA256 hash",
       type: "string",
     },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -1065,6 +1095,11 @@ export const MITRE_TECHNIQUES_CONFIG: EndpointParamConfig = {
       description: "Filter by MITRE technique IDs (comma-separated list, e.g. T1059,T1078)",
       type: "csv",
       aliases: ["techniqueIds"],
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -1111,6 +1146,11 @@ export const DECODERS_CONFIG: EndpointParamConfig = {
       description: "Filter by decoder status (enabled | disabled | all)",
       type: "string",
     },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -1139,9 +1179,23 @@ export const ROOTCHECK_CONFIG: EndpointParamConfig = {
       description: "Filter by rootcheck status",
       type: "string",
     },
-    // NOTE: pci_dss and cis were removed — they are NOT in the Wazuh v4.14.3 spec
-    // for GET /rootcheck/{agent_id}. They existed in older versions but were dropped.
-    // Use the 'q' parameter for compliance filtering instead.
+    // Restored: pci_dss and cis ARE in the Wazuh v4.14.3 spec for GET /rootcheck/{agent_id}
+    pci_dss: {
+      wazuhName: "pci_dss",
+      description: "Filter by PCI DSS requirement (e.g. 10.6.1)",
+      type: "string",
+      aliases: ["pciDss"],
+    },
+    cis: {
+      wazuhName: "cis",
+      description: "Filter by CIS benchmark (e.g. 1.1.1)",
+      type: "string",
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -1179,6 +1233,11 @@ export const RULES_FILES_CONFIG: EndpointParamConfig = {
       description: "Filter by rule file status (enabled | disabled | all)",
       type: "string",
     },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -1212,6 +1271,11 @@ export const DECODERS_FILES_CONFIG: EndpointParamConfig = {
       description: "Filter by decoder file status (enabled | disabled | all)",
       type: "string",
     },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -1240,6 +1304,11 @@ export const LISTS_CONFIG: EndpointParamConfig = {
       type: "string",
       aliases: ["relativeDirname"],
     },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -1265,6 +1334,11 @@ export const LISTS_FILES_CONFIG: EndpointParamConfig = {
       type: "string",
       aliases: ["relativeDirname"],
     },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -1287,6 +1361,11 @@ export const MITRE_TACTICS_CONFIG: EndpointParamConfig = {
       description: "Filter by MITRE tactic IDs (comma-separated)",
       type: "csv",
       aliases: ["tacticIds", "tactic_ids"],
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -1311,6 +1390,11 @@ export const MITRE_GROUPS_CONFIG: EndpointParamConfig = {
       type: "csv",
       aliases: ["groupIds", "group_ids"],
     },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -1333,6 +1417,11 @@ export const MITRE_MITIGATIONS_CONFIG: EndpointParamConfig = {
       description: "Filter by MITRE mitigation IDs (comma-separated)",
       type: "csv",
       aliases: ["mitigationIds", "mitigation_ids"],
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -1357,6 +1446,11 @@ export const MITRE_SOFTWARE_CONFIG: EndpointParamConfig = {
       type: "csv",
       aliases: ["softwareIds", "software_ids"],
     },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -1371,12 +1465,18 @@ export const MITRE_REFERENCES_CONFIG: EndpointParamConfig = {
     limit: UNIVERSAL_PARAMS.limit,
     sort: UNIVERSAL_PARAMS.sort,
     search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
     q: UNIVERSAL_PARAMS.q,
     mitre_reference_ids: {
       wazuhName: "reference_ids",
       description: "Filter by MITRE reference IDs (comma-separated)",
       type: "csv",
       aliases: ["referenceIds", "reference_ids"],
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -1399,6 +1499,11 @@ export const GROUP_FILES_CONFIG: EndpointParamConfig = {
       wazuhName: "hash",
       description: "Select algorithm to generate the returned checksums",
       type: "string",
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -1495,6 +1600,11 @@ export const SYSCOLLECTOR_NETIFACE_CONFIG: EndpointParamConfig = {
       description: "Filter by MAC address",
       type: "string",
     },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -1537,6 +1647,11 @@ export const SYSCOLLECTOR_NETADDR_CONFIG: EndpointParamConfig = {
       description: "Filter by netmask",
       type: "string",
     },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -1558,6 +1673,11 @@ export const SYSCOLLECTOR_HOTFIXES_CONFIG: EndpointParamConfig = {
       wazuhName: "hotfix",
       description: "Filter by hotfix ID (e.g. KB5000802)",
       type: "string",
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -1595,6 +1715,11 @@ export const SYSCOLLECTOR_NETPROTO_CONFIG: EndpointParamConfig = {
       wazuhName: "dhcp",
       description: "Filter by DHCP status",
       type: "string",
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -1659,6 +1784,11 @@ export const CISCAT_CONFIG: EndpointParamConfig = {
       description: "Filter by CIS-CAT score",
       type: "number",
     },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
   },
 };
 
@@ -1673,14 +1803,12 @@ export const CISCAT_CONFIG: EndpointParamConfig = {
 export const EXPERIMENTAL_CISCAT_RESULTS_CONFIG: EndpointParamConfig = {
   endpoint: "/experimental/ciscat/results",
   params: {
-    // Universal params
+    // Universal params (no q/distinct per spec v4.14.3)
     offset: UNIVERSAL_PARAMS.offset,
     limit: UNIVERSAL_PARAMS.limit,
     sort: UNIVERSAL_PARAMS.sort,
     search: UNIVERSAL_PARAMS.search,
     select: UNIVERSAL_PARAMS.select,
-    q: UNIVERSAL_PARAMS.q,
-    distinct: UNIVERSAL_PARAMS.distinct,
 
     // Cross-agent filter
     agents_list: {
@@ -1736,15 +1864,61 @@ export const EXPERIMENTAL_CISCAT_RESULTS_CONFIG: EndpointParamConfig = {
 
 
 /**
- * GET /experimental/syscollector/packages — Cross-agent packages
- * Spec ref: operationId api.controllers.experimental_controller.get_packages_info
+ * Derive an experimental syscollector endpoint config from a standard single-agent config.
  *
- * Mirrors SYSCOLLECTOR_PACKAGES_CONFIG + agents_list for cross-agent queries.
+ * - Copies all params from stdConfig (excluding q, distinct, wait_for_complete)
+ * - Adds agents_list (string) for cross-agent filtering
+ * - Adds wait_for_complete (boolean) for cluster sync
  */
-export const EXP_SYSCOLLECTOR_PACKAGES_CONFIG: EndpointParamConfig = {
-  endpoint: "/experimental/syscollector/packages",
+function deriveExpConfig(
+  stdConfig: EndpointParamConfig,
+  expEndpoint: string
+): EndpointParamConfig {
+  const params: Record<string, ParamDef> = {};
+  for (const [key, def] of Object.entries(stdConfig.params)) {
+    if (key === "q" || key === "distinct" || key === "wait_for_complete") continue;
+    params[key] = def;
+  }
+  params.agents_list = {
+    type: "string",
+    wazuhName: "agents_list",
+    description: "Comma-separated list of agent IDs",
+  };
+  params.wait_for_complete = {
+    type: "boolean",
+    wazuhName: "wait_for_complete",
+    description: "Wait for cluster synchronization",
+  };
+  return { endpoint: expEndpoint, params };
+}
+
+export const EXP_SYSCOLLECTOR_PACKAGES_CONFIG = deriveExpConfig(
+  SYSCOLLECTOR_PACKAGES_CONFIG,
+  "/experimental/syscollector/packages"
+);
+
+export const EXP_SYSCOLLECTOR_PROCESSES_CONFIG = deriveExpConfig(
+  SYSCOLLECTOR_PROCESSES_CONFIG,
+  "/experimental/syscollector/processes"
+);
+
+export const EXP_SYSCOLLECTOR_PORTS_CONFIG = deriveExpConfig(
+  SYSCOLLECTOR_PORTS_CONFIG,
+  "/experimental/syscollector/ports"
+);
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PHASE 1 + 2 BROKER CONFIGS — Remediation Sprint 2026-03-10
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /security/roles — List security roles
+ * Spec ref: operationId api.controllers.security_controller.get_roles
+ */
+export const SECURITY_ROLES_CONFIG: EndpointParamConfig = {
+  endpoint: "/security/roles",
   params: {
-    // Universal params
     offset: UNIVERSAL_PARAMS.offset,
     limit: UNIVERSAL_PARAMS.limit,
     sort: UNIVERSAL_PARAMS.sort,
@@ -1752,210 +1926,538 @@ export const EXP_SYSCOLLECTOR_PACKAGES_CONFIG: EndpointParamConfig = {
     select: UNIVERSAL_PARAMS.select,
     q: UNIVERSAL_PARAMS.q,
     distinct: UNIVERSAL_PARAMS.distinct,
-    // Cross-agent filter
+    role_ids: {
+      wazuhName: "role_ids",
+      description: "List of role IDs to filter (comma-separated)",
+      type: "csv",
+    },
+  },
+};
+
+/**
+ * GET /security/policies — List security policies
+ * Spec ref: operationId api.controllers.security_controller.get_policies
+ */
+export const SECURITY_POLICIES_CONFIG: EndpointParamConfig = {
+  endpoint: "/security/policies",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    policy_ids: {
+      wazuhName: "policy_ids",
+      description: "List of policy IDs to filter (comma-separated)",
+      type: "csv",
+    },
+  },
+};
+
+/**
+ * GET /security/users — List security users
+ * Spec ref: operationId api.controllers.security_controller.get_users
+ */
+export const SECURITY_USERS_CONFIG: EndpointParamConfig = {
+  endpoint: "/security/users",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+    user_ids: {
+      wazuhName: "user_ids",
+      description: "List of user IDs to filter (comma-separated)",
+      type: "csv",
+    },
+  },
+};
+
+/**
+ * GET /cluster/{node_id}/configuration — Cluster node configuration
+ * Spec ref: operationId api.controllers.cluster_controller.get_node_config
+ * Mirrors MANAGER_CONFIG pattern.
+ */
+export const CLUSTER_NODE_CONFIGURATION_CONFIG: EndpointParamConfig = {
+  endpoint: "/cluster/{node_id}/configuration",
+  params: {
+    section: {
+      wazuhName: "section",
+      description: "Return the configuration of the specified section",
+      type: "string",
+    },
+    field: {
+      wazuhName: "field",
+      description: "Return the configuration of the specified field inside the section",
+      type: "string",
+    },
+    raw: {
+      wazuhName: "raw",
+      description: "Return raw configuration file",
+      type: "boolean",
+    },
+  },
+};
+
+/**
+ * GET /cluster/{node_id}/logs — Cluster node logs
+ * Spec ref: operationId api.controllers.cluster_controller.get_log_node
+ */
+export const CLUSTER_NODE_LOGS_CONFIG: EndpointParamConfig = {
+  endpoint: "/cluster/{node_id}/logs",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    q: UNIVERSAL_PARAMS.q,
+    tag: {
+      wazuhName: "tag",
+      description: "Filter by daemon tag (e.g. wazuh-modulesd)",
+      type: "string",
+    },
+    level: {
+      wazuhName: "level",
+      description: "Filter by log level (info, error, warning, debug)",
+      type: "string",
+    },
+  },
+};
+
+/**
+ * GET /tasks/status — Task status
+ * Spec ref: operationId api.controllers.task_controller.get_tasks_status
+ */
+export const TASKS_STATUS_CONFIG: EndpointParamConfig = {
+  endpoint: "/tasks/status",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    task_list: {
+      wazuhName: "task_list",
+      description: "List of task IDs to filter (comma-separated)",
+      type: "csv",
+    },
     agents_list: {
       wazuhName: "agents_list",
-      description: "Comma-separated list of agent IDs to filter",
+      description: "List of agent IDs to filter (comma-separated)",
       type: "csv",
-      aliases: ["agent_list"],
     },
-    // Endpoint-specific field filters
-    vendor: {
-      wazuhName: "vendor",
-      description: "Filter by package vendor",
+    command: {
+      wazuhName: "command",
+      description: "Filter by command type",
       type: "string",
     },
-    name: {
-      wazuhName: "name",
-      description: "Filter by package name",
+    node: {
+      wazuhName: "node",
+      description: "Filter by node name",
       type: "string",
+    },
+    module: {
+      wazuhName: "module",
+      description: "Filter by module",
+      type: "string",
+    },
+    status: {
+      wazuhName: "status",
+      description: "Filter by task status (in_progress, done, failed, cancelled)",
+      type: "string",
+    },
+  },
+};
+
+/**
+ * GET /security/rules — List RBAC security rules
+ * Spec ref: operationId api.controllers.security_controller.get_rules
+ */
+export const SECURITY_RBAC_RULES_CONFIG: EndpointParamConfig = {
+  endpoint: "/security/rules",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    rule_ids: {
+      wazuhName: "rule_ids",
+      description: "List of rule IDs to filter (comma-separated)",
+      type: "csv",
+    },
+  },
+};
+
+/**
+ * GET /decoders/parents — List parent decoders
+ * Spec ref: operationId api.controllers.decoder_controller.get_parent_decoders
+ */
+export const DECODER_PARENTS_CONFIG: EndpointParamConfig = {
+  endpoint: "/decoders/parents",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
+  },
+};
+
+/**
+ * GET /syscollector/{agent_id}/os — Agent OS information
+ * Spec ref: operationId api.controllers.syscollector_controller.get_os_info
+ */
+export const SYSCOLLECTOR_OS_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/os",
+  params: {
+    select: UNIVERSAL_PARAMS.select,
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
+  },
+};
+
+/**
+ * GET /syscollector/{agent_id}/hardware — Agent hardware information
+ * Spec ref: operationId api.controllers.syscollector_controller.get_hardware_info
+ */
+export const SYSCOLLECTOR_HARDWARE_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/hardware",
+  params: {
+    select: UNIVERSAL_PARAMS.select,
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
+    },
+  },
+};
+
+/**
+ * GET /agents/outdated — Outdated agents
+ * Spec ref: operationId api.controllers.agent_controller.get_agent_outdated
+ */
+export const AGENTS_OUTDATED_CONFIG: EndpointParamConfig = {
+  endpoint: "/agents/outdated",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+  },
+};
+
+/**
+ * GET /agents/no_group — Agents with no group
+ * Spec ref: operationId api.controllers.agent_controller.get_agent_no_group
+ */
+export const AGENTS_NO_GROUP_CONFIG: EndpointParamConfig = {
+  endpoint: "/agents/no_group",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+  },
+};
+
+/**
+ * GET /agents/stats/distinct — Agent stats distinct
+ * Spec ref: operationId api.controllers.agent_controller.get_agent_fields
+ */
+export const AGENTS_STATS_DISTINCT_CONFIG: EndpointParamConfig = {
+  endpoint: "/agents/stats/distinct",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    q: UNIVERSAL_PARAMS.q,
+    fields: {
+      wazuhName: "fields",
+      description: "List of fields to return distinct values for (comma-separated)",
+      type: "csv",
+    },
+  },
+};
+
+/**
+ * GET /syscollector/{agent_id}/browser_extensions — Browser extensions
+ * Spec ref: operationId api.controllers.syscollector_controller.get_browser_extensions
+ */
+export const SYSCOLLECTOR_BROWSER_EXTENSIONS_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/browser_extensions",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+  },
+};
+
+/**
+ * GET /syscollector/{agent_id}/users — Local users
+ * Spec ref: operationId api.controllers.syscollector_controller.get_users
+ */
+export const SYSCOLLECTOR_USERS_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/users",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+  },
+};
+
+/**
+ * GET /syscollector/{agent_id}/groups — Local groups
+ * Spec ref: operationId api.controllers.syscollector_controller.get_groups
+ */
+export const SYSCOLLECTOR_GROUPS_CONFIG: EndpointParamConfig = {
+  endpoint: "/syscollector/{agent_id}/groups",
+  params: {
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
+  },
+};
+
+export const EXP_SYSCOLLECTOR_NETIFACE_CONFIG = deriveExpConfig(
+  SYSCOLLECTOR_NETIFACE_CONFIG,
+  "/experimental/syscollector/netiface"
+);
+
+export const EXP_SYSCOLLECTOR_NETADDR_CONFIG = deriveExpConfig(
+  SYSCOLLECTOR_NETADDR_CONFIG,
+  "/experimental/syscollector/netaddr"
+);
+
+export const EXP_SYSCOLLECTOR_NETPROTO_CONFIG = deriveExpConfig(
+  SYSCOLLECTOR_NETPROTO_CONFIG,
+  "/experimental/syscollector/netproto"
+);
+
+/**
+ * GET /experimental/syscollector/os — All OS info (cross-agent)
+ * Spec ref: operationId api.controllers.experimental_controller.get_os_info
+ */
+export const EXP_SYSCOLLECTOR_OS_CONFIG: EndpointParamConfig = {
+  endpoint: "/experimental/syscollector/os",
+  params: {
+    // Universal params (no q/distinct per spec v4.14.3)
+    offset: UNIVERSAL_PARAMS.offset,
+    limit: UNIVERSAL_PARAMS.limit,
+    sort: UNIVERSAL_PARAMS.sort,
+    search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    agents_list: {
+      wazuhName: "agents_list",
+      description: "List of agent IDs (comma-separated)",
+      type: "csv",
+    },
+    // Endpoint-specific field filters (spec v4.14.3)
+    "os.name": {
+      wazuhName: "os.name",
+      description: "Filter by OS name",
+      type: "string",
+      aliases: ["osName"],
+    },
+    "os.version": {
+      wazuhName: "os.version",
+      description: "Filter by OS version",
+      type: "string",
+      aliases: ["osVersion"],
     },
     architecture: {
       wazuhName: "architecture",
-      description: "Filter by package architecture (e.g. x86_64, amd64)",
-      type: "string",
-    },
-    format: {
-      wazuhName: "format",
-      description: "Filter by package format (e.g. rpm, deb)",
+      description: "Filter by architecture",
       type: "string",
     },
     version: {
       wazuhName: "version",
-      description: "Filter by package version",
+      description: "Filter by Wazuh agent version",
       type: "string",
+    },
+    release: {
+      wazuhName: "release",
+      description: "Filter by OS release",
+      type: "string",
+    },
+    wait_for_complete: {
+      type: "boolean",
+      wazuhName: "wait_for_complete",
+      description: "Wait for cluster synchronization",
     },
   },
 };
 
 /**
- * GET /experimental/syscollector/processes — Cross-agent processes
- * Spec ref: operationId api.controllers.experimental_controller.get_processes_info
- *
- * Mirrors SYSCOLLECTOR_PROCESSES_CONFIG + agents_list for cross-agent queries.
+ * GET /experimental/syscollector/hardware — All hardware info (cross-agent)
+ * Spec ref: operationId api.controllers.experimental_controller.get_hardware_info
  */
-export const EXP_SYSCOLLECTOR_PROCESSES_CONFIG: EndpointParamConfig = {
-  endpoint: "/experimental/syscollector/processes",
+export const EXP_SYSCOLLECTOR_HARDWARE_CONFIG: EndpointParamConfig = {
+  endpoint: "/experimental/syscollector/hardware",
   params: {
-    // Universal params
+    // Universal params (no q/distinct per spec v4.14.3)
     offset: UNIVERSAL_PARAMS.offset,
     limit: UNIVERSAL_PARAMS.limit,
     sort: UNIVERSAL_PARAMS.sort,
     search: UNIVERSAL_PARAMS.search,
     select: UNIVERSAL_PARAMS.select,
-    q: UNIVERSAL_PARAMS.q,
-    distinct: UNIVERSAL_PARAMS.distinct,
-    // Cross-agent filter
     agents_list: {
       wazuhName: "agents_list",
-      description: "Comma-separated list of agent IDs to filter",
+      description: "List of agent IDs (comma-separated)",
       type: "csv",
-      aliases: ["agent_list"],
     },
-    // Endpoint-specific field filters
-    pid: {
-      wazuhName: "pid",
-      description: "Filter by process PID",
+    // Endpoint-specific field filters (spec v4.14.3)
+    board_serial: {
+      wazuhName: "board_serial",
+      description: "Filter by board serial number",
       type: "string",
-      aliases: ["process_pid"],
+      aliases: ["boardSerial"],
     },
-    state: {
-      wazuhName: "state",
-      description: "Filter by process state (e.g. S, R, Z)",
+    "cpu.name": {
+      wazuhName: "cpu.name",
+      description: "Filter by CPU name",
       type: "string",
-      aliases: ["process_state"],
+      aliases: ["cpuName"],
     },
-    ppid: {
-      wazuhName: "ppid",
-      description: "Filter by parent process PID",
+    "cpu.cores": {
+      wazuhName: "cpu.cores",
+      description: "Filter by number of CPU cores",
       type: "string",
+      aliases: ["cpuCores"],
     },
-    egroup: {
-      wazuhName: "egroup",
-      description: "Filter by effective group",
+    "cpu.mhz": {
+      wazuhName: "cpu.mhz",
+      description: "Filter by CPU frequency (MHz)",
       type: "string",
+      aliases: ["cpuMhz"],
     },
-    euser: {
-      wazuhName: "euser",
-      description: "Filter by effective user",
+    "ram.free": {
+      wazuhName: "ram.free",
+      description: "Filter by free RAM",
       type: "string",
+      aliases: ["ramFree"],
     },
-    fgroup: {
-      wazuhName: "fgroup",
-      description: "Filter by filesystem group",
+    "ram.total": {
+      wazuhName: "ram.total",
+      description: "Filter by total RAM",
       type: "string",
+      aliases: ["ramTotal"],
     },
-    name: {
-      wazuhName: "name",
-      description: "Filter by process name",
-      type: "string",
-      aliases: ["process_name"],
+    wait_for_complete: {
+      type: "boolean",
+      wazuhName: "wait_for_complete",
+      description: "Wait for cluster synchronization",
     },
-    nlwp: {
-      wazuhName: "nlwp",
-      description: "Filter by number of lightweight processes (threads)",
-      type: "string",
+  },
+};
+
+export const EXP_SYSCOLLECTOR_HOTFIXES_CONFIG = deriveExpConfig(
+  SYSCOLLECTOR_HOTFIXES_CONFIG,
+  "/experimental/syscollector/hotfixes"
+);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PROMOTION SPRINT — Manual → Broker wiring (2026-03-10)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /decoders/files/{filename} — Decoder file content
+ * Spec ref: operationId api.controllers.decoder_controller.get_file
+ * Note: filename is a path param, not forwarded as a query param.
+ */
+export const DECODER_FILE_CONTENT_CONFIG: EndpointParamConfig = {
+  endpoint: "/decoders/files/{filename}",
+  params: {
+    raw: {
+      type: "boolean",
+      wazuhName: "raw",
+      description: "Return file contents in raw plain text format",
     },
-    pgrp: {
-      wazuhName: "pgrp",
-      description: "Filter by process group ID",
+    relative_dirname: {
       type: "string",
+      wazuhName: "relative_dirname",
+      description: "Filter by relative directory path of the decoder file",
     },
-    priority: {
-      wazuhName: "priority",
-      description: "Filter by scheduling priority",
-      type: "string",
-    },
-    rgroup: {
-      wazuhName: "rgroup",
-      description: "Filter by real group",
-      type: "string",
-    },
-    ruser: {
-      wazuhName: "ruser",
-      description: "Filter by real user",
-      type: "string",
-    },
-    sgroup: {
-      wazuhName: "sgroup",
-      description: "Filter by saved group",
-      type: "string",
-    },
-    suser: {
-      wazuhName: "suser",
-      description: "Filter by saved user",
-      type: "string",
+    wait_for_complete: {
+      type: "boolean",
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
 
 /**
- * GET /experimental/syscollector/ports — Cross-agent ports
- * Spec ref: operationId api.controllers.experimental_controller.get_ports_info
- *
- * Mirrors SYSCOLLECTOR_PORTS_CONFIG + agents_list for cross-agent queries.
+ * GET /security/config — Security configuration (token TTL, RBAC mode)
+ * Spec ref: operationId api.controllers.security_controller.get_security_config
  */
-export const EXP_SYSCOLLECTOR_PORTS_CONFIG: EndpointParamConfig = {
-  endpoint: "/experimental/syscollector/ports",
+export const SECURITY_CONFIG_CONFIG: EndpointParamConfig = {
+  endpoint: "/security/config",
   params: {
-    // Universal params
-    offset: UNIVERSAL_PARAMS.offset,
-    limit: UNIVERSAL_PARAMS.limit,
-    sort: UNIVERSAL_PARAMS.sort,
-    search: UNIVERSAL_PARAMS.search,
-    select: UNIVERSAL_PARAMS.select,
-    q: UNIVERSAL_PARAMS.q,
-    distinct: UNIVERSAL_PARAMS.distinct,
-    // Cross-agent filter
-    agents_list: {
-      wazuhName: "agents_list",
-      description: "Comma-separated list of agent IDs to filter",
-      type: "csv",
-      aliases: ["agent_list"],
+    wait_for_complete: {
+      type: "boolean",
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
-    // Endpoint-specific field filters
-    pid: {
-      wazuhName: "pid",
-      description: "Filter by PID",
-      type: "string",
+  },
+};
+
+/**
+ * GET /security/users/me — Current authenticated user info
+ * Spec ref: operationId api.controllers.security_controller.get_user_me
+ */
+export const SECURITY_CURRENT_USER_CONFIG: EndpointParamConfig = {
+  endpoint: "/security/users/me",
+  params: {
+    wait_for_complete: {
+      type: "boolean",
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
-    protocol: {
-      wazuhName: "protocol",
-      description: "Filter by protocol (e.g. tcp, udp)",
+  },
+};
+
+/**
+ * GET /security/actions — List all RBAC actions
+ * Spec ref: operationId api.controllers.security_controller.get_rbac_actions
+ */
+export const SECURITY_ACTIONS_CONFIG: EndpointParamConfig = {
+  endpoint: "/security/actions",
+  params: {
+    endpoint: {
       type: "string",
-    },
-    "local.ip": {
-      wazuhName: "local.ip",
-      description: "Filter by local IP address",
-      type: "string",
-      aliases: ["local_ip"],
-    },
-    "local.port": {
-      wazuhName: "local.port",
-      description: "Filter by local port number",
-      type: "string",
-      aliases: ["local_port"],
-    },
-    "remote.ip": {
-      wazuhName: "remote.ip",
-      description: "Filter by remote IP address",
-      type: "string",
-      aliases: ["remote_ip"],
-    },
-    tx_queue: {
-      wazuhName: "tx_queue",
-      description: "Filter by TX queue",
-      type: "string",
-    },
-    state: {
-      wazuhName: "state",
-      description: "Filter by connection state (e.g. listening, established)",
-      type: "string",
-    },
-    process: {
-      wazuhName: "process",
-      description: "Filter by process name associated with port",
-      type: "string",
+      wazuhName: "endpoint",
+      description: "Filter actions by API endpoint path",
     },
   },
 };

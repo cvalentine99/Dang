@@ -31,8 +31,15 @@ import {
   Database,
   Users,
   User,
+  Filter,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { SimplePagination } from "@/components/shared/SimplePagination";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -153,17 +160,86 @@ export default function SecurityExplorer() {
   const [search, setSearch] = useState("");
   const utils = trpc.useUtils();
 
+  // ── Pagination state per tab ──
+  const [rolesPage, setRolesPage] = useState(0);
+  const [policiesPage, setPoliciesPage] = useState(0);
+  const [usersPage, setUsersPage] = useState(0);
+  const pageSize = 25;
+
+  // ── Sort state ──
+  const [rolesSort, setRolesSort] = useState("");
+  const [policiesSort, setPoliciesSort] = useState("");
+  const [usersSort, setUsersSort] = useState("");
+
+  // ── Server search (debounced) ──
+  const [serverSearch, setServerSearch] = useState("");
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setServerSearch(value);
+      setRolesPage(0);
+      setPoliciesPage(0);
+      setUsersPage(0);
+    }, 300);
+  }, []);
+
+  // ── Detail selection state ──
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedPolicyId, setSelectedPolicyId] = useState<number | null>(null);
+  const [selectedRuleId, setSelectedRuleId] = useState<number | null>(null);
+
+  // ── Actions endpoint filter ──
+  const [actionsEndpointFilter, setActionsEndpointFilter] = useState("");
+
   const statusQ = trpc.wazuh.status.useQuery(undefined, { retry: 1, staleTime: 60_000 });
   const isConnected = statusQ.data?.configured === true && statusQ.data?.data != null;
 
   const rulesQ = trpc.wazuh.securityRbacRules.useQuery({ limit: 500, offset: 0 }, { retry: 1, staleTime: 60_000, enabled: isConnected });
-  const actionsQ = trpc.wazuh.securityActions.useQuery({}, { retry: 1, staleTime: 60_000, enabled: isConnected });
+  const actionsQ = trpc.wazuh.securityActions.useQuery(
+    {
+      ...(actionsEndpointFilter ? { endpoint: actionsEndpointFilter } : {}),
+    },
+    { retry: 1, staleTime: 60_000, enabled: isConnected }
+  );
   const resourcesQ = trpc.wazuh.securityResources.useQuery({}, { retry: 1, staleTime: 60_000, enabled: isConnected });
   const policiesQ = trpc.wazuh.securityCurrentUserPolicies.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
-  const securityRolesQ = trpc.wazuh.securityRoles.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
-  const securityUsersQ = trpc.wazuh.securityUsers.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
-  const securityPoliciesQ = trpc.wazuh.securityPolicies.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
+  const securityRolesQ = trpc.wazuh.securityRoles.useQuery(
+    {
+      offset: rolesPage * pageSize,
+      limit: pageSize,
+      ...(serverSearch ? { search: serverSearch } : {}),
+      ...(rolesSort ? { sort: rolesSort } : {}),
+    },
+    { retry: 1, staleTime: 60_000, enabled: isConnected }
+  );
+  const securityUsersQ = trpc.wazuh.securityUsers.useQuery(
+    {
+      offset: usersPage * pageSize,
+      limit: pageSize,
+      ...(serverSearch ? { search: serverSearch } : {}),
+      ...(usersSort ? { sort: usersSort } : {}),
+    },
+    { retry: 1, staleTime: 60_000, enabled: isConnected }
+  );
+  const securityPoliciesQ = trpc.wazuh.securityPolicies.useQuery(
+    {
+      offset: policiesPage * pageSize,
+      limit: pageSize,
+      ...(serverSearch ? { search: serverSearch } : {}),
+      ...(policiesSort ? { sort: policiesSort } : {}),
+    },
+    { retry: 1, staleTime: 60_000, enabled: isConnected }
+  );
   const securityCurrentUserQ = trpc.wazuh.securityCurrentUser.useQuery(undefined, { retry: 1, staleTime: 60_000, enabled: isConnected });
+
+  // ── Detail queries (by ID) ──
+  const roleDetailQ = trpc.wazuh.securityRoleById.useQuery({ roleId: selectedRoleId! }, { retry: 1, staleTime: 30_000, enabled: isConnected && selectedRoleId !== null });
+  const userDetailQ = trpc.wazuh.securityUserById.useQuery({ userId: selectedUserId! }, { retry: 1, staleTime: 30_000, enabled: isConnected && selectedUserId !== null });
+  const policyDetailQ = trpc.wazuh.securityPolicyById.useQuery({ policyId: selectedPolicyId! }, { retry: 1, staleTime: 30_000, enabled: isConnected && selectedPolicyId !== null });
+  const ruleDetailQ = trpc.wazuh.securityRuleById.useQuery({ ruleId: selectedRuleId! }, { retry: 1, staleTime: 30_000, enabled: isConnected && selectedRuleId !== null });
 
   const rulesData = useMemo(() => extractItems(rulesQ.data), [rulesQ.data]);
 
@@ -284,7 +360,7 @@ export default function SecurityExplorer() {
             <Input
               placeholder="Filter by keyword..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10 bg-secondary/20 border-border/30 text-sm"
             />
           </div>
@@ -344,7 +420,7 @@ export default function SecurityExplorer() {
                     </thead>
                     <tbody>
                       {filterItems(rulesData.items).map((rule, i) => (
-                        <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
+                        <tr key={i} className={`border-b border-border/10 hover:bg-secondary/20 transition-colors cursor-pointer ${selectedRuleId === Number(rule.id) ? "bg-primary/10" : ""}`} onClick={() => setSelectedRuleId(selectedRuleId === Number(rule.id) ? null : Number(rule.id))}>
                           <td className="py-2 px-3 font-mono text-primary">{String(rule.id ?? i)}</td>
                           <td className="py-2 px-3 text-foreground font-medium">{String(rule.name ?? "—")}</td>
                           <td className="py-2 px-3 font-mono text-muted-foreground max-w-[400px]">
@@ -370,6 +446,25 @@ export default function SecurityExplorer() {
                   )}
                 </div>
               )}
+              {selectedRuleId !== null && (
+                <div className="mt-3 pt-3 border-t border-border/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-medium text-primary flex items-center gap-1.5"><Shield className="h-3.5 w-3.5" /> Rule Detail — ID {selectedRuleId}</h4>
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setSelectedRuleId(null)}><X className="h-3 w-3 mr-1" /> Close</Button>
+                  </div>
+                  {ruleDetailQ.isLoading ? <TableSkeleton columns={2} rows={4} /> : ruleDetailQ.data ? (
+                    <div className="space-y-1">
+                      {Object.entries(extractItems(ruleDetailQ.data).items[0] ?? {}).map(([k, v]) => (
+                        <div key={k} className="flex items-start gap-3 py-1 border-b border-border/5">
+                          <span className="text-[10px] font-mono text-primary min-w-[120px] shrink-0">{k}</span>
+                          <span className="text-[10px] font-mono text-foreground break-all">{typeof v === "object" && v !== null ? JSON.stringify(v, null, 2) : String(v ?? "—")}</span>
+                        </div>
+                      ))}
+                      <RawJsonViewer data={ruleDetailQ.data as Record<string, unknown>} title={`Rule ${selectedRuleId} JSON`} />
+                    </div>
+                  ) : <p className="text-xs text-muted-foreground">No data</p>}
+                </div>
+              )}
             </GlassPanel>
           </TabsContent>
 
@@ -386,6 +481,20 @@ export default function SecurityExplorer() {
                   <Zap className="h-4 w-4 text-primary" /> Available Actions ({actionsData.total})
                 </h3>
                 {actionsQ.data ? <RawJsonViewer data={actionsQ.data as Record<string, unknown>} title="Actions JSON" /> : null}
+              </div>
+              <div className="flex items-center gap-2 mb-3">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Filter by endpoint..."
+                  value={actionsEndpointFilter}
+                  onChange={(e) => setActionsEndpointFilter(e.target.value)}
+                  className="h-7 w-48 text-xs bg-secondary/20 border-border/30"
+                />
+                {actionsEndpointFilter && (
+                  <button onClick={() => setActionsEndpointFilter("")} className="text-muted-foreground hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
               {actionsQ.isLoading ? <TableSkeleton columns={3} rows={8} /> : (
                 <div className="overflow-x-auto">
@@ -530,14 +639,15 @@ export default function SecurityExplorer() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-border/30">
-                        {["ID", "Name", "Policies", "Rules"].map(h => (
-                          <th key={h} className="text-left py-2 px-3 text-muted-foreground font-medium">{h}</th>
-                        ))}
+                        <SortableHeader label="ID" field="id" currentSort={rolesSort} onSort={(s) => { setRolesSort(s); setRolesPage(0); }} />
+                        <SortableHeader label="Name" field="name" currentSort={rolesSort} onSort={(s) => { setRolesSort(s); setRolesPage(0); }} />
+                        <th className="text-left py-2 px-3 text-muted-foreground font-medium">Policies</th>
+                        <th className="text-left py-2 px-3 text-muted-foreground font-medium">Rules</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filterItems(securityRolesData.items).map((role, i) => (
-                        <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
+                        <tr key={i} className={`border-b border-border/10 hover:bg-secondary/20 transition-colors cursor-pointer ${selectedRoleId === Number(role.id) ? "bg-primary/10" : ""}`} onClick={() => setSelectedRoleId(selectedRoleId === Number(role.id) ? null : Number(role.id))}>
                           <td className="py-2 px-3 font-mono text-primary">{String(role.id ?? i)}</td>
                           <td className="py-2 px-3 text-foreground font-medium">{String(role.name ?? "—")}</td>
                           <td className="py-2 px-3 text-muted-foreground">
@@ -564,6 +674,32 @@ export default function SecurityExplorer() {
                       No roles found
                     </div>
                   )}
+                  <SimplePagination
+                    page={rolesPage}
+                    totalPages={Math.max(1, Math.ceil(securityRolesData.total / pageSize))}
+                    total={securityRolesData.total}
+                    onPageChange={setRolesPage}
+                    label="roles"
+                  />
+                </div>
+              )}
+              {selectedRoleId !== null && (
+                <div className="mt-3 pt-3 border-t border-border/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-medium text-primary flex items-center gap-1.5"><Key className="h-3.5 w-3.5" /> Role Detail — ID {selectedRoleId}</h4>
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setSelectedRoleId(null)}><X className="h-3 w-3 mr-1" /> Close</Button>
+                  </div>
+                  {roleDetailQ.isLoading ? <TableSkeleton columns={2} rows={4} /> : roleDetailQ.data ? (
+                    <div className="space-y-1">
+                      {Object.entries(extractItems(roleDetailQ.data).items[0] ?? {}).map(([k, v]) => (
+                        <div key={k} className="flex items-start gap-3 py-1 border-b border-border/5">
+                          <span className="text-[10px] font-mono text-primary min-w-[120px] shrink-0">{k}</span>
+                          <span className="text-[10px] font-mono text-foreground break-all">{typeof v === "object" && v !== null ? JSON.stringify(v, null, 2) : String(v ?? "—")}</span>
+                        </div>
+                      ))}
+                      <RawJsonViewer data={roleDetailQ.data as Record<string, unknown>} title={`Role ${selectedRoleId} JSON`} />
+                    </div>
+                  ) : <p className="text-xs text-muted-foreground">No data</p>}
                 </div>
               )}
             </GlassPanel>
@@ -584,14 +720,15 @@ export default function SecurityExplorer() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-border/30">
-                        {["ID", "Username", "Roles", "Allow Run As"].map(h => (
-                          <th key={h} className="text-left py-2 px-3 text-muted-foreground font-medium">{h}</th>
-                        ))}
+                        <SortableHeader label="ID" field="id" currentSort={usersSort} onSort={(s) => { setUsersSort(s); setUsersPage(0); }} />
+                        <SortableHeader label="Username" field="username" currentSort={usersSort} onSort={(s) => { setUsersSort(s); setUsersPage(0); }} />
+                        <th className="text-left py-2 px-3 text-muted-foreground font-medium">Roles</th>
+                        <th className="text-left py-2 px-3 text-muted-foreground font-medium">Allow Run As</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filterItems(securityUsersData.items).map((user, i) => (
-                        <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
+                        <tr key={i} className={`border-b border-border/10 hover:bg-secondary/20 transition-colors cursor-pointer ${selectedUserId === Number(user.id) ? "bg-primary/10" : ""}`} onClick={() => setSelectedUserId(selectedUserId === Number(user.id) ? null : Number(user.id))}>
                           <td className="py-2 px-3 font-mono text-primary">{String(user.id ?? i)}</td>
                           <td className="py-2 px-3 text-foreground font-medium">{String(user.username ?? "—")}</td>
                           <td className="py-2 px-3 text-muted-foreground">
@@ -612,6 +749,32 @@ export default function SecurityExplorer() {
                       No users found
                     </div>
                   )}
+                  <SimplePagination
+                    page={usersPage}
+                    totalPages={Math.max(1, Math.ceil(securityUsersData.total / pageSize))}
+                    total={securityUsersData.total}
+                    onPageChange={setUsersPage}
+                    label="users"
+                  />
+                </div>
+              )}
+              {selectedUserId !== null && (
+                <div className="mt-3 pt-3 border-t border-border/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-medium text-primary flex items-center gap-1.5"><User className="h-3.5 w-3.5" /> User Detail — ID {selectedUserId}</h4>
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setSelectedUserId(null)}><X className="h-3 w-3 mr-1" /> Close</Button>
+                  </div>
+                  {userDetailQ.isLoading ? <TableSkeleton columns={2} rows={4} /> : userDetailQ.data ? (
+                    <div className="space-y-1">
+                      {Object.entries(extractItems(userDetailQ.data).items[0] ?? {}).map(([k, v]) => (
+                        <div key={k} className="flex items-start gap-3 py-1 border-b border-border/5">
+                          <span className="text-[10px] font-mono text-primary min-w-[120px] shrink-0">{k}</span>
+                          <span className="text-[10px] font-mono text-foreground break-all">{typeof v === "object" && v !== null ? JSON.stringify(v, null, 2) : String(v ?? "—")}</span>
+                        </div>
+                      ))}
+                      <RawJsonViewer data={userDetailQ.data as Record<string, unknown>} title={`User ${selectedUserId} JSON`} />
+                    </div>
+                  ) : <p className="text-xs text-muted-foreground">No data</p>}
                 </div>
               )}
             </GlassPanel>
@@ -632,14 +795,15 @@ export default function SecurityExplorer() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-border/30">
-                        {["ID", "Name", "Policy", "Roles"].map(h => (
-                          <th key={h} className="text-left py-2 px-3 text-muted-foreground font-medium">{h}</th>
-                        ))}
+                        <SortableHeader label="ID" field="id" currentSort={policiesSort} onSort={(s) => { setPoliciesSort(s); setPoliciesPage(0); }} />
+                        <SortableHeader label="Name" field="name" currentSort={policiesSort} onSort={(s) => { setPoliciesSort(s); setPoliciesPage(0); }} />
+                        <th className="text-left py-2 px-3 text-muted-foreground font-medium">Policy</th>
+                        <th className="text-left py-2 px-3 text-muted-foreground font-medium">Roles</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filterItems(securityPoliciesData.items).map((pol, i) => (
-                        <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
+                        <tr key={i} className={`border-b border-border/10 hover:bg-secondary/20 transition-colors cursor-pointer ${selectedPolicyId === Number(pol.id) ? "bg-primary/10" : ""}`} onClick={() => setSelectedPolicyId(selectedPolicyId === Number(pol.id) ? null : Number(pol.id))}>
                           <td className="py-2 px-3 font-mono text-primary">{String(pol.id ?? i)}</td>
                           <td className="py-2 px-3 text-foreground font-medium">{String(pol.name ?? "—")}</td>
                           <td className="py-2 px-3 font-mono text-muted-foreground max-w-[400px]">
@@ -662,6 +826,32 @@ export default function SecurityExplorer() {
                       No policies found
                     </div>
                   )}
+                  <SimplePagination
+                    page={policiesPage}
+                    totalPages={Math.max(1, Math.ceil(securityPoliciesData.total / pageSize))}
+                    total={securityPoliciesData.total}
+                    onPageChange={setPoliciesPage}
+                    label="policies"
+                  />
+                </div>
+              )}
+              {selectedPolicyId !== null && (
+                <div className="mt-3 pt-3 border-t border-border/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-medium text-primary flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" /> Policy Detail — ID {selectedPolicyId}</h4>
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setSelectedPolicyId(null)}><X className="h-3 w-3 mr-1" /> Close</Button>
+                  </div>
+                  {policyDetailQ.isLoading ? <TableSkeleton columns={2} rows={4} /> : policyDetailQ.data ? (
+                    <div className="space-y-1">
+                      {Object.entries(extractItems(policyDetailQ.data).items[0] ?? {}).map(([k, v]) => (
+                        <div key={k} className="flex items-start gap-3 py-1 border-b border-border/5">
+                          <span className="text-[10px] font-mono text-primary min-w-[120px] shrink-0">{k}</span>
+                          <span className="text-[10px] font-mono text-foreground break-all">{typeof v === "object" && v !== null ? JSON.stringify(v, null, 2) : String(v ?? "—")}</span>
+                        </div>
+                      ))}
+                      <RawJsonViewer data={policyDetailQ.data as Record<string, unknown>} title={`Policy ${selectedPolicyId} JSON`} />
+                    </div>
+                  ) : <p className="text-xs text-muted-foreground">No data</p>}
                 </div>
               )}
             </GlassPanel>

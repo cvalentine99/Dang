@@ -109,6 +109,11 @@ function extractItems(raw: unknown): Array<Record<string, unknown>> {
   return (d?.affected_items as Array<Record<string, unknown>>) ?? [];
 }
 
+function extractTotal(raw: unknown): number {
+  const d = (raw as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  return Number(d?.total_affected_items ?? 0);
+}
+
 /* ── Compliance Posture Meter (compact radial) ── */
 function PostureMeter({ score }: { score: number }) {
   const data = [{ name: "score", value: score, fill: score >= 80 ? COLORS.green : score >= 60 ? COLORS.yellow : COLORS.red }];
@@ -142,6 +147,13 @@ export default function Compliance() {
   const [selectedFramework, setSelectedFramework] = useState<"pci_dss" | "nist_800_53" | "hipaa" | "gdpr" | "tsc">("pci_dss");
   const [timeRange, setTimeRange] = useState("24h");
 
+  // CIS-CAT state
+  const [ciscatBenchmark, setCiscatBenchmark] = useState("");
+  const [ciscatProfile, setCiscatProfile] = useState("");
+  const [ciscatSearch, setCiscatSearch] = useState("");
+  const [ciscatPage, setCiscatPage] = useState(0);
+  const ciscatPageSize = 25;
+
   const statusQ = trpc.wazuh.status.useQuery(undefined, { retry: 1, staleTime: 60_000 });
   const isConnected = statusQ.data?.configured === true && statusQ.data?.data != null;
 
@@ -171,6 +183,18 @@ export default function Compliance() {
   const complianceQ = trpc.indexer.alertsComplianceAgg.useQuery(
     { framework: selectedFramework, from: complianceTimeWindow.from, to: complianceTimeWindow.to },
     { retry: 1, staleTime: 60_000, enabled: indexerHealthy }
+  );
+
+  // CIS-CAT experimental query
+  const ciscatQ = trpc.wazuh.expCiscatResults.useQuery(
+    {
+      limit: ciscatPageSize,
+      offset: ciscatPage * ciscatPageSize,
+      ...(ciscatBenchmark ? { benchmark: ciscatBenchmark } : {}),
+      ...(ciscatProfile ? { profile: ciscatProfile } : {}),
+      ...(ciscatSearch ? { search: ciscatSearch } : {}),
+    },
+    { retry: 1, staleTime: 30_000, enabled: isConnected }
   );
 
   const handleRefresh = useCallback(() => { utils.wazuh.invalidate(); utils.indexer.invalidate(); }, [utils]);
@@ -285,6 +309,9 @@ export default function Compliance() {
             </TabsTrigger>
             <TabsTrigger value="policies" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Policies</TabsTrigger>
             <TabsTrigger value="checks" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Checks</TabsTrigger>
+            <TabsTrigger value="ciscat" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+              <ShieldCheck className="h-3 w-3 mr-1" /> CIS-CAT
+            </TabsTrigger>
           </TabsList>
 
           {/* ── Overview Tab ─────────────────────────────────────────────── */}
@@ -713,6 +740,79 @@ export default function Compliance() {
                   ) : null}
                 </>
               )}
+            </GlassPanel>
+          </TabsContent>
+
+          {/* ── CIS-CAT Tab ─────────────────────────────────────────────── */}
+          <TabsContent value="ciscat" className="space-y-4 mt-4">
+            <GlassPanel>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-primary" /> CIS-CAT Benchmark Results
+                </h3>
+                <SourceBadge source="server" />
+              </div>
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <div className="flex items-center gap-1.5">
+                  <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                  <Input placeholder="Search..." value={ciscatSearch} onChange={(e) => { setCiscatSearch(e.target.value); setCiscatPage(0); }} className="w-40 h-7 text-xs bg-secondary/20 border-border/30" />
+                </div>
+                <Input placeholder="Benchmark filter..." value={ciscatBenchmark} onChange={(e) => { setCiscatBenchmark(e.target.value); setCiscatPage(0); }} className="w-44 h-7 text-xs bg-secondary/20 border-border/30" />
+                <Input placeholder="Profile filter..." value={ciscatProfile} onChange={(e) => { setCiscatProfile(e.target.value); setCiscatPage(0); }} className="w-44 h-7 text-xs bg-secondary/20 border-border/30" />
+              </div>
+              {ciscatQ.isLoading ? <TableSkeleton columns={9} rows={6} /> : (() => {
+                const items = extractItems(ciscatQ.data);
+                const total = extractTotal(ciscatQ.data);
+                return items.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">No CIS-CAT results found. CIS-CAT benchmarks may not be configured on your agents.</div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[11px]">
+                        <thead><tr className="border-b border-border/20 text-muted-foreground">
+                          <th className="text-left py-1.5 px-2 font-medium">Agent</th>
+                          <th className="text-left py-1.5 px-2 font-medium">Benchmark</th>
+                          <th className="text-left py-1.5 px-2 font-medium">Profile</th>
+                          <th className="text-right py-1.5 px-2 font-medium text-threat-low">Pass</th>
+                          <th className="text-right py-1.5 px-2 font-medium text-threat-critical">Fail</th>
+                          <th className="text-right py-1.5 px-2 font-medium text-threat-high">Error</th>
+                          <th className="text-right py-1.5 px-2 font-medium text-muted-foreground">Not Checked</th>
+                          <th className="text-right py-1.5 px-2 font-medium text-muted-foreground">Unknown</th>
+                          <th className="text-right py-1.5 px-2 font-medium">Score</th>
+                        </tr></thead>
+                        <tbody>
+                          {items.map((row, i) => {
+                            const score = Number(row.score ?? 0);
+                            const scoreColor = score >= 90 ? "text-threat-low" : score >= 70 ? "text-threat-medium" : "text-threat-critical";
+                            return (
+                              <tr key={i} className="border-b border-border/5 hover:bg-secondary/10 transition-colors">
+                                <td className="py-1.5 px-2 font-mono text-primary">{String(row.agent_id ?? "—")}</td>
+                                <td className="py-1.5 px-2 text-foreground max-w-[200px] truncate" title={String(row.benchmark ?? "")}>{String(row.benchmark ?? "—")}</td>
+                                <td className="py-1.5 px-2 text-foreground max-w-[200px] truncate" title={String(row.profile ?? "")}>{String(row.profile ?? "—")}</td>
+                                <td className="py-1.5 px-2 text-right font-mono text-threat-low">{Number(row.pass ?? 0)}</td>
+                                <td className="py-1.5 px-2 text-right font-mono text-threat-critical">{Number(row.fail ?? 0)}</td>
+                                <td className="py-1.5 px-2 text-right font-mono text-threat-high">{Number(row.error ?? 0)}</td>
+                                <td className="py-1.5 px-2 text-right font-mono text-muted-foreground">{Number(row.notchecked ?? 0)}</td>
+                                <td className="py-1.5 px-2 text-right font-mono text-muted-foreground">{Number(row.unknown ?? 0)}</td>
+                                <td className={`py-1.5 px-2 text-right font-mono font-bold ${scoreColor}`}>{score}%</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/10">
+                      <p className="text-[10px] text-muted-foreground">{total} result{total !== 1 ? "s" : ""}</p>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" disabled={ciscatPage === 0} onClick={() => setCiscatPage(p => p - 1)}><ChevronLeft className="h-3 w-3" /></Button>
+                        <span className="text-[10px] text-muted-foreground px-2">Page {ciscatPage + 1} of {Math.max(1, Math.ceil(total / ciscatPageSize))}</span>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" disabled={(ciscatPage + 1) * ciscatPageSize >= total} onClick={() => setCiscatPage(p => p + 1)}><ChevronRight className="h-3 w-3" /></Button>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+              {ciscatQ.data != null ? <div className="mt-2"><RawJsonViewer data={ciscatQ.data as Record<string, unknown>} title="CIS-CAT Results JSON" /></div> : null}
             </GlassPanel>
           </TabsContent>
         </Tabs>

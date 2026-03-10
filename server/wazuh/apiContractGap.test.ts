@@ -58,17 +58,17 @@ describe("C-2: /tasks/status accepts all 12+ spec params", () => {
   });
 });
 
-describe("C-3: ROOTCHECK_CONFIG has no pci_dss or cis", () => {
-  it("should not forward pci_dss", () => {
+describe("C-3: ROOTCHECK_CONFIG — pci_dss and cis restored per spec v4.14.3", () => {
+  it("should forward pci_dss (restored per spec v4.14.3)", () => {
     const result = brokerParams(ROOTCHECK_CONFIG, { pci_dss: "11.5" });
-    expect(result.unsupportedParams).toContain("pci_dss");
-    expect(result.forwardedQuery).not.toHaveProperty("pci_dss");
+    expect(result.unsupportedParams).not.toContain("pci_dss");
+    expect(result.forwardedQuery).toHaveProperty("pci_dss", "11.5");
   });
 
-  it("should not forward cis", () => {
+  it("should forward cis (restored per spec v4.14.3)", () => {
     const result = brokerParams(ROOTCHECK_CONFIG, { cis: "1.1.1" });
-    expect(result.unsupportedParams).toContain("cis");
-    expect(result.forwardedQuery).not.toHaveProperty("cis");
+    expect(result.unsupportedParams).not.toContain("cis");
+    expect(result.forwardedQuery).toHaveProperty("cis", "1.1.1");
   });
 
   it("should still forward valid rootcheck params", () => {
@@ -294,9 +294,12 @@ describe("M-1 through M-18: Router input schemas accept expanded params", () => 
 
   it("M-3: agentsStatsDistinct accepts offset, limit, sort, search, q", () => {
     const block = extractProcedureBlock(src, "agentsStatsDistinct");
-    for (const p of ["sort", "search", "q", "limit", "offset"]) {
+    for (const p of ["sort", "search", "q"]) {
       expect(block).toContain(p);
     }
+    // limit/offset may be provided via paginationSchema.shape spread
+    const hasPagination = block.includes("limit") || block.includes("paginationSchema");
+    expect(hasPagination).toBe(true);
   });
 
   it("M-4: agentDaemonStats accepts daemons_list", () => {
@@ -410,10 +413,11 @@ describe("L-1 through L-6: Low findings structural verification", () => {
     expect(block).toContain("get_dirnames_path");
   });
 
-  it("L-2: decoderFileContent accepts raw, get_dirnames_path", () => {
+  it("L-2: decoderFileContent accepts raw, relative_dirname (broker-wired via DECODER_FILE_CONTENT_CONFIG)", () => {
     const block = extractProcedureBlock(src, "decoderFileContent");
     expect(block).toContain("raw");
-    expect(block).toContain("get_dirnames_path");
+    expect(block).toContain("relative_dirname");
+    expect(block).toContain("DECODER_FILE_CONTENT_CONFIG");
   });
 
   it("L-3: listsFileContent accepts raw", () => {

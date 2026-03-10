@@ -28,7 +28,13 @@ import {
   ShieldCheck,
   GitBranch,
   type LucideIcon,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { TableSkeleton } from "@/components/shared/TableSkeleton";
 
 // ── Auto-Refresh Intervals ──────────────────────────────────────────────────
 
@@ -547,10 +553,20 @@ function WazuhApiIntelligence() {
     retry: 1,
   });
 
-  const managerStatsQ = trpc.wazuh.managerStats.useQuery(undefined, {
-    staleTime: 60_000,
-    retry: 1,
-  });
+  // Manager stats date picker
+  const [statsDate, setStatsDate] = useState("");
+
+  // Task status filters
+  const [taskPage, setTaskPage] = useState(0);
+  const [taskStatusFilter, setTaskStatusFilter] = useState("");
+  const [taskModule, setTaskModule] = useState("");
+  const [taskSearch, setTaskSearch] = useState("");
+  const taskPageSize = 25;
+
+  const managerStatsQ = trpc.wazuh.managerStats.useQuery(
+    statsDate ? { date: statsDate } : undefined,
+    { staleTime: 60_000, retry: 1 }
+  );
 
   const isConfiguredQ = trpc.wazuh.isConfigured.useQuery(undefined, {
     staleTime: 60_000,
@@ -559,6 +575,8 @@ function WazuhApiIntelligence() {
 
   const [compConfigComponent, setCompConfigComponent] = useState("agent");
   const [compConfigConfiguration, setCompConfigConfiguration] = useState("internal");
+
+
   const managerCompConfigQ = trpc.wazuh.managerComponentConfig.useQuery(
     { component: compConfigComponent, configuration: compConfigConfiguration },
     { staleTime: 60_000, retry: 1 }
@@ -570,7 +588,13 @@ function WazuhApiIntelligence() {
   });
 
   const taskStatusQ = trpc.wazuh.taskStatus.useQuery(
-    {},
+    {
+      offset: taskPage * taskPageSize,
+      limit: taskPageSize,
+      ...(taskStatusFilter ? { status: taskStatusFilter } : {}),
+      ...(taskModule ? { module: taskModule } : {}),
+      ...(taskSearch ? { search: taskSearch } : {}),
+    },
     { staleTime: 60_000, retry: 1 }
   );
 
@@ -742,7 +766,21 @@ function WazuhApiIntelligence() {
                 <Activity className="w-4 h-4 text-[oklch(0.7_0.15_286)]" />
                 Manager Stats
               </h3>
-              {managerStatsQ.data ? <RawJsonViewer data={managerStatsQ.data} title="Manager Stats JSON" /> : null}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-muted-foreground">Date:</span>
+                <Input
+                  type="date"
+                  value={statsDate}
+                  onChange={(e) => setStatsDate(e.target.value)}
+                  className="h-7 w-36 text-[11px] bg-secondary/20 border-border/30"
+                />
+                {statsDate && (
+                  <button onClick={() => setStatsDate("")} className="text-muted-foreground hover:text-foreground">
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+                {managerStatsQ.data ? <RawJsonViewer data={managerStatsQ.data} title="Manager Stats JSON" /> : null}
+              </div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">GET /manager/stats — Runtime statistics</p>
           </div>
@@ -860,21 +898,114 @@ function WazuhApiIntelligence() {
             </h3>
             {taskStatusQ.data ? <RawJsonViewer data={taskStatusQ.data as Record<string, unknown>} title="Task Status JSON" /> : null}
           </div>
+          <div className="flex items-center gap-3 mb-3">
+            <Input
+              placeholder="Search tasks..."
+              value={taskSearch}
+              onChange={(e) => { setTaskSearch(e.target.value); setTaskPage(0); }}
+              className="h-7 w-40 text-xs bg-secondary/20 border-border/30"
+            />
+            <select
+              value={taskStatusFilter}
+              onChange={(e) => { setTaskStatusFilter(e.target.value); setTaskPage(0); }}
+              className="h-7 text-xs bg-secondary/20 border border-border/30 rounded px-2 text-foreground"
+            >
+              <option value="">All Statuses</option>
+              <option value="In progress">In progress</option>
+              <option value="Done">Done</option>
+              <option value="Failed">Failed</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+            <select
+              value={taskModule}
+              onChange={(e) => { setTaskModule(e.target.value); setTaskPage(0); }}
+              className="h-7 text-xs bg-secondary/20 border border-border/30 rounded px-2 text-foreground"
+            >
+              <option value="">All Modules</option>
+              <option value="upgrade_module">Upgrade</option>
+              <option value="api">API</option>
+            </select>
+          </div>
           <BrokerWarnings data={taskStatusQ.data} context="taskStatus" />
           {taskStatusQ.isLoading ? (
-            <div className="flex items-center justify-center py-6">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-violet-400" />
-            </div>
+            <TableSkeleton columns={6} rows={5} />
           ) : taskStatusQ.isError ? (
             <div className="flex items-center gap-2 text-red-400 text-xs">
               <XCircle className="w-4 h-4" />
               <span>{taskStatusQ.error.message}</span>
             </div>
-          ) : taskStatusQ.data ? (
-            <pre className="bg-black/30 rounded-lg p-4 text-xs font-mono text-slate-300 overflow-auto max-h-[200px] whitespace-pre-wrap">
-              {JSON.stringify(taskStatusQ.data, null, 2)}
-            </pre>
-          ) : (
+          ) : taskStatusQ.data ? (() => {
+            const raw = taskStatusQ.data as Record<string, unknown>;
+            const d = (raw?.data ?? raw) as Record<string, unknown>;
+            const items = (d?.affected_items ?? d?.items ?? []) as Array<Record<string, unknown>>;
+            const total = Number(d?.total_affected_items ?? d?.total ?? items.length);
+            const totalPages = Math.max(1, Math.ceil(total / taskPageSize));
+            return (
+              <>
+                {items.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    <Layers className="h-6 w-6 mx-auto mb-2 opacity-40" />
+                    No tasks found
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border/30">
+                          {["Task ID", "Agent", "Command", "Module", "Status", "Create Time"].map(h => (
+                            <th key={h} className="text-left py-2 px-3 text-muted-foreground font-medium">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((task, i) => (
+                          <tr key={i} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
+                            <td className="py-1.5 px-3 font-mono text-primary">{String(task.task_id ?? "\u2014")}</td>
+                            <td className="py-1.5 px-3 font-mono text-muted-foreground">{String(task.agent_id ?? "\u2014")}</td>
+                            <td className="py-1.5 px-3 text-foreground">{String(task.command ?? "\u2014")}</td>
+                            <td className="py-1.5 px-3 text-muted-foreground">{String(task.module ?? "\u2014")}</td>
+                            <td className="py-1.5 px-3">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                String(task.status) === "Done" ? "bg-emerald-500/10 text-emerald-400" :
+                                String(task.status) === "Failed" ? "bg-red-500/10 text-red-400" :
+                                String(task.status) === "In progress" ? "bg-amber-500/10 text-amber-400" :
+                                "bg-secondary/30 text-muted-foreground"
+                              }`}>
+                                {String(task.status ?? "\u2014")}
+                              </span>
+                            </td>
+                            <td className="py-1.5 px-3 text-muted-foreground font-mono">{String(task.create_time ?? "\u2014")}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/10">
+                    <span className="text-xs text-muted-foreground">{total} total tasks</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setTaskPage(p => Math.max(0, p - 1))}
+                        disabled={taskPage === 0}
+                        className="p-1 rounded hover:bg-secondary/30 disabled:opacity-30 transition-colors"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <span className="text-xs text-muted-foreground">Page {taskPage + 1} of {totalPages}</span>
+                      <button
+                        onClick={() => setTaskPage(p => Math.min(totalPages - 1, p + 1))}
+                        disabled={taskPage >= totalPages - 1}
+                        className="p-1 rounded hover:bg-secondary/30 disabled:opacity-30 transition-colors"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })() : (
             <p className="text-xs text-muted-foreground italic">No data available</p>
           )}
         </GlassPanel>

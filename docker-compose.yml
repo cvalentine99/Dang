@@ -62,6 +62,9 @@ services:
       LOCAL_ADMIN_USER: ${LOCAL_ADMIN_USER:-}
       LOCAL_ADMIN_PASS: ${LOCAL_ADMIN_PASS:-}
 
+      # TLS — Wazuh/Indexer typically use self-signed certs
+      SKIP_TLS_VERIFY: ${SKIP_TLS_VERIFY:-true}
+
       # Wazuh Manager API (optional — leave blank to start without Wazuh)
       WAZUH_HOST: ${WAZUH_HOST:-}
       WAZUH_PORT: ${WAZUH_PORT:-55000}

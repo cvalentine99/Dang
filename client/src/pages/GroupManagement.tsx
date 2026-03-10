@@ -31,6 +31,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
+import { SortableHeader } from "@/components/shared/SortableHeader";
 
 function extractItems(raw: unknown): { items: Array<Record<string, unknown>>; total: number } {
   const d = (raw as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
@@ -51,6 +52,11 @@ export default function GroupManagement() {
   const [noGroupPage, setNoGroupPage] = useState(0);
   const [distinctField, setDistinctField] = useState("os.platform");
   const [fileToView, setFileToView] = useState<string | null>(null);
+  const [outdatedSort, setOutdatedSort] = useState("");
+  const [noGroupSort, setNoGroupSort] = useState("");
+  const [distinctPage, setDistinctPage] = useState(0);
+  const [outdatedSearch, setOutdatedSearch] = useState("");
+  const [noGroupSearch, setNoGroupSearch] = useState("");
 
   const utils = trpc.useUtils();
   const statusQ = trpc.wazuh.status.useQuery(undefined, { retry: 1, staleTime: 30_000 });
@@ -62,15 +68,29 @@ export default function GroupManagement() {
     { retry: 1, staleTime: 60_000, enabled: isConnected }
   );
   const outdatedQ = trpc.wazuh.agentsOutdated.useQuery(
-    { limit: 100, offset: outdatedPage * 100 },
+    {
+      limit: 100,
+      offset: outdatedPage * 100,
+      ...(outdatedSort ? { sort: outdatedSort } : {}),
+      ...(outdatedSearch ? { search: outdatedSearch } : {}),
+    },
     { retry: 1, staleTime: 60_000, enabled: isConnected }
   );
   const noGroupQ = trpc.wazuh.agentsNoGroup.useQuery(
-    { limit: 100, offset: noGroupPage * 100 },
+    {
+      limit: 100,
+      offset: noGroupPage * 100,
+      ...(noGroupSort ? { sort: noGroupSort } : {}),
+      ...(noGroupSearch ? { search: noGroupSearch } : {}),
+    },
     { retry: 1, staleTime: 60_000, enabled: isConnected }
   );
   const distinctQ = trpc.wazuh.agentsStatsDistinct.useQuery(
-    { fields: distinctField },
+    {
+      fields: distinctField,
+      limit: 100,
+      offset: distinctPage * 100,
+    },
     { retry: 1, staleTime: 60_000, enabled: isConnected }
   );
   const membersQ = trpc.wazuh.agentGroupMembers.useQuery(
@@ -455,6 +475,15 @@ export default function GroupManagement() {
                 </h3>
                 {outdatedQ.data ? <RawJsonViewer data={outdatedQ.data as Record<string, unknown>} title="Outdated Agents JSON" /> : null}
               </div>
+              <div className="flex items-center gap-2 mb-3">
+                <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search outdated agents..."
+                  value={outdatedSearch}
+                  onChange={(e) => { setOutdatedSearch(e.target.value); setOutdatedPage(0); }}
+                  className="h-7 w-48 text-xs bg-secondary/20 border-border/30"
+                />
+              </div>
               <BrokerWarnings data={outdatedQ.data} context="Outdated Agents" />
               {outdatedQ.isLoading ? <TableSkeleton columns={4} rows={6} /> : (
                 <>
@@ -462,9 +491,10 @@ export default function GroupManagement() {
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-border/30">
-                          {["ID", "Name", "Version", "Manager Version"].map(h => (
-                            <th key={h} className="text-left py-2 px-3 text-muted-foreground font-medium">{h}</th>
-                          ))}
+                          <SortableHeader label="ID" field="id" currentSort={outdatedSort} onSort={(s) => { setOutdatedSort(s); setOutdatedPage(0); }} />
+                          <SortableHeader label="Name" field="name" currentSort={outdatedSort} onSort={(s) => { setOutdatedSort(s); setOutdatedPage(0); }} />
+                          <SortableHeader label="Version" field="version" currentSort={outdatedSort} onSort={(s) => { setOutdatedSort(s); setOutdatedPage(0); }} />
+                          <th className="text-left py-2 px-3 text-muted-foreground font-medium">Manager Version</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -514,6 +544,15 @@ export default function GroupManagement() {
                 </h3>
                 {noGroupQ.data ? <RawJsonViewer data={noGroupQ.data as Record<string, unknown>} title="Ungrouped Agents JSON" /> : null}
               </div>
+              <div className="flex items-center gap-2 mb-3">
+                <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search ungrouped agents..."
+                  value={noGroupSearch}
+                  onChange={(e) => { setNoGroupSearch(e.target.value); setNoGroupPage(0); }}
+                  className="h-7 w-48 text-xs bg-secondary/20 border-border/30"
+                />
+              </div>
               <BrokerWarnings data={noGroupQ.data} context="Ungrouped Agents" />
               {noGroupQ.isLoading ? <TableSkeleton columns={4} rows={6} /> : (
                 <>
@@ -521,9 +560,11 @@ export default function GroupManagement() {
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-border/30">
-                          {["ID", "Name", "IP", "Status", "OS"].map(h => (
-                            <th key={h} className="text-left py-2 px-3 text-muted-foreground font-medium">{h}</th>
-                          ))}
+                          <SortableHeader label="ID" field="id" currentSort={noGroupSort} onSort={(s) => { setNoGroupSort(s); setNoGroupPage(0); }} />
+                          <SortableHeader label="Name" field="name" currentSort={noGroupSort} onSort={(s) => { setNoGroupSort(s); setNoGroupPage(0); }} />
+                          <SortableHeader label="IP" field="ip" currentSort={noGroupSort} onSort={(s) => { setNoGroupSort(s); setNoGroupPage(0); }} />
+                          <SortableHeader label="Status" field="status" currentSort={noGroupSort} onSort={(s) => { setNoGroupSort(s); setNoGroupPage(0); }} />
+                          <th className="text-left py-2 px-3 text-muted-foreground font-medium">OS</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -588,7 +629,7 @@ export default function GroupManagement() {
                     variant={distinctField === f ? "default" : "outline"}
                     size="sm"
                     className="h-6 text-[10px]"
-                    onClick={() => setDistinctField(f)}
+                    onClick={() => { setDistinctField(f); setDistinctPage(0); }}
                   >
                     {f}
                   </Button>
@@ -647,6 +688,24 @@ export default function GroupManagement() {
                   })()}
                 </div>
               )}
+              {(() => {
+                const { total } = extractItems(distinctQ.data);
+                const totalPages = Math.max(1, Math.ceil(total / 100));
+                if (totalPages <= 1) return null;
+                return (
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/20">
+                    <span className="text-xs text-muted-foreground">Page {distinctPage + 1} of {totalPages}</span>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" disabled={distinctPage === 0} onClick={() => setDistinctPage(p => p - 1)}>
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="outline" size="sm" disabled={(distinctPage + 1) * 100 >= total} onClick={() => setDistinctPage(p => p + 1)}>
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()}
             </GlassPanel>
           </TabsContent>
         </Tabs>

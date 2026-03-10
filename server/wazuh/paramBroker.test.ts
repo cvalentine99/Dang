@@ -289,7 +289,7 @@ describe("/agents endpoint config", () => {
       "os.version": "22.04",
       "os.name": "Ubuntu",
       older_than: "7d",
-      manager_host: "wazuh-master",
+      agents_list: "001,002,003",
       version: "Wazuh v4.14.3",
       group: "default",
       node_name: "node01",
@@ -1655,18 +1655,18 @@ describe("KG wiring: DECODERS_CONFIG", () => {
 });
 
 describe("KG wiring: ROOTCHECK_CONFIG", () => {
-  it("forwards valid field-specific filters and rejects non-spec pci_dss/cis (C-3 fix)", () => {
+  it("forwards valid field-specific filters including pci_dss/cis (restored per spec v4.14.3)", () => {
     const result = brokerParams(ROOTCHECK_CONFIG, {
       status: "outstanding",
       pci_dss: "2.2",
       cis: "1.4",
     });
     expect(result.forwardedQuery.status).toBe("outstanding");
-    // C-3: pci_dss and cis are NOT in the Wazuh v4.14.3 spec for /rootcheck
-    expect(result.unsupportedParams).toContain("pci_dss");
-    expect(result.unsupportedParams).toContain("cis");
-    expect(result.forwardedQuery).not.toHaveProperty("pci_dss");
-    expect(result.forwardedQuery).not.toHaveProperty("cis");
+    // pci_dss and cis ARE in the Wazuh v4.14.3 spec for /rootcheck/{agent_id}
+    expect(result.unsupportedParams).not.toContain("pci_dss");
+    expect(result.unsupportedParams).not.toContain("cis");
+    expect(result.forwardedQuery).toHaveProperty("pci_dss", "2.2");
+    expect(result.forwardedQuery).toHaveProperty("cis", "1.4");
   });
 
   it("includes all universal params", () => {

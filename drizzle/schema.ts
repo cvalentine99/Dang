@@ -1181,7 +1181,7 @@ export const responseActions = mysqlTable("response_actions", {
 
   // ── Identity ───────────────────────────────────────────────────────────────
   /** Unique action ID (e.g., "ra-abc123") */
-  actionId: varchar("actionId", { length: 64 }).notNull(),
+  actionId: varchar("actionId", { length: 64 }).notNull().unique(),
 
   // ── Classification ─────────────────────────────────────────────────────────
   /** What kind of response action */

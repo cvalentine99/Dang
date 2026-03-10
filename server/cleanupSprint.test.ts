@@ -57,13 +57,17 @@ describe("#76/#86 — Truthiness bugs on numeric inputs", () => {
     expect(matches).toBeNull();
   });
 
-  it("should use explicit null checks for limit (input.limit != null)", () => {
-    // At least one instance of the correct pattern should exist
-    expect(wazuhRouterSrc).toContain("input.limit != null");
+  it("should use explicit null checks for limit (input.limit != null) or delegate to brokerParams", () => {
+    // Endpoints either use explicit null checks or delegate to brokerParams() which handles this internally
+    const hasExplicitCheck = wazuhRouterSrc.includes("input.limit != null");
+    const hasBrokerDelegation = wazuhRouterSrc.includes("brokerParams(");
+    expect(hasExplicitCheck || hasBrokerDelegation).toBe(true);
   });
 
-  it("should use explicit null checks for offset (input.offset != null)", () => {
-    expect(wazuhRouterSrc).toContain("input.offset != null");
+  it("should use explicit null checks for offset (input.offset != null) or delegate to brokerParams", () => {
+    const hasExplicitCheck = wazuhRouterSrc.includes("input.offset != null");
+    const hasBrokerDelegation = wazuhRouterSrc.includes("brokerParams(");
+    expect(hasExplicitCheck || hasBrokerDelegation).toBe(true);
   });
 
   it("should NOT use truthiness checks on scheduleId in driftAnalyticsRouter", () => {

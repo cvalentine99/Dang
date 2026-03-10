@@ -18,8 +18,10 @@ import {
   ArrowRight,
   Sparkles,
   Ticket,
+  Zap,
 } from "lucide-react";
 import { severityColor, StatusBadge, TriageRouteBadge, TriageSeverityBadge, SplunkTicketLink } from "./Badges";
+import { PipelineStageIndicator } from "./PipelineStageIndicator";
 import type { QueueItem, TriageData } from "./types";
 
 interface QueueItemCardProps {
@@ -46,14 +48,17 @@ export function QueueItemCard({
   const [expanded, setExpanded] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
 
+  // ── Stage 1 only: Auto-Triage mutation ──────────────────────────────────
   const autoTriageMutation = trpc.pipeline.autoTriageQueueItem.useMutation({
     onSuccess: (result) => {
       if (result.success) {
         toast.success("Pipeline triage complete", {
           description: `Triage ID: ${result.triageId}`,
         });
-        trpc.useUtils().alertQueue.list.invalidate();
+        utils.alertQueue.list.invalidate();
+        utils.pipeline.getPipelineRunByQueueItem.invalidate({ queueItemId: item.id });
       } else {
         toast.error("Pipeline triage failed", { description: result.error });
       }
@@ -63,14 +68,47 @@ export function QueueItemCard({
     },
   });
 
+  // ── Full Pipeline (all 4 stages) mutation ───────────────────────────────
+  const fullPipelineMutation = trpc.pipeline.runFullPipeline.useMutation({
+    onSuccess: (result) => {
+      if (result.status === "completed") {
+        toast.success("Full pipeline completed", {
+          description: `All 4 stages done in ${(result.totalLatencyMs / 1000).toFixed(1)}s — Run ID: ${result.runId}`,
+        });
+      } else if (result.status === "partial") {
+        const failedStages = Object.entries(result.stages)
+          .filter(([, v]) => v.status === "failed")
+          .map(([k]) => k);
+        toast.warning("Pipeline partially completed", {
+          description: `Failed at: ${failedStages.join(", ")}. Use "Continue" to retry.`,
+        });
+      }
+      utils.alertQueue.list.invalidate();
+      utils.pipeline.getPipelineRunByQueueItem.invalidate({ queueItemId: item.id });
+    },
+    onError: (err) => {
+      toast.error("Full pipeline error", { description: err.message });
+    },
+  });
+
   const autoTriageStatusQ = trpc.pipeline.getAutoTriageStatus.useQuery(
     { queueItemId: item.id },
     { enabled: !!item.pipelineTriageId || item.autoTriageStatus === "running" || item.autoTriageStatus === "completed", staleTime: 10_000 }
   );
 
-  const triageSummary = autoTriageStatusQ.data?.triageSummary;
+  // ── Pipeline run status for this queue item ─────────────────────────────
+  const pipelineRunQ = trpc.pipeline.getPipelineRunByQueueItem.useQuery(
+    { queueItemId: item.id },
+    {
+      enabled: !!item.pipelineTriageId || item.autoTriageStatus === "completed" || fullPipelineMutation.isSuccess,
+      staleTime: 5_000,
+      refetchInterval: (fullPipelineMutation.isPending || autoTriageMutation.isPending) ? 2_000 : false,
+    }
+  );
 
+  const triageSummary = autoTriageStatusQ.data?.triageSummary;
   const triage = item.triageResult as TriageData | null;
+  const pipelineRun = pipelineRunQ.data;
 
   const splunkEnabled = trpc.splunk.isEnabled.useQuery(undefined, { staleTime: 60_000 });
   const createTicketMutation = trpc.splunk.createTicket.useMutation({
@@ -84,8 +122,8 @@ export function QueueItemCard({
           description: result.message || "HEC accepted the request but did not create a ticket",
         });
       }
-      trpc.useUtils().alertQueue.list.invalidate();
-      trpc.useUtils().splunk.ticketArtifactCountsByQueueItem.invalidate();
+      utils.alertQueue.list.invalidate();
+      utils.splunk.ticketArtifactCountsByQueueItem.invalidate();
     },
     onError: (err) => {
       toast.error("Failed to create Splunk ticket", { description: err.message });
@@ -96,6 +134,28 @@ export function QueueItemCard({
     const alertSummary = `Triage alert ${item.alertId}: Rule ${item.ruleId} (Level ${item.ruleLevel}) - ${item.ruleDescription ?? "Unknown"} on agent ${item.agentId ?? "unknown"} (${item.agentName ?? "unknown"})`;
     navigate(`/analyst?q=${encodeURIComponent(alertSummary)}`);
   };
+
+  const handleRunFullPipeline = () => {
+    const rawAlert = item.rawJson ?? {
+      id: item.alertId,
+      rule: {
+        id: item.ruleId,
+        description: item.ruleDescription,
+        level: item.ruleLevel,
+      },
+      agent: {
+        id: item.agentId,
+        name: item.agentName,
+      },
+      timestamp: item.alertTimestamp,
+    };
+    fullPipelineMutation.mutate({
+      rawAlert,
+      queueItemId: item.id,
+    });
+  };
+
+  const isAnyPipelineRunning = autoTriageMutation.isPending || fullPipelineMutation.isPending;
 
   return (
     <div className={`glass-panel rounded-xl overflow-hidden transition-all ${
@@ -164,28 +224,50 @@ export function QueueItemCard({
           )}
           {item.status === "queued" && (
             <>
-              {!item.pipelineTriageId && item.autoTriageStatus !== "running" && (
-                autoTriageMutation.isPending ? (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.15)] animate-pulse-subtle">
-                    <Loader2 className="h-3.5 w-3.5 text-purple-300 animate-spin" />
-                    <span className="text-xs font-medium text-purple-200">Triaging…</span>
-                  </div>
-                ) : (
+              {!item.pipelineTriageId && item.autoTriageStatus !== "running" && !isAnyPipelineRunning && (
+                <div className="flex items-center gap-1.5">
+                  {/* Stage 1 only: Triage Pipeline */}
                   <button
                     onClick={() => autoTriageMutation.mutate({ queueItemId: item.id })}
-                    disabled={!canRunStructuredPipeline || autoTriageMutation.isPending}
+                    disabled={!canRunStructuredPipeline || isAnyPipelineRunning}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       canRunStructuredPipeline
                         ? "bg-purple-500/15 border border-purple-500/30 text-purple-300 hover:bg-purple-500/25 hover:shadow-[0_0_10px_rgba(168,85,247,0.15)]"
                         : "bg-white/5 border border-white/10 text-muted-foreground/50 cursor-not-allowed"
                     }`}
-                    title={canRunStructuredPipeline ? "Send to Triage Pipeline (creates structured triage artifacts)" : "Pipeline blocked — check readiness banner for details"}
+                    title={canRunStructuredPipeline ? "Run Stage 1 only (Triage) — creates triage artifacts" : "Pipeline blocked — check readiness banner for details"}
                   >
                     <Sparkles className="h-3.5 w-3.5" />
-                    Send to Triage Pipeline
+                    Triage Only
                   </button>
-                )
+
+                  {/* Full Pipeline: All 4 stages */}
+                  <button
+                    onClick={handleRunFullPipeline}
+                    disabled={!canRunStructuredPipeline || isAnyPipelineRunning}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      canRunStructuredPipeline
+                        ? "bg-gradient-to-r from-violet-500/20 to-purple-500/20 border border-violet-500/40 text-violet-200 hover:from-violet-500/30 hover:to-purple-500/30 hover:shadow-[0_0_12px_rgba(139,92,246,0.2)]"
+                        : "bg-white/5 border border-white/10 text-muted-foreground/50 cursor-not-allowed"
+                    }`}
+                    title={canRunStructuredPipeline ? "Run all 4 stages: Triage → Correlation → Hypothesis → Response Actions" : "Pipeline blocked — check readiness banner for details"}
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    Full Pipeline
+                  </button>
+                </div>
               )}
+
+              {/* Loading state for pipeline mutations */}
+              {isAnyPipelineRunning && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.15)] animate-pulse-subtle">
+                  <Loader2 className="h-3.5 w-3.5 text-purple-300 animate-spin" />
+                  <span className="text-xs font-medium text-purple-200">
+                    {fullPipelineMutation.isPending ? "Running full pipeline…" : "Triaging…"}
+                  </span>
+                </div>
+              )}
+
               <button
                 onClick={() => onDismiss(item.id)}
                 className="p-1.5 rounded-lg border border-white/10 text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all"
@@ -278,8 +360,8 @@ export function QueueItemCard({
         </div>
       </div>
 
-      {/* Processing indicator */}
-      {(item.status === "processing" || item.autoTriageStatus === "running" || autoTriageMutation.isPending) && (
+      {/* Processing indicator — shown during triage-only or full pipeline */}
+      {(item.status === "processing" || item.autoTriageStatus === "running" || autoTriageMutation.isPending) && !fullPipelineMutation.isPending && (
         <div className="px-4 pb-3 pt-1">
           <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
             <div className="h-full rounded-full bg-gradient-to-r from-purple-500 via-cyan-500 to-purple-500 animate-shimmer-slide" style={{ width: "80%", backgroundSize: "200% 100%" }} />
@@ -296,6 +378,37 @@ export function QueueItemCard({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Full pipeline progress indicator — shown during full pipeline execution */}
+      {fullPipelineMutation.isPending && (
+        <div className="px-4 pb-3 pt-1">
+          <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-full rounded-full bg-gradient-to-r from-violet-500 via-purple-500 via-cyan-500 to-violet-500 animate-shimmer-slide" style={{ width: "100%", backgroundSize: "300% 100%" }} />
+          </div>
+          <div className="flex items-center justify-between mt-1.5">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
+              </span>
+              <p className="text-[10px] text-violet-300 font-mono">
+                Running full pipeline (4 stages)… This may take 30–60 seconds.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pipeline Stage Progress Indicator — shown when a pipeline run exists */}
+      {pipelineRun && !fullPipelineMutation.isPending && !autoTriageMutation.isPending && (
+        <PipelineStageIndicator
+          pipelineRun={pipelineRun as any}
+          queueItemId={item.id}
+          onPipelineUpdated={() => {
+            utils.alertQueue.list.invalidate();
+          }}
+        />
       )}
 
       {/* Expanded content */}

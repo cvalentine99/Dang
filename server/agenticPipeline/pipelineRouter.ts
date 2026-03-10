@@ -1371,4 +1371,26 @@ export const pipelineRouter = router({
         generatedAt: data.generatedAt,
       };
     }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PIPELINE RUN LOOKUP BY QUEUE ITEM
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Get the latest pipeline run for a given queue item.
+   * Used by the Alert Queue UI to show stage progress indicators
+   * and enable inline "Continue Pipeline" actions.
+   */
+  getPipelineRunByQueueItem: protectedProcedure
+    .input(z.object({ queueItemId: z.number().int() }))
+    .query(async ({ input }) => {
+      const db = await requireDb();
+      const [row] = await db
+        .select()
+        .from(pipelineRuns)
+        .where(eq(pipelineRuns.queueItemId, input.queueItemId))
+        .orderBy(desc(pipelineRuns.startedAt))
+        .limit(1);
+      return row ?? null;
+    }),
 });

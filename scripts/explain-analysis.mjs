@@ -16,7 +16,7 @@ const pool = mysql.createPool({
   user: url.username,
   password: url.password,
   database: url.pathname.slice(1),
-  ssl: { rejectUnauthorized: false },
+  ssl: { rejectUnauthorized: !(process.env.SKIP_TLS_VERIFY === "true" || process.env.SKIP_TLS_VERIFY === "1") },
 });
 
 const results = [];

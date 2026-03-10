@@ -5,7 +5,12 @@
  * Configuration is read from the connection_settings table (category: 'llm')
  * with fallback to environment variables (LLM_HOST, LLM_PORT, LLM_MODEL, LLM_ENABLED).
  *
- * The custom endpoint is expected to implement the OpenAI /v1/chat/completions API.
+ * Nemotron-3-Nano-30B-A3B Specific Enhancements:
+ * - NVIDIA-mandated temperature/top_p per inference mode (tool calling vs conversational)
+ * - XML <tool_call> parser: converts Nemotron's native XML tool-call format to OpenAI JSON
+ * - <think>...</think> reasoning trace extraction
+ * - System prompt XML schema reminder injection (prevents 86% parser failure rate)
+ * - Model auto-detection for Nemotron-specific parameter tuning
  */
 
 import { getEffectiveSettings } from "../admin/connectionSettingsService";
@@ -29,6 +34,196 @@ export interface LLMTestResult {
   message: string;
   latencyMs: number;
   models?: string[];
+}
+
+/** Parsed XML tool call from Nemotron's native format */
+export interface ParsedToolCall {
+  functionName: string;
+  parameters: Record<string, string>;
+}
+
+/** Extracted thinking trace from <think>...</think> blocks */
+export interface ThinkingTrace {
+  content: string;
+  durationEstimateTokens: number;
+}
+
+// ── Nemotron Model Detection ───────────────────────────────────────────────
+
+/**
+ * Detect if the configured model is a Nemotron variant.
+ * Used to apply Nemotron-specific inference parameters automatically.
+ */
+export function isNemotronModel(modelName: string): boolean {
+  const lower = modelName.toLowerCase();
+  return lower.includes("nemotron") || lower.includes("nvidia-nemotron");
+}
+
+// ── NVIDIA-Mandated Inference Parameters ───────────────────────────────────
+
+/**
+ * Per Section 4.3 of the Nemotron integration analysis:
+ * - Tool calling: temperature=0.6, top_p=0.95 (NVIDIA mandated)
+ * - Conversational: temperature=1.0, top_p=1.0
+ *
+ * These values are critical — deviating causes:
+ * - Higher temperature → tool hallucination (premature EOS, \boxed{} format)
+ * - Lower temperature → repetitive/degenerate outputs
+ */
+export function getNemotronInferenceParams(mode: "tool_calling" | "conversational"): {
+  temperature: number;
+  top_p: number;
+} {
+  if (mode === "tool_calling") {
+    return { temperature: 0.6, top_p: 0.95 };
+  }
+  return { temperature: 1.0, top_p: 1.0 };
+}
+
+// ── XML Tool-Call Parser ───────────────────────────────────────────────────
+
+/**
+ * Parse Nemotron's native XML tool-call format into structured data.
+ *
+ * Nemotron-3-Nano uses XML-style syntax (NOT OpenAI JSON) for function calls:
+ *
+ * ```xml
+ * <tool_call>
+ * <function=function_name>
+ * <parameter=param_name>
+ * value
+ * </parameter>
+ * </function>
+ * </tool_call>
+ * ```
+ *
+ * Crucial constraints (Section 4.2):
+ * 1. Perfect nesting: <function> inside <tool_call>
+ * 2. No conversational suffixes after </tool_call>
+ * 3. Reasoning dependency: disabling thinking trace increases hallucination rate
+ */
+export function parseNemotronToolCalls(content: string): ParsedToolCall[] {
+  const toolCalls: ParsedToolCall[] = [];
+
+  // Match all <tool_call>...</tool_call> blocks
+  const toolCallRegex = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
+  let toolCallMatch: RegExpExecArray | null;
+
+  while ((toolCallMatch = toolCallRegex.exec(content)) !== null) {
+    const block = toolCallMatch[1];
+
+    // Extract function name: <function=function_name>
+    const funcMatch = block.match(/<function=([^>]+)>/);
+    if (!funcMatch) continue;
+
+    const functionName = funcMatch[1].trim();
+    const parameters: Record<string, string> = {};
+
+    // Extract all parameters: <parameter=param_name>value</parameter>
+    const paramRegex = /<parameter=([^>]+)>\s*([\s\S]*?)\s*<\/parameter>/g;
+    let paramMatch: RegExpExecArray | null;
+
+    while ((paramMatch = paramRegex.exec(block)) !== null) {
+      const paramName = paramMatch[1].trim();
+      const paramValue = paramMatch[2].trim();
+      parameters[paramName] = paramValue;
+    }
+
+    toolCalls.push({ functionName, parameters });
+  }
+
+  return toolCalls;
+}
+
+/**
+ * Convert Nemotron XML tool calls to OpenAI-compatible tool_calls format.
+ * This allows the rest of the pipeline to work with a unified format
+ * regardless of whether the model uses XML or JSON tool calling.
+ */
+export function convertXmlToolCallsToOpenAI(
+  xmlToolCalls: ParsedToolCall[]
+): Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> {
+  return xmlToolCalls.map((tc, idx) => ({
+    id: `nemotron_tc_${Date.now()}_${idx}`,
+    type: "function" as const,
+    function: {
+      name: tc.functionName,
+      arguments: JSON.stringify(tc.parameters),
+    },
+  }));
+}
+
+// ── Thinking Trace Extraction ──────────────────────────────────────────────
+
+/**
+ * Extract <think>...</think> reasoning traces from Nemotron responses.
+ *
+ * Per Section 4.1: The model uses <think> tags (Token IDs 12 and 13)
+ * for chain-of-thought reasoning before tool calls.
+ * Disabling thinking traces increases hallucination rate.
+ */
+export function extractThinkingTrace(content: string): {
+  thinkingTrace: ThinkingTrace | null;
+  cleanContent: string;
+} {
+  const thinkRegex = /<think>([\s\S]*?)<\/think>/;
+  const match = content.match(thinkRegex);
+
+  if (!match) {
+    return { thinkingTrace: null, cleanContent: content };
+  }
+
+  const thinkContent = match[1].trim();
+  // Rough token estimate: ~4 chars per token for English text
+  const estimatedTokens = Math.ceil(thinkContent.length / 4);
+
+  const cleanContent = content.replace(/<think>[\s\S]*?<\/think>\s*/g, "").trim();
+
+  return {
+    thinkingTrace: {
+      content: thinkContent,
+      durationEstimateTokens: estimatedTokens,
+    },
+    cleanContent,
+  };
+}
+
+// ── XML Schema Reminder for System Prompts ─────────────────────────────────
+
+/**
+ * Build the XML tool-calling schema reminder that MUST be included in system prompts
+ * when using Nemotron with tool calling.
+ *
+ * Per Section 4.3: Without this reminder, the parser failure rate is 86%.
+ * The reminder ensures the model outputs well-formed XML tool calls.
+ */
+export function buildXmlSchemaReminder(tools: Array<{ function: { name: string; parameters: unknown } }>): string {
+  const toolList = tools.map(t => `  - ${t.function.name}`).join("\n");
+
+  return [
+    "",
+    "TOOL CALLING FORMAT (MANDATORY):",
+    "When you need to call a tool, you MUST use this exact XML format:",
+    "",
+    "<tool_call>",
+    "<function=FUNCTION_NAME>",
+    "<parameter=PARAM_NAME>",
+    "value",
+    "</parameter>",
+    "</function>",
+    "</tool_call>",
+    "",
+    "CRITICAL RULES:",
+    "1. <function> MUST be nested inside <tool_call>",
+    "2. Each <parameter> MUST be nested inside <function>",
+    "3. Do NOT add any conversational text after </tool_call>",
+    "4. Do NOT use JSON format for tool calls — use XML only",
+    "5. Parameter values must be plain text, not JSON-encoded",
+    "",
+    "Available tools:",
+    toolList,
+    "",
+  ].join("\n");
 }
 
 // ── Environment variable defaults ───────────────────────────────────────────
@@ -84,9 +279,17 @@ function buildBaseUrl(config: LLMConfig): string {
 
 /**
  * Invoke the custom LLM endpoint (OpenAI-compatible /v1/chat/completions).
+ *
+ * When a Nemotron model is detected:
+ * - Applies NVIDIA-mandated temperature/top_p based on whether tools are present
+ * - Injects XML schema reminder into system prompt when tools are provided
+ * - Parses XML tool calls from the response and converts to OpenAI format
+ * - Extracts thinking traces from <think> blocks
  */
 async function invokeCustomLLM(params: InvokeParams, config: LLMConfig): Promise<InvokeResult> {
   const url = `${buildBaseUrl(config)}/v1/chat/completions`;
+  const nemotron = isNemotronModel(config.model);
+  const hasTools = !!(params.tools && params.tools.length > 0);
 
   // Build the payload — OpenAI-compatible format
   const payload: Record<string, unknown> = {
@@ -104,7 +307,7 @@ async function invokeCustomLLM(params: InvokeParams, config: LLMConfig): Promise
     payload.max_tokens = 32768;
   }
 
-  if (params.tools && params.tools.length > 0) {
+  if (hasTools) {
     payload.tools = params.tools;
   }
 
@@ -127,14 +330,12 @@ async function invokeCustomLLM(params: InvokeParams, config: LLMConfig): Promise
         2
       );
       // Prepend schema instruction to the first system message, or create one if none exists.
-      // Without this, the LLM gets json_object format but no schema guidance — #52 fix.
       const messages = payload.messages as Array<{ role: string; content: string }>;
       const schemaInstruction = `You MUST respond with valid JSON matching this exact schema:\n${schemaStr}`;
       const systemIdx = messages.findIndex(m => m.role === "system");
       if (systemIdx >= 0) {
         messages[systemIdx].content += `\n\n${schemaInstruction}`;
       } else {
-        // No system message — prepend one so the schema instruction is never dropped
         messages.unshift({ role: "system", content: schemaInstruction });
       }
     } else {
@@ -142,8 +343,32 @@ async function invokeCustomLLM(params: InvokeParams, config: LLMConfig): Promise
     }
   }
 
-  // Temperature — slightly lower for structured/analytical tasks
-  payload.temperature = 0.7;
+  // ── Nemotron-specific inference parameters ────────────────────────────────
+  if (nemotron) {
+    // NVIDIA-mandated temperature/top_p (Section 4.3)
+    const inferenceMode = hasTools ? "tool_calling" : "conversational";
+    const { temperature, top_p } = getNemotronInferenceParams(inferenceMode);
+    payload.temperature = temperature;
+    payload.top_p = top_p;
+
+    // Inject XML schema reminder into system prompt when tools are present (Section 4.3)
+    // This prevents the documented 86% parser failure rate
+    if (hasTools && params.tools) {
+      const messages = payload.messages as Array<{ role: string; content: string }>;
+      const xmlReminder = buildXmlSchemaReminder(
+        params.tools as Array<{ function: { name: string; parameters: unknown } }>
+      );
+      const systemIdx = messages.findIndex(m => m.role === "system");
+      if (systemIdx >= 0) {
+        messages[systemIdx].content += xmlReminder;
+      } else {
+        messages.unshift({ role: "system", content: xmlReminder });
+      }
+    }
+  } else {
+    // Non-Nemotron models: use a reasonable default
+    payload.temperature = 0.7;
+  }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -167,7 +392,42 @@ async function invokeCustomLLM(params: InvokeParams, config: LLMConfig): Promise
     );
   }
 
-  return (await response.json()) as InvokeResult;
+  const result = (await response.json()) as InvokeResult;
+
+  // ── Nemotron post-processing ──────────────────────────────────────────────
+  if (nemotron) {
+    const firstChoice = result.choices?.[0];
+    if (firstChoice?.message?.content && typeof firstChoice.message.content === "string") {
+      const rawContent = firstChoice.message.content;
+
+      // Extract thinking trace
+      const { thinkingTrace, cleanContent } = extractThinkingTrace(rawContent);
+
+      // Parse XML tool calls if present
+      const xmlToolCalls = parseNemotronToolCalls(rawContent);
+      if (xmlToolCalls.length > 0) {
+        // Convert XML tool calls to OpenAI format and attach to the message
+        const openaiToolCalls = convertXmlToolCallsToOpenAI(xmlToolCalls);
+        (firstChoice.message as Record<string, unknown>).tool_calls = openaiToolCalls;
+
+        // Remove the XML tool call text from the content
+        const contentWithoutToolCalls = cleanContent
+          .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "")
+          .trim();
+        (firstChoice.message as Record<string, unknown>).content = contentWithoutToolCalls || null;
+      } else {
+        // No tool calls — just clean up thinking traces from visible content
+        firstChoice.message.content = cleanContent;
+      }
+
+      // Attach thinking trace as metadata (non-standard field for observability)
+      if (thinkingTrace) {
+        (firstChoice.message as Record<string, unknown>)._thinkingTrace = thinkingTrace;
+      }
+    }
+  }
+
+  return result;
 }
 
 // ── Unified LLM Invocation ──────────────────────────────────────────────────
@@ -229,7 +489,7 @@ export async function invokeLLMWithFallback(params: InvokeParams & { caller?: st
 
   if (config.enabled && config.host) {
     try {
-      console.log(`[LLM] Using custom endpoint: ${buildBaseUrl(config)} (model: ${config.model})`);
+      console.log(`[LLM] Using custom endpoint: ${buildBaseUrl(config)} (model: ${config.model}${isNemotronModel(config.model) ? ", nemotron-optimized" : ""})`);
       const result = await invokeCustomLLM(params, config);
       const latencyMs = Date.now() - startTime;
       const usage = extractUsage(result);

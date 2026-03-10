@@ -34,6 +34,11 @@ import {
   ChevronRight,
   Wifi,
   Shield,
+  SortAsc,
+  SortDesc,
+  ArrowUpDown,
+  Filter,
+  X,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
 
@@ -47,6 +52,18 @@ const COLORS = {
 };
 
 type TabKey = "packages" | "processes" | "ports" | "os" | "hardware" | "hotfixes" | "netaddr" | "netiface" | "netproto";
+
+const TAB_SORT_FIELDS: Partial<Record<TabKey, Record<string, string>>> = {
+  packages:  { "Name": "name", "Version": "version", "Vendor": "vendor", "Architecture": "architecture" },
+  processes: { "Name": "name", "PID": "pid", "State": "state", "User": "euser" },
+  ports:     { "Protocol": "protocol", "Local Port": "local.port", "State": "state", "PID": "pid" },
+  os:        { "OS Name": "os.name", "Platform": "os.platform", "Hostname": "hostname" },
+  hardware:  { "CPU Cores": "cpu.cores", "RAM (MB)": "ram.total" },
+  hotfixes:  { "Hotfix ID": "hotfix", "Scan Time": "scan.time" },
+  netaddr:   { "Interface": "iface", "Address": "address", "Protocol": "proto" },
+  netiface:  { "Name": "name", "Type": "type", "State": "state", "MTU": "mtu" },
+  netproto:  { "Interface": "iface", "Type": "type", "Gateway": "gateway" },
+};
 
 const TAB_META: Record<TabKey, { label: string; icon: typeof Package; columns: string[] }> = {
   packages:  { label: "Packages",    icon: Package,  columns: ["Agent", "Name", "Version", "Architecture", "Vendor", "Format"] },
@@ -103,10 +120,13 @@ function AgentCell({ item }: { item: Record<string, unknown> }) {
 }
 
 // ── Generic data table ──────────────────────────────────────────────────────
-function DataTable({ columns, rows, renderRow }: {
+function DataTable({ columns, rows, renderRow, sortableFields, currentSort, onSort }: {
   columns: string[];
   rows: Array<Record<string, unknown>>;
   renderRow: (item: Record<string, unknown>, idx: number) => React.ReactNode;
+  sortableFields?: Record<string, string>;
+  currentSort?: string;
+  onSort?: (sort: string) => void;
 }) {
   if (rows.length === 0) {
     return (
@@ -122,9 +142,36 @@ function DataTable({ columns, rows, renderRow }: {
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-border/30">
-            {columns.map((h) => (
-              <th key={h} className="text-left py-2 px-3 text-muted-foreground font-medium whitespace-nowrap">{h}</th>
-            ))}
+            {columns.map((h) => {
+              const sortField = sortableFields?.[h];
+              if (sortField && onSort && currentSort !== undefined) {
+                const isActive = currentSort.replace(/^[+-]/, "") === sortField;
+                const isAsc = currentSort === `+${sortField}`;
+                return (
+                  <th
+                    key={h}
+                    className="text-left py-2 px-3 text-muted-foreground font-medium whitespace-nowrap cursor-pointer hover:text-foreground transition-colors select-none"
+                    onClick={() => {
+                      if (!isActive) onSort(`+${sortField}`);
+                      else if (isAsc) onSort(`-${sortField}`);
+                      else onSort("");
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {h}
+                      {isActive ? (
+                        isAsc ? <SortAsc className="h-3 w-3 text-primary" /> : <SortDesc className="h-3 w-3 text-primary" />
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3 opacity-30" />
+                      )}
+                    </span>
+                  </th>
+                );
+              }
+              return (
+                <th key={h} className="text-left py-2 px-3 text-muted-foreground font-medium whitespace-nowrap">{h}</th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>{rows.map((item, i) => renderRow(item, i))}</tbody>
@@ -143,6 +190,18 @@ export default function FleetInventory() {
   const pageSize = 50;
   const utils = trpc.useUtils();
 
+  // ── Sort state per tab ──
+  const [sorts, setSorts] = useState<Record<TabKey, string>>({
+    packages: "", processes: "", ports: "", os: "", hardware: "",
+    hotfixes: "", netaddr: "", netiface: "", netproto: "",
+  });
+
+  // ── Distinct toggle ──
+  const [distinct, setDistinct] = useState(false);
+
+  // ── Hotfix filter ──
+  const [hotfixFilter, setHotfixFilter] = useState("");
+
   // ── Connection check ──────────────────────────────────────────────────
   const statusQ = trpc.wazuh.status.useQuery(undefined, { retry: 1, staleTime: 60_000 });
   const isConnected = statusQ.data?.configured === true && statusQ.data?.data != null;
@@ -158,7 +217,10 @@ export default function FleetInventory() {
     limit: pageSize,
     offset: (pages[tab] - 1) * pageSize,
     ...(search ? { q: `name~${search}` } : {}),
-  }), [pages, search]);
+    ...(sorts[tab] ? { sort: sorts[tab] } : {}),
+    ...(distinct ? { distinct: true } : {}),
+    ...(tab === "hotfixes" && hotfixFilter ? { hotfix: hotfixFilter } : {}),
+  }), [pages, search, sorts, distinct, hotfixFilter]);
 
   // ── Queries (only active tab fetches) ─────────────────────────────────
   const packagesQ = trpc.wazuh.expSyscollectorPackages.useQuery(qInput("packages"), qOpts("packages"));
@@ -190,6 +252,10 @@ export default function FleetInventory() {
   const handleRefresh = useCallback(() => { utils.wazuh.invalidate(); }, [utils]);
   const handlePageChange = useCallback((tab: TabKey, p: number) => {
     setPages(prev => ({ ...prev, [tab]: p }));
+  }, []);
+  const handleSortChange = useCallback((tab: TabKey, sort: string) => {
+    setSorts(prev => ({ ...prev, [tab]: sort }));
+    setPages(prev => ({ ...prev, [tab]: 1 }));
   }, []);
 
   // ── Row renderers per tab ─────────────────────────────────────────────
@@ -358,6 +424,38 @@ export default function FleetInventory() {
           <span className="text-xs text-muted-foreground">
             Showing {items.length} of {total.toLocaleString()} records
           </span>
+          <div className="flex items-center gap-3 ml-auto">
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={distinct}
+                onChange={(e) => {
+                  setDistinct(e.target.checked);
+                  setPages(prev => ({ ...prev, [activeTab]: 1 }));
+                }}
+                className="rounded border-border/30"
+              />
+              Distinct
+            </label>
+            {activeTab === "hotfixes" && (
+              <div className="flex items-center gap-1">
+                <Input
+                  placeholder="Filter hotfix ID..."
+                  value={hotfixFilter}
+                  onChange={(e) => {
+                    setHotfixFilter(e.target.value);
+                    setPages(prev => ({ ...prev, hotfixes: 1 }));
+                  }}
+                  className="h-7 w-36 text-xs bg-secondary/20 border-border/30"
+                />
+                {hotfixFilter && (
+                  <button onClick={() => { setHotfixFilter(""); setPages(prev => ({ ...prev, hotfixes: 1 })); }} className="text-muted-foreground hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </GlassPanel>
 
@@ -407,6 +505,9 @@ export default function FleetInventory() {
                     columns={TAB_META[tab].columns}
                     rows={items}
                     renderRow={rowRenderers[tab]}
+                    sortableFields={TAB_SORT_FIELDS[tab]}
+                    currentSort={sorts[tab]}
+                    onSort={(s) => handleSortChange(tab, s)}
                   />
                   {totalPages > 1 && (
                     <Pagination

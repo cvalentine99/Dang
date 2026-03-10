@@ -52,8 +52,37 @@ import {
   EXP_SYSCOLLECTOR_PACKAGES_CONFIG,
   EXP_SYSCOLLECTOR_PROCESSES_CONFIG,
   EXP_SYSCOLLECTOR_PORTS_CONFIG,
+  // Phase 1+2 remediation configs
+  SECURITY_ROLES_CONFIG,
+  SECURITY_POLICIES_CONFIG,
+  SECURITY_USERS_CONFIG,
+  CLUSTER_NODE_CONFIGURATION_CONFIG,
+  CLUSTER_NODE_LOGS_CONFIG,
+  TASKS_STATUS_CONFIG,
+  AGENTS_OUTDATED_CONFIG,
+  AGENTS_NO_GROUP_CONFIG,
+  AGENTS_STATS_DISTINCT_CONFIG,
+  SYSCOLLECTOR_BROWSER_EXTENSIONS_CONFIG,
+  SYSCOLLECTOR_USERS_CONFIG,
+  SYSCOLLECTOR_GROUPS_CONFIG,
+  EXP_SYSCOLLECTOR_NETIFACE_CONFIG,
+  EXP_SYSCOLLECTOR_NETADDR_CONFIG,
+  EXP_SYSCOLLECTOR_NETPROTO_CONFIG,
+  EXP_SYSCOLLECTOR_OS_CONFIG,
+  EXP_SYSCOLLECTOR_HARDWARE_CONFIG,
+  EXP_SYSCOLLECTOR_HOTFIXES_CONFIG,
+  // Task 2+3 new configs
+  SECURITY_RBAC_RULES_CONFIG,
+  DECODER_PARENTS_CONFIG,
+  SYSCOLLECTOR_OS_CONFIG,
+  SYSCOLLECTOR_HARDWARE_CONFIG,
+  // Promotion sprint — manual → broker
+  DECODER_FILE_CONTENT_CONFIG,
+  SECURITY_CONFIG_CONFIG,
+  SECURITY_CURRENT_USER_CONFIG,
+  SECURITY_ACTIONS_CONFIG,
 } from "./paramBroker";
-import { generateCoverageReport } from "./brokerCoverage";
+import { generateCoverageReport, BROKER_CONFIG_REGISTRY } from "./brokerCoverage";
 
 // ── Per-request user context for rate limiting ──────────────────────────────
 // AsyncLocalStorage carries the authenticated user's ID through the call stack
@@ -230,7 +259,14 @@ export const wazuhRouter = router({
   managerConfigValidation: wazuhProcedure.query(() => proxyGet("/manager/configuration/validation")),
 
   // ── Manager stats ─────────────────────────────────────────────────────────
-  managerStats: wazuhProcedure.query(() => proxyGet("/manager/stats")),
+  /** GET /manager/stats — Manager stats (manual: date param added) */
+  managerStats: wazuhProcedure
+    .input(z.object({ date: z.string().optional() }).optional())
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input?.date) params.date = input.date;
+      return proxyGet("/manager/stats", params);
+    }),
   statsHourly: wazuhProcedure.query(() => proxyGet("/manager/stats/hourly")),
   statsWeekly: wazuhProcedure.query(() => proxyGet("/manager/stats/weekly")),
   analysisd: wazuhProcedure.query(() => proxyGet("/manager/stats/analysisd")),
@@ -365,9 +401,14 @@ export const wazuhRouter = router({
     .input(z.object({ nodeId: nodeIdSchema }))
     .query(({ input }) => proxyGet(`/cluster/${input.nodeId}/info`)),
 
+  /** GET /cluster/{node_id}/stats — Node stats (manual: date param added) */
   clusterNodeStats: wazuhProcedure
-    .input(z.object({ nodeId: nodeIdSchema }))
-    .query(({ input }) => proxyGet(`/cluster/${input.nodeId}/stats`)),
+    .input(z.object({ nodeId: nodeIdSchema, date: z.string().optional() }))
+    .query(({ input }) => {
+      const params: Record<string, string> = {};
+      if (input.date) params.date = input.date;
+      return proxyGet(`/cluster/${input.nodeId}/stats`, params);
+    }),
 
   clusterNodeStatsHourly: wazuhProcedure
     .input(z.object({ nodeId: nodeIdSchema }))
@@ -412,6 +453,7 @@ export const wazuhRouter = router({
         registerIP: z.string().optional(),
         group_config_status: z.string().optional(),
         manager: z.string().optional(),
+        wait_for_complete: z.boolean().optional(),
       })
     )
     .query(({ input }) => {
@@ -620,6 +662,7 @@ export const wazuhRouter = router({
     }),
 
   /** Agents with outdated version compared to manager (M-1 expanded) */
+  /** GET /agents/outdated — Outdated agents (broker-wired) */
   agentsOutdated: wazuhProcedure
     .input(paginationSchema.extend({
       sort: z.string().optional(),
@@ -628,17 +671,14 @@ export const wazuhRouter = router({
       q: z.string().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string | number | boolean | undefined> = {
-        limit: input.limit, offset: input.offset,
-      };
-      if (input.sort) params.sort = input.sort;
-      if (input.search) params.search = input.search;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      if (input.q) params.q = input.q;
-      return proxyGet("/agents/outdated", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(AGENTS_OUTDATED_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /agents/outdated: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/agents/outdated", forwardedQuery), errors);
     }),
 
-  /** Agents not assigned to any group (M-2 expanded) */
+  /** GET /agents/no_group — Agents with no group (broker-wired) */
   agentsNoGroup: wazuhProcedure
     .input(paginationSchema.extend({
       sort: z.string().optional(),
@@ -647,33 +687,28 @@ export const wazuhRouter = router({
       q: z.string().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string | number | boolean | undefined> = {
-        limit: input.limit, offset: input.offset,
-      };
-      if (input.sort) params.sort = input.sort;
-      if (input.search) params.search = input.search;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      if (input.q) params.q = input.q;
-      return proxyGet("/agents/no_group", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(AGENTS_NO_GROUP_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /agents/no_group: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/agents/no_group", forwardedQuery), errors);
     }),
 
-  /** Agent stats distinct — unique field values across agents (M-3 expanded) */
+  /** GET /agents/stats/distinct — Agent stats distinct (broker-wired) */
   agentsStatsDistinct: wazuhProcedure
     .input(z.object({
-      fields: z.string(),
+      fields: z.union([z.string(), z.array(z.string())]),
       ...paginationSchema.shape,
       sort: z.string().optional(),
       search: z.string().optional(),
       q: z.string().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string | number | boolean | undefined> = {
-        fields: input.fields, limit: input.limit, offset: input.offset,
-      };
-      if (input.sort) params.sort = input.sort;
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      return proxyGet("/agents/stats/distinct", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(AGENTS_STATS_DISTINCT_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /agents/stats/distinct: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/agents/stats/distinct", forwardedQuery), errors);
     }),
 
   /**
@@ -712,22 +747,24 @@ export const wazuhRouter = router({
     .input(z.object({
       agentId: agentIdSchema,
       select: z.union([z.string(), z.array(z.string())]).optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      return proxyGet(`/syscollector/${input.agentId}/os`, params);
+      const { agentId, ...params } = input;
+      const { forwardedQuery, errors } = brokerParams(SYSCOLLECTOR_OS_CONFIG, params);
+      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/os`, forwardedQuery), errors);
     }),
 
   agentHardware: wazuhProcedure
     .input(z.object({
       agentId: agentIdSchema,
       select: z.union([z.string(), z.array(z.string())]).optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      return proxyGet(`/syscollector/${input.agentId}/hardware`, params);
+      const { agentId, ...params } = input;
+      const { forwardedQuery, errors } = brokerParams(SYSCOLLECTOR_HARDWARE_CONFIG, params);
+      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/hardware`, forwardedQuery), errors);
     }),
 
   agentPackages: wazuhProcedure
@@ -745,6 +782,7 @@ export const wazuhRouter = router({
       format: z.string().optional(),
       version: z.string().optional(),
       ...paginationSchema.shape,
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
@@ -776,6 +814,7 @@ export const wazuhRouter = router({
       state: z.string().optional(),
       process: z.string().optional(),
       ...paginationSchema.shape,
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
@@ -813,6 +852,7 @@ export const wazuhRouter = router({
       sgroup: z.string().optional(),
       suser: z.string().optional(),
       ...paginationSchema.shape,
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
@@ -840,6 +880,7 @@ export const wazuhRouter = router({
       address: z.string().optional(),
       broadcast: z.string().optional(),
       netmask: z.string().optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
@@ -873,6 +914,7 @@ export const wazuhRouter = router({
       "tx.dropped": z.string().optional(),
       "rx.dropped": z.string().optional(),
       mac: z.string().optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
@@ -893,6 +935,7 @@ export const wazuhRouter = router({
       q: z.string().optional(),
       distinct: z.boolean().optional(),
       hotfix: z.string().optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
@@ -913,6 +956,7 @@ export const wazuhRouter = router({
       q: z.string().optional(),
       distinct: z.boolean().optional(),
       hash: z.string().optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { groupId, ...rest } = input;
@@ -928,24 +972,24 @@ export const wazuhRouter = router({
   // ══════════════════════════════════════════════════════════════════════════════
 
   /** Browser extensions installed on the agent (Windows only) (M-16 expanded) */
+  /** GET /syscollector/{agent_id}/browser_extensions — Browser extensions (broker-wired) */
   agentBrowserExtensions: wazuhProcedure
     .input(z.object({
       agentId: agentIdSchema,
       ...paginationSchema.shape,
       sort: z.string().optional(),
       search: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
       q: z.string().optional(),
       distinct: z.boolean().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string | number | boolean | undefined> = {
-        limit: input.limit, offset: input.offset,
-      };
-      if (input.sort) params.sort = input.sort;
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      if (input.distinct !== undefined) params.distinct = input.distinct;
-      return proxyGet(`/syscollector/${input.agentId}/browser_extensions`, params)
+      const { agentId, ...rest } = input;
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SYSCOLLECTOR_BROWSER_EXTENSIONS_CONFIG, rest);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /syscollector/{agent_id}/browser_extensions: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/browser_extensions`, forwardedQuery), errors)
         .catch((err: unknown) => {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/browser_extensions failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
@@ -978,50 +1022,48 @@ export const wazuhRouter = router({
         });
     }),
 
-  /** Local users on the agent (M-14 expanded) */
+  /** GET /syscollector/{agent_id}/users — Local users (broker-wired) */
   agentUsers: wazuhProcedure
     .input(z.object({
       agentId: agentIdSchema,
       ...paginationSchema.shape,
       sort: z.string().optional(),
       search: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
       q: z.string().optional(),
       distinct: z.boolean().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string | number | boolean | undefined> = {
-        limit: input.limit, offset: input.offset,
-      };
-      if (input.sort) params.sort = input.sort;
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      if (input.distinct !== undefined) params.distinct = input.distinct;
-      return proxyGet(`/syscollector/${input.agentId}/users`, params)
-.catch((err: unknown) => {
+      const { agentId, ...rest } = input;
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SYSCOLLECTOR_USERS_CONFIG, rest);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /syscollector/{agent_id}/users: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/users`, forwardedQuery), errors)
+        .catch((err: unknown) => {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/users failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
     }),
 
-  /** Local groups on the agent (M-15 expanded) */
+  /** GET /syscollector/{agent_id}/groups — Local groups (broker-wired) */
   agentGroups2: wazuhProcedure
     .input(z.object({
       agentId: agentIdSchema,
       ...paginationSchema.shape,
       sort: z.string().optional(),
       search: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
       q: z.string().optional(),
       distinct: z.boolean().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string | number | boolean | undefined> = {
-        limit: input.limit, offset: input.offset,
-      };
-      if (input.sort) params.sort = input.sort;
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      if (input.distinct !== undefined) params.distinct = input.distinct;
-      return proxyGet(`/syscollector/${input.agentId}/groups`, params)
-.catch((err: unknown) => {
+      const { agentId, ...rest } = input;
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SYSCOLLECTOR_GROUPS_CONFIG, rest);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /syscollector/{agent_id}/groups: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/groups`, forwardedQuery), errors)
+        .catch((err: unknown) => {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/groups failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
     }),
@@ -1040,6 +1082,7 @@ export const wazuhRouter = router({
       type: z.string().optional(),
       gateway: z.string().optional(),
       dhcp: z.string().optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
@@ -1138,7 +1181,7 @@ export const wazuhRouter = router({
       return proxyGet("/experimental/syscollector/ports", forwardedQuery);
     }),
 
-  /** GET /experimental/syscollector/netaddr — All network addresses across all agents (M-17 expanded) */
+  /** GET /experimental/syscollector/netaddr — All network addresses (broker-wired) */
   expSyscollectorNetaddr: wazuhProcedure
     .input(paginationSchema.extend({
       search: z.string().optional(),
@@ -1153,23 +1196,14 @@ export const wazuhRouter = router({
       netmask: z.string().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input.limit != null) params.limit = String(input.limit);
-      if (input.offset != null) params.offset = String(input.offset);
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      if (input.sort) params.sort = input.sort;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      if (input.distinct !== undefined) params.distinct = String(input.distinct);
-      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
-      if (input.proto) params.proto = input.proto;
-      if (input.address) params.address = input.address;
-      if (input.broadcast) params.broadcast = input.broadcast;
-      if (input.netmask) params.netmask = input.netmask;
-      return proxyGet("/experimental/syscollector/netaddr", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(EXP_SYSCOLLECTOR_NETADDR_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /experimental/syscollector/netaddr: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/experimental/syscollector/netaddr", forwardedQuery), errors);
     }),
 
-  /** GET /experimental/syscollector/netiface — All network interfaces across all agents (M-18 expanded) */
+  /** GET /experimental/syscollector/netiface — All network interfaces (broker-wired, 21 params) */
   expSyscollectorNetiface: wazuhProcedure
     .input(paginationSchema.extend({
       search: z.string().optional(),
@@ -1194,33 +1228,14 @@ export const wazuhRouter = router({
       mac: z.string().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input.limit != null) params.limit = String(input.limit);
-      if (input.offset != null) params.offset = String(input.offset);
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      if (input.sort) params.sort = input.sort;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      if (input.distinct !== undefined) params.distinct = String(input.distinct);
-      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
-      if (input.name) params.name = input.name;
-      if (input.adapter) params.adapter = input.adapter;
-      if (input.type) params.type = input.type;
-      if (input.state) params.state = input.state;
-      if (input.mtu) params.mtu = input.mtu;
-      if (input["tx.packets"]) params["tx.packets"] = input["tx.packets"];
-      if (input["rx.packets"]) params["rx.packets"] = input["rx.packets"];
-      if (input["tx.bytes"]) params["tx.bytes"] = input["tx.bytes"];
-      if (input["rx.bytes"]) params["rx.bytes"] = input["rx.bytes"];
-      if (input["tx.errors"]) params["tx.errors"] = input["tx.errors"];
-      if (input["rx.errors"]) params["rx.errors"] = input["rx.errors"];
-      if (input["tx.dropped"]) params["tx.dropped"] = input["tx.dropped"];
-      if (input["rx.dropped"]) params["rx.dropped"] = input["rx.dropped"];
-      if (input.mac) params.mac = input.mac;
-      return proxyGet("/experimental/syscollector/netiface", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(EXP_SYSCOLLECTOR_NETIFACE_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /experimental/syscollector/netiface: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/experimental/syscollector/netiface", forwardedQuery), errors);
     }),
 
-  /** GET /experimental/syscollector/netproto — All network protocols across all agents */
+  /** GET /experimental/syscollector/netproto — All network protocols (broker-wired) */
   expSyscollectorNetproto: wazuhProcedure
     .input(paginationSchema.extend({
       search: z.string().optional(),
@@ -1231,19 +1246,14 @@ export const wazuhRouter = router({
       agents_list: z.union([z.string(), z.array(z.string())]).optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input.limit != null) params.limit = String(input.limit);
-      if (input.offset != null) params.offset = String(input.offset);
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      if (input.sort) params.sort = input.sort;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      if (input.distinct !== undefined) params.distinct = String(input.distinct);
-      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
-      return proxyGet("/experimental/syscollector/netproto", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(EXP_SYSCOLLECTOR_NETPROTO_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /experimental/syscollector/netproto: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/experimental/syscollector/netproto", forwardedQuery), errors);
     }),
 
-  /** GET /experimental/syscollector/os — All OS info across all agents */
+  /** GET /experimental/syscollector/os — All OS info (broker-wired) */
   expSyscollectorOs: wazuhProcedure
     .input(paginationSchema.extend({
       search: z.string().optional(),
@@ -1254,19 +1264,14 @@ export const wazuhRouter = router({
       agents_list: z.union([z.string(), z.array(z.string())]).optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input.limit != null) params.limit = String(input.limit);
-      if (input.offset != null) params.offset = String(input.offset);
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      if (input.sort) params.sort = input.sort;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      if (input.distinct !== undefined) params.distinct = String(input.distinct);
-      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
-      return proxyGet("/experimental/syscollector/os", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(EXP_SYSCOLLECTOR_OS_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /experimental/syscollector/os: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/experimental/syscollector/os", forwardedQuery), errors);
     }),
 
-  /** GET /experimental/syscollector/hardware — All hardware info across all agents */
+  /** GET /experimental/syscollector/hardware — All hardware info (broker-wired) */
   expSyscollectorHardware: wazuhProcedure
     .input(paginationSchema.extend({
       search: z.string().optional(),
@@ -1277,19 +1282,14 @@ export const wazuhRouter = router({
       agents_list: z.union([z.string(), z.array(z.string())]).optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input.limit != null) params.limit = String(input.limit);
-      if (input.offset != null) params.offset = String(input.offset);
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      if (input.sort) params.sort = input.sort;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      if (input.distinct !== undefined) params.distinct = String(input.distinct);
-      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
-      return proxyGet("/experimental/syscollector/hardware", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(EXP_SYSCOLLECTOR_HARDWARE_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /experimental/syscollector/hardware: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/experimental/syscollector/hardware", forwardedQuery), errors);
     }),
 
-  /** GET /experimental/syscollector/hotfixes — All hotfixes across all agents (L-6 expanded) */
+  /** GET /experimental/syscollector/hotfixes — All hotfixes (broker-wired) */
   expSyscollectorHotfixes: wazuhProcedure
     .input(paginationSchema.extend({
       search: z.string().optional(),
@@ -1301,17 +1301,11 @@ export const wazuhRouter = router({
       hotfix: z.string().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input.limit != null) params.limit = String(input.limit);
-      if (input.offset != null) params.offset = String(input.offset);
-      if (input.search) params.search = input.search;
-      if (input.q) params.q = input.q;
-      if (input.sort) params.sort = input.sort;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      if (input.distinct !== undefined) params.distinct = String(input.distinct);
-      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
-      if (input.hotfix) params.hotfix = input.hotfix;
-      return proxyGet("/experimental/syscollector/hotfixes", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(EXP_SYSCOLLECTOR_HOTFIXES_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /experimental/syscollector/hotfixes: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/experimental/syscollector/hotfixes", forwardedQuery), errors);
     }),
 
   /**
@@ -1379,6 +1373,7 @@ export const wazuhRouter = router({
         tsc: z.string().optional(),
         mitre: z.string().optional(),
         rule_ids: z.union([z.string(), z.array(z.string())]).optional(),
+        wait_for_complete: z.boolean().optional(),
       })
     )
     .query(({ input }) => {
@@ -1433,6 +1428,7 @@ export const wazuhRouter = router({
       filename: filenameSchema.optional(),
       relative_dirname: z.string().optional(),
       status: z.enum(["enabled", "disabled", "all"]).optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(RULES_FILES_CONFIG, input);
@@ -1467,6 +1463,7 @@ export const wazuhRouter = router({
       q: z.string().optional(),
       distinct: z.boolean().optional(),
       mitre_tactic_ids: z.union([z.string(), z.array(z.string())]).optional(),
+      wait_for_complete: z.boolean().optional(),
     }).optional())
     .query(({ input }) => {
       if (!input) return proxyGet("/mitre/tactics");
@@ -1491,6 +1488,7 @@ export const wazuhRouter = router({
       q: z.string().optional(),
       distinct: z.boolean().optional(),
       technique_ids: z.union([z.string(), z.array(z.string())]).optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(MITRE_TECHNIQUES_CONFIG, input);
@@ -1511,6 +1509,7 @@ export const wazuhRouter = router({
       q: z.string().optional(),
       distinct: z.boolean().optional(),
       mitre_mitigation_ids: z.union([z.string(), z.array(z.string())]).optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(MITRE_MITIGATIONS_CONFIG, input);
@@ -1528,6 +1527,7 @@ export const wazuhRouter = router({
       q: z.string().optional(),
       distinct: z.boolean().optional(),
       mitre_software_ids: z.union([z.string(), z.array(z.string())]).optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(MITRE_SOFTWARE_CONFIG, input);
@@ -1545,6 +1545,7 @@ export const wazuhRouter = router({
       q: z.string().optional(),
       distinct: z.boolean().optional(),
       mitre_group_ids: z.union([z.string(), z.array(z.string())]).optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(MITRE_GROUPS_CONFIG, input);
@@ -1562,6 +1563,7 @@ export const wazuhRouter = router({
       search: z.string().optional(),
       q: z.string().optional(),
       mitre_reference_ids: z.union([z.string(), z.array(z.string())]).optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(MITRE_REFERENCES_CONFIG, input);
@@ -1682,6 +1684,7 @@ export const wazuhRouter = router({
       notchecked: z.number().optional(),
       unknown: z.number().optional(),
       score: z.number().optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
@@ -1725,6 +1728,7 @@ export const wazuhRouter = router({
         sha1: z.string().optional(),
         sha256: z.string().optional(),
         ...paginationSchema.shape,
+        wait_for_complete: z.boolean().optional(),
       })
     )
     .query(({ input }) => {
@@ -1764,6 +1768,7 @@ export const wazuhRouter = router({
       q: z.string().optional(),
       distinct: z.boolean().optional(),
       status: z.string().optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { agentId, ...rest } = input;
@@ -1803,6 +1808,7 @@ export const wazuhRouter = router({
       filename: filenameSchema.optional(),
       relative_dirname: z.string().optional(),
       status: z.enum(["enabled", "disabled", "all"]).optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(DECODERS_CONFIG, input);
@@ -1825,6 +1831,7 @@ export const wazuhRouter = router({
       filename: filenameSchema.optional(),
       relative_dirname: z.string().optional(),
       status: z.enum(["enabled", "disabled", "all"]).optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(DECODERS_FILES_CONFIG, input);
@@ -1834,43 +1841,47 @@ export const wazuhRouter = router({
       return withBrokerWarnings(proxyGet("/decoders/files", forwardedQuery), errors);
     }),
 
-  /** Parent decoders — top-level decoders that other decoders inherit from (M-9 expanded) */
+  /** Parent decoders — top-level decoders that other decoders inherit from (broker-wired) */
   decoderParents: wazuhProcedure
     .input(paginationSchema.extend({
       search: z.string().optional(),
       sort: z.string().optional(),
       select: z.union([z.string(), z.array(z.string())]).optional(),
+      q: z.string().optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string | number | boolean | undefined> = {
-        limit: input.limit, offset: input.offset,
-      };
-      if (input.search) params.search = input.search;
-      if (input.sort) params.sort = input.sort;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      return proxyGet("/decoders/parents", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(DECODER_PARENTS_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /decoders/parents: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/decoders/parents", forwardedQuery), errors);
     }),
 
-  /** View decoder file content by filename (L-2 expanded) */
+  /** View decoder file content by filename */
   decoderFileContent: wazuhProcedure
     .input(z.object({
       filename: filenameSchema,
       raw: z.boolean().optional(),
-      get_dirnames_path: z.string().optional(),
+      relative_dirname: z.string().optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string | boolean> = {};
-      if (input.raw !== undefined) params.raw = input.raw;
-      if (input.get_dirnames_path) params.get_dirnames_path = input.get_dirnames_path;
-      return proxyGet(`/decoders/files/${input.filename}`, params);
+      const { filename, ...queryInput } = input;
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(DECODER_FILE_CONTENT_CONFIG, queryInput);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /decoders/files/{filename}: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet(`/decoders/files/${filename}`, forwardedQuery), errors);
     }),
 
   // ══════════════════════════════════════════════════════════════════════════════
   // TASKS
   // ══════════════════════════════════════════════════════════════════════════════
+  /** GET /tasks/status — Task status (broker-wired) */
   taskStatus: wazuhProcedure
     .input(z.object({
-      taskIds: z.array(z.number()).optional(),
+      task_list: z.union([z.string(), z.array(z.number())]).optional(),
       agents_list: z.union([z.string(), z.array(z.string())]).optional(),
       command: z.string().optional(),
       node: z.string().optional(),
@@ -1883,20 +1894,11 @@ export const wazuhRouter = router({
       q: z.string().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string | number | boolean | undefined> = {};
-      if (input.taskIds?.length) params.task_list = input.taskIds.join(",");
-      if (input.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
-      if (input.command) params.command = input.command;
-      if (input.node) params.node = input.node;
-      if (input.module) params.module = input.module;
-      if (input.status) params.status = input.status;
-      params.limit = input.limit;
-      params.offset = input.offset;
-      if (input.sort) params.sort = input.sort;
-      if (input.search) params.search = input.search;
-      if (input.select) params.select = Array.isArray(input.select) ? input.select.join(",") : input.select;
-      if (input.q) params.q = input.q;
-      return proxyGet("/tasks/status", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(TASKS_STATUS_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /tasks/status: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/tasks/status", forwardedQuery), errors);
     }),
 
   // NOTE: GET /active-response does not exist in Wazuh v4.14.3.
@@ -1906,9 +1908,72 @@ export const wazuhRouter = router({
   // ══════════════════════════════════════════════════════════════════════════════
   // SECURITY (RBAC info — read-only)
   // ══════════════════════════════════════════════════════════════════════════════
-  securityRoles: wazuhProcedure.query(() => proxyGet("/security/roles")),
-  securityPolicies: wazuhProcedure.query(() => proxyGet("/security/policies")),
-  securityUsers: wazuhProcedure.query(() => proxyGet("/security/users")),
+  /**
+   * GET /security/roles — List security roles (broker-wired)
+   * Supports: offset, limit, sort, search, select, q, distinct, role_ids
+   */
+  securityRoles: wazuhProcedure
+    .input(
+      paginationSchema.extend({
+        search: z.string().optional(),
+        sort: z.string().optional(),
+        q: z.string().optional(),
+        select: z.union([z.string(), z.array(z.string())]).optional(),
+        distinct: z.boolean().optional(),
+        role_ids: z.union([z.string(), z.array(z.string())]).optional(),
+      }).optional()
+    )
+    .query(({ input }) => {
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SECURITY_ROLES_CONFIG, input ?? {});
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /security/roles: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/security/roles", forwardedQuery), errors);
+    }),
+  /**
+   * GET /security/policies — List security policies (broker-wired)
+   * Supports: offset, limit, sort, search, select, q, distinct, policy_ids
+   */
+  securityPolicies: wazuhProcedure
+    .input(
+      paginationSchema.extend({
+        search: z.string().optional(),
+        sort: z.string().optional(),
+        q: z.string().optional(),
+        select: z.union([z.string(), z.array(z.string())]).optional(),
+        distinct: z.boolean().optional(),
+        policy_ids: z.union([z.string(), z.array(z.string())]).optional(),
+      }).optional()
+    )
+    .query(({ input }) => {
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SECURITY_POLICIES_CONFIG, input ?? {});
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /security/policies: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/security/policies", forwardedQuery), errors);
+    }),
+  /**
+   * GET /security/users — List security users (broker-wired)
+   * Supports: offset, limit, sort, search, select, q, distinct, user_ids
+   */
+  securityUsers: wazuhProcedure
+    .input(
+      paginationSchema.extend({
+        search: z.string().optional(),
+        sort: z.string().optional(),
+        q: z.string().optional(),
+        select: z.union([z.string(), z.array(z.string())]).optional(),
+        distinct: z.boolean().optional(),
+        user_ids: z.union([z.string(), z.array(z.string())]).optional(),
+      }).optional()
+    )
+    .query(({ input }) => {
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SECURITY_USERS_CONFIG, input ?? {});
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /security/users: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/security/users", forwardedQuery), errors);
+    }),
 
   /** GET /security/users/{user_id} — Fetch individual user by ID (C-4 gap fill) */
   securityUserById: wazuhProcedure
@@ -1932,15 +1997,29 @@ export const wazuhRouter = router({
 
   /**
    * GET /security/config — Security configuration (token TTL, RBAC mode)
-   * P2 GAP fill. No parameters beyond pretty/wait_for_complete.
    */
-  securityConfig: wazuhProcedure.query(() => proxyGet("/security/config")),
+  securityConfig: wazuhProcedure
+    .input(z.object({ wait_for_complete: z.boolean().optional() }).optional())
+    .query(({ input }) => {
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SECURITY_CONFIG_CONFIG, input ?? {});
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /security/config: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/security/config", forwardedQuery), errors);
+    }),
 
   /**
    * GET /security/users/me — Current authenticated user info
-   * P2 GAP fill. No parameters beyond pretty/wait_for_complete.
    */
-  securityCurrentUser: wazuhProcedure.query(() => proxyGet("/security/users/me")),
+  securityCurrentUser: wazuhProcedure
+    .input(z.object({ wait_for_complete: z.boolean().optional() }).optional())
+    .query(({ input }) => {
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SECURITY_CURRENT_USER_CONFIG, input ?? {});
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /security/users/me: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/security/users/me", forwardedQuery), errors);
+    }),
 
   /**
    * GET /security/rules — List RBAC security rules
@@ -1951,34 +2030,28 @@ export const wazuhRouter = router({
       paginationSchema.extend({
         rule_ids: z.union([z.string(), z.array(z.string())]).optional(),
         search: z.string().optional(),
-        select: z.union([z.string(), z.array(z.string())]).optional(),
         sort: z.string().optional(),
-        q: z.string().optional(),
-        distinct: z.boolean().optional(),
       })
     )
     .query(({ input }) => {
-      const { limit, offset, ...rest } = input;
-      const params: Record<string, string | number | boolean> = { limit, offset };
-      if (rest.rule_ids) params.rule_ids = Array.isArray(rest.rule_ids) ? rest.rule_ids.join(",") : rest.rule_ids;
-      if (rest.search) params.search = rest.search;
-      if (rest.select) params.select = Array.isArray(rest.select) ? rest.select.join(",") : rest.select;
-      if (rest.sort) params.sort = rest.sort;
-      if (rest.q) params.q = rest.q;
-      if (rest.distinct !== undefined) params.distinct = rest.distinct;
-      return proxyGet("/security/rules", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SECURITY_RBAC_RULES_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /security/rules: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/security/rules", forwardedQuery), errors);
     }),
 
   /**
    * GET /security/actions — List all RBAC actions
-   * Sprint v2 P0 gap fill. Optional endpoint filter.
    */
   securityActions: wazuhProcedure
     .input(z.object({ endpoint: z.string().optional() }).optional())
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input?.endpoint) params.endpoint = input.endpoint;
-      return proxyGet("/security/actions", params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SECURITY_ACTIONS_CONFIG, input ?? {});
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /security/actions: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/security/actions", forwardedQuery), errors);
     }),
 
   /**
@@ -2011,6 +2084,7 @@ export const wazuhRouter = router({
       distinct: z.boolean().optional(),
       filename: filenameSchema.optional(),
       relative_dirname: z.string().optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(LISTS_CONFIG, input);
@@ -2026,6 +2100,7 @@ export const wazuhRouter = router({
       search: z.string().optional(),
       filename: filenameSchema.optional(),
       relative_dirname: z.string().optional(),
+      wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(LISTS_FILES_CONFIG, input);
@@ -2089,10 +2164,22 @@ export const wazuhRouter = router({
     .input(z.object({ nodeId: nodeIdSchema }))
     .query(({ input }) => proxyGet(`/cluster/${input.nodeId}/status`)),
 
-  /** GET /cluster/{node_id}/configuration — Full node configuration */
+  /** GET /cluster/{node_id}/configuration — Node config (broker-wired: section, field, raw) */
   clusterNodeConfiguration: wazuhProcedure
-    .input(z.object({ nodeId: nodeIdSchema }))
-    .query(({ input }) => proxyGet(`/cluster/${input.nodeId}/configuration`)),
+    .input(z.object({
+      nodeId: nodeIdSchema,
+      section: z.string().optional(),
+      field: z.string().optional(),
+      raw: z.boolean().optional(),
+    }))
+    .query(({ input }) => {
+      const { nodeId, ...rest } = input;
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(CLUSTER_NODE_CONFIGURATION_CONFIG, rest);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /cluster/{node_id}/configuration: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet(`/cluster/${nodeId}/configuration`, forwardedQuery), errors);
+    }),
 
   /** GET /cluster/{node_id}/configuration/{component}/{configuration} — Granular node config */
   clusterNodeComponentConfig: wazuhProcedure
@@ -2111,7 +2198,7 @@ export const wazuhRouter = router({
       return proxyGet(`/cluster/${input.nodeId}/daemons/stats`, params);
     }),
 
-  /** GET /cluster/{node_id}/logs — Node logs */
+  /** GET /cluster/{node_id}/logs — Node logs (broker-wired) */
   clusterNodeLogs: wazuhProcedure
     .input(z.object({
       nodeId: nodeIdSchema,
@@ -2124,15 +2211,11 @@ export const wazuhRouter = router({
     }))
     .query(({ input }) => {
       const { nodeId, ...rest } = input;
-      const params: Record<string, string> = {};
-      if (rest.limit) params.limit = String(rest.limit);
-      if (rest.offset) params.offset = String(rest.offset);
-      if (rest.sort) params.sort = rest.sort;
-      if (rest.search) params.search = rest.search;
-      if (rest.tag) params.tag = rest.tag;
-      if (rest.level) params.level = rest.level;
-      if (rest.q) params.q = rest.q;
-      return proxyGet(`/cluster/${nodeId}/logs`, params);
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(CLUSTER_NODE_LOGS_CONFIG, rest);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /cluster/{node_id}/logs: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet(`/cluster/${nodeId}/logs`, forwardedQuery), errors);
     }),
 
   /** GET /cluster/{node_id}/logs/summary — Node log summary */
@@ -2166,6 +2249,58 @@ export const wazuhRouter = router({
   brokerCoverage: protectedProcedure
     .query(() => {
       return generateCoverageReport();
+    }),
+
+  /**
+   * Broker Param Playground — test arbitrary params against any broker config.
+   * Returns the broker result (forwarded, unsupported, errors) without making
+   * any actual Wazuh API call. Pure server-side validation.
+   */
+  brokerPlayground: protectedProcedure
+    .input(z.object({
+      configName: z.string(),
+      params: z.record(z.string(), z.unknown()),
+    }))
+    .mutation(({ input }) => {
+      const entry = BROKER_CONFIG_REGISTRY.find(e => e.name === input.configName);
+      if (!entry) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Unknown broker config: ${input.configName}`,
+        });
+      }
+      const result = brokerParams(entry.config, input.params);
+      // Also return the config metadata for the UI
+      const paramDefs = Object.entries(entry.config.params).map(([key, def]) => ({
+        key,
+        wazuhName: def.wazuhName,
+        type: def.type,
+        description: def.description,
+        aliases: def.aliases || [],
+      }));
+      return {
+        configName: input.configName,
+        endpoint: entry.config.endpoint,
+        ...result,
+        paramDefs,
+      };
+    }),
+
+  /** List all available broker configs for the playground dropdown */
+  brokerConfigList: protectedProcedure
+    .query(() => {
+      return BROKER_CONFIG_REGISTRY.map(e => ({
+        name: e.name,
+        endpoint: e.config.endpoint,
+        paramCount: Object.keys(e.config.params).length,
+        params: Object.entries(e.config.params).map(([key, def]) => ({
+          key,
+          wazuhName: def.wazuhName,
+          type: def.type,
+          description: def.description,
+          aliases: def.aliases || [],
+        })),
+      }));
     }),
 
   // ══════════════════════════════════════════════════════════════════════════════

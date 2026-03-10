@@ -8,6 +8,7 @@ import { WazuhGuard } from "@/components/shared/WazuhGuard";
 import { trpc } from "@/lib/trpc";
 
 import { ExportButton } from "@/components/shared/ExportButton";
+import AlertClassifyButton from "@/components/shared/AlertClassifyButton";
 import { EXPORT_COLUMNS } from "@/lib/exportUtils";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
@@ -962,6 +963,14 @@ export default function SiemEvents() {
                     >
                       <Copy className="h-3.5 w-3.5" />
                     </button>
+                    <AlertClassifyButton
+                      alertData={event as unknown as Record<string, unknown>}
+                      agentContext={{
+                        agentId: event.agent.id,
+                        agentName: event.agent.name,
+                      }}
+                      compact
+                    />
                   </div>
                 </div>
 

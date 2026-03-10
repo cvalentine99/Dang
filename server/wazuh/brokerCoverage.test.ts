@@ -150,15 +150,16 @@ describe("EXPERIMENTAL_CISCAT_RESULTS_CONFIG", () => {
     expect(EXPERIMENTAL_CISCAT_RESULTS_CONFIG.endpoint).toBe("/experimental/ciscat/results");
   });
 
-  it("supports universal params", () => {
+  it("supports universal params (minus q/distinct per spec v4.14.3)", () => {
     const paramNames = Object.keys(EXPERIMENTAL_CISCAT_RESULTS_CONFIG.params);
     expect(paramNames).toContain("offset");
     expect(paramNames).toContain("limit");
     expect(paramNames).toContain("sort");
     expect(paramNames).toContain("search");
     expect(paramNames).toContain("select");
-    expect(paramNames).toContain("q");
-    expect(paramNames).toContain("distinct");
+    // Experimental endpoints do NOT support q/distinct per spec v4.14.3
+    expect(paramNames).not.toContain("q");
+    expect(paramNames).not.toContain("distinct");
   });
 
   it("supports agents_list filter", () => {
@@ -216,18 +217,25 @@ describe("EXPERIMENTAL_CISCAT_RESULTS_CONFIG", () => {
     expect(result.forwardedQuery).not.toHaveProperty("bogus_param");
   });
 
-  it("has the same CIS-CAT field filters as per-agent CISCAT_CONFIG", () => {
+  it("has the same CIS-CAT field filters as per-agent CISCAT_CONFIG (minus q/distinct per spec v4.14.3)", () => {
     const expParams = Object.keys(EXPERIMENTAL_CISCAT_RESULTS_CONFIG.params);
     const perAgentParams = Object.keys(CISCAT_CONFIG.params);
 
-    // All per-agent CIS-CAT field params should also be in experimental
+    // All per-agent CIS-CAT field params should also be in experimental,
+    // EXCEPT q and distinct which the experimental endpoint does not support per spec v4.14.3
+    const experimentalExcluded = ["q", "distinct", "wait_for_complete"];
     for (const p of perAgentParams) {
+      if (experimentalExcluded.includes(p)) continue;
       expect(expParams).toContain(p);
     }
 
     // Experimental has agents_list that per-agent doesn't
     expect(expParams).toContain("agents_list");
     expect(perAgentParams).not.toContain("agents_list");
+
+    // Confirm experimental does NOT have q/distinct
+    expect(expParams).not.toContain("q");
+    expect(expParams).not.toContain("distinct");
   });
 });
 

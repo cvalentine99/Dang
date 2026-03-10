@@ -24,7 +24,7 @@ const pool = HAS_DB
       user: parsed.username,
       password: parsed.password,
       database: parsed.pathname.slice(1),
-      ssl: { rejectUnauthorized: false },
+      ssl: { rejectUnauthorized: !(process.env.SKIP_TLS_VERIFY === "true" || process.env.SKIP_TLS_VERIFY === "1") },
     })
   : (null as unknown as ReturnType<typeof mysql.createPool>);
 
