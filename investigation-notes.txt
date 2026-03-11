@@ -1,0 +1,34 @@
+alert_queue DB columns:
+id: int, NOT NULL, auto_increment
+alertId: varchar(128), NOT NULL
+ruleId: varchar(32), NOT NULL
+ruleDescription: text, YES
+ruleLevel: int, NOT NULL, default 0
+agentId: varchar(16), YES
+agentName: varchar(128), YES
+alertTimestamp: varchar(64), YES
+rawJson: json, YES
+status: enum('queued','processing','completed','failed','dismissed'), NOT NULL, default 'queued'
+triageResult: json, YES
+queuedBy: int, YES
+queuedAt: timestamp, NOT NULL, default CURRENT_TIMESTAMP
+processedAt: timestamp, YES
+completedAt: timestamp, YES
+pipelineTriageId: varchar(64), YES
+autoTriageStatus: varchar(20), YES, default 'pending'
+
+Error message SQL:
+insert into `alert_queue` (`id`, `alertId`, `ruleId`, `ruleDescription`, `ruleLevel`, `agentId`, `agentName`, `alertTimestamp`, `rawJson`, `status`, `triageResult`, `queuedBy`, `queuedAt`, `processedAt`, `completedAt`, `pipelineTriageId`, `autoTriageStatus`) 
+values (default, ?, ?, ?, ?, ?, ?, ?, ?, ?, default, ?, default, default, default, default, default)
+
+Params: DrSjr5wBEbLI3yH00aCW,19005,SCA summary: CIS Microsoft Windows 11 Enterprise Benchmark v3.0.0: Score less than 30% (26),9,002,RFENDWINDOWS,2026-03-02T11:41:13.296-0600,{...json...},queued,1
+
+Analysis:
+- The SQL has 17 columns listed (all columns)
+- 10 params provided (alertId, ruleId, ruleDescription, ruleLevel, agentId, agentName, alertTimestamp, rawJson, status, queuedBy)
+- 7 columns use "default" (id, triageResult, queuedAt, processedAt, completedAt, pipelineTriageId, autoTriageStatus)
+- The rawJson param is a very long JSON string
+- ruleDescription is very long text
+
+Possible issue: The rawJson field contains the full alert JSON which could be very large.
+The ruleDescription length looks fine for TEXT type.

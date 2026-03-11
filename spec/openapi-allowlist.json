@@ -1,0 +1,37 @@
+{
+  "_comment": "Endpoint inventory governance for the Dang! router vs Wazuh v4.14.3 OpenAPI spec.",
+
+  "excluded": {
+    "_comment": "Spec GET endpoints intentionally NOT wired in the router. Each must have a reason.",
+    "endpoints": [
+      "/agents/uninstall",
+      "/agents/{agent_id}/key",
+      "/security/user/authenticate"
+    ],
+    "reasons": {
+      "/agents/uninstall": "Write operation — violates read-only-by-default project constraint. Agent uninstall is a destructive action.",
+      "/agents/{agent_id}/key": "Returns agent registration key — sensitive credential exposure. Not needed for read-focused analyst workflows.",
+      "/security/user/authenticate": "Auth is handled by Dang!'s own OAuth layer, not by proxying Wazuh token requests to the browser."
+    }
+  },
+
+  "extra": {
+    "_comment": "Registry endpoints that exist in the router but are NOT in the Wazuh v4.14.3 OpenAPI spec. These are intentional additions, not drift.",
+    "endpoints": [
+      "/",
+      "/agents/{agent_id}",
+      "/security/users/{user_id}",
+      "/security/roles/{role_id}",
+      "/security/policies/{policy_id}",
+      "/security/rules/{rule_id}"
+    ],
+    "reasons": {
+      "/": "Root API info endpoint. Returns Wazuh server metadata (version, cluster name). Not in spec but supported at runtime.",
+      "/agents/{agent_id}": "Single-agent detail fetch by ID. The spec lists /agents with agent filtering, but the direct ID path works at runtime and is more ergonomic for detail views.",
+      "/security/users/{user_id}": "Individual user retrieval. The spec only defines PUT on this path, but Wazuh accepts GET at runtime. Added as C-4 convenience endpoint.",
+      "/security/roles/{role_id}": "Individual role retrieval. Same as users — spec has PUT only, runtime supports GET. Added as C-4 convenience endpoint.",
+      "/security/policies/{policy_id}": "Individual policy retrieval. Same pattern — spec has PUT only, runtime supports GET. Added as C-4 convenience endpoint.",
+      "/security/rules/{rule_id}": "Individual RBAC rule retrieval. Same pattern — spec has PUT only, runtime supports GET. Added as C-4 convenience endpoint."
+    }
+  }
+}

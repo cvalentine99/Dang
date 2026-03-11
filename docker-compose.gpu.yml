@@ -1,0 +1,80 @@
+# ============================================================================
+# Dang! SIEM — GPU LLM Overlay (Nemotron Nano on CUDA)
+#
+# Runs unsloth/Nemotron-3-Nano-30B-A3B-GGUF via llama.cpp server
+# alongside the Dang! application on a CUDA-capable host.
+#
+# Prerequisites:
+#   - NVIDIA GPU with CUDA support (24GB+ VRAM recommended)
+#   - NVIDIA Container Toolkit installed:
+#       sudo apt install nvidia-container-toolkit
+#       sudo nvidia-ctk runtime configure --runtime=docker
+#       sudo systemctl restart docker
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+#
+# Or via deploy.sh:
+#   ./deploy.sh --gpu
+#
+# With HTTPS proxy:
+#   ./deploy.sh --proxy caddy --gpu
+#
+# The model is downloaded on first startup (~18GB) and cached in a volume.
+# Subsequent starts are fast (model loaded from cache).
+# ============================================================================
+
+services:
+  # ── Override app to connect to the local LLM service ──────────────────────
+  app:
+    depends_on:
+      db:
+        condition: service_healthy
+      llm:
+        condition: service_healthy
+    environment:
+      # Point Dang! at the local llama.cpp server
+      LLM_HOST: llm
+      LLM_PORT: 8080
+      LLM_MODEL: ${LLM_MODEL:-unsloth/Nemotron-3-Nano-30B-A3B-GGUF}
+      LLM_ENABLED: "true"
+
+  # ── llama.cpp Server with CUDA ────────────────────────────────────────────
+  llm:
+    image: ghcr.io/ggerganov/llama.cpp:server-cuda
+    container_name: dang-llm
+    restart: unless-stopped
+    ports:
+      - "${LLM_EXTERNAL_PORT:-8080}:8080"
+    volumes:
+      - llm-models:/models
+    environment:
+      # Model download and configuration
+      LLAMA_ARG_MODEL_URL: ${LLM_MODEL_URL:-https://huggingface.co/unsloth/Nemotron-3-Nano-30B-A3B-GGUF/resolve/main/Nemotron-3-Nano-30B-A3B-Q4_K_M.gguf}
+      LLAMA_ARG_CTX_SIZE: ${LLM_CTX_SIZE:-8192}
+      LLAMA_ARG_N_GPU_LAYERS: ${LLM_GPU_LAYERS:-99}
+      LLAMA_ARG_HOST: 0.0.0.0
+      LLAMA_ARG_PORT: 8080
+      LLAMA_ARG_FLASH_ATTN: "true"
+      LLAMA_ARG_THREADS: ${LLM_THREADS:-8}
+      LLAMA_ARG_PARALLEL: ${LLM_PARALLEL:-2}
+      LLAMA_ARG_CONT_BATCHING: "true"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${LLM_GPU_COUNT:-1}
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - dang-net
+
+volumes:
+  llm-models:
+    driver: local

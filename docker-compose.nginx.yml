@@ -1,0 +1,54 @@
+# ============================================================================
+# Dang! SIEM — Nginx HTTPS Reverse Proxy Override
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.nginx.yml up -d
+#
+# Or via deploy.sh:
+#   ./deploy.sh --proxy nginx
+#
+# Requires SSL certificates in proxy/nginx/ssl/:
+#   - dang.crt  (certificate or fullchain)
+#   - dang.key  (private key)
+#
+# Generate self-signed certs for testing:
+#   openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+#     -keyout proxy/nginx/ssl/dang.key \
+#     -out proxy/nginx/ssl/dang.crt \
+#     -subj "/CN=dang.local"
+# ============================================================================
+
+services:
+  # Override app to remove direct port exposure (Nginx handles ingress)
+  app:
+    ports: []
+    expose:
+      - "3000"
+
+  # ── Nginx Reverse Proxy ──────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: dang-nginx
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./proxy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./proxy/nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - dang-net
+
+volumes:
+  nginx-logs:
+    driver: local

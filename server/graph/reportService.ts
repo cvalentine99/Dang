@@ -1,0 +1,341 @@
+/**
+ * Investigation Report Service
+ *
+ * Generates Markdown and HTML reports from investigation sessions,
+ * including metadata, timeline, analyst notes, and evidence.
+ */
+
+import { getDb } from "../db";
+import {
+  investigationSessions,
+  investigationNotes,
+} from "../../drizzle/schema";
+import { eq, desc, and } from "drizzle-orm";
+
+// ── Types ───────────────────────────────────────────────────────────────────
+
+export interface ReportData {
+  id: number;
+  title: string;
+  description: string | null;
+  status: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  evidence: Array<{
+    type: string;
+    label: string;
+    data: Record<string, unknown>;
+    addedAt: string;
+  }>;
+  timeline: Array<{
+    timestamp: string;
+    event: string;
+    source: string;
+    severity?: string;
+  }>;
+  notes: Array<{
+    id: number;
+    content: string;
+    createdAt: string;
+  }>;
+}
+
+// ── Data Fetcher ────────────────────────────────────────────────────────────
+
+export async function getInvestigationReportData(
+  sessionId: number,
+  userId: number
+): Promise<ReportData | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const sessions = await db
+    .select()
+    .from(investigationSessions)
+    .where(
+      and(
+        eq(investigationSessions.id, sessionId),
+        eq(investigationSessions.userId, userId)
+      )
+    )
+    .limit(1);
+
+  if (sessions.length === 0) return null;
+  const session = sessions[0];
+
+  const notes = await db
+    .select()
+    .from(investigationNotes)
+    .where(eq(investigationNotes.sessionId, sessionId))
+    .orderBy(desc(investigationNotes.createdAt));
+
+  return {
+    id: session.id,
+    title: session.title,
+    description: session.description,
+    status: session.status,
+    tags: Array.isArray(session.tags) ? (session.tags as string[]) : [],
+    createdAt: session.createdAt.toISOString(),
+    updatedAt: session.updatedAt.toISOString(),
+    evidence: Array.isArray(session.evidence)
+      ? (session.evidence as ReportData["evidence"])
+      : [],
+    timeline: Array.isArray(session.timeline)
+      ? (session.timeline as ReportData["timeline"])
+      : [],
+    notes: notes.map((n) => ({
+      id: n.id,
+      content: n.content,
+      createdAt: n.createdAt.toISOString(),
+    })),
+  };
+}
+
+// ── Markdown Generator ──────────────────────────────────────────────────────
+
+export function generateMarkdownReport(data: ReportData): string {
+  const lines: string[] = [];
+
+  // Header
+  lines.push(`# Investigation Report: ${data.title}`);
+  lines.push("");
+  lines.push("---");
+  lines.push("");
+
+  // Metadata table
+  lines.push("## Investigation Metadata");
+  lines.push("");
+  lines.push("| Field | Value |");
+  lines.push("|-------|-------|");
+  lines.push(`| **ID** | #${data.id} |`);
+  lines.push(`| **Status** | ${data.status.toUpperCase()} |`);
+  lines.push(`| **Created** | ${new Date(data.createdAt).toLocaleString()} |`);
+  lines.push(`| **Last Updated** | ${new Date(data.updatedAt).toLocaleString()} |`);
+  if (data.tags.length > 0) {
+    lines.push(`| **Tags** | ${data.tags.map((t) => `\`${t}\``).join(", ")} |`);
+  }
+  lines.push("");
+
+  // Description
+  if (data.description) {
+    lines.push("## Description");
+    lines.push("");
+    lines.push(data.description);
+    lines.push("");
+  }
+
+  // Timeline
+  if (data.timeline.length > 0) {
+    lines.push("## Timeline");
+    lines.push("");
+    lines.push("| Timestamp | Event | Source | Severity |");
+    lines.push("|-----------|-------|--------|----------|");
+    for (const entry of data.timeline) {
+      const ts = new Date(entry.timestamp).toLocaleString();
+      const sev = entry.severity ?? "—";
+      lines.push(`| ${ts} | ${entry.event} | ${entry.source} | ${sev} |`);
+    }
+    lines.push("");
+  }
+
+  // Evidence
+  if (data.evidence.length > 0) {
+    lines.push("## Evidence");
+    lines.push("");
+    for (let i = 0; i < data.evidence.length; i++) {
+      const ev = data.evidence[i];
+      lines.push(`### Evidence ${i + 1}: ${ev.label}`);
+      lines.push("");
+      lines.push(`- **Type:** ${ev.type}`);
+      lines.push(`- **Added:** ${new Date(ev.addedAt).toLocaleString()}`);
+      lines.push("");
+      if (Object.keys(ev.data).length > 0) {
+        lines.push("```json");
+        lines.push(JSON.stringify(ev.data, null, 2));
+        lines.push("```");
+        lines.push("");
+      }
+    }
+  }
+
+  // Analyst Notes
+  if (data.notes.length > 0) {
+    lines.push("## Analyst Notes");
+    lines.push("");
+    for (const note of data.notes) {
+      const ts = new Date(note.createdAt).toLocaleString();
+      lines.push(`### Note (${ts})`);
+      lines.push("");
+      lines.push(note.content);
+      lines.push("");
+      lines.push("---");
+      lines.push("");
+    }
+  }
+
+  // Footer
+  lines.push("---");
+  lines.push("");
+  lines.push(
+    `*Report generated by Dang! SecondSight on ${new Date().toLocaleString()}*`
+  );
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+// ── HTML Generator (for PDF-like rendering) ─────────────────────────────────
+
+export function generateHtmlReport(data: ReportData): string {
+  const md = generateMarkdownReport(data);
+
+  // Convert basic markdown to HTML
+  let html = md
+    // Headers
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    // Bold
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    // Inline code
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    // Code blocks
+    .replace(/```json\n([\s\S]*?)```/g, '<pre class="code-block"><code>$1</code></pre>')
+    .replace(/```\n([\s\S]*?)```/g, '<pre class="code-block"><code>$1</code></pre>')
+    // Horizontal rules
+    .replace(/^---$/gm, "<hr>")
+    // List items
+    .replace(/^- (.+)$/gm, "<li>$1</li>")
+    // Italic
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    // Tables
+    .replace(/\|([^\n]+)\|\n\|[-| ]+\|\n((?:\|[^\n]+\|\n?)*)/g, (_match, header: string, body: string) => {
+      const headers = header.split("|").map((h: string) => h.trim()).filter(Boolean);
+      const rows = body.trim().split("\n").map((row: string) =>
+        row.split("|").map((c: string) => c.trim()).filter(Boolean)
+      );
+      let table = '<table><thead><tr>';
+      for (const h of headers) table += `<th>${h}</th>`;
+      table += '</tr></thead><tbody>';
+      for (const row of rows) {
+        table += '<tr>';
+        for (const cell of row) table += `<td>${cell}</td>`;
+        table += '</tr>';
+      }
+      table += '</tbody></table>';
+      return table;
+    })
+    // Paragraphs (lines that aren't already wrapped)
+    .replace(/^(?!<[a-z]|$)(.+)$/gm, "<p>$1</p>");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Investigation Report: ${escapeHtml(data.title)}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0a0a0f;
+      color: #e2e2e8;
+      padding: 40px;
+      max-width: 900px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 28px;
+      color: #c4b5fd;
+      margin-bottom: 8px;
+      border-bottom: 2px solid rgba(168, 139, 250, 0.3);
+      padding-bottom: 12px;
+    }
+    h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 20px;
+      color: #a78bfa;
+      margin: 32px 0 16px;
+    }
+    h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      color: #c4b5fd;
+      margin: 20px 0 8px;
+    }
+    p { margin: 8px 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 13px;
+    }
+    th, td {
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 8px 12px;
+      text-align: left;
+    }
+    th {
+      background: rgba(168, 139, 250, 0.1);
+      color: #c4b5fd;
+      font-weight: 600;
+    }
+    td { background: rgba(255,255,255,0.02); }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(168, 139, 250, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #c4b5fd;
+    }
+    .code-block {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      margin: 12px 0;
+    }
+    .code-block code {
+      background: none;
+      padding: 0;
+      font-size: 11px;
+      color: #a5b4fc;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      margin: 24px 0;
+    }
+    li {
+      margin: 4px 0 4px 20px;
+      list-style: disc;
+    }
+    em { color: #94a3b8; }
+    strong { color: #e2e8f0; }
+    @media print {
+      body { background: white; color: #1a1a2e; padding: 20px; }
+      h1, h2, h3, code { color: #4c1d95; }
+      th { background: #f3e8ff; color: #4c1d95; }
+      td { background: #fafafa; }
+      .code-block { background: #f8f8f8; border-color: #e5e7eb; }
+      .code-block code { color: #4c1d95; }
+    }
+  </style>
+</head>
+<body>
+${html}
+</body>
+</html>`;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}

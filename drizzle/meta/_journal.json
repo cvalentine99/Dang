@@ -1,0 +1,111 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1771710286130,
+      "tag": "0000_brief_jimmy_woo",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1771710653544,
+      "tag": "0001_mushy_thor_girl",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1771710682684,
+      "tag": "0002_magenta_next_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1771751388413,
+      "tag": "0003_nice_human_robot",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1771756319318,
+      "tag": "0004_strong_dark_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1771769836593,
+      "tag": "0005_flowery_rawhide_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1771772122795,
+      "tag": "0006_slim_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1771784419124,
+      "tag": "0007_bored_cargill",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1771788365652,
+      "tag": "0008_certain_machine_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1771789677010,
+      "tag": "0009_fresh_marrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1771843928938,
+      "tag": "0010_good_master_chief",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1772395200000,
+      "tag": "0011_missing_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1772395300000,
+      "tag": "0012_ticket_artifacts",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1772395400000,
+      "tag": "0013_sensitive_access_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1772395500000,
+      "tag": "0014_saved_search_types",
+      "breakpoints": true
+    }
+  ]
+}

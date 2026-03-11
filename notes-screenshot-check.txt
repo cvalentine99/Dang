@@ -1,0 +1,3 @@
+Screenshot check: Dev server running, SOC Console visible. Sidebar shows all nav groups.
+Need to scroll down to see Intelligence group with Walter Queue entry.
+No TypeScript errors, no build errors. Server running cleanly.

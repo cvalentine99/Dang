@@ -1,0 +1,149 @@
+import { COOKIE_NAME } from "@shared/const";
+import { parse as parseCookie } from "cookie";
+import { getSessionCookieOptions } from "./_core/cookies";
+import { sdk } from "./_core/sdk";
+import { systemRouter } from "./_core/systemRouter";
+import { publicProcedure, router } from "./_core/trpc";
+import { wazuhRouter } from "./wazuh/wazuhRouter";
+import { hybridragRouter } from "./hybridrag/hybridragRouter";
+import { savedSearchesRouter } from "./savedSearches/savedSearchesRouter";
+import { baselinesRouter } from "./baselines/baselinesRouter";
+import { baselineSchedulesRouter } from "./baselines/baselineSchedulesRouter";
+import { indexerRouter } from "./indexer/indexerRouter";
+import { otxRouter } from "./otx/otxRouter";
+import { notesRouter } from "./notes/notesRouter";
+import { localAuthRouter } from "./localAuth/localAuthRouter";
+import { adminUsersRouter } from "./admin/adminUsersRouter";
+import { graphRouter } from "./graph/graphRouter";
+import { connectionSettingsRouter } from "./admin/connectionSettingsRouter";
+import { llmRouter } from "./llm/llmRouter";
+import { alertQueueRouter } from "./alertQueue/alertQueueRouter";
+import { splunkRouter } from "./splunk/splunkRouter";
+import { autoQueueRouter } from "./alertQueue/autoQueueRouter";
+import { huntRouter } from "./hunt/huntRouter";
+import { pipelineRouter } from "./agenticPipeline/pipelineRouter";
+import { responseActionsRouter } from "./agenticPipeline/responseActionsRouter";
+import { driftAnalyticsRouter } from "./baselines/driftAnalyticsRouter";
+import { anomalyRouter } from "./baselines/anomalyRouter";
+import { notificationHistoryRouter } from "./baselines/notificationHistoryRouter";
+import { suppressionRouter } from "./baselines/suppressionRouter";
+import { exportRouter } from "./baselines/exportRouter";
+import { enhancedLLMRouter } from "./enhancedLLM/enhancedLLMRouter";
+import { readinessRouter } from "./agenticReadiness/readinessRouter";
+import { sensitiveAccessRouter } from "./admin/sensitiveAccessRouter";
+
+export const appRouter = router({
+  system: systemRouter,
+  auth: router({
+    me: publicProcedure.query(opts => {
+      if (!opts.ctx.user) return null;
+      // S-8: Allowlist — only expose fields the frontend needs
+      const u = opts.ctx.user;
+      return {
+        id: u.id,
+        openId: u.openId,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        lastSignedIn: u.lastSignedIn,
+        createdAt: u.createdAt,
+      };
+    }),
+    logout: publicProcedure.mutation(({ ctx }) => {
+      // S-2: Blocklist the token server-side before clearing the cookie
+      const cookieHeader = ctx.req.headers.cookie;
+      if (cookieHeader) {
+        const parsed = parseCookie(cookieHeader);
+        const token = parsed[COOKIE_NAME];
+        if (token) {
+          sdk.blockToken(token);
+        }
+      }
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      return { success: true } as const;
+    }),
+  }),
+
+  // Wazuh read-only proxy — all GET, no mutations
+  wazuh: wazuhRouter,
+
+  // HybridRAG agentic assistant + analyst notes
+  hybridrag: hybridragRouter,
+
+  // Saved search queries (SIEM + Threat Hunting)
+  savedSearches: savedSearchesRouter,
+
+  // Configuration baselines for drift detection
+  baselines: baselinesRouter,
+
+  // Scheduled baseline auto-capture
+  baselineSchedules: baselineSchedulesRouter,
+
+  // Wazuh Indexer (OpenSearch/Elasticsearch) — read-only queries
+  indexer: indexerRouter,
+
+  // AlienVault OTX Threat Intelligence — read-only
+  otx: otxRouter,
+
+  // Analyst Notes v2 — local-only entity-linked notes
+  notes: notesRouter,
+
+  // Local auth for Docker self-hosted mode
+  localAuth: localAuthRouter,
+
+  // Admin user management (admin-only)
+  adminUsers: adminUsersRouter,
+
+  // Knowledge Graph + HybridRAG Agentic Pipeline
+  graph: graphRouter,
+  // Connection Settings (admin-only)
+  connectionSettings: connectionSettingsRouter,
+
+  // LLM health monitoring and token usage tracking
+  llm: llmRouter,
+
+  // Alert queue (10-deep, human-initiated structured triage)
+  alertQueue: alertQueueRouter,
+
+  // Splunk ES Mission Control — HEC ticket creation
+  splunk: splunkRouter,
+
+  // Auto-queue rules — automatic alert routing
+  autoQueue: autoQueueRouter,
+
+  // Threat Hunting — server-side multi-source IOC correlation
+  hunt: huntRouter,
+
+  // Agentic SOC Pipeline — structured triage, correlation, case management
+  pipeline: pipelineRouter,
+
+  // Response Actions — first-class, structured, queryable, stateful, auditable
+  responseActions: responseActionsRouter,
+
+  // Drift Analytics — read-only aggregated drift trend data
+  driftAnalytics: driftAnalyticsRouter,
+
+  // Drift Anomaly Detection — statistical outlier flagging
+  anomalies: anomalyRouter,
+
+  // Drift Notification History — audit trail for all drift/anomaly notifications
+  notificationHistory: notificationHistoryRouter,
+
+  // Anomaly Suppression Rules — maintenance window alert muting
+  suppression: suppressionRouter,
+
+  // Drift Report Export — CSV/PDF export for compliance reporting
+  export: exportRouter,
+
+  // Enhanced LLM — Nemotron-3 Nano session-type-aware chat, alert classification, DGX health
+  enhancedLLM: enhancedLLMRouter,
+
+  // Agentic Readiness — pre-flight dependency and workflow status
+  readiness: readinessRouter,
+
+  // Sensitive Access Audit — admin-only compliance viewer
+  sensitiveAccess: sensitiveAccessRouter,
+});
+
+export type AppRouter = typeof appRouter;

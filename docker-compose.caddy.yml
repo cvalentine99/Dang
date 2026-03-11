@@ -1,0 +1,47 @@
+# ============================================================================
+# Dang! SIEM — Caddy HTTPS Reverse Proxy Override
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
+#
+# Or via deploy.sh:
+#   ./deploy.sh --proxy caddy
+#
+# Caddy automatically provisions Let's Encrypt TLS certificates.
+# Ensure ports 80 and 443 are open and DANG_DOMAIN is set in .env.
+# ============================================================================
+
+services:
+  # Override app to remove direct port exposure (Caddy handles ingress)
+  app:
+    ports: []
+    expose:
+      - "3000"
+
+  # ── Caddy Reverse Proxy ──────────────────────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: dang-caddy
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DANG_DOMAIN: ${DANG_DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./proxy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - dang-net
+
+volumes:
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local

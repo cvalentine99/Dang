@@ -1,0 +1,5158 @@
+{
+  "generated": "2026-03-10T20:09:26.518Z",
+  "callsiteCount": 182,
+  "procedureCount": 129,
+  "consumedProcedures": [
+    "agentBrowserExtensions",
+    "agentById",
+    "agentConfig",
+    "agentDaemonStats",
+    "agentGroupMembers",
+    "agentGroupSync",
+    "agentGroups",
+    "agentGroups2",
+    "agentHardware",
+    "agentHotfixes",
+    "agentKey",
+    "agentNetaddr",
+    "agentNetiface",
+    "agentNetproto",
+    "agentOs",
+    "agentOverview",
+    "agentPackages",
+    "agentPorts",
+    "agentProcesses",
+    "agentServices",
+    "agentStats",
+    "agentSummaryOs",
+    "agentSummaryStatus",
+    "agentUsers",
+    "agents",
+    "agentsNoGroup",
+    "agentsOutdated",
+    "agentsStatsDistinct",
+    "agentsSummary",
+    "agentsUninstallPermission",
+    "agentsUpgradeResult",
+    "analysisd",
+    "apiInfo",
+    "brokerConfigList",
+    "brokerCoverage",
+    "brokerPlayground",
+    "cacheClear",
+    "cacheSetEnabled",
+    "cacheSetTtl",
+    "cacheStats",
+    "ciscatResults",
+    "clusterApiConfig",
+    "clusterConfigValidation",
+    "clusterHealthcheck",
+    "clusterLocalConfig",
+    "clusterLocalInfo",
+    "clusterNodeComponentConfig",
+    "clusterNodeConfiguration",
+    "clusterNodeDaemonStats",
+    "clusterNodeInfo",
+    "clusterNodeLogs",
+    "clusterNodeLogsSummary",
+    "clusterNodeStats",
+    "clusterNodeStatsAnalysisd",
+    "clusterNodeStatsHourly",
+    "clusterNodeStatsRemoted",
+    "clusterNodeStatsWeekly",
+    "clusterNodeStatus",
+    "clusterNodes",
+    "clusterRulesetSync",
+    "clusterStatus",
+    "daemonStats",
+    "decoderFileContent",
+    "decoderFiles",
+    "decoderParents",
+    "decoders",
+    "expCiscatResults",
+    "expSyscollectorHardware",
+    "expSyscollectorHotfixes",
+    "expSyscollectorNetaddr",
+    "expSyscollectorNetiface",
+    "expSyscollectorNetproto",
+    "expSyscollectorOs",
+    "expSyscollectorPackages",
+    "expSyscollectorPorts",
+    "expSyscollectorProcesses",
+    "groupConfiguration",
+    "groupFileContent",
+    "groupFiles",
+    "isConfigured",
+    "lists",
+    "listsFileContent",
+    "listsFiles",
+    "managerApiConfig",
+    "managerComponentConfig",
+    "managerConfigValidation",
+    "managerConfiguration",
+    "managerInfo",
+    "managerLogs",
+    "managerLogsSummary",
+    "managerStats",
+    "managerStatus",
+    "managerVersionCheck",
+    "mitreGroups",
+    "mitreMetadata",
+    "mitreMitigations",
+    "mitreReferences",
+    "mitreSoftware",
+    "mitreTactics",
+    "mitreTechniques",
+    "rootcheckLastScan",
+    "rootcheckResults",
+    "ruleFileContent",
+    "ruleGroups",
+    "rules",
+    "rulesByRequirement",
+    "rulesFiles",
+    "scaChecks",
+    "scaPolicies",
+    "securityActions",
+    "securityConfig",
+    "securityCurrentUser",
+    "securityCurrentUserPolicies",
+    "securityPolicies",
+    "securityPolicyById",
+    "securityRbacRules",
+    "securityResources",
+    "securityRoleById",
+    "securityRoles",
+    "securityRuleById",
+    "securityUserById",
+    "securityUsers",
+    "statsHourly",
+    "statsWeekly",
+    "status",
+    "syscheckFiles",
+    "syscheckLastScan",
+    "taskStatus"
+  ],
+  "violations": [],
+  "callsites": [
+    {
+      "file": "client/src/pages/AgentCompare.tsx",
+      "line": 66,
+      "procedure": "agents",
+      "passedKeys": {
+        "limit": "500",
+        "offset": "0",
+        "search": "search || undefined"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentCompare.tsx",
+      "line": 437,
+      "procedure": "agentById",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentCompare.tsx",
+      "line": 442,
+      "procedure": "scaPolicies",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 64,
+      "procedure": "agentOs",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 65,
+      "procedure": "agentHardware",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 66,
+      "procedure": "scaPolicies",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 67,
+      "procedure": "syscheckLastScan",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 68,
+      "procedure": "agentGroupSync",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 567,
+      "procedure": "syscheckFiles",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 573,
+      "procedure": "syscheckLastScan",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 650,
+      "procedure": "agentPackages",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 651,
+      "procedure": "agentPorts",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 652,
+      "procedure": "agentProcesses",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 653,
+      "procedure": "agentNetiface",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 654,
+      "procedure": "agentNetaddr",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 802,
+      "procedure": "syscheckFiles",
+      "passedKeys": {
+        "limit": "100",
+        "offset": "0",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 1022,
+      "procedure": "agentConfig",
+      "passedKeys": {
+        "component": "pair.component",
+        "configuration": "pair.configuration",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 1029,
+      "procedure": "agentStats",
+      "passedKeys": {
+        "component": "statsComponent",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 1035,
+      "procedure": "agentDaemonStats",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 1043,
+      "procedure": "agentKey",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 1311,
+      "procedure": "rootcheckLastScan",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 1316,
+      "procedure": "rootcheckResults",
+      "passedKeys": {
+        "limit": "PAGE_SIZE",
+        "offset": "page * PAGE_SIZE",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 1543,
+      "procedure": "ciscatResults",
+      "passedKeys": {
+        "limit": "PAGE_SIZE",
+        "offset": "page * PAGE_SIZE",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentDetail.tsx",
+      "line": 1718,
+      "procedure": "agentById",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentHealth.tsx",
+      "line": 88,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/AgentHealth.tsx",
+      "line": 91,
+      "procedure": "agentSummaryStatus",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/AgentHealth.tsx",
+      "line": 92,
+      "procedure": "agentSummaryOs",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/AgentHealth.tsx",
+      "line": 93,
+      "procedure": "agentGroups",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/AgentHealth.tsx",
+      "line": 108,
+      "procedure": "agents",
+      "passedKeys": {},
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentHealth.tsx",
+      "line": 114,
+      "procedure": "agentsOutdated",
+      "passedKeys": {
+        "limit": "1",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentHealth.tsx",
+      "line": 115,
+      "procedure": "agentsNoGroup",
+      "passedKeys": {
+        "limit": "1",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentHealth.tsx",
+      "line": 127,
+      "procedure": "agentsUpgradeResult",
+      "passedKeys": {},
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentHealth.tsx",
+      "line": 134,
+      "procedure": "agentById",
+      "passedKeys": {
+        "agentId": "selectedAgent ?? \"000\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentHealth.tsx",
+      "line": 135,
+      "procedure": "agentOs",
+      "passedKeys": {
+        "agentId": "selectedAgent ?? \"000\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AgentHealth.tsx",
+      "line": 136,
+      "procedure": "agentHardware",
+      "passedKeys": {
+        "agentId": "selectedAgent ?? \"000\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/AlertsTimeline.tsx",
+      "line": 170,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/AlertsTimeline.tsx",
+      "line": 173,
+      "procedure": "statsHourly",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/AlertsTimeline.tsx",
+      "line": 174,
+      "procedure": "statsWeekly",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/BrokerCoverage.tsx",
+      "line": 142,
+      "procedure": "brokerCoverage",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/BrokerPlayground.tsx",
+      "line": 390,
+      "procedure": "brokerConfigList",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/BrokerPlayground.tsx",
+      "line": 391,
+      "procedure": "brokerPlayground",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 220,
+      "procedure": "clusterNodeStatus",
+      "passedKeys": {
+        "nodeId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 224,
+      "procedure": "clusterNodeConfiguration",
+      "passedKeys": {
+        "nodeId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 228,
+      "procedure": "clusterNodeDaemonStats",
+      "passedKeys": {
+        "nodeId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 232,
+      "procedure": "clusterNodeLogs",
+      "passedKeys": {
+        "limit": "logPageSize",
+        "offset": "(logPage - 1) * logPageSize",
+        "nodeId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 236,
+      "procedure": "clusterNodeLogsSummary",
+      "passedKeys": {
+        "nodeId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 240,
+      "procedure": "clusterNodeStatsAnalysisd",
+      "passedKeys": {
+        "nodeId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 244,
+      "procedure": "clusterNodeStatsRemoted",
+      "passedKeys": {
+        "nodeId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 248,
+      "procedure": "clusterNodeStatsWeekly",
+      "passedKeys": {
+        "nodeId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 252,
+      "procedure": "clusterNodeInfo",
+      "passedKeys": {
+        "nodeId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 256,
+      "procedure": "clusterNodeStats",
+      "passedKeys": {
+        "nodeId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 260,
+      "procedure": "clusterNodeStatsHourly",
+      "passedKeys": {
+        "nodeId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 266,
+      "procedure": "clusterNodeComponentConfig",
+      "passedKeys": {
+        "component": "compComponent",
+        "configuration": "compConfiguration",
+        "nodeId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 616,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 618,
+      "procedure": "managerStatus",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 619,
+      "procedure": "managerInfo",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 620,
+      "procedure": "statsHourly",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 621,
+      "procedure": "daemonStats",
+      "passedKeys": {
+        "daemons": "[\"wazuh-analysisd\", \"wazuh-remoted\", \"wazuh-db\"]"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 622,
+      "procedure": "managerConfigValidation",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 623,
+      "procedure": "clusterStatus",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 624,
+      "procedure": "clusterNodes",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 625,
+      "procedure": "clusterHealthcheck",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 626,
+      "procedure": "clusterLocalInfo",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 627,
+      "procedure": "clusterLocalConfig",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 632,
+      "procedure": "managerLogs",
+      "passedKeys": {
+        "offset": "mgrLogPage * 20",
+        "limit": "20"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 638,
+      "procedure": "managerConfiguration",
+      "passedKeys": {},
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 643,
+      "procedure": "cacheStats",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 644,
+      "procedure": "cacheClear",
+      "passedKeys": {
+        "onSuccess": "() => { utils.wazuh.cacheStats.invalidate(); toast.success(\"Cache cleared\"); }",
+        "onError": "(e) => toast.error(`Error: ${e.message}`)"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 645,
+      "procedure": "cacheSetEnabled",
+      "passedKeys": {
+        "onSuccess": "() => { utils.wazuh.cacheStats.invalidate(); }",
+        "onError": "(e) => toast.error(`Error: ${e.message}`)"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 646,
+      "procedure": "cacheSetTtl",
+      "passedKeys": {
+        "onSuccess": "() => { utils.wazuh.cacheStats.invalidate(); }",
+        "onError": "(e) => toast.error(`Error: ${e.message}`)"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 651,
+      "procedure": "clusterApiConfig",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 652,
+      "procedure": "clusterConfigValidation",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 653,
+      "procedure": "clusterRulesetSync",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ClusterHealth.tsx",
+      "line": 654,
+      "procedure": "managerApiConfig",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Compliance.tsx",
+      "line": 157,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Compliance.tsx",
+      "line": 165,
+      "procedure": "agents",
+      "passedKeys": {
+        "limit": "100",
+        "offset": "0",
+        "status": "\"active\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/Compliance.tsx",
+      "line": 171,
+      "procedure": "scaPolicies",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/Compliance.tsx",
+      "line": 172,
+      "procedure": "scaChecks",
+      "passedKeys": {
+        "policyId": "selectedPolicy ?? \"\"",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/Compliance.tsx",
+      "line": 189,
+      "procedure": "expCiscatResults",
+      "passedKeys": {
+        "limit": "ciscatPageSize",
+        "offset": "ciscatPage * ciscatPageSize"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/FileIntegrity.tsx",
+      "line": 64,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/FileIntegrity.tsx",
+      "line": 67,
+      "procedure": "agents",
+      "passedKeys": {
+        "limit": "100",
+        "offset": "0",
+        "status": "\"active\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/FileIntegrity.tsx",
+      "line": 73,
+      "procedure": "syscheckFiles",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "search": "search || undefined",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/FileIntegrity.tsx",
+      "line": 77,
+      "procedure": "syscheckLastScan",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/FleetInventory.tsx",
+      "line": 206,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/FleetInventory.tsx",
+      "line": 226,
+      "procedure": "expSyscollectorPackages",
+      "passedKeys": {
+        "limit": "dynamic",
+        "offset": "dynamic",
+        "q": "dynamic-spread"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/FleetInventory.tsx",
+      "line": 227,
+      "procedure": "expSyscollectorProcesses",
+      "passedKeys": {
+        "limit": "dynamic",
+        "offset": "dynamic",
+        "q": "dynamic-spread"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/FleetInventory.tsx",
+      "line": 228,
+      "procedure": "expSyscollectorPorts",
+      "passedKeys": {
+        "limit": "dynamic",
+        "offset": "dynamic",
+        "q": "dynamic-spread"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/FleetInventory.tsx",
+      "line": 229,
+      "procedure": "expSyscollectorOs",
+      "passedKeys": {
+        "limit": "dynamic",
+        "offset": "dynamic",
+        "q": "dynamic-spread"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/FleetInventory.tsx",
+      "line": 230,
+      "procedure": "expSyscollectorHardware",
+      "passedKeys": {
+        "limit": "dynamic",
+        "offset": "dynamic",
+        "q": "dynamic-spread"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/FleetInventory.tsx",
+      "line": 231,
+      "procedure": "expSyscollectorHotfixes",
+      "passedKeys": {
+        "limit": "dynamic",
+        "offset": "dynamic",
+        "q": "dynamic-spread"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/FleetInventory.tsx",
+      "line": 232,
+      "procedure": "expSyscollectorNetaddr",
+      "passedKeys": {
+        "limit": "dynamic",
+        "offset": "dynamic",
+        "q": "dynamic-spread"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/FleetInventory.tsx",
+      "line": 233,
+      "procedure": "expSyscollectorNetiface",
+      "passedKeys": {
+        "limit": "dynamic",
+        "offset": "dynamic",
+        "q": "dynamic-spread"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/FleetInventory.tsx",
+      "line": 234,
+      "procedure": "expSyscollectorNetproto",
+      "passedKeys": {
+        "limit": "dynamic",
+        "offset": "dynamic",
+        "q": "dynamic-spread"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/GroupManagement.tsx",
+      "line": 62,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/GroupManagement.tsx",
+      "line": 66,
+      "procedure": "agentGroups",
+      "passedKeys": {
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/GroupManagement.tsx",
+      "line": 70,
+      "procedure": "agentsOutdated",
+      "passedKeys": {
+        "limit": "100",
+        "offset": "outdatedPage * 100"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/GroupManagement.tsx",
+      "line": 79,
+      "procedure": "agentsNoGroup",
+      "passedKeys": {
+        "limit": "100",
+        "offset": "noGroupPage * 100"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/GroupManagement.tsx",
+      "line": 88,
+      "procedure": "agentsStatsDistinct",
+      "passedKeys": {
+        "fields": "distinctField",
+        "limit": "100",
+        "offset": "distinctPage * 100"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/GroupManagement.tsx",
+      "line": 96,
+      "procedure": "agentGroupMembers",
+      "passedKeys": {
+        "groupId": "selectedGroup ?? \"\"",
+        "limit": "100",
+        "offset": "membersPage * 100"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/GroupManagement.tsx",
+      "line": 100,
+      "procedure": "groupConfiguration",
+      "passedKeys": {
+        "groupId": "selectedGroup ?? \"\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/GroupManagement.tsx",
+      "line": 104,
+      "procedure": "groupFiles",
+      "passedKeys": {
+        "groupId": "selectedGroup ?? \"\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/GroupManagement.tsx",
+      "line": 108,
+      "procedure": "groupFileContent",
+      "passedKeys": {
+        "groupId": "selectedGroup ?? \"\"",
+        "fileName": "fileToView ?? \"\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "line": 228,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "line": 231,
+      "procedure": "agentSummaryStatus",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "line": 232,
+      "procedure": "analysisd",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "line": 233,
+      "procedure": "statsHourly",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "line": 234,
+      "procedure": "managerStatus",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "line": 235,
+      "procedure": "rules",
+      "passedKeys": {
+        "limit": "10",
+        "sort": "\"-level\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "line": 236,
+      "procedure": "agents",
+      "passedKeys": {
+        "limit": "8",
+        "sort": "\"-dateAdd\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "line": 237,
+      "procedure": "mitreTactics",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "line": 238,
+      "procedure": "managerLogsSummary",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "line": 239,
+      "procedure": "agentOverview",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "line": 240,
+      "procedure": "agentsSummary",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 93,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 101,
+      "procedure": "agents",
+      "passedKeys": {
+        "limit": "100",
+        "offset": "0",
+        "status": "\"active\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 111,
+      "procedure": "agentPackages",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "search": "search || undefined",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 115,
+      "procedure": "agentPorts",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 119,
+      "procedure": "agentProcesses",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "search": "search || undefined",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 123,
+      "procedure": "agentNetiface",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 127,
+      "procedure": "agentNetaddr",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 131,
+      "procedure": "agentNetproto",
+      "passedKeys": {
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 135,
+      "procedure": "agentHotfixes",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 141,
+      "procedure": "agentBrowserExtensions",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 147,
+      "procedure": "agentServices",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 153,
+      "procedure": "agentUsers",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ITHygiene.tsx",
+      "line": 157,
+      "procedure": "agentGroups2",
+      "passedKeys": {
+        "limit": "pageSize",
+        "offset": "page * pageSize",
+        "agentId": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/MitreAttack.tsx",
+      "line": 109,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/MitreAttack.tsx",
+      "line": 119,
+      "procedure": "mitreTactics",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/MitreAttack.tsx",
+      "line": 120,
+      "procedure": "mitreTechniques",
+      "passedKeys": {
+        "limit": "500"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/MitreAttack.tsx",
+      "line": 121,
+      "procedure": "mitreGroups",
+      "passedKeys": {
+        "limit": "100"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/MitreAttack.tsx",
+      "line": 122,
+      "procedure": "rules",
+      "passedKeys": {
+        "limit": "500",
+        "offset": "0",
+        "sort": "\"-level\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/MitreAttack.tsx",
+      "line": 123,
+      "procedure": "mitreMetadata",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/MitreAttack.tsx",
+      "line": 128,
+      "procedure": "mitreSoftware",
+      "passedKeys": {
+        "limit": "MITRE_PAGE_SIZE",
+        "offset": "softwarePage * MITRE_PAGE_SIZE"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/MitreAttack.tsx",
+      "line": 132,
+      "procedure": "mitreMitigations",
+      "passedKeys": {
+        "limit": "MITRE_PAGE_SIZE",
+        "offset": "mitigationsPage * MITRE_PAGE_SIZE"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/MitreAttack.tsx",
+      "line": 136,
+      "procedure": "mitreReferences",
+      "passedKeys": {
+        "limit": "MITRE_PAGE_SIZE",
+        "offset": "referencesPage * MITRE_PAGE_SIZE"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 82,
+      "procedure": "ruleFileContent",
+      "passedKeys": {
+        "filename": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 83,
+      "procedure": "decoderFileContent",
+      "passedKeys": {
+        "filename": "shorthand"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 177,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 221,
+      "procedure": "rules",
+      "passedKeys": {},
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 225,
+      "procedure": "decoders",
+      "passedKeys": {
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 229,
+      "procedure": "ruleGroups",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 234,
+      "procedure": "rulesFiles",
+      "passedKeys": {
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 238,
+      "procedure": "decoderFiles",
+      "passedKeys": {
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 242,
+      "procedure": "lists",
+      "passedKeys": {
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 246,
+      "procedure": "listsFiles",
+      "passedKeys": {
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 255,
+      "procedure": "decoderParents",
+      "passedKeys": {
+        "limit": "DP_PAGE_SIZE",
+        "offset": "decoderParentsPage * DP_PAGE_SIZE"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 262,
+      "procedure": "rulesByRequirement",
+      "passedKeys": {
+        "requirement": "activeRequirement"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/RulesetExplorer.tsx",
+      "line": 268,
+      "procedure": "listsFileContent",
+      "passedKeys": {
+        "filename": "cdbFileToView ?? \"\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 197,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 200,
+      "procedure": "securityRbacRules",
+      "passedKeys": {
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 201,
+      "procedure": "securityActions",
+      "passedKeys": {},
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 207,
+      "procedure": "securityResources",
+      "passedKeys": {},
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 208,
+      "procedure": "securityCurrentUserPolicies",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 209,
+      "procedure": "securityRoles",
+      "passedKeys": {
+        "offset": "rolesPage * pageSize",
+        "limit": "pageSize"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 218,
+      "procedure": "securityUsers",
+      "passedKeys": {
+        "offset": "usersPage * pageSize",
+        "limit": "pageSize"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 227,
+      "procedure": "securityPolicies",
+      "passedKeys": {
+        "offset": "policiesPage * pageSize",
+        "limit": "pageSize"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 236,
+      "procedure": "securityCurrentUser",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 239,
+      "procedure": "securityRoleById",
+      "passedKeys": {
+        "roleId": "selectedRoleId!"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 240,
+      "procedure": "securityUserById",
+      "passedKeys": {
+        "userId": "selectedUserId!"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 241,
+      "procedure": "securityPolicyById",
+      "passedKeys": {
+        "policyId": "selectedPolicyId!"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/SecurityExplorer.tsx",
+      "line": 242,
+      "procedure": "securityRuleById",
+      "passedKeys": {
+        "ruleId": "selectedRuleId!"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/SiemEvents.tsx",
+      "line": 110,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/SiemEvents.tsx",
+      "line": 113,
+      "procedure": "rules",
+      "passedKeys": {
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/SiemEvents.tsx",
+      "line": 117,
+      "procedure": "agents",
+      "passedKeys": {
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/Status.tsx",
+      "line": 541,
+      "procedure": "apiInfo",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Status.tsx",
+      "line": 546,
+      "procedure": "managerVersionCheck",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Status.tsx",
+      "line": 551,
+      "procedure": "securityConfig",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Status.tsx",
+      "line": 566,
+      "procedure": "managerStats",
+      "passedKeys": {},
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/Status.tsx",
+      "line": 571,
+      "procedure": "isConfigured",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Status.tsx",
+      "line": 580,
+      "procedure": "managerComponentConfig",
+      "passedKeys": {
+        "component": "compConfigComponent",
+        "configuration": "compConfigConfiguration"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/Status.tsx",
+      "line": 585,
+      "procedure": "agentsUninstallPermission",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Status.tsx",
+      "line": 590,
+      "procedure": "taskStatus",
+      "passedKeys": {
+        "offset": "taskPage * taskPageSize",
+        "limit": "taskPageSize"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/ThreatHunting.tsx",
+      "line": 247,
+      "procedure": "agentSummaryStatus",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/ThreatHunting.tsx",
+      "line": 248,
+      "procedure": "rules",
+      "passedKeys": {
+        "limit": "1",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/pages/Vulnerabilities.tsx",
+      "line": 105,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/pages/Vulnerabilities.tsx",
+      "line": 112,
+      "procedure": "agents",
+      "passedKeys": {
+        "limit": "100",
+        "offset": "0",
+        "status": "\"active\""
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/components/DriftComparison.tsx",
+      "line": 413,
+      "procedure": "agents",
+      "passedKeys": {
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/components/DriftComparison.tsx",
+      "line": 446,
+      "procedure": "agentPackages",
+      "passedKeys": {
+        "agentId": "agentId || \"__noop__\"",
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/components/DriftComparison.tsx",
+      "line": 455,
+      "procedure": "agentServices",
+      "passedKeys": {
+        "agentId": "agentId || \"__noop__\"",
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/components/DriftComparison.tsx",
+      "line": 464,
+      "procedure": "agentUsers",
+      "passedKeys": {
+        "agentId": "agentId || \"__noop__\"",
+        "limit": "500",
+        "offset": "0"
+      },
+      "isVoid": false
+    },
+    {
+      "file": "client/src/components/shared/WazuhGuard.tsx",
+      "line": 21,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    },
+    {
+      "file": "client/src/components/shared/WazuhGuard.tsx",
+      "line": 72,
+      "procedure": "status",
+      "passedKeys": {},
+      "isVoid": true
+    }
+  ],
+  "schemas": {
+    "status": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "isConfigured": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "managerInfo": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "managerStatus": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "managerConfiguration": {
+      "inputType": "object",
+      "keys": {
+        "section": {
+          "required": false,
+          "default": null
+        },
+        "field": {
+          "required": false,
+          "default": null
+        },
+        "raw": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "managerConfigValidation": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "managerStats": {
+      "inputType": "object",
+      "keys": {
+        "date": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "statsHourly": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "statsWeekly": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "analysisd": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "remoted": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "daemonStats": {
+      "inputType": "object",
+      "keys": {
+        "daemons": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "managerLogs": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "level": {
+          "required": false,
+          "default": null
+        },
+        "tag": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "managerLogsSummary": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "managerVersionCheck": {
+      "inputType": "object",
+      "keys": {
+        "force_query": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "managerComponentConfig": {
+      "inputType": "object",
+      "keys": {
+        "component": {
+          "required": true,
+          "default": null
+        },
+        "configuration": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "clusterStatus": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "clusterNodes": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "type": {
+          "required": false,
+          "default": null
+        },
+        "nodes_list": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "clusterHealthcheck": {
+      "inputType": "object",
+      "keys": {
+        "nodes_list": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "clusterLocalInfo": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "clusterLocalConfig": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "clusterRulesetSync": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "clusterApiConfig": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "clusterConfigValidation": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "managerApiConfig": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "clusterNodeInfo": {
+      "inputType": "object",
+      "keys": {
+        "nodeId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "clusterNodeStats": {
+      "inputType": "object",
+      "keys": {
+        "nodeId": {
+          "required": true,
+          "default": null
+        },
+        "date": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "clusterNodeStatsHourly": {
+      "inputType": "object",
+      "keys": {
+        "nodeId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "agents": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "status": {
+          "required": false,
+          "default": null
+        },
+        "os_platform": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "group": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "older_than": {
+          "required": false,
+          "default": null
+        },
+        "manager_host": {
+          "required": false,
+          "default": null
+        },
+        "version": {
+          "required": false,
+          "default": null
+        },
+        "node_name": {
+          "required": false,
+          "default": null
+        },
+        "name": {
+          "required": false,
+          "default": null
+        },
+        "ip": {
+          "required": false,
+          "default": null
+        },
+        "registerIP": {
+          "required": false,
+          "default": null
+        },
+        "group_config_status": {
+          "required": false,
+          "default": null
+        },
+        "manager": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentSummaryStatus": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "agentSummaryOs": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "agentsSummary": {
+      "inputType": "object",
+      "keys": {
+        "agents_list": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentOverview": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "agentById": {
+      "inputType": "object",
+      "keys": {
+        "agentId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "agentKey": {
+      "inputType": "object",
+      "keys": {
+        "agentId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "agentDaemonStats": {
+      "inputType": "object",
+      "keys": {
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "daemons_list": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentStats": {
+      "inputType": "object",
+      "keys": {
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "component": {
+          "required": false,
+          "default": "\"logcollector\""
+        }
+      }
+    },
+    "agentConfig": {
+      "inputType": "object",
+      "keys": {
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "component": {
+          "required": true,
+          "default": null
+        },
+        "configuration": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "agentsUpgradeResult": {
+      "inputType": "object",
+      "keys": {
+        "agents_list": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "os_platform": {
+          "required": false,
+          "default": null
+        },
+        "os_version": {
+          "required": false,
+          "default": null
+        },
+        "os_name": {
+          "required": false,
+          "default": null
+        },
+        "manager": {
+          "required": false,
+          "default": null
+        },
+        "version": {
+          "required": false,
+          "default": null
+        },
+        "group": {
+          "required": false,
+          "default": null
+        },
+        "node_name": {
+          "required": false,
+          "default": null
+        },
+        "name": {
+          "required": false,
+          "default": null
+        },
+        "ip": {
+          "required": false,
+          "default": null
+        },
+        "registerIP": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentsUninstallPermission": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "agentGroupSync": {
+      "inputType": "object",
+      "keys": {
+        "agentId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "apiInfo": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "agentGroups": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "hash": {
+          "required": false,
+          "default": null
+        },
+        "groups_list": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentsOutdated": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentsNoGroup": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentsStatsDistinct": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "fields": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentGroupMembers": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "groupId": {
+          "required": true,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "status": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentOs": {
+      "inputType": "object",
+      "keys": {
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentHardware": {
+      "inputType": "object",
+      "keys": {
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentPackages": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "vendor": {
+          "required": false,
+          "default": null
+        },
+        "name": {
+          "required": false,
+          "default": null
+        },
+        "architecture": {
+          "required": false,
+          "default": null
+        },
+        "format": {
+          "required": false,
+          "default": null
+        },
+        "version": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentPorts": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "pid": {
+          "required": false,
+          "default": null
+        },
+        "protocol": {
+          "required": false,
+          "default": null
+        },
+        "tx_queue": {
+          "required": false,
+          "default": null
+        },
+        "state": {
+          "required": false,
+          "default": null
+        },
+        "process": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentProcesses": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "pid": {
+          "required": false,
+          "default": null
+        },
+        "state": {
+          "required": false,
+          "default": null
+        },
+        "ppid": {
+          "required": false,
+          "default": null
+        },
+        "egroup": {
+          "required": false,
+          "default": null
+        },
+        "euser": {
+          "required": false,
+          "default": null
+        },
+        "fgroup": {
+          "required": false,
+          "default": null
+        },
+        "name": {
+          "required": false,
+          "default": null
+        },
+        "nlwp": {
+          "required": false,
+          "default": null
+        },
+        "pgrp": {
+          "required": false,
+          "default": null
+        },
+        "priority": {
+          "required": false,
+          "default": null
+        },
+        "rgroup": {
+          "required": false,
+          "default": null
+        },
+        "ruser": {
+          "required": false,
+          "default": null
+        },
+        "sgroup": {
+          "required": false,
+          "default": null
+        },
+        "suser": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentNetaddr": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "iface": {
+          "required": false,
+          "default": null
+        },
+        "proto": {
+          "required": false,
+          "default": null
+        },
+        "address": {
+          "required": false,
+          "default": null
+        },
+        "broadcast": {
+          "required": false,
+          "default": null
+        },
+        "netmask": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentNetiface": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "name": {
+          "required": false,
+          "default": null
+        },
+        "adapter": {
+          "required": false,
+          "default": null
+        },
+        "type": {
+          "required": false,
+          "default": null
+        },
+        "state": {
+          "required": false,
+          "default": null
+        },
+        "mtu": {
+          "required": false,
+          "default": null
+        },
+        "mac": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentHotfixes": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "hotfix": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "groupFiles": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "groupId": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "hash": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentBrowserExtensions": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentServices": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentUsers": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentGroups2": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "agentNetproto": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "iface": {
+          "required": false,
+          "default": null
+        },
+        "type": {
+          "required": false,
+          "default": null
+        },
+        "gateway": {
+          "required": false,
+          "default": null
+        },
+        "dhcp": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "expSyscollectorPackages": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "agents_list": {
+          "required": false,
+          "default": null
+        },
+        "vendor": {
+          "required": false,
+          "default": null
+        },
+        "name": {
+          "required": false,
+          "default": null
+        },
+        "architecture": {
+          "required": false,
+          "default": null
+        },
+        "format": {
+          "required": false,
+          "default": null
+        },
+        "version": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "expSyscollectorProcesses": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "agents_list": {
+          "required": false,
+          "default": null
+        },
+        "pid": {
+          "required": false,
+          "default": null
+        },
+        "state": {
+          "required": false,
+          "default": null
+        },
+        "ppid": {
+          "required": false,
+          "default": null
+        },
+        "egroup": {
+          "required": false,
+          "default": null
+        },
+        "euser": {
+          "required": false,
+          "default": null
+        },
+        "fgroup": {
+          "required": false,
+          "default": null
+        },
+        "name": {
+          "required": false,
+          "default": null
+        },
+        "nlwp": {
+          "required": false,
+          "default": null
+        },
+        "pgrp": {
+          "required": false,
+          "default": null
+        },
+        "priority": {
+          "required": false,
+          "default": null
+        },
+        "rgroup": {
+          "required": false,
+          "default": null
+        },
+        "ruser": {
+          "required": false,
+          "default": null
+        },
+        "sgroup": {
+          "required": false,
+          "default": null
+        },
+        "suser": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "expSyscollectorPorts": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "agents_list": {
+          "required": false,
+          "default": null
+        },
+        "pid": {
+          "required": false,
+          "default": null
+        },
+        "protocol": {
+          "required": false,
+          "default": null
+        },
+        "tx_queue": {
+          "required": false,
+          "default": null
+        },
+        "state": {
+          "required": false,
+          "default": null
+        },
+        "process": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "expSyscollectorNetaddr": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "agents_list": {
+          "required": false,
+          "default": null
+        },
+        "proto": {
+          "required": false,
+          "default": null
+        },
+        "address": {
+          "required": false,
+          "default": null
+        },
+        "broadcast": {
+          "required": false,
+          "default": null
+        },
+        "netmask": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "expSyscollectorNetiface": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "agents_list": {
+          "required": false,
+          "default": null
+        },
+        "name": {
+          "required": false,
+          "default": null
+        },
+        "adapter": {
+          "required": false,
+          "default": null
+        },
+        "type": {
+          "required": false,
+          "default": null
+        },
+        "state": {
+          "required": false,
+          "default": null
+        },
+        "mtu": {
+          "required": false,
+          "default": null
+        },
+        "mac": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "expSyscollectorNetproto": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "agents_list": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "expSyscollectorOs": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "agents_list": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "expSyscollectorHardware": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "agents_list": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "expSyscollectorHotfixes": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "agents_list": {
+          "required": false,
+          "default": null
+        },
+        "hotfix": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "expCiscatResults": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "agents_list": {
+          "required": false,
+          "default": null
+        },
+        "benchmark": {
+          "required": false,
+          "default": null
+        },
+        "profile": {
+          "required": false,
+          "default": null
+        },
+        "pass": {
+          "required": false,
+          "default": null
+        },
+        "fail": {
+          "required": false,
+          "default": null
+        },
+        "error": {
+          "required": false,
+          "default": null
+        },
+        "notchecked": {
+          "required": false,
+          "default": null
+        },
+        "unknown": {
+          "required": false,
+          "default": null
+        },
+        "score": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "rules": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "level": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "group": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "status": {
+          "required": false,
+          "default": null
+        },
+        "filename": {
+          "required": false,
+          "default": null
+        },
+        "relative_dirname": {
+          "required": false,
+          "default": null
+        },
+        "pci_dss": {
+          "required": false,
+          "default": null
+        },
+        "gdpr": {
+          "required": false,
+          "default": null
+        },
+        "gpg13": {
+          "required": false,
+          "default": null
+        },
+        "hipaa": {
+          "required": false,
+          "default": null
+        },
+        "tsc": {
+          "required": false,
+          "default": null
+        },
+        "mitre": {
+          "required": false,
+          "default": null
+        },
+        "rule_ids": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "ruleGroups": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "rulesByRequirement": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "requirement": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "rulesFiles": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "filename": {
+          "required": false,
+          "default": null
+        },
+        "relative_dirname": {
+          "required": false,
+          "default": null
+        },
+        "status": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "ruleFileContent": {
+      "inputType": "object",
+      "keys": {
+        "filename": {
+          "required": true,
+          "default": null
+        },
+        "raw": {
+          "required": false,
+          "default": null
+        },
+        "get_dirnames_path": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "mitreTactics": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "mitre_tactic_ids": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "mitreTechniques": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "technique_ids": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "mitreMitigations": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "mitre_mitigation_ids": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "mitreSoftware": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "mitre_software_ids": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "mitreGroups": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "mitre_group_ids": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "mitreMetadata": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "mitreReferences": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "mitre_reference_ids": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "scaPolicies": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "name": {
+          "required": false,
+          "default": null
+        },
+        "description": {
+          "required": false,
+          "default": null
+        },
+        "references": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "scaChecks": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "policyId": {
+          "required": true,
+          "default": null
+        },
+        "result": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "title": {
+          "required": false,
+          "default": null
+        },
+        "description": {
+          "required": false,
+          "default": null
+        },
+        "rationale": {
+          "required": false,
+          "default": null
+        },
+        "remediation": {
+          "required": false,
+          "default": null
+        },
+        "command": {
+          "required": false,
+          "default": null
+        },
+        "reason": {
+          "required": false,
+          "default": null
+        },
+        "file": {
+          "required": false,
+          "default": null
+        },
+        "process": {
+          "required": false,
+          "default": null
+        },
+        "directory": {
+          "required": false,
+          "default": null
+        },
+        "registry": {
+          "required": false,
+          "default": null
+        },
+        "references": {
+          "required": false,
+          "default": null
+        },
+        "condition": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "ciscatResults": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "benchmark": {
+          "required": false,
+          "default": null
+        },
+        "profile": {
+          "required": false,
+          "default": null
+        },
+        "pass": {
+          "required": false,
+          "default": null
+        },
+        "fail": {
+          "required": false,
+          "default": null
+        },
+        "error": {
+          "required": false,
+          "default": null
+        },
+        "notchecked": {
+          "required": false,
+          "default": null
+        },
+        "unknown": {
+          "required": false,
+          "default": null
+        },
+        "score": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "syscheckFiles": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "type": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "hash": {
+          "required": false,
+          "default": null
+        },
+        "file": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "arch": {
+          "required": false,
+          "default": null
+        },
+        "summary": {
+          "required": false,
+          "default": null
+        },
+        "md5": {
+          "required": false,
+          "default": null
+        },
+        "sha1": {
+          "required": false,
+          "default": null
+        },
+        "sha256": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "syscheckLastScan": {
+      "inputType": "object",
+      "keys": {
+        "agentId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "rootcheckResults": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "agentId": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "status": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "rootcheckLastScan": {
+      "inputType": "object",
+      "keys": {
+        "agentId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "decoders": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "decoder_names": {
+          "required": false,
+          "default": null
+        },
+        "filename": {
+          "required": false,
+          "default": null
+        },
+        "relative_dirname": {
+          "required": false,
+          "default": null
+        },
+        "status": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "decoderFiles": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "filename": {
+          "required": false,
+          "default": null
+        },
+        "relative_dirname": {
+          "required": false,
+          "default": null
+        },
+        "status": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "decoderParents": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "decoderFileContent": {
+      "inputType": "object",
+      "keys": {
+        "filename": {
+          "required": true,
+          "default": null
+        },
+        "raw": {
+          "required": false,
+          "default": null
+        },
+        "relative_dirname": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "taskStatus": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "task_list": {
+          "required": false,
+          "default": null
+        },
+        "agents_list": {
+          "required": false,
+          "default": null
+        },
+        "command": {
+          "required": false,
+          "default": null
+        },
+        "node": {
+          "required": false,
+          "default": null
+        },
+        "module": {
+          "required": false,
+          "default": null
+        },
+        "status": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "securityRoles": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "role_ids": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "securityPolicies": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "policy_ids": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "securityUsers": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "user_ids": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "securityUserById": {
+      "inputType": "object",
+      "keys": {
+        "userId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "securityRoleById": {
+      "inputType": "object",
+      "keys": {
+        "roleId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "securityPolicyById": {
+      "inputType": "object",
+      "keys": {
+        "policyId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "securityRuleById": {
+      "inputType": "object",
+      "keys": {
+        "ruleId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "securityConfig": {
+      "inputType": "object",
+      "keys": {
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "securityCurrentUser": {
+      "inputType": "object",
+      "keys": {
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "securityRbacRules": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "rule_ids": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "securityActions": {
+      "inputType": "object",
+      "keys": {
+        "endpoint": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "securityResources": {
+      "inputType": "object",
+      "keys": {
+        "resource": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "securityCurrentUserPolicies": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "lists": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "filename": {
+          "required": false,
+          "default": null
+        },
+        "relative_dirname": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "listsFiles": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "filename": {
+          "required": false,
+          "default": null
+        },
+        "relative_dirname": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "groupConfiguration": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "groupId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "listsFileContent": {
+      "inputType": "object",
+      "keys": {
+        "filename": {
+          "required": true,
+          "default": null
+        },
+        "raw": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "groupFileContent": {
+      "inputType": "object",
+      "keys": {
+        "groupId": {
+          "required": true,
+          "default": null
+        },
+        "fileName": {
+          "required": true,
+          "default": null
+        },
+        "type_agents": {
+          "required": false,
+          "default": null
+        },
+        "raw": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "clusterNodeStatus": {
+      "inputType": "object",
+      "keys": {
+        "nodeId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "clusterNodeConfiguration": {
+      "inputType": "object",
+      "keys": {
+        "nodeId": {
+          "required": true,
+          "default": null
+        },
+        "section": {
+          "required": false,
+          "default": null
+        },
+        "field": {
+          "required": false,
+          "default": null
+        },
+        "raw": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "clusterNodeComponentConfig": {
+      "inputType": "object",
+      "keys": {
+        "nodeId": {
+          "required": true,
+          "default": null
+        },
+        "component": {
+          "required": true,
+          "default": null
+        },
+        "configuration": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "clusterNodeDaemonStats": {
+      "inputType": "object",
+      "keys": {
+        "nodeId": {
+          "required": true,
+          "default": null
+        },
+        "daemons_list": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "clusterNodeLogs": {
+      "inputType": "object",
+      "keys": {
+        "limit": {
+          "required": false,
+          "default": "100"
+        },
+        "offset": {
+          "required": false,
+          "default": "0"
+        },
+        "nodeId": {
+          "required": true,
+          "default": null
+        },
+        "sort": {
+          "required": false,
+          "default": null
+        },
+        "search": {
+          "required": false,
+          "default": null
+        },
+        "tag": {
+          "required": false,
+          "default": null
+        },
+        "level": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        }
+      }
+    },
+    "clusterNodeLogsSummary": {
+      "inputType": "object",
+      "keys": {
+        "nodeId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "clusterNodeStatsAnalysisd": {
+      "inputType": "object",
+      "keys": {
+        "nodeId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "clusterNodeStatsRemoted": {
+      "inputType": "object",
+      "keys": {
+        "nodeId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "clusterNodeStatsWeekly": {
+      "inputType": "object",
+      "keys": {
+        "nodeId": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "brokerCoverage": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "brokerPlayground": {
+      "inputType": "object",
+      "keys": {
+        "configName": {
+          "required": true,
+          "default": null
+        },
+        "params": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "brokerConfigList": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "cacheStats": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "cacheClear": {
+      "inputType": "void",
+      "keys": {}
+    },
+    "cacheSetTtl": {
+      "inputType": "object",
+      "keys": {
+        "ttlMs": {
+          "required": true,
+          "default": null
+        }
+      }
+    },
+    "cacheSetEnabled": {
+      "inputType": "object",
+      "keys": {
+        "enabled": {
+          "required": true,
+          "default": null
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+Knowledge Graph Page (/graph) - Current State Analysis
+=======================================================
+
+WHAT'S ALREADY BUILT:
+1. D3 force-directed graph visualization (4-layer KG)
+2. Node types: resource, endpoint, parameter, response, auth_method, use_case, index, field, error_pattern
+3. Node detail panel (click to inspect properties + raw JSON)
+4. Layer filter dropdown (API Ontology, Operational Semantics, Schema Lineage, Error & Failure)
+5. Risk level filter (SAFE, MUTATING, DESTRUCTIVE)
+6. Search across all KG layers (keyword search with dropdown results)
+7. Risk Paths panel (attack path detection with animated path highlighting)
+8. Graph Legend with type toggles (show/hide node types)
+9. Stats overlay (endpoint/resource/use-case/index counts, risk breakdown, HTTP method breakdown)
+10. Zoom controls (zoom in, zoom out, reset)
+11. Node dragging (D3 drag behavior)
+12. Risk glow effects on highlighted paths
+13. Method badges on endpoint nodes (GET/POST/PUT/DELETE color-coded)
+14. LLM lock icons on blocked endpoints
+
+BACKEND CAPABILITIES (graphRouter):
+- etlFullSync / etlSyncLayer / etlStatus (KG extraction pipeline)
+- graphStats (entity counts, risk/method breakdown)
+- overviewGraph (4-layer graph with filtering)
+- endpointsByResource (drill into a resource)
+- endpointDetail (full endpoint with params/responses)
+- searchGraph (cross-layer keyword search)
+- resourceOverview (all resources with endpoint counts)
+- useCases (all operational semantics)
+- errorPatterns (all error patterns)
+- endpoints (paginated, filtered endpoint list)
+- riskAnalysis (dangerous endpoints, resource risk map, LLM blocked count)
+- detectRiskPaths (attack path detection)
+- riskPathGraph (D3-formatted risk path data)
+- answerProvenance (trust auditing)
+- analystQuery (agentic LLM pipeline)
+- Investigation CRUD (create, list, get, update, add/delete notes)
+- Investigation export (Markdown, HTML)
+
+WHAT'S MISSING / COULD BE ENHANCED:
+1. NO endpoint detail drill-down from graph - clicking a node shows properties but can't expand to see params/responses
+2. NO resource-level drill-down - can't click a resource to see all its endpoints
+3. NO neighbor expansion - can't right-click a node to "expand neighbors"
+4. NO minimap for large graphs
+5. NO edge relationship tooltips
+6. NO graph layout options (force, hierarchical, radial)
+7. NO "focus on node" (center + zoom to a specific node from search)
+8. NO endpoint table view (tabular alternative to graph)
+9. NO comparison view (compare two resources or endpoints side-by-side)
+10. NO graph export (PNG/SVG)
+11. Stats overlay and detail panel overlap when both visible
+12. Search results don't highlight/focus the node in the graph
+13. No connection to Investigations page (can't add graph findings to an investigation)
+14. No use-case or error-pattern detail views
+15. Risk path panel doesn't link to the actual endpoint details

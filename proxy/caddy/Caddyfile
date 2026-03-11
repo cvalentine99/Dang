@@ -1,0 +1,60 @@
+# ============================================================================
+# Dang! SIEM — Caddy Reverse Proxy
+#
+# Caddy automatically provisions and renews TLS certificates via Let's Encrypt.
+# Just set DANG_DOMAIN in your .env file and ensure ports 80/443 are open.
+#
+# For local/internal use with self-signed certs, use:
+#   DANG_DOMAIN=localhost
+# ============================================================================
+
+{
+	# Global options
+	email {$ACME_EMAIL:admin@example.com}
+
+	# Uncomment for staging certs during testing (avoids rate limits)
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# ── Main site ───────────────────────────────────────────────────────────────
+{$DANG_DOMAIN:localhost} {
+	# Reverse proxy to the Dang! app container
+	reverse_proxy dang-app:3000 {
+		# Health check — Caddy will mark backend unhealthy if this fails
+		health_uri /api/health
+		health_interval 30s
+		health_timeout 10s
+	}
+
+	# Security headers
+	header {
+		# HSTS — tell browsers to always use HTTPS
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+
+		# Prevent MIME-type sniffing
+		X-Content-Type-Options "nosniff"
+
+		# Clickjacking protection
+		X-Frame-Options "SAMEORIGIN"
+
+		# XSS protection
+		X-XSS-Protection "1; mode=block"
+
+		# Referrer policy
+		Referrer-Policy "strict-origin-when-cross-origin"
+
+		# Remove server identification
+		-Server
+	}
+
+	# Gzip compression for text-based assets
+	encode gzip zstd
+
+	# Access logging
+	log {
+		output file /data/access.log {
+			roll_size 50MiB
+			roll_keep 5
+		}
+	}
+}
