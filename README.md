@@ -1,5 +1,8 @@
 # Dang! SIEM
 
+[![CI](https://github.com/cvalentine99/Dang/actions/workflows/ci.yml/badge.svg)](https://github.com/cvalentine99/Dang/actions/workflows/ci.yml)
+[![Docker Build](https://github.com/cvalentine99/Dang/actions/workflows/docker.yml/badge.svg)](https://github.com/cvalentine99/Dang/actions/workflows/docker.yml)
+[![GHCR](https://img.shields.io/badge/ghcr.io-cvalentine99%2Fdang--siem-purple?logo=github)](https://ghcr.io/cvalentine99/dang-siem)
 [![License: MIT](https://img.shields.io/badge/License-MIT-violet.svg)](LICENSE)
 
 An analyst-grade security operations platform that visualizes, correlates, and investigates **Wazuh security telemetry** — agents, alerts, vulnerabilities, FIM, CIS compliance, MITRE ATT&CK mappings, and threat intelligence — through a read-only proxy architecture with an LLM-powered agentic investigation pipeline. Built for SOC analysts on ultrawide monitors.
@@ -47,7 +50,7 @@ An analyst-grade security operations platform that visualizes, correlates, and i
                                     ┌─────────────────────────────────────────────┐
                                     │              Dang! SIEM Server               │
 Browser ──► Caddy/Nginx TLS ──►    │  Express 4 + tRPC 11                        │
-                                    │    ├── Wazuh Proxy (113 procedures)          │
+                                    │    ├── Wazuh Proxy (130 procedures)          │
                                     │    ├── Indexer Proxy (OpenSearch)             │
                                     │    ├── Agentic Pipeline (Triage → Hypothesis)│
                                     │    ├── Knowledge Graph ETL                   │
@@ -111,6 +114,7 @@ The application acts as a **strict read-only proxy** to Wazuh. All API calls flo
 | **Cluster Health** | `/cluster` | Cluster topology (master + workers), daemon status cards, hourly ingestion chart, node-level stats/logs/configuration, manager logs with level/tag filters, manager configuration section viewer |
 | **System Status** | `/status` | Wazuh API connectivity diagnostics, broker health, endpoint latency, Wazuh API Intelligence panels (managerVersionCheck, securityConfig, apiInfo) |
 | **Security Explorer** | `/security` | Wazuh RBAC inspection — roles, policies, users, rules, resources, actions, current user policies |
+| **Group Management** | `/groups` | Wazuh agent group management — group listing, agent-to-group assignment, group configuration viewer |
 
 ### Intelligence (Agentic)
 
@@ -119,12 +123,12 @@ The application acts as a **strict read-only proxy** to Wazuh. All API calls flo
 | **Security Analyst** | `/analyst` | LLM-powered chat with Wazuh context injection, knowledge graph awareness, alert enrichment, conversation history |
 | **Knowledge Graph** | `/graph` | Interactive API knowledge graph — ETL sync, resource/endpoint visualization, risk path analysis, endpoint table view, multi-select operations |
 | **Investigations** | `/investigations` | Investigation session management — create, list, add notes, link to alerts/agents/CVEs |
-| **Data Pipeline** | `/pipeline` | Full agentic pipeline orchestration — triage, correlation, hypothesis with state machine visualization |
-| **Alert Queue** | `/alert-queue` | Analyst work queue — enqueue alerts for triage, priority sorting, bulk operations |
+| **Data Pipeline** | `/pipeline` | Full agentic pipeline orchestration — triage, correlation, hypothesis, response actions with state machine visualization |
+| **Alert Queue** | `/alert-queue` | Analyst work queue — enqueue alerts for triage, priority sorting, bulk operations, Splunk ticket creation |
 | **Auto-Queue Rules** | `/auto-queue-rules` | Rule-based automatic alert queuing — severity thresholds, rule ID matching, agent patterns, MITRE technique filters, rate limiting |
 | **Triage Pipeline** | `/triage` | Step-by-step triage execution with LLM-generated analysis, evidence collection, severity assessment |
 | **Living Cases** | `/living-cases` | Evolving investigation cases that accumulate evidence across triage/correlation/hypothesis stages |
-| **Response Actions** | `/response-actions` | Proposed response actions with approval workflow, urgency levels, playbook references, evidence basis |
+| **Response Actions** | `/response-actions` | Proposed response actions with approval workflow, urgency levels, bulk approve, audit trail, evidence basis |
 | **Pipeline Inspector** | `/pipeline-inspector` | Debug view into pipeline run state — stage timings, token usage, error traces |
 | **Feedback Analytics** | `/feedback-analytics` | Analyst feedback on LLM outputs — accuracy ratings, correction tracking, model performance metrics |
 
@@ -136,13 +140,15 @@ The application acts as a **strict read-only proxy** to Wazuh. All API calls flo
 | **User Management** | `/admin/users` | Admin-only user list with role management (admin/user), account status |
 | **Connection Settings** | `/admin/settings` | Runtime configuration for Wazuh host, port, credentials, Indexer settings, OTX API key, Splunk HEC |
 | **Access Audit** | `/admin/audit` | Sensitive access audit trail — who accessed agent keys and when, with date-range filtering and resource type filters |
+| **Broker Coverage** | `/admin/broker-coverage` | Parameter broker coverage ledger — shows which Wazuh API endpoints have broker validation, gap analysis against the OpenAPI spec, coverage percentages by domain |
+| **DGX Health** | `/admin/dgx-health` | NVIDIA DGX/GPU infrastructure health monitoring for local LLM inference |
+| **Param Playground** | `/admin/broker-playground` | Interactive parameter broker testing — send queries through the broker and inspect validation, normalization, and warnings |
 
 ### Tools
 
 | Page | Route | Description |
 |---|---|---|
 | **Analyst Notes** | `/notes` | Database-backed investigation notes attached to alerts, agents, or CVEs with severity tagging and resolve/delete workflow |
-| **Broker Coverage** | `/broker-coverage` | Parameter broker coverage ledger — shows which Wazuh API endpoints have broker validation, gap analysis against the OpenAPI spec, coverage percentages by domain |
 
 ---
 
@@ -212,7 +218,7 @@ Alert Queue ──► Triage Agent ──► Correlation Agent ──► Hypothe
 |---|---|
 | Frontend | React 19, TypeScript, Tailwind CSS 4, Recharts, shadcn/ui, Framer Motion |
 | Backend | Express 4, tRPC 11, Drizzle ORM, SuperJSON |
-| Database | MySQL 8 (TiDB compatible) — 38 tables |
+| Database | MySQL 8 (TiDB compatible) — 40 tables |
 | Auth | Local JWT (self-hosted) or Manus OAuth (cloud) |
 | LLM | Any OpenAI-compatible API — Nemotron 3 Nano default, configurable |
 | Threat Intel | AlienVault OTX v2 API |
@@ -220,7 +226,7 @@ Alert Queue ──► Triage Agent ──► Correlation Agent ──► Hypothe
 | Container | Docker multi-stage, Node 22 slim, tini init |
 | CI/CD | GitHub Actions, GHCR, Dependabot |
 | Proxy | Caddy (auto TLS) or Nginx (manual TLS) |
-| Testing | Vitest — 85 test files, 716 suites, 2667 tests |
+| Testing | Vitest — 111 test files |
 
 ---
 
@@ -229,7 +235,7 @@ Alert Queue ──► Triage Agent ──► Correlation Agent ──► Hypothe
 ### Docker (Recommended)
 
 ```bash
-git clone https://github.com/cvalentine99/Dang.git && cd Dang-
+git clone https://github.com/cvalentine99/Dang.git && cd Dang
 cp env.docker.template .env
 # Edit .env with your Wazuh credentials and JWT_SECRET
 ./deploy.sh                    # HTTP on port 3000
@@ -252,7 +258,7 @@ docker pull ghcr.io/cvalentine99/dang-siem:latest
 ### Development
 
 ```bash
-git clone https://github.com/cvalentine99/Dang.git && cd Dang-
+git clone https://github.com/cvalentine99/Dang.git && cd Dang
 pnpm install
 # Set environment variables (see env.docker.template for reference)
 pnpm dev                       # Starts Vite + Express on port 3000
@@ -332,7 +338,7 @@ See **[DOCKER.md](DOCKER.md)** for full deployment documentation including envir
 
 ## Database Schema
 
-The application uses 38 MySQL tables managed by Drizzle ORM with migration files in `drizzle/`. Schema changes are applied via `webdev_execute_sql` (cloud) or `drizzle-kit migrate` (Docker). Key table groups:
+The application uses 40 MySQL tables managed by Drizzle ORM with migration files in `drizzle/`. Schema changes are applied via `webdev_execute_sql` (cloud) or `drizzle-kit migrate` (Docker). Key table groups:
 
 | Group | Tables | Purpose |
 |---|---|---|
@@ -349,7 +355,7 @@ The application uses 38 MySQL tables managed by Drizzle ORM with migration files
 
 ## Testing
 
-The test suite uses **Vitest** with 85 test files covering backend procedures, parameter broker validation, UI wiring parity, security auth, agentic pipeline stages, KG ETL integration, and broker coverage.
+The test suite uses **Vitest** with 111 test files covering backend procedures, parameter broker validation, UI wiring parity, security auth, agentic pipeline stages, KG ETL integration, and broker coverage.
 
 ```bash
 pnpm test                      # Run full suite
@@ -357,7 +363,7 @@ pnpm test -- --reporter=json   # JSON output for CI
 pnpm proof:generate            # Regenerate ci-proof-artifact.md from vitest.json
 ```
 
-**Current status:** 716 suites, 2667 tests, all passing (machine-generated from `test-output/vitest.json`).
+**Current status:** All passing (machine-generated from `test-output/vitest.json`).
 
 Key test categories:
 
@@ -394,7 +400,7 @@ All data panels include **Raw JSON viewers** for forensic inspection. Every pane
 
 ## Backend API Surface
 
-The Wazuh proxy router exposes **113 tRPC procedures** organized by domain:
+The Wazuh proxy router exposes **130 tRPC procedures** organized by domain:
 
 | Domain | Count | Examples |
 |---|---|---|
@@ -409,7 +415,7 @@ The Wazuh proxy router exposes **113 tRPC procedures** organized by domain:
 | Experimental | 8 | `expSyscollectorPackages`, `expSyscollectorPorts`, `expSyscollectorProcesses`, `expSyscollectorHardware` |
 | System | 5 | `status`, `isConfigured`, `apiInfo`, `taskStatus`, `agentsUninstallPermission` |
 
-Beyond the Wazuh proxy, the application registers **28 sub-routers** covering: `indexer` (Wazuh Indexer search), `otx` (AlienVault OTX), `splunk` (Splunk HEC), `graph` (Knowledge Graph), `pipeline` (Agentic Pipeline), `responseActions`, `hunt` (Threat Hunting), `alertQueue`, `autoQueue`, `baselines`, `driftAnalytics`, `anomalies`, `suppression`, `notificationHistory`, `export`, `notes`, `savedSearches`, `hybridrag`, `llm`, `enhancedLLM`, `readiness`, `sensitiveAccess`, `adminUsers`, `connectionSettings`, `localAuth`, and `baselineSchedules`.
+Beyond the Wazuh proxy, the application registers **28 sub-routers** with **191 total tRPC procedures** covering: `indexer` (19 — Wazuh Indexer search + aggregations), `otx` (9 — AlienVault OTX), `splunk` (11 — Splunk HEC ticket creation), `graph` (26 — Knowledge Graph ETL + investigations), `pipeline` (30 — Agentic Pipeline), `responseActions` (14 — approval workflow + audit trail), `hunt` (6 — Threat Hunting), `alertQueue` (8), `autoQueue` (6), `baselines` (4), `baselineSchedules` (8), `driftAnalytics` (7), `anomalies` (5), `suppression` (4), `notificationHistory` (3), `export` (5), `notes` (7), `savedSearches` (4), `hybridrag` (9), `llm` (4), `enhancedLLM` (5), `readiness` (1), `sensitiveAccess` (2), `adminUsers` (4), `connectionSettings` (4), and `localAuth`.
 
 ---
 
@@ -418,19 +424,19 @@ Beyond the Wazuh proxy, the application registers **28 sub-routers** covering: `
 ```
 client/
   src/
-    pages/                 ← 35+ page components
+    pages/                 ← 42 page components
     components/            ← Shared UI (GlassPanel, ThreatBadge, StatCard, BrokerWarnings,
                               RawJsonViewer, PageHeader, RefreshControl, WazuhGuard)
     contexts/              ← React contexts
     hooks/                 ← Custom hooks
     lib/trpc.ts            ← tRPC client binding
-    App.tsx                ← Routes & layout (35+ routes)
+    App.tsx                ← Routes & layout (42+ routes)
     index.css              ← Amethyst Nexus theme tokens
 
 server/
   wazuh/
     wazuhClient.ts         ← Wazuh API proxy with auth, rate limiting
-    wazuhRouter.ts         ← 113 tRPC procedures
+    wazuhRouter.ts         ← 130 tRPC procedures
     paramBroker.ts         ← Parameter validation and normalization
   agenticPipeline/         ← Triage, Correlation, Hypothesis agents + resume helper
   agenticReadiness/        ← Pipeline readiness checks
@@ -452,7 +458,7 @@ server/
   routers.ts               ← 28 sub-routers registered
 
 drizzle/
-  schema.ts                ← 38 tables
+  schema.ts                ← 40 tables
   0001-0013_*.sql          ← Migration files
   meta/_journal.json       ← Migration journal
 
