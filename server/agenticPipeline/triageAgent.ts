@@ -22,7 +22,6 @@ import { eq, desc, and, or, like, sql, getTableColumns } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import type {
   TriageObject,
-  TriageAgentInput,
   AgenticSeverity,
   TriageRoute,
   ExtractedEntity,
@@ -278,32 +277,63 @@ export async function runTriageAgent(input: {
   const alertTimestamp = extractTimestamp(input.rawAlert);
   const agentInfo = extractAgentInfo(input.rawAlert);
 
-  // Insert a pending triage row
+  // Insert a pending triage row — DB persistence is required for pipeline truth.
+  // If the INSERT fails, the triage cannot report success because downstream
+  // stages (correlation, hypothesis) read from DB, not from in-memory results.
   let dbId: number | undefined;
-  try {
-    const db = await getDb();
-    if (db) {
-      const result = await db.insert(triageObjects).values({
+  const db = await getDb();
+  if (db) {
+    const result = await db.insert(triageObjects).values({
+      triageId,
+      alertId: alertId || "unknown",
+      ruleId: ruleId || "unknown",
+      ruleDescription,
+      ruleLevel: ruleLevel ?? 0,
+      alertTimestamp,
+      agentId: agentInfo.id || null,
+      agentName: agentInfo.name || null,
+      status: "processing",
+      route: "B_LOW_CONFIDENCE", // default until LLM responds
+      triagedBy: "triage_agent",
+      triggeredByUserId: input.userId,
+      alertQueueItemId: input.alertQueueItemId ?? null,
+      triageData: {
+        schemaVersion: "1.0",
         triageId,
+        triagedAt: new Date().toISOString(),
+        triagedBy: "triage_agent",
         alertId: alertId || "unknown",
         ruleId: ruleId || "unknown",
-        ruleDescription,
+        ruleDescription: ruleDescription || "",
         ruleLevel: ruleLevel ?? 0,
-        alertTimestamp,
-        agentId: agentInfo.id || null,
-        agentName: agentInfo.name || null,
-        status: "processing",
-        route: "B_LOW_CONFIDENCE", // default until LLM responds
-        triagedBy: "triage_agent",
-        triggeredByUserId: input.userId,
-        alertQueueItemId: input.alertQueueItemId ?? null,
-        triageData: {} as TriageObject, // placeholder — updated after LLM response
-      });
-      dbId = result[0]?.insertId;
-    }
-  } catch (err) {
-    // Non-fatal: continue without DB row
-    console.error("[TriageAgent] DB insert failed:", err);
+        alertTimestamp: alertTimestamp || new Date().toISOString(),
+        agent: agentInfo,
+        alertFamily: "pending",
+        severity: "info",
+        severityConfidence: 0,
+        severityReasoning: "",
+        entities: [],
+        mitreMapping: [],
+        dedup: { isDuplicate: false, similarityScore: 0, reasoning: "Processing" },
+        route: "B_LOW_CONFIDENCE",
+        routeReasoning: "Processing — awaiting LLM triage",
+        summary: "Triage in progress",
+        keyEvidence: [],
+        uncertainties: [],
+        caseLink: { shouldLink: false, confidence: 0, reasoning: "Processing" },
+        rawAlert: input.rawAlert,
+      } satisfies TriageObject, // valid sentinel — updated after LLM response
+    });
+    dbId = result[0]?.insertId;
+  }
+
+  if (!dbId) {
+    return {
+      success: false,
+      triageId,
+      latencyMs: Date.now() - startTime,
+      error: "Database not available or INSERT failed — cannot persist triage",
+    };
   }
 
   try {
@@ -373,12 +403,20 @@ Agent context:
       severity: validateSeverity(parsed.severity),
       severityConfidence: clampConfidence(parsed.severityConfidence),
       severityReasoning: parsed.severityReasoning || "",
-      entities: (parsed.entities || []).map((e) => ({
-        type: e.type as ExtractedEntity["type"],
-        value: e.value,
-        source: "llm_inference" as const,
-        confidence: clampConfidence(e.confidence),
-      })),
+      entities: (parsed.entities || []).reduce<ExtractedEntity[]>((acc, e) => {
+        const validType = validateEntityType(e.type);
+        if (validType) {
+          acc.push({
+            type: validType,
+            value: e.value,
+            source: "llm_inference" as const,
+            confidence: clampConfidence(e.confidence),
+          });
+        } else {
+          console.warn(`[TriageAgent] Dropping entity with invalid type '${e.type}' (value: '${String(e.value).slice(0, 50)}')`);
+        }
+        return acc;
+      }, []),
       mitreMapping: (parsed.mitreMapping || []).map((m) => ({
         techniqueId: m.techniqueId,
         techniqueName: m.techniqueName,
@@ -432,30 +470,26 @@ Agent context:
     ];
 
     // ── Persist ──────────────────────────────────────────────────────────
+    // DB UPDATE is mandatory — if it fails, the triage row stays as a
+    // "processing" placeholder with empty triageData, which is worse than
+    // reporting failure. Downstream stages read from DB, not memory.
     const tokensUsed = extractTokenCount(llmResult);
-    try {
-      const db = await getDb();
-      if (db && dbId) {
-        await db.update(triageObjects)
-          .set({
-            alertFamily: triageObject.alertFamily,
-            severity: triageObject.severity,
-            severityConfidence: triageObject.severityConfidence,
-            route: triageObject.route,
-            isDuplicate: triageObject.dedup.isDuplicate ? 1 : 0,
-            similarityScore: triageObject.dedup.similarityScore,
-            similarTriageId: triageObject.dedup.similarTriageId ?? null,
-            summary: triageObject.summary,
-            triageData: triageObject,
-            status: "completed",
-            latencyMs,
-            tokensUsed,
-          })
-          .where(eq(triageObjects.id, dbId));
-      }
-    } catch (err) {
-      console.error("[TriageAgent] DB update failed:", err);
-    }
+    await db!.update(triageObjects)
+      .set({
+        alertFamily: triageObject.alertFamily,
+        severity: triageObject.severity,
+        severityConfidence: triageObject.severityConfidence,
+        route: triageObject.route,
+        isDuplicate: triageObject.dedup.isDuplicate ? 1 : 0,
+        similarityScore: triageObject.dedup.similarityScore,
+        similarTriageId: triageObject.dedup.similarTriageId ?? null,
+        summary: triageObject.summary,
+        triageData: triageObject,
+        status: "completed",
+        latencyMs,
+        tokensUsed,
+      })
+      .where(eq(triageObjects.id, dbId));
 
     return {
       success: true,
@@ -683,15 +717,61 @@ function extractWazuhEntities(raw: Record<string, unknown>): ExtractedEntity[] {
 }
 
 function buildKeyEvidence(raw: Record<string, unknown>, agent: TriageObject["agent"]): EvidenceItem[] {
-  return [{
-    id: `evidence-raw-alert-${extractAlertId(raw)}`,
+  const alertId = extractAlertId(raw);
+  const ts = extractTimestamp(raw);
+  const evidence: EvidenceItem[] = [{
+    id: `evidence-raw-alert-${alertId}`,
     label: "Original Wazuh Alert",
     type: "alert",
     source: "wazuh_alert",
     data: raw,
-    collectedAt: extractTimestamp(raw),
+    collectedAt: ts,
     relevance: 1.0,
   }];
+
+  // FIM (syscheck) evidence
+  const syscheck = raw.syscheck as Record<string, unknown> | undefined;
+  if (syscheck?.path) {
+    evidence.push({
+      id: `evidence-fim-${alertId}`,
+      label: `FIM event: ${syscheck.path}`,
+      type: "fim_event",
+      source: "wazuh_fim",
+      data: syscheck,
+      collectedAt: ts,
+      relevance: 0.9,
+    });
+  }
+
+  // Agent metadata evidence
+  if (agent.id && agent.id !== "unknown") {
+    evidence.push({
+      id: `evidence-agent-${agent.id}`,
+      label: `Agent: ${agent.name || agent.id}`,
+      type: "agent_metadata",
+      source: "wazuh_agent",
+      data: { id: agent.id, name: agent.name, ip: agent.ip, os: agent.os, groups: agent.groups },
+      collectedAt: ts,
+      relevance: 0.7,
+    });
+  }
+
+  // MITRE mapping evidence from the raw alert rule
+  const rule = raw.rule as Record<string, unknown> | undefined;
+  const mitre = rule?.mitre as Record<string, unknown> | undefined;
+  if (mitre?.id && Array.isArray(mitre.id) && mitre.id.length > 0) {
+    evidence.push({
+      id: `evidence-mitre-${alertId}`,
+      label: `MITRE ATT&CK: ${(mitre.id as string[]).join(", ")}`,
+      type: "alert",
+      source: "wazuh_alert",
+      data: mitre,
+      collectedAt: ts,
+      relevance: 0.85,
+    });
+  }
+
+  return evidence;
 }
 
 function extractTokenCount(result: InvokeResult): number {
@@ -711,6 +791,15 @@ function validateSeverity(s: unknown): AgenticSeverity {
 function validateRoute(r: unknown): TriageRoute {
   const valid: TriageRoute[] = ["A_DUPLICATE_NOISY", "B_LOW_CONFIDENCE", "C_HIGH_CONFIDENCE", "D_LIKELY_BENIGN"];
   return valid.includes(r as TriageRoute) ? (r as TriageRoute) : "B_LOW_CONFIDENCE";
+}
+
+const VALID_ENTITY_TYPES = new Set<ExtractedEntity["type"]>([
+  "host", "user", "process", "hash", "ip", "domain",
+  "rule_id", "mitre_technique", "cve", "file_path", "port", "registry_key",
+]);
+
+function validateEntityType(t: unknown): ExtractedEntity["type"] | null {
+  return VALID_ENTITY_TYPES.has(t as ExtractedEntity["type"]) ? (t as ExtractedEntity["type"]) : null;
 }
 
 function clampConfidence(c: unknown): Confidence {

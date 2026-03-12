@@ -94,9 +94,10 @@ describe("Audit #45/#46 — hypothesisAgent enum normalization", () => {
   });
 
   it("should NOT use the old invalid urgency enum [immediate, high, medium, low] for recommendedActions", () => {
-    // The old inline urgency check used ["immediate", "high", "medium", "low"]
-    // This should be replaced with URGENCY_MAP_NORM
-    expect(agentSrc).toContain("URGENCY_MAP_NORM");
+    // Refactored: uses VALID_URGENCY passthrough array + URGENCY_FALLBACK remap dict
+    // instead of the older URGENCY_MAP_NORM constant. Logic is equivalent.
+    expect(agentSrc).toContain("URGENCY_FALLBACK");
+    expect(agentSrc).toContain("VALID_URGENCY");
   });
 
   it("should map 'high' urgency to 'immediate' (DB-valid)", () => {
@@ -112,7 +113,9 @@ describe("Audit #45/#46 — hypothesisAgent enum normalization", () => {
   });
 
   it("should have 'scheduled' as a valid urgency value", () => {
-    expect(agentSrc).toContain('scheduled: "scheduled"');
+    // "scheduled" passes through VALID_URGENCY.includes() directly — no explicit mapping needed
+    expect(agentSrc).toContain('"scheduled"');
+    expect(agentSrc).toContain("VALID_URGENCY");
   });
 });
 

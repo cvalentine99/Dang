@@ -50,9 +50,9 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
 
-# Install all dependencies (not --prod) because the built server
-# imports vite.config for static file serving path resolution
-RUN pnpm install --frozen-lockfile --prod=false && pnpm store prune
+# #94: Production-only dependencies — vite is now dynamically imported
+# in dev mode only, so devDependencies are not needed at runtime.
+RUN pnpm install --frozen-lockfile --prod && pnpm store prune
 
 # Copy built artifacts from builder
 # esbuild bundles server → dist/index.js

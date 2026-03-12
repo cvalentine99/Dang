@@ -691,8 +691,12 @@ export const pipelineRouter = router({
 
         if (!row) return { success: false as const, error: "Living case not found" };
 
-        const caseData = row.caseData as unknown as Record<string, unknown> & { completedPivots?: unknown[]; lastUpdatedAt?: string; lastUpdatedBy?: string };
-        if (!caseData.completedPivots) caseData.completedPivots = [];
+        const raw = row.caseData;
+        if (!raw || typeof raw !== "object") {
+          return { success: false as const, error: "Living case has corrupted caseData — cannot record pivot" };
+        }
+        const caseData = raw as unknown as Record<string, unknown> & { completedPivots?: unknown[]; lastUpdatedAt?: string; lastUpdatedBy?: string };
+        if (!Array.isArray(caseData.completedPivots)) caseData.completedPivots = [];
 
         caseData.completedPivots.push({
           action: input.action,

@@ -229,10 +229,10 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "securityRoles", wazuhPath: "/security/roles", wiringLevel: "broker", brokerConfig: "SECURITY_ROLES_CONFIG", paramCount: 8, category: "Security" },  // spec: 8 data
   { procedure: "securityPolicies", wazuhPath: "/security/policies", wiringLevel: "broker", brokerConfig: "SECURITY_POLICIES_CONFIG", paramCount: 8, category: "Security" },  // spec: 8 data
   { procedure: "securityUsers", wazuhPath: "/security/users", wiringLevel: "broker", brokerConfig: "SECURITY_USERS_CONFIG", paramCount: 8, category: "Security" },  // spec: 8 data
-  { procedure: "securityUserById", wazuhPath: "/security/users/{user_id}", wiringLevel: "broker", brokerConfig: "SECURITY_USER_BY_ID_CONFIG", paramCount: 1, category: "Security" },
-  { procedure: "securityRoleById", wazuhPath: "/security/roles/{role_id}", wiringLevel: "broker", brokerConfig: "SECURITY_ROLE_BY_ID_CONFIG", paramCount: 1, category: "Security" },
-  { procedure: "securityPolicyById", wazuhPath: "/security/policies/{policy_id}", wiringLevel: "broker", brokerConfig: "SECURITY_POLICY_BY_ID_CONFIG", paramCount: 1, category: "Security" },
-  { procedure: "securityRuleById", wazuhPath: "/security/rules/{rule_id}", wiringLevel: "broker", brokerConfig: "SECURITY_RULE_BY_ID_CONFIG", paramCount: 1, category: "Security" },
+  { procedure: "securityUserById", wazuhPath: "/security/users", wiringLevel: "broker", brokerConfig: "SECURITY_USERS_CONFIG", paramCount: 1, category: "Security" },  // uses ?user_ids filter (spec-compliant)
+  { procedure: "securityRoleById", wazuhPath: "/security/roles", wiringLevel: "broker", brokerConfig: "SECURITY_ROLES_CONFIG", paramCount: 1, category: "Security" },  // uses ?role_ids filter (spec-compliant)
+  { procedure: "securityPolicyById", wazuhPath: "/security/policies", wiringLevel: "broker", brokerConfig: "SECURITY_POLICIES_CONFIG", paramCount: 1, category: "Security" },  // uses ?policy_ids filter (spec-compliant)
+  { procedure: "securityRuleById", wazuhPath: "/security/rules", wiringLevel: "broker", brokerConfig: "SECURITY_RBAC_RULES_CONFIG", paramCount: 1, category: "Security" },  // uses ?rule_ids filter (spec-compliant)
   { procedure: "securityConfig", wazuhPath: "/security/config", wiringLevel: "broker", brokerConfig: "SECURITY_CONFIG_CONFIG", paramCount: 1, category: "Security" },
   { procedure: "securityCurrentUser", wazuhPath: "/security/users/me", wiringLevel: "broker", brokerConfig: "SECURITY_CURRENT_USER_CONFIG", paramCount: 1, category: "Security" },
   { procedure: "securityRbacRules", wazuhPath: "/security/rules", wiringLevel: "broker", brokerConfig: "SECURITY_RBAC_RULES_CONFIG", paramCount: 5, category: "Security" },  // spec: offset,limit,sort,search,rule_ids
@@ -347,10 +347,6 @@ export const BROKER_CONFIG_REGISTRY: Array<{ name: string; config: broker.Endpoi
   { name: "RULE_FILE_CONTENT_CONFIG", config: broker.RULE_FILE_CONTENT_CONFIG },
   { name: "SYSCHECK_LAST_SCAN_CONFIG", config: broker.SYSCHECK_LAST_SCAN_CONFIG },
   { name: "ROOTCHECK_LAST_SCAN_CONFIG", config: broker.ROOTCHECK_LAST_SCAN_CONFIG },
-  { name: "SECURITY_USER_BY_ID_CONFIG", config: broker.SECURITY_USER_BY_ID_CONFIG },
-  { name: "SECURITY_ROLE_BY_ID_CONFIG", config: broker.SECURITY_ROLE_BY_ID_CONFIG },
-  { name: "SECURITY_POLICY_BY_ID_CONFIG", config: broker.SECURITY_POLICY_BY_ID_CONFIG },
-  { name: "SECURITY_RULE_BY_ID_CONFIG", config: broker.SECURITY_RULE_BY_ID_CONFIG },
   { name: "SECURITY_RESOURCES_CONFIG", config: broker.SECURITY_RESOURCES_CONFIG },
   { name: "LISTS_FILE_CONTENT_CONFIG", config: broker.LISTS_FILE_CONTENT_CONFIG },
   { name: "GROUP_CONFIGURATION_CONFIG", config: broker.GROUP_CONFIGURATION_CONFIG },

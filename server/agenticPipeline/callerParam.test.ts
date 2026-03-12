@@ -85,7 +85,7 @@ describe("LLM caller param — all invokeLLM call sites must pass caller", () =>
 // ── 2. autoTriageQueueItem success path fields ───────────────────────────────
 
 describe("autoTriageQueueItem success path — sets all required fields", () => {
-  it("pipelineRouter.ts success .set() includes status, processedAt, completedAt", () => {
+  it("pipelineRouter.ts success .set() includes status, processedAt, pipelineTriageId", () => {
     const source = readFileSync(
       resolve(__dirname, "./pipelineRouter.ts"),
       "utf8"
@@ -98,10 +98,10 @@ describe("autoTriageQueueItem success path — sets all required fields", () => 
     // Extract a generous section after the procedure definition
     const section = source.slice(autoTriageIdx, autoTriageIdx + 4000);
 
-    // The success path .set() must include all three fields
-    expect(section).toContain('status: "completed"');
+    // The success path .set() sets status to "triaged" (not "completed") because
+    // auto-triage only completes triage — correlation/hypothesis/response haven't run.
+    expect(section).toContain('status: "triaged"');
     expect(section).toContain("processedAt:");
-    expect(section).toContain("completedAt:");
     expect(section).toContain("pipelineTriageId:");
     expect(section).toContain('autoTriageStatus: "completed"');
   });

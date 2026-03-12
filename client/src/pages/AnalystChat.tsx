@@ -733,8 +733,8 @@ function LiveAnalysisConsole({ steps }: { steps: AgentStep[] }): React.JSX.Eleme
           </div>
         </div>
 
-        {/* Live agent activity console */}
-        <AgentActivityConsole steps={steps} isLive={true} />
+        {/* Agent activity console — isLive=false for simulated/estimated steps */}
+        <AgentActivityConsole steps={steps} isLive={false} />
       </div>
     </div>
   );
@@ -888,13 +888,14 @@ export default function AnalystChat(): React.JSX.Element {
   useEffect(() => {
     if (!isAnalyzing) return;
 
+    // Simulated steps — no durationMs values, since these are estimates, not measurements.
     const simulatedSteps: AgentStep[] = [
       { agent: "orchestrator", phase: 1, action: "Analyzing query intent", detail: "Classifying query and extracting entities...", status: "running", timestamp: Date.now() },
-      { agent: "orchestrator", phase: 1, action: "Intent classified", detail: "Selecting retrieval strategy...", status: "complete", timestamp: Date.now(), durationMs: 800 },
+      { agent: "orchestrator", phase: 1, action: "Intent classified", detail: "Selecting retrieval strategy...", status: "complete", timestamp: Date.now() },
       { agent: "graph_retriever", phase: 2, action: "Querying Knowledge Graph", detail: "Traversing knowledge graph...", status: "running", timestamp: Date.now() },
       { agent: "indexer_retriever", phase: 3, action: "Searching Wazuh Indexer", detail: "Querying wazuh-alerts-* and wazuh-states-vulnerabilities-*...", status: "running", timestamp: Date.now() },
-      { agent: "graph_retriever", phase: 2, action: "Graph retrieval complete", detail: "Retrieved data from KG layers...", status: "complete", timestamp: Date.now(), durationMs: 1200 },
-      { agent: "indexer_retriever", phase: 3, action: "Indexer search complete", detail: "Retrieved alerts and events...", status: "complete", timestamp: Date.now(), durationMs: 1500 },
+      { agent: "graph_retriever", phase: 2, action: "Graph retrieval complete", detail: "Retrieved data from KG layers...", status: "complete", timestamp: Date.now() },
+      { agent: "indexer_retriever", phase: 3, action: "Indexer search complete", detail: "Retrieved alerts and events...", status: "complete", timestamp: Date.now() },
       { agent: "synthesizer", phase: 4, action: "Generating analysis", detail: "Synthesizing from retrieved sources...", status: "running", timestamp: Date.now() },
       { agent: "safety_validator", phase: 4, action: "Validating output safety", detail: "Scanning for blocked patterns...", status: "running", timestamp: Date.now() },
     ];

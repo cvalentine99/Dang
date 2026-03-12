@@ -274,6 +274,8 @@ bash scripts/verify-archive.sh dang-source.zip  # 11 automated checks (no secret
 
 See **[DOCKER.md](DOCKER.md)** for full deployment documentation including environment variables, HTTPS proxy setup, health checks, GPU overlay, and CI/CD pipeline details.
 
+**New to Wazuh?** See **[WAZUH-INSTALL.md](WAZUH-INSTALL.md)** for a beginner-friendly guide to installing Wazuh Manager, Indexer, and Agents from scratch.
+
 > **Note:** The KG seeder (`seed-kg.mjs`) imports shared TypeScript modules via `tsx`. The Docker image includes `tsx` in its dependencies. If running the seeder outside Docker, use `npx tsx seed-kg.mjs` instead of `node seed-kg.mjs`.
 
 ---

@@ -38,7 +38,8 @@ describe("Audit #26: Dedup guard in resumePipelineHelper", () => {
 
   it("dedup guard appears before the new pipeline run INSERT", () => {
     const dedupIdx = source.indexOf("Audit #26");
-    const insertIdx = source.indexOf("db.insert(pipelineRuns)");
+    // INSERT is inside a transaction (tx.insert, not db.insert)
+    const insertIdx = source.indexOf("tx.insert(pipelineRuns)");
     expect(dedupIdx).toBeGreaterThan(-1);
     expect(insertIdx).toBeGreaterThan(-1);
     expect(dedupIdx).toBeLessThan(insertIdx);
@@ -125,8 +126,9 @@ describe("Audit #83: Concurrent pipeline guard on same alert", () => {
     const runFullIdx = source.indexOf("runFullPipeline: protectedProcedure");
     expect(runFullIdx).toBeGreaterThan(-1);
 
-    // The guard should appear between runFullPipeline and the INSERT
-    const chunk = source.slice(runFullIdx, runFullIdx + 2500);
+    // The guard is inside a transaction that also includes stale-run TTL cleanup,
+    // so we need a wider window to capture both the guard and INSERT.
+    const chunk = source.slice(runFullIdx, runFullIdx + 4500);
     expect(chunk).toContain("Audit #83");
     expect(chunk).toContain('eq(pipelineRuns.status, "running")');
     expect(chunk).toContain("eq(pipelineRuns.alertId, alertId)");
@@ -134,33 +136,35 @@ describe("Audit #83: Concurrent pipeline guard on same alert", () => {
 
   it("throws CONFLICT when another pipeline is already processing the same alert", () => {
     const runFullIdx = source.indexOf("runFullPipeline: protectedProcedure");
-    const chunk = source.slice(runFullIdx, runFullIdx + 2500);
+    const chunk = source.slice(runFullIdx, runFullIdx + 4500);
     expect(chunk).toContain('"CONFLICT"');
     expect(chunk).toContain("already processing alert");
   });
 
   it("guard appears before the pipeline run INSERT", () => {
     const runFullIdx = source.indexOf("runFullPipeline: protectedProcedure");
-    const chunk = source.slice(runFullIdx, runFullIdx + 2500);
+    const chunk = source.slice(runFullIdx, runFullIdx + 4500);
 
     const guardIdx = chunk.indexOf("Audit #83");
-    const insertIdx = chunk.indexOf("db.insert(pipelineRuns)");
+    // INSERT is inside the same transaction (tx.insert, not db.insert)
+    const insertIdx = chunk.indexOf("tx.insert(pipelineRuns)");
     expect(guardIdx).toBeGreaterThan(-1);
     expect(insertIdx).toBeGreaterThan(-1);
     expect(guardIdx).toBeLessThan(insertIdx);
   });
 
-  it("skips guard for unknown alertId to avoid blocking legitimate runs", () => {
+  it("guard is wrapped in a transaction with FOR UPDATE to eliminate TOCTOU race", () => {
     const runFullIdx = source.indexOf("runFullPipeline: protectedProcedure");
-    const chunk = source.slice(runFullIdx, runFullIdx + 2500);
+    const chunk = source.slice(runFullIdx, runFullIdx + 4500);
 
-    // Should skip the guard when alertId is "unknown"
-    expect(chunk).toContain('alertId !== "unknown"');
+    // Guard and INSERT share a transaction; the SELECT uses FOR UPDATE
+    expect(chunk).toContain("db.transaction(async (tx)");
+    expect(chunk).toContain('.for("update")');
   });
 
   it("guard uses and() to combine alertId and status conditions", () => {
     const runFullIdx = source.indexOf("runFullPipeline: protectedProcedure");
-    const chunk = source.slice(runFullIdx, runFullIdx + 2500);
+    const chunk = source.slice(runFullIdx, runFullIdx + 4500);
 
     // Should use and() for compound WHERE
     expect(chunk).toContain("and(");

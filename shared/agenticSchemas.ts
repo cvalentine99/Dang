@@ -261,32 +261,30 @@ export interface CorrelationBundle {
   /** Entities discovered during correlation that weren't in the original alert */
   discoveredEntities: ExtractedEntity[];
 
-  // ── Vulnerability Context ──────────────────────────────────────────────────
+  // ── Evidence Context (optional — not yet populated by normalizer) ──────────
+  // These fields are defined for future use. The correlation agent retrieves
+  // this data and passes it to the LLM, but the normalizer does not yet
+  // propagate structured evidence into the canonical bundle. Always [] today.
 
   /** Vulnerabilities on the affected host(s) that may be relevant */
-  vulnerabilityContext: Array<{
+  vulnerabilityContext?: Array<{
     cveId: string;
     severity: AgenticSeverity;
     name: string;
     affectedPackage?: string;
-    /** How relevant is this vuln to the alert (0.0–1.0) */
     relevance: Confidence;
   }>;
 
-  // ── FIM Context ────────────────────────────────────────────────────────────
-
   /** Recent file integrity changes on the affected host(s) */
-  fimContext: Array<{
+  fimContext?: Array<{
     path: string;
     event: string;
     timestamp: string;
     relevance: Confidence;
   }>;
 
-  // ── Threat Intel ───────────────────────────────────────────────────────────
-
   /** Threat intelligence matches for extracted IOCs */
-  threatIntelMatches: Array<{
+  threatIntelMatches?: Array<{
     ioc: string;
     iocType: string;
     source: string;
@@ -294,14 +292,11 @@ export interface CorrelationBundle {
     confidence: Confidence;
   }>;
 
-  // ── Prior Investigations ───────────────────────────────────────────────────
-
   /** Existing investigations that may be related */
-  priorInvestigations: Array<{
+  priorInvestigations?: Array<{
     investigationId: number;
     title: string;
     status: string;
-    /** Why this investigation is related */
     linkReason: string;
     relevance: Confidence;
   }>;
@@ -314,8 +309,8 @@ export interface CorrelationBundle {
     affectedHosts: number;
     /** Number of users potentially affected */
     affectedUsers: number;
-    /** List of affected agent IDs */
-    affectedAgentIds: string[];
+    /** List of affected agent IDs (not yet populated — always []) */
+    affectedAgentIds?: string[];
     /** Asset criticality of affected systems */
     assetCriticality: "critical" | "high" | "medium" | "low" | "unknown";
     /** Confidence in the blast radius estimate */
@@ -476,9 +471,9 @@ export interface LivingCaseObject {
     /** What to do */
     action: string;
     /** Category */
-    category: "immediate" | "next" | "optional";
-    /** Urgency level for prioritization */
-    urgency?: "immediate" | "high" | "medium" | "low";
+    category: "immediate" | "next" | "scheduled" | "optional";
+    /** Urgency level for prioritization — matches DB enum (immediate|next|scheduled|optional) */
+    urgency?: "immediate" | "next" | "scheduled" | "optional";
     /** Target entity type (e.g., host, user, ip, hash, rule) */
     targetType?: string;
     /** Target entity value (e.g., specific IP, hostname, user) */
@@ -544,74 +539,10 @@ export interface LivingCaseObject {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PIPELINE STAGE CONTRACTS
-// Define what each agent receives and returns
 // ═══════════════════════════════════════════════════════════════════════════════
-
-/** Input to the Triage Agent */
-export interface TriageAgentInput {
-  /** Raw Wazuh alert JSON */
-  rawAlert: Record<string, unknown>;
-  /** Agent metadata (if available) */
-  agentContext?: {
-    id: string;
-    name: string;
-    ip?: string;
-    os?: string;
-    groups?: string[];
-  };
-  /** Recent triage objects for dedup comparison (last N from same agent/rule) */
-  recentTriageObjects?: Array<{
-    triageId: string;
-    alertFamily: string;
-    ruleId: string;
-    severity: AgenticSeverity;
-    triagedAt: string;
-    summary: string;
-  }>;
-  /** Active investigation sessions for case-link suggestion */
-  activeInvestigations?: Array<{
-    id: number;
-    title: string;
-    description?: string;
-    linkedEntities?: string[];
-  }>;
-}
-
-/** Input to the Correlation Agent */
-export interface CorrelationAgentInput {
-  /** The triage object to correlate */
-  triageObject: TriageObject;
-  /** Retrieved evidence pack (assembled by backend, not the LLM) */
-  evidencePack: {
-    sameHostAlerts: Array<Record<string, unknown>>;
-    sameUserAlerts: Array<Record<string, unknown>>;
-    sameIocAlerts: Array<Record<string, unknown>>;
-    hostVulnerabilities: Array<Record<string, unknown>>;
-    hostFimEvents: Array<Record<string, unknown>>;
-    threatIntelHits: Array<Record<string, unknown>>;
-    priorInvestigations: Array<{ id: number; title: string; status: string; evidence: unknown[] }>;
-  };
-}
-
-/** Input to the Hypothesis Agent */
-export interface HypothesisAgentInput {
-  /** The triage object */
-  triageObject: TriageObject;
-  /** The correlation bundle */
-  correlationBundle: CorrelationBundle;
-}
-
-/** Input to the Case Agent (incremental update) */
-export interface CaseAgentInput {
-  /** Current living case state (or null for new case) */
-  currentCase: LivingCaseObject | null;
-  /** New triage object being added to the case */
-  newTriage?: TriageObject;
-  /** New correlation bundle being added */
-  newCorrelation?: CorrelationBundle;
-  /** Analyst action to record */
-  analystAction?: {
-    type: "pivot_completed" | "theory_override" | "action_approved" | "action_rejected" | "note_added";
-    details: Record<string, unknown>;
-  };
-}
+//
+// NOTE: Agent input contracts are defined locally in each agent file
+// (triageAgent.ts, correlationAgent.ts, hypothesisAgent.ts) where they
+// are actually consumed. Shared interfaces were removed because they had
+// drifted from the actual function signatures and were never imported.
+// ═══════════════════════════════════════════════════════════════════════════════

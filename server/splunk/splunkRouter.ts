@@ -101,8 +101,9 @@ export function _getBatchProgressForTest(): BatchProgress {
 export const splunkRouter = router({
   /**
    * Get current Splunk configuration (token masked for security).
+   * BUG-S1 FIX: Gated to adminProcedure — token preview exposes 12 chars of HEC token.
    */
-  getConfig: protectedProcedure.query(async () => {
+  getConfig: adminProcedure.query(async () => {
     const config = await getEffectiveSplunkConfig();
     return {
       host: config.host,
@@ -184,10 +185,14 @@ export const splunkRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Queue item not found" });
       }
 
-      if (item.status !== "completed") {
+      // Accept both "completed" queue items AND items that have been
+      // pipeline-triaged (pipelineTriageId set) even if main status is still "queued"
+      // because runFullPipeline only sets autoTriageStatus, not the main status field.
+      const isTicketEligible = item.status === "completed" || !!item.pipelineTriageId;
+      if (!isTicketEligible) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "Can only create tickets for completed triage reports",
+          message: "Can only create tickets for completed or pipeline-triaged items",
         });
       }
 
@@ -354,22 +359,47 @@ export const splunkRouter = router({
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       }
 
-      // Get all completed items with triage results
+      // Get all ticket-eligible items — both "completed" status AND
+      // items with pipelineTriageId set (runFullPipeline doesn't update main status).
       const completedItems = await db
         .select()
         .from(alertQueue)
-        .where(eq(alertQueue.status, "completed"));
+        .where(
+          and(
+            sql`${alertQueue.status} != 'dismissed'`,
+            sql`(${alertQueue.status} = 'completed' OR ${alertQueue.pipelineTriageId} IS NOT NULL)`
+          )
+        );
 
       // Filter to items that have triage data (pipeline or legacy) and no existing Splunk ticket
       // Note: we can't async-filter, so we check pipelineTriageId OR triageResult presence,
       // then resolve full triage data inside the loop
-      const eligibleItems = completedItems.filter((item) => {
+      const preFilteredItems = completedItems.filter((item) => {
         const triage = item.triageResult as Record<string, unknown> | null;
         // Skip if already ticketed via legacy stamp
         if (triage?.splunkTicketId) return false;
         // Eligible if pipeline-triaged OR has legacy triage
         return !!item.pipelineTriageId || !!(triage?.answer);
       });
+
+      // BUG-S2 FIX: Also check ticket_artifacts for existing successful tickets.
+      // The legacy splunkTicketId stamp can be missing if the queue update failed
+      // after artifact recording — without this check, batch re-runs create duplicates.
+      let eligibleItems = preFilteredItems;
+      if (preFilteredItems.length > 0) {
+        const preFilteredIds = preFilteredItems.map(i => i.id);
+        const existingTickets = await db
+          .select({ queueItemId: ticketArtifacts.queueItemId })
+          .from(ticketArtifacts)
+          .where(
+            and(
+              inArray(ticketArtifacts.queueItemId, preFilteredIds),
+              eq(ticketArtifacts.success, true),
+            )
+          );
+        const alreadyTicketedIds = new Set(existingTickets.map(r => r.queueItemId));
+        eligibleItems = preFilteredItems.filter(i => !alreadyTicketedIds.has(i.id));
+      }
 
       if (eligibleItems.length === 0) {
         return {
@@ -492,7 +522,7 @@ export const splunkRouter = router({
               system: "splunk_es",
               queueItemId: item.id,
               // pipelineRunId omitted — defaults to NULL (no pipeline run for exception path)
-              triageId: item.pipelineTriageId || undefined,
+              triageId: item.pipelineTriageId || null,
               alertId: item.alertId,
               ruleId: item.ruleId ?? null,
               ruleLevel: item.ruleLevel,
@@ -574,15 +604,23 @@ export const splunkRouter = router({
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-      const rows = await db
-        .select()
-        .from(ticketArtifacts)
-        .where(whereClause)
-        .orderBy(sql`${ticketArtifacts.createdAt} DESC`)
-        .limit(input.limit)
-        .offset(input.offset);
+      // BUG-S3 FIX: Return true total count, not just page length.
+      // Without this, the UI shows "50" once more than 50 artifacts exist.
+      const [rows, [totalRow]] = await Promise.all([
+        db
+          .select()
+          .from(ticketArtifacts)
+          .where(whereClause)
+          .orderBy(sql`${ticketArtifacts.createdAt} DESC`)
+          .limit(input.limit)
+          .offset(input.offset),
+        db
+          .select({ total: sql<number>`COUNT(*)` })
+          .from(ticketArtifacts)
+          .where(whereClause),
+      ]);
 
-      return { artifacts: rows, count: rows.length };
+      return { artifacts: rows, count: Number(totalRow?.total ?? rows.length) };
     }),
 
   /**

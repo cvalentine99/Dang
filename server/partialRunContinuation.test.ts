@@ -86,7 +86,8 @@ describe("Backend resumePipelineRun — Partial Run Continuation", () => {
     });
 
     it("should have Priority 1 and Priority 2 comments", () => {
-      expect(autoDetect).toContain("Priority 1: Find the first failed stage");
+      // BUG-02 expanded Priority 1 to include stale-running stages for crash recovery
+      expect(autoDetect).toContain("Priority 1: Find the first failed or stale-running stage");
       expect(autoDetect).toContain("Priority 2: Find the first pending stage");
     });
 

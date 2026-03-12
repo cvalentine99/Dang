@@ -358,7 +358,8 @@ IMPORTANT: Set confidence to how well you understand the query (0.0 = no idea, 1
       retrievalStrategy: ["both" as const],
       confidence: 0.5,
     };
-  } catch {
+  } catch (parseErr) {
+    console.warn("[analystQuery] Intent analysis parse failed, falling back to defaults:", (parseErr as Error).message ?? parseErr);
     result = {
       intent: "general_query",
       entities: { agentIds: [], hostnames: [], cveIds: [], ipAddresses: [], ruleIds: [], mitreTactics: [], keywords: [query] },
@@ -693,16 +694,15 @@ async function retrievePipelineContext(
     if (activeCases.length > 0) {
       const caseSummaries = activeCases.map(c => {
         let alertFamily = "";
-        let riskScore = 0;
         try {
           const data = c.caseData as unknown as Record<string, unknown>;
           alertFamily = (data?.alertFamily as string) ?? "";
-          riskScore = (data?.riskScore as number) ?? 0;
         } catch { /* ignore parse errors */ }
         return {
           id: c.id,
           sessionId: c.sessionId,
-          riskScore,
+          // riskScore was removed from canonical schema — use theoryConfidence instead
+          riskScore: c.theoryConfidence ?? 0,
           alertFamily,
           workingTheory: (c.workingTheory ?? "").slice(0, 200),
           theoryConfidence: c.theoryConfidence,
