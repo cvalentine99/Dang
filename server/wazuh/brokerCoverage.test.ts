@@ -5,6 +5,8 @@ import {
   EXPERIMENTAL_CISCAT_RESULTS_CONFIG,
   CISCAT_CONFIG,
 } from "./paramBroker";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 // ── Coverage Report Tests ────────────────────────────────────────────────────
 
@@ -34,12 +36,17 @@ describe("brokerCoverage — generateCoverageReport", () => {
     expect(report.brokerWired).toBeGreaterThan(0);
   });
 
-  it("has no manual-param endpoints (all promoted to broker)", () => {
-    expect(report.manualParam).toBe(0);
+  it("has manual-param endpoints (truthful classification)", () => {
+    expect(report.manualParam).toBeGreaterThan(0);
   });
 
-  it("has no passthrough endpoints (all promoted to broker)", () => {
-    expect(report.passthrough).toBe(0);
+  it("has passthrough endpoints (truthful classification)", () => {
+    expect(report.passthrough).toBeGreaterThan(0);
+  });
+
+  it("broker coverage is less than 100% (truthful — not all endpoints call brokerParams)", () => {
+    expect(report.brokerCoveragePercent).toBeLessThan(100);
+    expect(report.brokerCoveragePercent).toBeGreaterThan(40);
   });
 
   it("calculates broker coverage percentage correctly", () => {
@@ -50,6 +57,10 @@ describe("brokerCoverage — generateCoverageReport", () => {
   it("calculates param coverage percentage correctly", () => {
     const expected = Math.round(((report.brokerWired + report.manualParam) / report.totalProcedures) * 100);
     expect(report.paramCoveragePercent).toBe(expected);
+  });
+
+  it("reports endpoint coverage as total/total", () => {
+    expect(report.endpointCoverage).toBe(`${report.totalProcedures}/${report.totalProcedures}`);
   });
 
   it("has broker configs", () => {
@@ -303,6 +314,184 @@ describe("brokerCoverage — category completeness", () => {
       const found = report.categories.find(c => c.category === cat);
       expect(found).toBeDefined();
       expect(found!.total).toBeGreaterThan(0);
+    });
+  }
+});
+
+// ── Classification Truth Regression Tests ────────────────────────────────────
+// These tests verify that the ENDPOINT_REGISTRY classifications match the
+// actual runtime wiring in wazuhRouter.ts. They read the source file and
+// check whether each spot-checked procedure actually calls brokerParams().
+
+describe("brokerCoverage — classification matches wazuhRouter.ts runtime", () => {
+  let routerSource: string;
+  let report: CoverageReport;
+
+  beforeAll(() => {
+    const routerPath = path.resolve(__dirname, "wazuhRouter.ts");
+    routerSource = fs.readFileSync(routerPath, "utf-8");
+    report = generateCoverageReport();
+  });
+
+  /**
+   * Extract the query handler body for a given procedure name.
+   * Looks for "procedureName:" or "procedureName :" and grabs text until the
+   * next top-level procedure definition (pattern: /^\s+\w+:\s/m after the match).
+   */
+  function getProcedureBody(name: string): string {
+    // Match the procedure definition start
+    const regex = new RegExp(`\\b${name}:\\s`, "m");
+    const match = regex.exec(routerSource);
+    if (!match) return "";
+    const start = match.index;
+    // Find the next procedure definition (a word followed by colon at start of line after whitespace)
+    const rest = routerSource.slice(start + match[0].length);
+    // Look for the next top-level procedure: line starting with optional whitespace, then word + colon
+    const nextProcMatch = /\n\s{2}\w+:\s(?:wazuhProcedure|protectedProcedure|adminProcedure)/m.exec(rest);
+    const end = nextProcMatch ? start + match[0].length + nextProcMatch.index : start + 2000;
+    return routerSource.slice(start, end);
+  }
+
+  // ── Broker-wired procedures: MUST contain brokerParams() call ──
+  const expectedBroker: string[] = [
+    "managerConfiguration",
+    "managerLogs",
+    "clusterNodes",
+    "agents",
+    "agentGroups",
+    "agentsOutdated",
+    "agentsNoGroup",
+    "agentsStatsDistinct",
+    "agentGroupMembers",
+    "agentPackages",
+    "agentPorts",
+    "agentProcesses",
+    "rules",
+    "rulesFiles",
+    "mitreTactics",
+    "mitreTechniques",
+    "scaPolicies",
+    "scaChecks",
+    "ciscatResults",
+    "syscheckFiles",
+    "rootcheckResults",
+    "decoders",
+    "decoderFiles",
+    "decoderParents",
+    "decoderFileContent",
+    "taskStatus",
+    "securityRoles",
+    "securityPolicies",
+    "securityUsers",
+    "securityConfig",
+    "securityCurrentUser",
+    "securityRbacRules",
+    "securityActions",
+    "lists",
+    "listsFiles",
+    "clusterNodeConfiguration",
+    "clusterNodeLogs",
+    "expCiscatResults",
+  ];
+
+  for (const proc of expectedBroker) {
+    it(`${proc} is classified as broker AND calls brokerParams() at runtime`, () => {
+      const ep = report.endpoints.find(e => e.procedure === proc);
+      expect(ep).toBeDefined();
+      expect(ep!.wiringLevel).toBe("broker");
+
+      const body = getProcedureBody(proc);
+      expect(body).toBeTruthy();
+      expect(body).toContain("brokerParams(");
+    });
+  }
+
+  // ── Manual procedures: MUST NOT contain brokerParams() call ──
+  const expectedManual: Array<{ proc: string; reason: string }> = [
+    { proc: "managerStats", reason: "inline date param" },
+    { proc: "daemonStats", reason: "inline daemons_list join" },
+    { proc: "managerVersionCheck", reason: "inline force_query param" },
+    { proc: "clusterHealthcheck", reason: "inline nodes_list join" },
+    { proc: "clusterNodeStats", reason: "inline date param" },
+    { proc: "clusterNodeDaemonStats", reason: "inline daemons_list join" },
+    { proc: "agentsSummary", reason: "inline agents_list join" },
+    { proc: "agentDaemonStats", reason: "inline daemons_list join" },
+    { proc: "agentsUpgradeResult", reason: "inline 12-param assembly" },
+    { proc: "ruleGroups", reason: "inline pagination + sort/search" },
+    { proc: "rulesByRequirement", reason: "inline pagination + sort/search" },
+    { proc: "ruleFileContent", reason: "inline raw + get_dirnames_path" },
+    { proc: "groupConfiguration", reason: "inline pagination" },
+    { proc: "groupFileContent", reason: "inline type_agents + raw" },
+    { proc: "listsFileContent", reason: "inline raw param" },
+    { proc: "securityResources", reason: "inline resource param" },
+  ];
+
+  for (const { proc, reason } of expectedManual) {
+    it(`${proc} is classified as manual (${reason}) and does NOT call brokerParams()`, () => {
+      const ep = report.endpoints.find(e => e.procedure === proc);
+      expect(ep).toBeDefined();
+      expect(ep!.wiringLevel).toBe("manual");
+
+      const body = getProcedureBody(proc);
+      expect(body).toBeTruthy();
+      expect(body).not.toContain("brokerParams(");
+    });
+  }
+
+  // ── Passthrough procedures: MUST NOT contain brokerParams() call ──
+  const expectedPassthrough: string[] = [
+    "status",
+    "isConfigured",
+    "managerInfo",
+    "managerStatus",
+    "managerConfigValidation",
+    "statsHourly",
+    "statsWeekly",
+    "analysisd",
+    "remoted",
+    "managerLogsSummary",
+    "managerApiConfig",
+    "clusterStatus",
+    "clusterLocalInfo",
+    "clusterLocalConfig",
+    "clusterRulesetSync",
+    "clusterApiConfig",
+    "clusterConfigValidation",
+    "clusterNodeInfo",
+    "clusterNodeStatsHourly",
+    "clusterNodeStatus",
+    "clusterNodeLogsSummary",
+    "clusterNodeStatsAnalysisd",
+    "clusterNodeStatsRemoted",
+    "clusterNodeStatsWeekly",
+    "agentSummaryStatus",
+    "agentSummaryOs",
+    "agentOverview",
+    "agentsUninstallPermission",
+    "apiInfo",
+    "agentById",
+    "agentStats",
+    "agentConfig",
+    "agentGroupSync",
+    "mitreMetadata",
+    "securityUserById",
+    "securityRoleById",
+    "securityPolicyById",
+    "securityRuleById",
+    "securityCurrentUserPolicies",
+    "syscheckLastScan",
+    "rootcheckLastScan",
+  ];
+
+  for (const proc of expectedPassthrough) {
+    it(`${proc} is classified as passthrough and does NOT call brokerParams()`, () => {
+      const ep = report.endpoints.find(e => e.procedure === proc);
+      expect(ep).toBeDefined();
+      expect(ep!.wiringLevel).toBe("passthrough");
+
+      const body = getProcedureBody(proc);
+      expect(body).toBeTruthy();
+      expect(body).not.toContain("brokerParams(");
     });
   }
 });

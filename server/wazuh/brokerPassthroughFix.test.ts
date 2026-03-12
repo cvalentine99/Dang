@@ -2,18 +2,20 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { generateCoverageReport, type CoverageReport } from "./brokerCoverage";
 
 /**
- * Validates that 4 endpoints previously registered as bare passthrough
- * are now properly broker-wired with wait_for_complete configs.
+ * Validates the truthful classification of 4 endpoints that were previously
+ * falsely registered as "broker" but are actually passthrough in wazuhRouter.ts.
  *
- * Per the Wazuh API spec v4.14.3:
- *   - /manager/info          → wait_for_complete
- *   - /manager/status        → wait_for_complete
- *   - /mitre/metadata        → wait_for_complete
- *   - /security/users/me/policies → no data params (empty config)
+ * These endpoints have broker configs defined in paramBroker.ts (e.g.
+ * MANAGER_INFO_CONFIG), but the tRPC procedures do NOT call brokerParams()
+ * at runtime — they are simple passthrough calls to proxyGet().
  *
- * Full coverage sprint promoted all endpoints to broker level.
+ * The registry now correctly reflects the runtime behavior:
+ *   - /manager/info               → passthrough (no brokerParams call)
+ *   - /manager/status             → passthrough (no brokerParams call)
+ *   - /mitre/metadata             → passthrough (no brokerParams call)
+ *   - /security/users/me/policies → passthrough (no brokerParams call)
  */
-describe("Broker full coverage — 4 previously-passthrough endpoints", () => {
+describe("Truthful classification — 4 previously-overstated endpoints", () => {
   let report: CoverageReport;
 
   beforeAll(() => {
@@ -28,19 +30,19 @@ describe("Broker full coverage — 4 previously-passthrough endpoints", () => {
       expect(ep).toBeDefined();
     });
 
-    it("is broker-wired", () => {
+    it("is passthrough (does not call brokerParams at runtime)", () => {
       const ep = report.endpoints.find(e => e.procedure === "managerInfo")!;
-      expect(ep.wiringLevel).toBe("broker");
+      expect(ep.wiringLevel).toBe("passthrough");
     });
 
-    it("has paramCount 1 (wait_for_complete)", () => {
+    it("has paramCount 0 (no query params forwarded)", () => {
       const ep = report.endpoints.find(e => e.procedure === "managerInfo")!;
-      expect(ep.paramCount).toBe(1);
+      expect(ep.paramCount).toBe(0);
     });
 
-    it("has brokerConfig MANAGER_INFO_CONFIG", () => {
+    it("has no brokerConfig (passthrough endpoints omit it)", () => {
       const ep = report.endpoints.find(e => e.procedure === "managerInfo")!;
-      expect(ep.brokerConfig).toBe("MANAGER_INFO_CONFIG");
+      expect(ep.brokerConfig).toBeFalsy();
     });
 
     it("maps to /manager/info", () => {
@@ -57,19 +59,19 @@ describe("Broker full coverage — 4 previously-passthrough endpoints", () => {
       expect(ep).toBeDefined();
     });
 
-    it("is broker-wired", () => {
+    it("is passthrough (does not call brokerParams at runtime)", () => {
       const ep = report.endpoints.find(e => e.procedure === "managerStatus")!;
-      expect(ep.wiringLevel).toBe("broker");
+      expect(ep.wiringLevel).toBe("passthrough");
     });
 
-    it("has paramCount 1 (wait_for_complete)", () => {
+    it("has paramCount 0 (no query params forwarded)", () => {
       const ep = report.endpoints.find(e => e.procedure === "managerStatus")!;
-      expect(ep.paramCount).toBe(1);
+      expect(ep.paramCount).toBe(0);
     });
 
-    it("has brokerConfig MANAGER_STATUS_CONFIG", () => {
+    it("has no brokerConfig (passthrough endpoints omit it)", () => {
       const ep = report.endpoints.find(e => e.procedure === "managerStatus")!;
-      expect(ep.brokerConfig).toBe("MANAGER_STATUS_CONFIG");
+      expect(ep.brokerConfig).toBeFalsy();
     });
 
     it("maps to /manager/status", () => {
@@ -86,19 +88,19 @@ describe("Broker full coverage — 4 previously-passthrough endpoints", () => {
       expect(ep).toBeDefined();
     });
 
-    it("is broker-wired", () => {
+    it("is passthrough (does not call brokerParams at runtime)", () => {
       const ep = report.endpoints.find(e => e.procedure === "mitreMetadata")!;
-      expect(ep.wiringLevel).toBe("broker");
+      expect(ep.wiringLevel).toBe("passthrough");
     });
 
-    it("has paramCount 1 (wait_for_complete)", () => {
+    it("has paramCount 0 (no query params forwarded)", () => {
       const ep = report.endpoints.find(e => e.procedure === "mitreMetadata")!;
-      expect(ep.paramCount).toBe(1);
+      expect(ep.paramCount).toBe(0);
     });
 
-    it("has brokerConfig MITRE_METADATA_CONFIG", () => {
+    it("has no brokerConfig (passthrough endpoints omit it)", () => {
       const ep = report.endpoints.find(e => e.procedure === "mitreMetadata")!;
-      expect(ep.brokerConfig).toBe("MITRE_METADATA_CONFIG");
+      expect(ep.brokerConfig).toBeFalsy();
     });
 
     it("maps to /mitre/metadata", () => {
@@ -115,9 +117,9 @@ describe("Broker full coverage — 4 previously-passthrough endpoints", () => {
       expect(ep).toBeDefined();
     });
 
-    it("is broker-wired", () => {
+    it("is passthrough (does not call brokerParams at runtime)", () => {
       const ep = report.endpoints.find(e => e.procedure === "securityCurrentUserPolicies")!;
-      expect(ep.wiringLevel).toBe("broker");
+      expect(ep.wiringLevel).toBe("passthrough");
     });
 
     it("has paramCount 0 (no data params)", () => {
@@ -125,9 +127,9 @@ describe("Broker full coverage — 4 previously-passthrough endpoints", () => {
       expect(ep.paramCount).toBe(0);
     });
 
-    it("has brokerConfig SECURITY_CURRENT_USER_POLICIES_CONFIG", () => {
+    it("has no brokerConfig (passthrough endpoints omit it)", () => {
       const ep = report.endpoints.find(e => e.procedure === "securityCurrentUserPolicies")!;
-      expect(ep.brokerConfig).toBe("SECURITY_CURRENT_USER_POLICIES_CONFIG");
+      expect(ep.brokerConfig).toBeFalsy();
     });
 
     it("maps to /security/users/me/policies", () => {
@@ -167,10 +169,19 @@ describe("Broker full coverage — 4 previously-passthrough endpoints", () => {
       }
     });
 
-    it("100% broker coverage — zero passthrough, zero manual", () => {
-      expect(report.passthrough).toBe(0);
-      expect(report.manualParam).toBe(0);
-      expect(report.brokerCoveragePercent).toBe(100);
+    it("broker coverage is truthful — less than 100% since not all procedures call brokerParams()", () => {
+      expect(report.passthrough).toBeGreaterThan(0);
+      expect(report.manualParam).toBeGreaterThan(0);
+      expect(report.brokerCoveragePercent).toBeLessThan(100);
+      // Broker + manual + passthrough = total
+      expect(report.brokerWired + report.manualParam + report.passthrough).toBe(report.totalProcedures);
+    });
+
+    it("no manual endpoint has a brokerConfig set", () => {
+      const manualEps = report.endpoints.filter(e => e.wiringLevel === "manual");
+      for (const ep of manualEps) {
+        expect(ep.brokerConfig, `${ep.procedure} is manual but has brokerConfig=${ep.brokerConfig}`).toBeFalsy();
+      }
     });
   });
 });

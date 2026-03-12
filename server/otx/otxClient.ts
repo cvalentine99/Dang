@@ -12,7 +12,7 @@
 
 import axios, { AxiosInstance } from "axios";
 import NodeCache from "node-cache";
-import { eq, and, gt, lt } from "drizzle-orm";
+import { eq, and, gt, lt, sql } from "drizzle-orm";
 import { threatIntelCache } from "../../drizzle/schema";
 import { getDb } from "../db";
 
@@ -281,15 +281,22 @@ export async function getDbCacheStats(): Promise<{
     if (!db) return null;
 
     const rows = await db
-      .select()
-      .from(threatIntelCache);
+      .select({
+        endpointType: threatIntelCache.endpointType,
+        count: sql<number>`COUNT(*)`.as("count"),
+      })
+      .from(threatIntelCache)
+      .groupBy(threatIntelCache.endpointType);
 
     const byType: Record<string, number> = {};
+    let totalEntries = 0;
     for (const row of rows) {
-      byType[row.endpointType] = (byType[row.endpointType] ?? 0) + 1;
+      const count = Number(row.count);
+      byType[row.endpointType] = count;
+      totalEntries += count;
     }
 
-    return { totalEntries: rows.length, byType };
+    return { totalEntries, byType };
   } catch {
     return null;
   }

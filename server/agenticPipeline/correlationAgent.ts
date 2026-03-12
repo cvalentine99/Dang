@@ -304,6 +304,20 @@ async function fetchFimEvents(
   }
 }
 
+/** Validate entity values before OTX path interpolation — fail closed on malformed indicators. */
+const ENTITY_VALIDATORS: Record<string, RegExp> = {
+  ip: /^[\da-fA-F.:]+$/,           // IPv4 dotted-decimal or IPv6 hex+colons
+  hash: /^[a-fA-F0-9]+$/,          // MD5/SHA1/SHA256 hex
+  domain: /^[a-zA-Z0-9._-]+$/,     // DNS-safe characters only
+};
+
+export function isValidEntityValue(type: string, value: string): boolean {
+  const pattern = ENTITY_VALIDATORS[type];
+  if (!pattern) return false;
+  if (value.length === 0 || value.length > 256) return false;
+  return pattern.test(value);
+}
+
 /**
  * Lookup IOCs against OTX threat intelligence.
  */
@@ -315,9 +329,11 @@ async function fetchThreatIntel(
   // Lookup IPs
   const ips = entities.filter((e) => e.type === "ip").slice(0, 5);
   for (const ip of ips) {
+    if (!isValidEntityValue("ip", ip.value)) continue;
     try {
+      const safeValue = encodeURIComponent(ip.value);
       const data = await otxGet(
-        `/api/v1/indicators/IPv4/${ip.value}/general`,
+        `/api/v1/indicators/IPv4/${safeValue}/general`,
         {},
         "indicators",
         600
@@ -335,9 +351,11 @@ async function fetchThreatIntel(
   // Lookup hashes
   const hashes = entities.filter((e) => e.type === "hash").slice(0, 3);
   for (const hash of hashes) {
+    if (!isValidEntityValue("hash", hash.value)) continue;
     try {
+      const safeValue = encodeURIComponent(hash.value);
       const data = await otxGet(
-        `/api/v1/indicators/file/${hash.value}/general`,
+        `/api/v1/indicators/file/${safeValue}/general`,
         {},
         "indicators",
         600
@@ -355,9 +373,11 @@ async function fetchThreatIntel(
   // Lookup domains
   const domains = entities.filter((e) => e.type === "domain").slice(0, 3);
   for (const domain of domains) {
+    if (!isValidEntityValue("domain", domain.value)) continue;
     try {
+      const safeValue = encodeURIComponent(domain.value);
       const data = await otxGet(
-        `/api/v1/indicators/domain/${domain.value}/general`,
+        `/api/v1/indicators/domain/${safeValue}/general`,
         {},
         "indicators",
         600
@@ -411,11 +431,13 @@ async function fetchPriorInvestigations(
   try {
     // CR-8: Only show active sessions as merge candidates — closed sessions
     // should not be reopened by automated pipeline decisions.
+    // No LIMIT — active sessions are bounded by SOC workload (typically <100).
+    // A previous LIMIT(50) caused false-negative matches when the correct
+    // investigation was ranked 51+ by updatedAt, leading to duplicate cases.
     const sessions = await db.select()
       .from(investigationSessions)
       .where(eq(investigationSessions.status, "active"))
-      .orderBy(desc(investigationSessions.updatedAt))
-      .limit(50);
+      .orderBy(desc(investigationSessions.updatedAt));
     
     const entityValues = new Set(entities.map((e) => e.value.toLowerCase()));
     if (agentId) entityValues.add(agentId);

@@ -447,12 +447,19 @@ async function syncCaseSummaryAtomic(tx: DbLike, caseId: number): Promise<void> 
   const caseData = (caseRow.caseData ?? {}) as LivingCaseObject & { actionSummary?: CaseSummary };
   caseData.actionSummary = summary;
 
+  // Refresh denormalized workingTheory/theoryConfidence from caseData
+  // so they stay in sync with the canonical JSON blob after every state transition.
+  const refreshedTheory = caseData.workingTheory?.statement ?? caseRow.workingTheory;
+  const refreshedConfidence = caseData.workingTheory?.confidence ?? caseRow.theoryConfidence;
+
   await tx
     .update(livingCaseState)
     .set({
       pendingActionCount: summary.proposed,
       approvalRequiredCount: approvalRequired,
       caseData,
+      workingTheory: refreshedTheory,
+      theoryConfidence: refreshedConfidence,
     })
     .where(eq(livingCaseState.id, caseId));
 }
