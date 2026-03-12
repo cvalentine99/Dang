@@ -61,8 +61,8 @@ export interface AlertClassification {
 export interface DGXHealthMetrics {
   modelStatus: "online" | "offline" | "degraded" | "unknown";
   modelName: string;
-  quantization: string;
-  contextSize: number;
+  quantization: string | null;
+  contextSize: number | null;
   decodeTokensPerSec: number | null;
   prefillTokensPerSec: number | null;
   activeRequests: number;
@@ -71,7 +71,7 @@ export interface DGXHealthMetrics {
     modelWeightsMB: number | null;
     kvCacheMB: number | null;
     availableMB: number | null;
-    totalMB: number;
+    totalMB: number | null;
   };
   uptime: number | null;
   lastHealthCheck: number;
@@ -555,8 +555,8 @@ export async function getDGXHealth(): Promise<DGXHealthMetrics> {
   const defaults: DGXHealthMetrics = {
     modelStatus: "unknown",
     modelName: config.model || "Not configured",
-    quantization: "Q8_K_XL",
-    contextSize: 32768,
+    quantization: null,    // populated from /v1/models or left null
+    contextSize: null,     // populated from /v1/models or left null
     decodeTokensPerSec: null,
     prefillTokensPerSec: null,
     activeRequests: priorityQueue.active,
@@ -565,7 +565,7 @@ export async function getDGXHealth(): Promise<DGXHealthMetrics> {
       modelWeightsMB: null,
       kvCacheMB: null,
       availableMB: null,
-      totalMB: 131072, // 128GB DGX Spark
+      totalMB: null, // only populated if probed from hardware
     },
     uptime: null,
     lastHealthCheck: now,
@@ -638,21 +638,13 @@ export async function getDGXHealth(): Promise<DGXHealthMetrics> {
           }
         }
 
-        // KV cache usage
+        // KV cache usage — only estimate when we have context size
         const kvMatch = metricsText.match(/llamacpp:kv_cache_usage_ratio\s+([\d.]+)/);
-        if (kvMatch) {
+        if (kvMatch && defaults.contextSize) {
           const ratio = parseFloat(kvMatch[1]);
-          // Estimate KV cache MB based on context size and ratio
           const estimatedMaxKvMB = (defaults.contextSize / 1024) * 0.5; // ~0.5MB per 1K tokens for 6 attn layers
           defaults.memoryUsage.kvCacheMB = Math.round(ratio * estimatedMaxKvMB * 10) / 10;
         }
-
-        // Model weight estimate (Q8_K_XL ≈ 30GB)
-        defaults.memoryUsage.modelWeightsMB = 30720; // 30GB
-        defaults.memoryUsage.availableMB = defaults.memoryUsage.totalMB
-          - (defaults.memoryUsage.modelWeightsMB ?? 0)
-          - (defaults.memoryUsage.kvCacheMB ?? 0)
-          - 4096; // OS/CUDA overhead
       }
     } catch {
       // Metrics endpoint not available — that's fine

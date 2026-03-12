@@ -1661,11 +1661,6 @@ export const SYSCOLLECTOR_NETIFACE_CONFIG: EndpointParamConfig = {
       type: "string",
       aliases: ["rx_dropped"],
     },
-    mac: {
-      wazuhName: "mac",
-      description: "Filter by MAC address",
-      type: "string",
-    },
     wait_for_complete: {
       type: "boolean" as const,
       wazuhName: "wait_for_complete",
@@ -2172,10 +2167,18 @@ export const SECURITY_RBAC_RULES_CONFIG: EndpointParamConfig = {
     limit: UNIVERSAL_PARAMS.limit,
     sort: UNIVERSAL_PARAMS.sort,
     search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
+    q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
     rule_ids: {
       wazuhName: "rule_ids",
       description: "List of rule IDs to filter (comma-separated)",
       type: "csv",
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -3093,60 +3096,6 @@ export const SYSCHECK_LAST_SCAN_CONFIG: EndpointParamConfig = {
 /** GET /rootcheck/{agent_id}/last_scan — Rootcheck last scan */
 export const ROOTCHECK_LAST_SCAN_CONFIG: EndpointParamConfig = {
   endpoint: "/rootcheck/{agent_id}/last_scan",
-  params: {
-    wait_for_complete: {
-      type: "boolean",
-
-      wazuhName: "wait_for_complete",
-      description: "Disable timeout response (cluster sync wait)",
-    },
-  },
-};
-
-// ── Security by-ID ───────────────────────────────────────────────────────────
-
-/** GET /security/users/{user_id} — Security user by ID */
-export const SECURITY_USER_BY_ID_CONFIG: EndpointParamConfig = {
-  endpoint: "/security/users/{user_id}",
-  params: {
-    wait_for_complete: {
-      type: "boolean",
-
-      wazuhName: "wait_for_complete",
-      description: "Disable timeout response (cluster sync wait)",
-    },
-  },
-};
-
-/** GET /security/roles/{role_id} — Security role by ID */
-export const SECURITY_ROLE_BY_ID_CONFIG: EndpointParamConfig = {
-  endpoint: "/security/roles/{role_id}",
-  params: {
-    wait_for_complete: {
-      type: "boolean",
-
-      wazuhName: "wait_for_complete",
-      description: "Disable timeout response (cluster sync wait)",
-    },
-  },
-};
-
-/** GET /security/policies/{policy_id} — Security policy by ID */
-export const SECURITY_POLICY_BY_ID_CONFIG: EndpointParamConfig = {
-  endpoint: "/security/policies/{policy_id}",
-  params: {
-    wait_for_complete: {
-      type: "boolean",
-
-      wazuhName: "wait_for_complete",
-      description: "Disable timeout response (cluster sync wait)",
-    },
-  },
-};
-
-/** GET /security/rules/{rule_id} — Security rule by ID */
-export const SECURITY_RULE_BY_ID_CONFIG: EndpointParamConfig = {
-  endpoint: "/security/rules/{rule_id}",
   params: {
     wait_for_complete: {
       type: "boolean",

@@ -187,25 +187,33 @@ describe("Splunk Router Exports", () => {
 });
 
 describe("Batch Ticket Creation Logic", () => {
-  it("should correctly identify eligible items (completed with triage, no existing ticket)", () => {
-    const items = [
-      { status: "completed", triageResult: { answer: "analysis", splunkTicketId: null } },
-      { status: "completed", triageResult: { answer: "analysis", splunkTicketId: "DANG-123" } },
-      { status: "completed", triageResult: null },
-      { status: "queued", triageResult: { answer: "analysis" } },
-      { status: "completed", triageResult: { answer: "another analysis" } },
-      { status: "failed", triageResult: { answer: "failed analysis" } },
+  it("should correctly identify eligible items (completed or pipeline-triaged, with triage data, no existing ticket)", () => {
+    // Simulates items that passed the DB query:
+    //   status = 'completed' OR pipelineTriageId IS NOT NULL
+    // The JS filter then checks triage data presence + legacy ticket stamp.
+    const dbFilteredItems = [
+      // completed + legacy triage, no ticket → eligible
+      { status: "completed", pipelineTriageId: null, triageResult: { answer: "analysis", splunkTicketId: null } },
+      // completed + legacy triage, already ticketed → skipped
+      { status: "completed", pipelineTriageId: null, triageResult: { answer: "analysis", splunkTicketId: "DANG-123" } },
+      // completed but no triage data at all → skipped
+      { status: "completed", pipelineTriageId: null, triageResult: null },
+      // completed + legacy triage → eligible
+      { status: "completed", pipelineTriageId: null, triageResult: { answer: "another analysis" } },
+      // pipeline-triaged but status still "queued" → eligible (has pipelineTriageId)
+      { status: "queued", pipelineTriageId: "triage-abc", triageResult: null },
+      // pipeline-triaged but already ticketed via legacy stamp → skipped
+      { status: "queued", pipelineTriageId: "triage-def", triageResult: { splunkTicketId: "DANG-999" } },
     ];
 
-    const eligible = items.filter(i => {
-      if (i.status !== "completed") return false;
+    const eligible = dbFilteredItems.filter(i => {
       const triage = i.triageResult as Record<string, unknown> | null;
-      if (!triage || !triage.answer) return false;
-      if (triage.splunkTicketId) return false;
-      return true;
+      if (triage?.splunkTicketId) return false;
+      return !!i.pipelineTriageId || !!(triage?.answer);
     });
 
-    expect(eligible.length).toBe(2); // First and fifth items
+    // Items 0 (completed+answer), 3 (completed+answer), 4 (pipeline-triaged)
+    expect(eligible.length).toBe(3);
   });
 
   it("should skip items that already have a splunkTicketId", () => {

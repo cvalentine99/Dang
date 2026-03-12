@@ -101,7 +101,7 @@ export default function AlertClassifyButton({ alertData, agentContext, compact =
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Brain className="w-4 h-4 text-purple-400" />
-              <span className="text-xs font-medium text-foreground">AI Classification</span>
+              <span className="text-xs font-medium text-foreground">AI Classification <span className="text-[9px] text-muted-foreground font-normal">(LLM draft)</span></span>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={handleCopyResult} className="p-1 rounded hover:bg-white/5 text-muted-foreground" title="Copy">
@@ -124,7 +124,7 @@ export default function AlertClassifyButton({ alertData, agentContext, compact =
           {/* Confidence Gauge */}
           <div className="mb-3">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-muted-foreground">Confidence</span>
+              <span className="text-[10px] text-muted-foreground">Confidence <span className="text-[9px]">(LLM self-assessed)</span></span>
               <span className="text-[10px] font-mono text-foreground">{(result.confidence * 100).toFixed(0)}%</span>
             </div>
             <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
@@ -142,7 +142,7 @@ export default function AlertClassifyButton({ alertData, agentContext, compact =
           {result.iocs.length > 0 && (
             <div className="mb-3">
               <p className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
-                <Shield className="w-3 h-3" /> IOCs ({result.iocs.length})
+                <Shield className="w-3 h-3" /> IOCs ({result.iocs.length}) <span className="text-[9px]">— LLM-extracted</span>
               </p>
               <div className="flex flex-wrap gap-1">
                 {result.iocs.map((ioc, i) => (
@@ -158,7 +158,7 @@ export default function AlertClassifyButton({ alertData, agentContext, compact =
           {result.mitreATechniques.length > 0 && (
             <div className="mb-3">
               <p className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
-                <Target className="w-3 h-3" /> MITRE ATT&CK
+                <Target className="w-3 h-3" /> MITRE ATT&CK <span className="text-[9px]">— LLM-mapped</span>
               </p>
               <div className="flex flex-wrap gap-1">
                 {result.mitreATechniques.map((t, i) => (
@@ -174,12 +174,12 @@ export default function AlertClassifyButton({ alertData, agentContext, compact =
           {result.recommendedActions.length > 0 && (
             <div className="mb-3">
               <p className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" /> Recommended Actions
+                <AlertTriangle className="w-3 h-3" /> Suggested Actions <span className="text-[9px]">— AI-generated</span>
               </p>
               <ul className="space-y-1">
                 {result.recommendedActions.map((a, i) => (
                   <li key={i} className="flex items-start gap-1.5 text-[10px] text-foreground">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    <ChevronRight className="w-3 h-3 text-muted-foreground flex-shrink-0 mt-0.5" />
                     <span>{a}</span>
                   </li>
                 ))}

@@ -335,21 +335,21 @@ export function generateFullCaseReport(data: LivingCaseReportData): string {
       lines.push("");
     }
 
-    if (correlationBundle.vulnerabilityContext.length > 0) {
+    if ((correlationBundle.vulnerabilityContext ?? []).length > 0) {
       lines.push("### Vulnerability Context");
       lines.push("");
       lines.push("| CVE | Severity | Name | Relevance |");
       lines.push("|-----|----------|------|-----------|");
-      for (const v of correlationBundle.vulnerabilityContext) {
+      for (const v of correlationBundle.vulnerabilityContext!) {
         lines.push(`| ${v.cveId} | ${v.severity} | ${v.name} | ${(v.relevance * 100).toFixed(0)}% |`);
       }
       lines.push("");
     }
 
-    if (correlationBundle.threatIntelMatches.length > 0) {
+    if ((correlationBundle.threatIntelMatches ?? []).length > 0) {
       lines.push("### Threat Intelligence Matches");
       lines.push("");
-    for (const t of correlationBundle.threatIntelMatches) {
+    for (const t of correlationBundle.threatIntelMatches!) {
       lines.push(`- **${t.ioc}** (${t.iocType}) — Source: ${t.source}, Confidence: ${(t.confidence * 100).toFixed(0)}%`);
       if (t.threatName) lines.push(`  Threat: ${t.threatName}`);
       }

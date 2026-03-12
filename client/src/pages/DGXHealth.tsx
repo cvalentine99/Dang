@@ -174,8 +174,8 @@ export default function DGXHealth(): React.JSX.Element {
                 <Layers className="w-4 h-4 text-cyan-400" />
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Context</span>
               </div>
-              <p className="text-lg font-display font-bold text-foreground">{(h.contextSize / 1024).toFixed(0)}K</p>
-              <p className="text-[10px] text-muted-foreground mt-1">tokens max</p>
+              <p className="text-lg font-display font-bold text-foreground">{h.contextSize ? `${(h.contextSize / 1024).toFixed(0)}K` : "--"}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{h.contextSize ? "tokens max" : "not probed"}</p>
             </div>
 
             <div className="glass-panel rounded-xl p-4">
@@ -225,7 +225,7 @@ export default function DGXHealth(): React.JSX.Element {
               <MemoryStick className="w-4 h-4 text-purple-400" />
               <h2 className="text-sm font-display font-semibold text-foreground">Memory Usage</h2>
               <span className="text-[10px] text-muted-foreground ml-auto">
-                {formatBytes(h.memoryUsage.totalMB)} total (Grace Blackwell unified memory)
+                {formatBytes(h.memoryUsage.totalMB)} total (assumed — not probed from hardware)
               </span>
             </div>
 
@@ -233,7 +233,7 @@ export default function DGXHealth(): React.JSX.Element {
               {h.memoryUsage.modelWeightsMB !== null && (
                 <div
                   className="h-full bg-purple-500/60 flex items-center justify-center text-[9px] font-mono text-white/80"
-                  style={{ width: `${((h.memoryUsage.modelWeightsMB ?? 0) / h.memoryUsage.totalMB) * 100}%` }}
+                  style={{ width: `${((h.memoryUsage.modelWeightsMB ?? 0) / (h.memoryUsage.totalMB ?? 1)) * 100}%` }}
                   title={`Model Weights: ${formatBytes(h.memoryUsage.modelWeightsMB)}`}
                 >
                   Weights
@@ -242,7 +242,7 @@ export default function DGXHealth(): React.JSX.Element {
               {h.memoryUsage.kvCacheMB !== null && h.memoryUsage.kvCacheMB > 0 && (
                 <div
                   className="h-full bg-cyan-500/60 flex items-center justify-center text-[9px] font-mono text-white/80"
-                  style={{ width: `${Math.max(((h.memoryUsage.kvCacheMB ?? 0) / h.memoryUsage.totalMB) * 100, 1)}%` }}
+                  style={{ width: `${Math.max(((h.memoryUsage.kvCacheMB ?? 0) / (h.memoryUsage.totalMB ?? 1)) * 100, 1)}%` }}
                   title={`KV Cache: ${formatBytes(h.memoryUsage.kvCacheMB)}`}
                 >
                   KV
@@ -262,13 +262,13 @@ export default function DGXHealth(): React.JSX.Element {
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded bg-purple-500/60" />
                 <span className="text-[10px] text-muted-foreground">
-                  Model Weights: {formatBytes(h.memoryUsage.modelWeightsMB)}
+                  Model Weights: ~{formatBytes(h.memoryUsage.modelWeightsMB)} (est.)
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded bg-cyan-500/60" />
                 <span className="text-[10px] text-muted-foreground">
-                  KV Cache: {formatBytes(h.memoryUsage.kvCacheMB)}
+                  KV Cache: ~{formatBytes(h.memoryUsage.kvCacheMB)} (est.)
                 </span>
               </div>
               <div className="flex items-center gap-1.5">

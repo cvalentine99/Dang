@@ -32,7 +32,7 @@ describe("Broker Config Param Counts vs Spec v4.14.3", () => {
     { name: "MITRE_MITIGATIONS_CONFIG", config: broker.MITRE_MITIGATIONS_CONFIG, expectedCount: 9 },
     { name: "MITRE_SOFTWARE_CONFIG", config: broker.MITRE_SOFTWARE_CONFIG, expectedCount: 9 },
     { name: "DECODERS_CONFIG", config: broker.DECODERS_CONFIG, expectedCount: 12 },
-    { name: "SYSCOLLECTOR_NETIFACE_CONFIG", config: broker.SYSCOLLECTOR_NETIFACE_CONFIG, expectedCount: 22 },  // 7 universal + 14 specific (spec has 20 data but config includes mac=21) + wait_for_complete
+    { name: "SYSCOLLECTOR_NETIFACE_CONFIG", config: broker.SYSCOLLECTOR_NETIFACE_CONFIG, expectedCount: 21 },  // 7 universal + 13 specific + wait_for_complete (mac removed — not in spec v4.14.3)
     { name: "SYSCOLLECTOR_NETADDR_CONFIG", config: broker.SYSCOLLECTOR_NETADDR_CONFIG, expectedCount: 13 },
     { name: "SYSCOLLECTOR_HOTFIXES_CONFIG", config: broker.SYSCOLLECTOR_HOTFIXES_CONFIG, expectedCount: 9 },
     { name: "SYSCOLLECTOR_NETPROTO_CONFIG", config: broker.SYSCOLLECTOR_NETPROTO_CONFIG, expectedCount: 12 },
@@ -148,7 +148,7 @@ describe("Experimental config param counts vs spec v4.14.3", () => {
     { name: "EXP_SYSCOLLECTOR_PACKAGES_CONFIG", config: broker.EXP_SYSCOLLECTOR_PACKAGES_CONFIG, expectedCount: 12 },
     { name: "EXP_SYSCOLLECTOR_PROCESSES_CONFIG", config: broker.EXP_SYSCOLLECTOR_PROCESSES_CONFIG, expectedCount: 21 },
     { name: "EXP_SYSCOLLECTOR_PORTS_CONFIG", config: broker.EXP_SYSCOLLECTOR_PORTS_CONFIG, expectedCount: 15 },
-    { name: "EXP_SYSCOLLECTOR_NETIFACE_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETIFACE_CONFIG, expectedCount: 21 },  // 5 universal (no q/distinct) + agents_list + wait_for_complete + 14 specific
+    { name: "EXP_SYSCOLLECTOR_NETIFACE_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETIFACE_CONFIG, expectedCount: 20 },  // 5 universal (no q/distinct) + agents_list + wait_for_complete + 13 specific (mac removed)
     { name: "EXP_SYSCOLLECTOR_NETADDR_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETADDR_CONFIG, expectedCount: 12 },
     { name: "EXP_SYSCOLLECTOR_NETPROTO_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETPROTO_CONFIG, expectedCount: 11 },
     { name: "EXP_SYSCOLLECTOR_OS_CONFIG", config: broker.EXP_SYSCOLLECTOR_OS_CONFIG, expectedCount: 12 },

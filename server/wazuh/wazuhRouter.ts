@@ -913,7 +913,6 @@ export const wazuhRouter = router({
       "rx.errors": z.string().optional(),
       "tx.dropped": z.string().optional(),
       "rx.dropped": z.string().optional(),
-      mac: z.string().optional(),
       wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
@@ -1225,7 +1224,6 @@ export const wazuhRouter = router({
       "rx.errors": z.string().optional(),
       "tx.dropped": z.string().optional(),
       "rx.dropped": z.string().optional(),
-      mac: z.string().optional(),
     }))
     .query(({ input }) => {
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(EXP_SYSCOLLECTOR_NETIFACE_CONFIG, input);
@@ -1561,6 +1559,7 @@ export const wazuhRouter = router({
     .input(paginationSchema.extend({
       sort: z.string().optional(),
       search: z.string().optional(),
+      select: z.union([z.string(), z.array(z.string())]).optional(),
       q: z.string().optional(),
       mitre_reference_ids: z.union([z.string(), z.array(z.string())]).optional(),
       wait_for_complete: z.boolean().optional(),
@@ -1768,6 +1767,8 @@ export const wazuhRouter = router({
       q: z.string().optional(),
       distinct: z.boolean().optional(),
       status: z.string().optional(),
+      pci_dss: z.string().optional(),
+      cis: z.string().optional(),
       wait_for_complete: z.boolean().optional(),
     }))
     .query(({ input }) => {
@@ -1975,25 +1976,37 @@ export const wazuhRouter = router({
       return withBrokerWarnings(proxyGet("/security/users", forwardedQuery), errors);
     }),
 
-  /** GET /security/users/{user_id} — Fetch individual user by ID (C-4 gap fill) */
+  /**
+   * GET /security/users?user_ids={id} — Fetch individual user by ID
+   * Uses list endpoint with user_ids filter (spec-compliant; no GET /security/users/{id} in v4.14.3)
+   */
   securityUserById: wazuhProcedure
     .input(z.object({ userId: z.union([securityIdSchema, z.number()]) }))
-    .query(({ input }) => proxyGet(`/security/users/${input.userId}`)),
+    .query(({ input }) => proxyGet("/security/users", { user_ids: String(input.userId) })),
 
-  /** GET /security/roles/{role_id} — Fetch individual role by ID (C-4 gap fill) */
+  /**
+   * GET /security/roles?role_ids={id} — Fetch individual role by ID
+   * Uses list endpoint with role_ids filter (spec-compliant; no GET /security/roles/{id} in v4.14.3)
+   */
   securityRoleById: wazuhProcedure
     .input(z.object({ roleId: z.union([securityIdSchema, z.number()]) }))
-    .query(({ input }) => proxyGet(`/security/roles/${input.roleId}`)),
+    .query(({ input }) => proxyGet("/security/roles", { role_ids: String(input.roleId) })),
 
-  /** GET /security/policies/{policy_id} — Fetch individual policy by ID (C-4 gap fill) */
+  /**
+   * GET /security/policies?policy_ids={id} — Fetch individual policy by ID
+   * Uses list endpoint with policy_ids filter (spec-compliant; no GET /security/policies/{id} in v4.14.3)
+   */
   securityPolicyById: wazuhProcedure
     .input(z.object({ policyId: z.union([securityIdSchema, z.number()]) }))
-    .query(({ input }) => proxyGet(`/security/policies/${input.policyId}`)),
+    .query(({ input }) => proxyGet("/security/policies", { policy_ids: String(input.policyId) })),
 
-  /** GET /security/rules/{rule_id} — Fetch individual RBAC rule by ID (C-4 gap fill) */
+  /**
+   * GET /security/rules?rule_ids={id} — Fetch individual RBAC rule by ID
+   * Uses list endpoint with rule_ids filter (spec-compliant; no GET /security/rules/{id} in v4.14.3)
+   */
   securityRuleById: wazuhProcedure
     .input(z.object({ ruleId: z.union([securityIdSchema, z.number()]) }))
-    .query(({ input }) => proxyGet(`/security/rules/${input.ruleId}`)),
+    .query(({ input }) => proxyGet("/security/rules", { rule_ids: String(input.ruleId) })),
 
   /**
    * GET /security/config — Security configuration (token TTL, RBAC mode)
@@ -2022,6 +2035,14 @@ export const wazuhRouter = router({
     }),
 
   /**
+   * GET /security/user/authenticate — Token introspection
+   * Returns info about the current JWT token. Spec v4.14.3 coverage gap fill.
+   */
+  securityTokenInfo: wazuhProcedure
+    .input(z.void())
+    .query(() => proxyGet("/security/user/authenticate")),
+
+  /**
    * GET /security/rules — List RBAC security rules
    * Sprint v2 P0 gap fill. Supports rule_ids, pagination, search, sort, q, distinct.
    */
@@ -2031,6 +2052,10 @@ export const wazuhRouter = router({
         rule_ids: z.union([z.string(), z.array(z.string())]).optional(),
         search: z.string().optional(),
         sort: z.string().optional(),
+        select: z.union([z.string(), z.array(z.string())]).optional(),
+        q: z.string().optional(),
+        distinct: z.boolean().optional(),
+        wait_for_complete: z.boolean().optional(),
       })
     )
     .query(({ input }) => {

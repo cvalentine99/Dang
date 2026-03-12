@@ -58,6 +58,10 @@ services:
       # Auth — generate with: openssl rand -hex 32
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — generate with openssl rand -hex 32}
 
+      # Encryption — separate key for AES-256-GCM credential encryption (optional)
+      # If not set, a key is derived from JWT_SECRET via HKDF (safe but separation is best practice)
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+
       # Local auth — first registered user becomes admin if these are not set
       LOCAL_ADMIN_USER: ${LOCAL_ADMIN_USER:-}
       LOCAL_ADMIN_PASS: ${LOCAL_ADMIN_PASS:-}

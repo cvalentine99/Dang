@@ -30,8 +30,10 @@ ALTER TABLE anomaly_suppression_rules
 ALTER TABLE analyst_notes_v2
   ADD CONSTRAINT fk_anv2_userId FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE;
 
+-- C-1: investigation_sessions.userId is nullable (system-created sessions use NULL).
+-- SET NULL preserves investigation data when a user is deleted — critical for compliance.
 ALTER TABLE investigation_sessions
-  ADD CONSTRAINT fk_is_userId FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE;
+  ADD CONSTRAINT fk_is_userId FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL;
 
 ALTER TABLE investigation_notes
   ADD CONSTRAINT fk_in_userId FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE;
