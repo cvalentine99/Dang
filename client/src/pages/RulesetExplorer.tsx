@@ -257,8 +257,8 @@ export default function RulesetExplorer() {
     { enabled: isConfigured && activeTab === "decoderParents" }
   );
   // ─── Rules by Requirement ─────────────────────────────────────────────
-  const [requirementInput, setRequirementInput] = useState("PCI_DSS_10.6.1");
-  const [activeRequirement, setActiveRequirement] = useState("PCI_DSS_10.6.1");
+  const [requirementInput, setRequirementInput] = useState("pci_dss");
+  const [activeRequirement, setActiveRequirement] = useState("pci_dss");
   const rulesByReqQ = trpc.wazuh.rulesByRequirement.useQuery(
     { requirement: activeRequirement },
     { enabled: isConfigured && activeTab === "rulesByReq" && !!activeRequirement }
@@ -1604,7 +1604,7 @@ export default function RulesetExplorer() {
           <div className="flex items-center gap-2 mb-4">
             <input
               type="text"
-              placeholder="e.g. PCI_DSS_10.6.1"
+              placeholder="e.g. pci_dss"
               value={requirementInput}
               onChange={(e) => setRequirementInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && requirementInput.trim()) setActiveRequirement(requirementInput.trim()); }}
@@ -1619,7 +1619,7 @@ export default function RulesetExplorer() {
               <Search className="h-3.5 w-3.5 mr-1" /> Search
             </Button>
           </div>
-          <p className="text-[10px] text-slate-500 mb-3">Common requirements: PCI_DSS_10.6.1, PCI_DSS_11.4, GPG13_4.12, GDPR_IV_35.7.d, HIPAA_164.312.b, TSC_CC6.1</p>
+          <p className="text-[10px] text-slate-500 mb-3">Valid frameworks: pci_dss, gdpr, hipaa, nist-800-53, tsc, gpg13, mitre</p>
           {rulesByReqQ.isLoading ? (
             <TableSkeleton columns={4} rows={8} />
           ) : rulesByReqQ.isError ? (

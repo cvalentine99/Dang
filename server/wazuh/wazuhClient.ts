@@ -109,9 +109,8 @@ const GLOBAL_RATE_LIMITS: Record<string, number> = {
 };
 
 // Per-user limits per endpoint group (fraction of global — ensures fairness)
-// Default: 50% of the global limit per user
 const PER_USER_RATE_LIMITS: Record<string, number> = {
-  default: 30,
+  default: 50, // Pages like /agents fire 8+ queries on load; 30 was too tight
   alerts: 15,
   vulnerabilities: 10,
   syscheck: 10,

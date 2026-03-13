@@ -141,15 +141,23 @@ export default function AgentHealth() {
   // ── Agent summary (real or fallback) ──────────────────────────────────
   const agentData = useMemo(() => {
     const raw = agentSummaryQ.data;
-    const items = extractItems(raw);
-    const first = items[0];
+    const d = (raw as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+    if (!d) return { total: 0, active: 0, disconnected: 0, never: 0, pending: 0 };
+    // /agents/summary/status returns { data: { connection: { active, disconnected, ... total } } }
+    const connection = d.connection as Record<string, number> | undefined;
+    if (connection) {
+      return { total: connection.total ?? 0, active: connection.active ?? 0, disconnected: connection.disconnected ?? 0, never: connection.never_connected ?? 0, pending: connection.pending ?? 0 };
+    }
+    // Fallback: affected_items shape
+    const items = d.affected_items as Array<Record<string, unknown>> | undefined;
+    const first = items?.[0];
     if (!first) return { total: 0, active: 0, disconnected: 0, never: 0, pending: 0 };
     return {
       total: Number(first.total ?? 0),
-      active: Number(first.active ?? (first.connection as Record<string, number>)?.active ?? 0),
-      disconnected: Number(first.disconnected ?? (first.connection as Record<string, number>)?.disconnected ?? 0),
-      never: Number(first.never_connected ?? (first.connection as Record<string, number>)?.never_connected ?? 0),
-      pending: Number(first.pending ?? (first.connection as Record<string, number>)?.pending ?? 0),
+      active: Number(first.active ?? 0),
+      disconnected: Number(first.disconnected ?? 0),
+      never: Number(first.never_connected ?? 0),
+      pending: Number(first.pending ?? 0),
     };
   }, [agentSummaryQ.data, isConnected]);
 

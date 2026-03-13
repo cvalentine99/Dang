@@ -178,9 +178,13 @@ function AgentOverviewTable({ data }: { data: unknown }) {
 
 // ── AgentSummaryPanel — aggregate status counts ──────────────────────────────
 function AgentSummaryPanel({ data }: { data: unknown }) {
-  const items = extractItems(data);
-  const first = items[0];
-  if (!first) {
+  // /agents/summary/status returns { data: { connection: { active, disconnected, ... total } } }
+  const d = (data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const connection = d?.connection as Record<string, number> | undefined;
+  const first: Record<string, unknown> = connection
+    ? { total: connection.total, active: connection.active, disconnected: connection.disconnected, never_connected: connection.never_connected, pending: connection.pending }
+    : (extractItems(data)[0] ?? {});
+  if (!first || Object.keys(first).length === 0) {
     return <p className="text-xs text-muted-foreground text-center py-6">No agent summary data available</p>;
   }
   const statuses = [
@@ -301,13 +305,15 @@ export default function Home() {
     const raw = agentSummaryQ.data;
     const d = (raw as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
     if (!d) return { total: 0, active: 0, disconnected: 0, never: 0, pending: 0 };
+    // /agents/summary/status returns { data: { connection: { active, disconnected, ... total } } }
+    const connection = d.connection as Record<string, number> | undefined;
+    if (connection) {
+      return { total: connection.total ?? 0, active: connection.active ?? 0, disconnected: connection.disconnected ?? 0, never: connection.never_connected ?? 0, pending: connection.pending ?? 0 };
+    }
+    // Fallback: flat shape (affected_items or legacy)
     const items = d.affected_items as Array<Record<string, unknown>> | undefined;
     const first = items?.[0] ?? d;
-    const connection = (first as Record<string, unknown>)?.connection as Record<string, number> | undefined;
-    if (connection) {
-      return { total: Number((first as Record<string, unknown>).total ?? 0), active: connection.active ?? 0, disconnected: connection.disconnected ?? 0, never: connection.never_connected ?? 0, pending: connection.pending ?? 0 };
-    }
-    return { total: Number(first?.total ?? first?.active ?? 0) + Number(first?.disconnected ?? 0) + Number(first?.never_connected ?? 0), active: Number(first?.active ?? 0), disconnected: Number(first?.disconnected ?? 0), never: Number(first?.never_connected ?? 0), pending: Number(first?.pending ?? 0) };
+    return { total: Number(first?.total ?? 0) + Number(first?.active ?? 0) + Number(first?.disconnected ?? 0) + Number(first?.never_connected ?? 0), active: Number(first?.active ?? 0), disconnected: Number(first?.disconnected ?? 0), never: Number(first?.never_connected ?? 0), pending: Number(first?.pending ?? 0) };
   }, [agentSummaryQ.data]);
 
   const epsData = useMemo(() => {

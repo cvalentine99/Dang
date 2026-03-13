@@ -219,6 +219,9 @@ export async function otxGet(
     return data;
   } catch (err: unknown) {
     if (axios.isAxiosError(err)) {
+      if (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT") {
+        throw new Error("OTX API request timed out — AlienVault OTX may be unreachable from this network.");
+      }
       const status = err.response?.status;
       if (status === 401 || status === 403) {
         throw new Error("OTX authentication failed. Check your API key.");
