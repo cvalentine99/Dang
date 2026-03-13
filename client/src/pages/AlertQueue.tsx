@@ -140,12 +140,22 @@ export default function AlertQueue() {
     return counts != null && counts.success > 0;
   };
 
-  // Count completed items eligible for ticketing
+  /** Get the latest successful artifact ticket ID for a queue item (for Splunk deep links). */
+  const getArtifactTicketId = (itemId: number): string | null => {
+    const counts = ticketCounts[itemId];
+    return counts?.latestTicketId ?? null;
+  };
+
+  // Count items eligible for ticketing — uses canonical triage presence, artifact-only dedup
   const ticketEligibleCount = items.filter(i => {
-    if (i.status !== "completed") return false;
+    // Eligible if: canonical triage exists (pipelineTriageId) OR legacy manual triage has data
     const triage = i.triageResult as Record<string, unknown> | null;
-    if (!triage || !triage.answer) return false;
-    if (triage.splunkTicketId) return false;
+    const hasTriageData = !!(i as any).pipelineTriageId || !!(triage?.answer);
+    if (!hasTriageData) return false;
+    // Must be completed status OR have canonical pipeline triage
+    const isEligibleStatus = i.status === "completed" || !!(i as any).pipelineTriageId;
+    if (!isEligibleStatus) return false;
+    // Not already ticketed — artifact-only check (no legacy stamp)
     if (hasSuccessfulTicketForItem(i.id)) return false;
     return true;
   }).length;
@@ -224,6 +234,7 @@ export default function AlertQueue() {
                     ticketingDegraded={ticketingDegraded}
                     ticketingReason={ticketingReason}
                     hasSuccessfulTicket={hasSuccessfulTicketForItem(item.id)}
+                    artifactTicketId={getArtifactTicketId(item.id)}
                   />
                 ))}
               </div>
@@ -250,6 +261,7 @@ export default function AlertQueue() {
                     ticketingDegraded={ticketingDegraded}
                     ticketingReason={ticketingReason}
                     hasSuccessfulTicket={hasSuccessfulTicketForItem(item.id)}
+                    artifactTicketId={getArtifactTicketId(item.id)}
                   />
                 ))}
               </div>

@@ -175,6 +175,8 @@ export interface SplunkTicketPayload {
   triageId?: string;
   /** When the triage was performed */
   triagedAt?: string;
+  /** Queue item ID — used for deterministic ticket ID generation */
+  queueItemId?: number;
 }
 
 // ── HEC Client ────────────────────────────────────────────────────────────
@@ -317,6 +319,7 @@ export async function createSplunkTicket(payload: SplunkTicketPayload): Promise<
   success: boolean;
   message: string;
   ticketId?: string;
+  statusCode?: number;
 }> {
   const config = await getEffectiveSplunkConfig();
 
@@ -335,7 +338,12 @@ export async function createSplunkTicket(payload: SplunkTicketPayload): Promise<
           : "low";
 
   // Build the HEC event
-  const ticketId = `DANG-${Date.now()}-${payload.alertId.slice(-6)}`;
+  // Deterministic ticket ID: same queue item + triage always produces the same ID.
+  // Falls back to timestamp-based ID when queueItemId is unavailable.
+  const triageSlug = payload.triageId ? payload.triageId.slice(-8) : payload.alertId.slice(-8);
+  const ticketId = payload.queueItemId
+    ? `DANG-${payload.queueItemId}-${triageSlug}`
+    : `DANG-${Date.now()}-${payload.alertId.slice(-6)}`;
 
   const event: SplunkHECEvent = {
     time: Math.floor(Date.now() / 1000),
@@ -420,8 +428,9 @@ export async function createSplunkTicket(payload: SplunkTicketPayload): Promise<
       success: true,
       message: `Ticket ${ticketId} created in Splunk ES`,
       ticketId,
+      statusCode: result.statusCode,
     };
   }
 
-  return { success: false, message: result.message };
+  return { success: false, message: result.message, statusCode: result.statusCode };
 }
