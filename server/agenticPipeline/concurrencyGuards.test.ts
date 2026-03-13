@@ -172,6 +172,161 @@ describe("Audit #83: Concurrent pipeline guard on same alert", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// BUG-1: autoTriageQueueItem — atomic claim via transaction + FOR UPDATE
+// ═══════════════════════════════════════════════════════════════════════════════
+describe("BUG-1: autoTriageQueueItem atomic claim", () => {
+  const source = readSource("server/agenticPipeline/pipelineRouter.ts");
+
+  // Extract the autoTriageQueueItem mutation body
+  const fnStart = source.indexOf("autoTriageQueueItem: protectedProcedure");
+  const fnEnd = source.indexOf("getAutoTriageStatus: protectedProcedure", fnStart);
+  const fnBody = source.slice(fnStart, fnEnd);
+
+  it("wraps the initial read + guard + claim in a db.transaction()", () => {
+    expect(fnBody).toContain("db.transaction(async (tx)");
+  });
+
+  it("uses SELECT ... FOR UPDATE on the alertQueue row inside the transaction", () => {
+    // The SELECT inside the transaction should use .for("update")
+    const txStart = fnBody.indexOf("db.transaction(async (tx)");
+    const txEnd = fnBody.indexOf("return { claimed: true as const, item }");
+    const txBody = fnBody.slice(txStart, txEnd);
+    expect(txBody).toContain('.for("update")');
+  });
+
+  it("uses tx (not db) for SELECT inside the transaction", () => {
+    const txStart = fnBody.indexOf("db.transaction(async (tx)");
+    const txEnd = fnBody.indexOf("return { claimed: true as const, item }");
+    const txBody = fnBody.slice(txStart, txEnd);
+    // Must use tx.select(), not db.select()
+    expect(txBody).toContain("tx");
+    expect(txBody).toMatch(/tx\s*\.\s*select/);
+  });
+
+  it("checks pipelineTriageId inside the transaction before claiming", () => {
+    const txStart = fnBody.indexOf("db.transaction(async (tx)");
+    const txEnd = fnBody.indexOf("return { claimed: true as const, item }");
+    const txBody = fnBody.slice(txStart, txEnd);
+    expect(txBody).toContain("item.pipelineTriageId");
+  });
+
+  it("checks autoTriageStatus === 'running' inside the transaction to reject concurrent claims", () => {
+    const txStart = fnBody.indexOf("db.transaction(async (tx)");
+    const txEnd = fnBody.indexOf("return { claimed: true as const, item }");
+    const txBody = fnBody.slice(txStart, txEnd);
+    expect(txBody).toContain('autoTriageStatus === "running"');
+  });
+
+  it("sets autoTriageStatus = 'running' inside the transaction (via tx, not db)", () => {
+    const txStart = fnBody.indexOf("db.transaction(async (tx)");
+    const txEnd = fnBody.indexOf("return { claimed: true as const, item }");
+    const txBody = fnBody.slice(txStart, txEnd);
+    expect(txBody).toContain("tx");
+    expect(txBody).toContain('autoTriageStatus: "running"');
+  });
+
+  it("does NOT use db.select() or db.update() before the try block (no non-atomic reads)", () => {
+    // Between the db init and the try block, there should be no db.select() or db.update()
+    // (only db.transaction is allowed)
+    const dbInitIdx = fnBody.indexOf("const db = await getDb()");
+    const tryIdx = fnBody.indexOf("try {");
+    const preTryBody = fnBody.slice(dbInitIdx, tryIdx);
+    // db.select() and db.update() should not appear (only db.transaction)
+    expect(preTryBody).not.toContain("db.select()");
+    expect(preTryBody).not.toContain("db.update(");
+  });
+
+  it("runs runTriageAgent OUTSIDE the transaction (no LLM calls under row locks)", () => {
+    const txEnd = fnBody.indexOf("return { claimed: true as const, item }");
+    const triageCallIdx = fnBody.indexOf("runTriageAgent(");
+    // runTriageAgent must come after the transaction closes
+    expect(triageCallIdx).toBeGreaterThan(txEnd);
+  });
+
+  it("preserves existing response shapes (success/alreadyTriaged/error)", () => {
+    expect(fnBody).toContain("success: false as const, error: \"Queue item not found\"");
+    expect(fnBody).toContain("success: true as const, alreadyTriaged: true, triageId:");
+    expect(fnBody).toContain("success: false as const, error: \"Auto-triage already in progress\"");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BUG-2: autoTriageAllPending — atomic batch claim via transaction + FOR UPDATE
+// ═══════════════════════════════════════════════════════════════════════════════
+describe("BUG-2: autoTriageAllPending atomic batch claim", () => {
+  const source = readSource("server/agenticPipeline/pipelineRouter.ts");
+
+  // Extract the autoTriageAllPending mutation body
+  const fnStart = source.indexOf("autoTriageAllPending: protectedProcedure");
+  const fnEnd = source.indexOf("// ═══════════════", source.indexOf("total: pendingItems.length", fnStart));
+  const fnBody = source.slice(fnStart, fnEnd);
+
+  it("wraps the batch SELECT + claim in a db.transaction()", () => {
+    expect(fnBody).toContain("db.transaction(async (tx)");
+  });
+
+  it("uses SELECT ... FOR UPDATE on pending items inside the transaction", () => {
+    const txStart = fnBody.indexOf("db.transaction(async (tx)");
+    const txEnd = fnBody.indexOf("return pending;");
+    const txBody = fnBody.slice(txStart, txEnd);
+    expect(txBody).toContain('.for("update")');
+  });
+
+  it("uses tx (not db) for SELECT inside the batch claim transaction", () => {
+    const txStart = fnBody.indexOf("db.transaction(async (tx)");
+    const txEnd = fnBody.indexOf("return pending;");
+    const txBody = fnBody.slice(txStart, txEnd);
+    expect(txBody).toMatch(/tx\s*\.\s*select/);
+  });
+
+  it("atomically sets autoTriageStatus = 'running' for all claimed items in one UPDATE", () => {
+    const txStart = fnBody.indexOf("db.transaction(async (tx)");
+    const txEnd = fnBody.indexOf("return pending;");
+    const txBody = fnBody.slice(txStart, txEnd);
+    expect(txBody).toContain('autoTriageStatus: "running"');
+    expect(txBody).toContain("tx");
+    // Must use inArray to batch-update all claimed IDs at once
+    expect(txBody).toContain("inArray(alertQueue.id, ids)");
+  });
+
+  it("does NOT re-set autoTriageStatus to 'running' inside the for-loop (already claimed)", () => {
+    // Find the for-loop body
+    const loopStart = fnBody.indexOf("for (const item of pendingItems)");
+    expect(loopStart).toBeGreaterThan(-1);
+    const loopBody = fnBody.slice(loopStart);
+    // Inside the loop, there should be no .set({ autoTriageStatus: "running" })
+    // The only autoTriageStatus sets should be "completed" or "failed"
+    const runningSetPattern = /\.set\(\{[^}]*autoTriageStatus:\s*"running"/;
+    expect(loopBody).not.toMatch(runningSetPattern);
+  });
+
+  it("includes belt-and-suspenders check: skips items with pipelineTriageId already set", () => {
+    const loopStart = fnBody.indexOf("for (const item of pendingItems)");
+    const loopBody = fnBody.slice(loopStart);
+    expect(loopBody).toContain("fullItem.pipelineTriageId");
+    // Should skip/continue, not throw
+    expect(loopBody).toContain("if (fullItem.pipelineTriageId) continue");
+  });
+
+  it("runs triage OUTSIDE the claim transaction (no LLM calls under row locks)", () => {
+    const txEnd = fnBody.indexOf("return pending;");
+    const triageCallIdx = fnBody.indexOf("runTriageAgent(");
+    expect(triageCallIdx).toBeGreaterThan(txEnd);
+  });
+
+  it("preserves existing response shapes (triaged/failed/total/results)", () => {
+    expect(fnBody).toContain("triaged,");
+    expect(fnBody).toContain("failed,");
+    expect(fnBody).toContain("total: pendingItems.length,");
+    expect(fnBody).toContain("results,");
+  });
+
+  it("imports inArray from drizzle-orm for batch WHERE clause", () => {
+    expect(source).toMatch(/import\s*{[^}]*inArray[^}]*}\s*from\s*["']drizzle-orm["']/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // #54: Overlap guard on auto-queue poller
 // ═══════════════════════════════════════════════════════════════════════════════
 describe("Audit #54: Overlap guard on auto-queue poller", () => {

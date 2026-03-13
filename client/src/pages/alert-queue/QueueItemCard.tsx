@@ -102,7 +102,14 @@ export function QueueItemCard({
     {
       enabled: !!item.pipelineTriageId || item.autoTriageStatus === "completed" || fullPipelineMutation.isSuccess,
       staleTime: 5_000,
-      refetchInterval: (fullPipelineMutation.isPending || autoTriageMutation.isPending) ? 2_000 : false,
+      refetchInterval: (query) => {
+        // Poll while mutations are in-flight OR while the server-side pipeline is still running.
+        // Without this, passive viewers (analysts who didn't trigger the pipeline) see stale stage status.
+        if (fullPipelineMutation.isPending || autoTriageMutation.isPending) return 2_000;
+        const run = query.state.data as { status?: string } | undefined;
+        if (run?.status === "running") return 3_000;
+        return false;
+      },
     }
   );
 

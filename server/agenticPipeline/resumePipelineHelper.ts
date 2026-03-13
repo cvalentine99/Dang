@@ -476,6 +476,10 @@ export async function executeResumePipeline(
       };
       hypothesisPartialFailure = result.stages.responseActions;
 
+      // BUG-03 adjacent fix: sync result.status with DB truth so the API
+      // response does not claim "completed" when actions partially failed.
+      result.status = partialFailure ? "partial" : "completed";
+
       await db.update(pipelineRuns).set({
         livingCaseId: hypoResult.caseId,
         hypothesisStatus: "completed",
@@ -562,6 +566,9 @@ export async function executeResumePipeline(
         ...(partialFailure ? { partialFailure } : {}),
       };
 
+      // BUG-03 adjacent fix: sync result.status with DB truth for stage-4 path.
+      result.status = partialFailure ? "partial" : "completed";
+
       await db.update(pipelineRuns).set({
         livingCaseId: originalRun.livingCaseId,
         responseActionsCount: actionIds.length,
@@ -592,6 +599,8 @@ export async function executeResumePipeline(
   }
 
   result.totalLatencyMs = Date.now() - startTime;
-  result.status = "completed";
+  if (result.status === "running") {
+    result.status = "completed";
+  }
   return result;
 }

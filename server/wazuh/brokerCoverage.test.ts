@@ -5,6 +5,8 @@ import {
   EXPERIMENTAL_CISCAT_RESULTS_CONFIG,
   CISCAT_CONFIG,
 } from "./paramBroker";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 // ── Coverage Report Tests ────────────────────────────────────────────────────
 
@@ -34,12 +36,17 @@ describe("brokerCoverage — generateCoverageReport", () => {
     expect(report.brokerWired).toBeGreaterThan(0);
   });
 
-  it("has no manual-param endpoints (all promoted to broker)", () => {
-    expect(report.manualParam).toBe(0);
+  it("has manual-param endpoints (truthful classification)", () => {
+    expect(report.manualParam).toBeGreaterThan(0);
   });
 
-  it("has no passthrough endpoints (all promoted to broker)", () => {
-    expect(report.passthrough).toBe(0);
+  it("has passthrough endpoints (truthful classification)", () => {
+    expect(report.passthrough).toBeGreaterThan(0);
+  });
+
+  it("broker coverage is less than 100% (truthful — not all endpoints call brokerParams)", () => {
+    expect(report.brokerCoveragePercent).toBeLessThan(100);
+    expect(report.brokerCoveragePercent).toBeGreaterThan(40);
   });
 
   it("calculates broker coverage percentage correctly", () => {
@@ -50,6 +57,10 @@ describe("brokerCoverage — generateCoverageReport", () => {
   it("calculates param coverage percentage correctly", () => {
     const expected = Math.round(((report.brokerWired + report.manualParam) / report.totalProcedures) * 100);
     expect(report.paramCoveragePercent).toBe(expected);
+  });
+
+  it("reports endpoint coverage as total/total", () => {
+    expect(report.endpointCoverage).toBe(`${report.totalProcedures}/${report.totalProcedures}`);
   });
 
   it("has broker configs", () => {
@@ -305,4 +316,323 @@ describe("brokerCoverage — category completeness", () => {
       expect(found!.total).toBeGreaterThan(0);
     });
   }
+});
+
+// ── Classification Truth Regression Tests ────────────────────────────────────
+// These tests verify that the ENDPOINT_REGISTRY classifications match the
+// actual runtime wiring in wazuhRouter.ts. They read the source file and
+// check whether each spot-checked procedure actually calls brokerParams().
+
+describe("brokerCoverage — classification matches wazuhRouter.ts runtime", () => {
+  let routerSource: string;
+  let report: CoverageReport;
+
+  beforeAll(() => {
+    const routerPath = path.resolve(__dirname, "wazuhRouter.ts");
+    routerSource = fs.readFileSync(routerPath, "utf-8");
+    report = generateCoverageReport();
+  });
+
+  /**
+   * Extract the query handler body for a given procedure name.
+   * Looks for "procedureName:" or "procedureName :" and grabs text until the
+   * next top-level procedure definition (pattern: /^\s+\w+:\s/m after the match).
+   */
+  function getProcedureBody(name: string): string {
+    // Match the procedure definition start
+    const regex = new RegExp(`\\b${name}:\\s`, "m");
+    const match = regex.exec(routerSource);
+    if (!match) return "";
+    const start = match.index;
+    // Find the next procedure definition (a word followed by colon at start of line after whitespace)
+    const rest = routerSource.slice(start + match[0].length);
+    // Look for the next top-level procedure: line starting with optional whitespace, then word + colon
+    const nextProcMatch = /\n\s{2}\w+:\s(?:wazuhProcedure|protectedProcedure|adminProcedure)/m.exec(rest);
+    const end = nextProcMatch ? start + match[0].length + nextProcMatch.index : start + 2000;
+    return routerSource.slice(start, end);
+  }
+
+  // ── Broker-wired procedures: MUST contain brokerParams() call ──
+  const expectedBroker: string[] = [
+    "managerConfiguration",
+    "managerLogs",
+    "clusterNodes",
+    "agents",
+    "agentGroups",
+    "agentsOutdated",
+    "agentsNoGroup",
+    "agentsStatsDistinct",
+    "agentGroupMembers",
+    "agentPackages",
+    "agentPorts",
+    "agentProcesses",
+    "rules",
+    "rulesFiles",
+    "mitreTactics",
+    "mitreTechniques",
+    "scaPolicies",
+    "scaChecks",
+    "ciscatResults",
+    "syscheckFiles",
+    "rootcheckResults",
+    "decoders",
+    "decoderFiles",
+    "decoderParents",
+    "decoderFileContent",
+    "taskStatus",
+    "securityRoles",
+    "securityPolicies",
+    "securityUsers",
+    "securityConfig",
+    "securityCurrentUser",
+    "securityRbacRules",
+    "securityActions",
+    "lists",
+    "listsFiles",
+    "clusterNodeConfiguration",
+    "clusterNodeLogs",
+    "expCiscatResults",
+  ];
+
+  for (const proc of expectedBroker) {
+    it(`${proc} is classified as broker AND calls brokerParams() at runtime`, () => {
+      const ep = report.endpoints.find(e => e.procedure === proc);
+      expect(ep).toBeDefined();
+      expect(ep!.wiringLevel).toBe("broker");
+
+      const body = getProcedureBody(proc);
+      expect(body).toBeTruthy();
+      expect(body).toContain("brokerParams(");
+    });
+  }
+
+  // ── Manual procedures: MUST NOT contain brokerParams() call ──
+  const expectedManual: Array<{ proc: string; reason: string }> = [
+    { proc: "managerStats", reason: "inline date param" },
+    { proc: "daemonStats", reason: "inline daemons_list join" },
+    { proc: "managerVersionCheck", reason: "inline force_query param" },
+    { proc: "clusterHealthcheck", reason: "inline nodes_list join" },
+    { proc: "clusterNodeStats", reason: "inline date param" },
+    { proc: "clusterNodeDaemonStats", reason: "inline daemons_list join" },
+    { proc: "agentsSummary", reason: "inline agents_list join" },
+    { proc: "agentDaemonStats", reason: "inline daemons_list join" },
+    { proc: "agentsUpgradeResult", reason: "inline 12-param assembly" },
+    { proc: "ruleGroups", reason: "inline pagination + sort/search" },
+    { proc: "rulesByRequirement", reason: "inline pagination + sort/search" },
+    { proc: "ruleFileContent", reason: "inline raw + get_dirnames_path" },
+    { proc: "groupConfiguration", reason: "inline pagination" },
+    { proc: "groupFileContent", reason: "inline type_agents + raw" },
+    { proc: "listsFileContent", reason: "inline raw param" },
+    { proc: "securityResources", reason: "inline resource param" },
+  ];
+
+  for (const { proc, reason } of expectedManual) {
+    it(`${proc} is classified as manual (${reason}) and does NOT call brokerParams()`, () => {
+      const ep = report.endpoints.find(e => e.procedure === proc);
+      expect(ep).toBeDefined();
+      expect(ep!.wiringLevel).toBe("manual");
+
+      const body = getProcedureBody(proc);
+      expect(body).toBeTruthy();
+      expect(body).not.toContain("brokerParams(");
+    });
+  }
+
+  // ── Passthrough procedures: MUST NOT contain brokerParams() call ──
+  const expectedPassthrough: string[] = [
+    "status",
+    "isConfigured",
+    "managerInfo",
+    "managerStatus",
+    "managerConfigValidation",
+    "statsHourly",
+    "statsWeekly",
+    "analysisd",
+    "remoted",
+    "managerLogsSummary",
+    "managerApiConfig",
+    "clusterStatus",
+    "clusterLocalInfo",
+    "clusterLocalConfig",
+    "clusterRulesetSync",
+    "clusterApiConfig",
+    "clusterConfigValidation",
+    "clusterNodeInfo",
+    "clusterNodeStatsHourly",
+    "clusterNodeStatus",
+    "clusterNodeLogsSummary",
+    "clusterNodeStatsAnalysisd",
+    "clusterNodeStatsRemoted",
+    "clusterNodeStatsWeekly",
+    "agentSummaryStatus",
+    "agentSummaryOs",
+    "agentOverview",
+    "agentsUninstallPermission",
+    "apiInfo",
+    "agentById",
+    "agentStats",
+    "agentConfig",
+    "agentGroupSync",
+    "mitreMetadata",
+    "securityUserById",
+    "securityRoleById",
+    "securityPolicyById",
+    "securityRuleById",
+    "securityCurrentUserPolicies",
+    "syscheckLastScan",
+    "rootcheckLastScan",
+  ];
+
+  for (const proc of expectedPassthrough) {
+    it(`${proc} is classified as passthrough and does NOT call brokerParams()`, () => {
+      const ep = report.endpoints.find(e => e.procedure === proc);
+      expect(ep).toBeDefined();
+      expect(ep!.wiringLevel).toBe("passthrough");
+
+      const body = getProcedureBody(proc);
+      expect(body).toBeTruthy();
+      expect(body).not.toContain("brokerParams(");
+    });
+  }
+});
+
+// ── Registry ↔ Router Structural Parity Guard ────────────────────────────────
+// This test detects drift between the tRPC router (wazuhRouter.ts) and the
+// ENDPOINT_REGISTRY in brokerCoverage.ts. It catches two failure modes:
+//   1. A new procedure is added to the router but NOT to the registry (missing)
+//   2. A registry entry references a procedure that no longer exists (ghost)
+//
+// This is a STRUCTURAL guard — it only checks presence, not wiring level.
+// Classification truth is verified by the tests above.
+
+describe("brokerCoverage — registry ↔ router structural parity", () => {
+  /**
+   * Procedures in wazuhRouter.ts that are intentionally excluded from
+   * ENDPOINT_REGISTRY because they are NOT Wazuh API proxy endpoints.
+   *
+   * Each exclusion must have a documented reason. If you add a new procedure
+   * to the router and it IS a Wazuh API endpoint, add it to ENDPOINT_REGISTRY
+   * instead of adding it here.
+   */
+  const INTENTIONALLY_EXCLUDED = new Set([
+    // ── Meta / infrastructure procedures (not Wazuh API proxies) ──
+    "brokerCoverage",   // Returns broker coverage analysis report
+    "brokerPlayground", // Dev tool for testing broker param configs
+    "brokerConfigList", // Returns list of broker configs for UI
+
+    // ── Cache management procedures (internal plumbing, not Wazuh API) ──
+    "cacheStats",       // Returns request cache statistics
+    "cacheClear",       // Clears the request cache (mutation)
+    "cacheSetTtl",      // Sets cache TTL (mutation)
+    "cacheSetEnabled",  // Enables/disables cache (mutation)
+
+    // ── Sensitive admin-only procedures (special handling, not standard reads) ──
+    "agentKey",         // Reveals agent registration key; admin-only with audit trail
+
+    // ── Auth-related procedures (not standard Wazuh data endpoints) ──
+    "securityTokenInfo", // GET /security/user/authenticate — token introspection
+  ]);
+
+  let routerProcedures: Set<string>;
+  let registryProcedures: Set<string>;
+
+  beforeAll(() => {
+    // Extract procedure names from wazuhRouter.ts source using regex.
+    // Pattern: "  procedureName: wazuhProcedure|protectedProcedure|adminProcedure"
+    const routerPath = path.resolve(__dirname, "wazuhRouter.ts");
+    const routerSource = fs.readFileSync(routerPath, "utf-8");
+
+    const procedurePattern = /^\s{2}(\w+):\s+(?:wazuhProcedure|protectedProcedure|adminProcedure)/gm;
+    routerProcedures = new Set<string>();
+    let match;
+    while ((match = procedurePattern.exec(routerSource)) !== null) {
+      routerProcedures.add(match[1]);
+    }
+
+    // Extract procedure names from the coverage report (which reads ENDPOINT_REGISTRY)
+    const report = generateCoverageReport();
+    registryProcedures = new Set(report.endpoints.map(e => e.procedure));
+  });
+
+  it("discovers a reasonable number of router procedures", () => {
+    // Sanity check: the router should have many procedures. If this fails,
+    // the regex pattern may need updating to match a new procedure style.
+    expect(routerProcedures.size).toBeGreaterThan(80);
+  });
+
+  it("registry has a reasonable number of entries", () => {
+    expect(registryProcedures.size).toBeGreaterThan(80);
+  });
+
+  it("every router procedure is either in the registry or intentionally excluded", () => {
+    const missing: string[] = [];
+    for (const proc of routerProcedures) {
+      if (!registryProcedures.has(proc) && !INTENTIONALLY_EXCLUDED.has(proc)) {
+        missing.push(proc);
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new Error(
+        `${missing.length} router procedure(s) missing from ENDPOINT_REGISTRY in brokerCoverage.ts:\n` +
+        missing.map(p => `  - ${p}`).join("\n") +
+        "\n\nIf this is a Wazuh API endpoint, add it to ENDPOINT_REGISTRY.\n" +
+        "If it is NOT a Wazuh API endpoint (meta, cache, admin), add it to INTENTIONALLY_EXCLUDED in this test."
+      );
+    }
+  });
+
+  it("every registry entry corresponds to an actual router procedure", () => {
+    const ghosts: string[] = [];
+    for (const proc of registryProcedures) {
+      if (!routerProcedures.has(proc)) {
+        ghosts.push(proc);
+      }
+    }
+
+    if (ghosts.length > 0) {
+      throw new Error(
+        `${ghosts.length} ghost entry/entries in ENDPOINT_REGISTRY — procedure(s) not found in wazuhRouter.ts:\n` +
+        ghosts.map(p => `  - ${p}`).join("\n") +
+        "\n\nRemove these from ENDPOINT_REGISTRY or re-add the procedures to the router."
+      );
+    }
+  });
+
+  it("every intentionally excluded procedure actually exists in the router", () => {
+    // Guard against stale exclusions — if an excluded procedure is removed
+    // from the router, the exclusion should be removed too.
+    const stale: string[] = [];
+    for (const proc of INTENTIONALLY_EXCLUDED) {
+      if (!routerProcedures.has(proc)) {
+        stale.push(proc);
+      }
+    }
+
+    if (stale.length > 0) {
+      throw new Error(
+        `${stale.length} stale exclusion(s) — procedure(s) no longer exist in wazuhRouter.ts:\n` +
+        stale.map(p => `  - ${p}`).join("\n") +
+        "\n\nRemove these from INTENTIONALLY_EXCLUDED."
+      );
+    }
+  });
+
+  it("no intentionally excluded procedure is also in the registry (double-entry)", () => {
+    // If a procedure is both excluded AND in the registry, something is wrong.
+    const doubleEntries: string[] = [];
+    for (const proc of INTENTIONALLY_EXCLUDED) {
+      if (registryProcedures.has(proc)) {
+        doubleEntries.push(proc);
+      }
+    }
+
+    if (doubleEntries.length > 0) {
+      throw new Error(
+        `${doubleEntries.length} procedure(s) are both in INTENTIONALLY_EXCLUDED and ENDPOINT_REGISTRY:\n` +
+        doubleEntries.map(p => `  - ${p}`).join("\n") +
+        "\n\nRemove from INTENTIONALLY_EXCLUDED if it belongs in the registry, or vice versa."
+      );
+    }
+  });
 });

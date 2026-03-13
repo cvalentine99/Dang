@@ -456,9 +456,10 @@ describe("Sensitive Access Audit — UI Page", () => {
 describe("Sensitive Access Audit — Route + Nav", () => {
   const appSrc = readFile("client/src/App.tsx");
   const navSrc = readFile("client/src/components/DashboardLayout.tsx");
+  const registrySrc = readFile("client/src/lib/routeRegistry.ts");
 
-  it("should have /admin/audit route in App.tsx", () => {
-    expect(appSrc).toMatch(/\/admin\/audit/);
+  it("should have /admin/audit route in ROUTE_REGISTRY", () => {
+    expect(registrySrc).toMatch(/\/admin\/audit/);
   });
 
   it("should import SensitiveAccessAudit page", () => {

@@ -5,6 +5,11 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import DashboardLayout from "./components/DashboardLayout";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { ROUTE_REGISTRY, type RouteEntry } from "./lib/routeRegistry";
+
+// ── Page imports ─────────────────────────────────────────────────────────────
+// Each import is wired to the registry entry by pageName.
+
 import Home from "./pages/Home";
 import AgentHealth from "./pages/AgentHealth";
 import AlertsTimeline from "./pages/AlertsTimeline";
@@ -47,60 +52,51 @@ import GroupManagement from "./pages/GroupManagement";
 import BrokerCoverage from "./pages/BrokerCoverage";
 import DGXHealth from "./pages/DGXHealth";
 import BrokerPlayground from "./pages/BrokerPlayground";
+import type { ComponentType } from "react";
+
+// ── Component map — connects pageName strings to actual imports ─────────────
+const PAGE_COMPONENTS: Record<string, ComponentType<any>> = {
+  Home, AgentHealth, AgentDetail, AgentCompare, AlertsTimeline,
+  Vulnerabilities, MitreAttack, Compliance, FileIntegrity,
+  ITHygiene, ClusterHealth, SiemEvents, ThreatHunting,
+  RulesetExplorer, ThreatIntel, AnalystNotes, Assistant, Status,
+  AdminUsers, AdminSettings, TokenUsage, AnalystChat, KnowledgeGraph,
+  Investigations, DataPipeline, AlertQueue, AutoQueueRules,
+  TriagePipeline, LivingCaseView, ResponseActions, PipelineInspector,
+  FeedbackAnalytics, DriftAnalytics, FleetInventory, SecurityExplorer,
+  SensitiveAccessAudit, GroupManagement, BrokerCoverage, DGXHealth,
+  BrokerPlayground, Login, Register,
+};
+
+// Resolve each registry entry to its component
+function resolveRoute(entry: RouteEntry): RouteEntry & { component: ComponentType<any> } {
+  const component = PAGE_COMPONENTS[entry.pageName];
+  if (!component) {
+    console.warn(`[RouteRegistry] No component found for pageName "${entry.pageName}"`);
+    return { ...entry, component: NotFound };
+  }
+  return { ...entry, component };
+}
+
+const authRoutes = ROUTE_REGISTRY.filter(r => r.auth).map(resolveRoute);
+const dashRoutes = ROUTE_REGISTRY.filter(r => !r.auth).map(resolveRoute);
 
 function Router() {
   return (
     <Switch>
       {/* Auth routes — outside DashboardLayout */}
-      <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
+      {authRoutes.map(r => (
+        <Route key={r.path} path={r.path} component={r.component} />
+      ))}
 
       {/* Dashboard routes — inside DashboardLayout */}
       <Route>
         <DashboardLayout>
           <ErrorBoundary inline label="Page">
             <Switch>
-              <Route path="/" component={Home} />
-              <Route path="/agents" component={AgentHealth} />
-              <Route path="/fleet/:agentId" component={AgentDetail} />
-              <Route path="/fleet-compare" component={AgentCompare} />
-              <Route path="/alerts" component={AlertsTimeline} />
-              <Route path="/vulnerabilities" component={Vulnerabilities} />
-              <Route path="/mitre" component={MitreAttack} />
-              <Route path="/compliance" component={Compliance} />
-              <Route path="/fim" component={FileIntegrity} />
-              <Route path="/hygiene" component={ITHygiene} />
-              <Route path="/cluster" component={ClusterHealth} />
-              <Route path="/siem" component={SiemEvents} />
-              <Route path="/hunting" component={ThreatHunting} />
-              <Route path="/rules" component={RulesetExplorer} />
-              <Route path="/threat-intel" component={ThreatIntel} />
-              <Route path="/notes" component={AnalystNotes} />
-              <Route path="/assistant" component={Assistant} />
-              <Route path="/status" component={Status} />
-              <Route path="/admin/users" component={AdminUsers} />
-              <Route path="/admin/settings" component={AdminSettings} />
-              <Route path="/admin/token-usage" component={TokenUsage} />
-              <Route path="/analyst" component={AnalystChat} />
-              <Route path="/graph" component={KnowledgeGraph} />
-              <Route path="/investigations" component={Investigations} />
-              <Route path="/pipeline" component={DataPipeline} />
-              <Route path="/alert-queue" component={AlertQueue} />
-              <Route path="/auto-queue-rules" component={AutoQueueRules} />
-              <Route path="/triage" component={TriagePipeline} />
-              <Route path="/living-cases" component={LivingCaseView} />
-              <Route path="/living-cases/:id" component={LivingCaseView} />
-              <Route path="/response-actions" component={ResponseActions} />
-              <Route path="/pipeline-inspector" component={PipelineInspector} />
-              <Route path="/feedback-analytics" component={FeedbackAnalytics} />
-              <Route path="/drift-analytics" component={DriftAnalytics} />
-              <Route path="/fleet-inventory" component={FleetInventory} />
-              <Route path="/security" component={SecurityExplorer} />
-              <Route path="/admin/audit" component={SensitiveAccessAudit} />
-              <Route path="/groups" component={GroupManagement} />
-              <Route path="/admin/broker-coverage" component={BrokerCoverage} />
-              <Route path="/admin/dgx-health" component={DGXHealth} />
-              <Route path="/admin/broker-playground" component={BrokerPlayground} />
+              {dashRoutes.map(r => (
+                <Route key={r.path} path={r.path} component={r.component} />
+              ))}
               <Route path="/404" component={NotFound} />
               <Route component={NotFound} />
             </Switch>

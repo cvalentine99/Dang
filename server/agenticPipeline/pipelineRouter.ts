@@ -46,7 +46,7 @@ import {
 import { executeResumePipeline } from "./resumePipelineHelper";
 import { getDb } from "../db";
 import { triageObjects, alertQueue, correlationBundles, livingCaseState, pipelineRuns, responseActions } from "../../drizzle/schema";
-import { eq, desc, sql, and, lt } from "drizzle-orm";
+import { eq, desc, sql, and, lt, inArray } from "drizzle-orm";
 
 export const pipelineRouter = router({
   // ═══════════════════════════════════════════════════════════════════════════
@@ -151,6 +151,7 @@ export const pipelineRouter = router({
         return { success: false as const, error: "Triage object has no data" };
       }
 
+      const startTime = Date.now();
       try {
         const result = await runCorrelationAgent({
           triageId: input.triageId,
@@ -171,7 +172,7 @@ export const pipelineRouter = router({
         return {
           success: false as const,
           error: (err as Error).message,
-          latencyMs: 0,
+          latencyMs: Date.now() - startTime,
         };
       }
     }),
@@ -448,31 +449,37 @@ export const pipelineRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
-      // Get the queue item
-      const [item] = await db
-        .select()
-        .from(alertQueue)
-        .where(eq(alertQueue.id, input.queueItemId))
-        .limit(1);
+      // ── BUG-1 Fix: Atomic claim via transaction + FOR UPDATE ──────────────
+      // Prevents TOCTOU race where two concurrent calls both read the item as
+      // un-triaged, then both proceed to run the triage agent on the same item.
+      const claimResult = await db.transaction(async (tx) => {
+        const [item] = await tx
+          .select()
+          .from(alertQueue)
+          .where(eq(alertQueue.id, input.queueItemId))
+          .limit(1)
+          .for("update");
 
-      if (!item) {
-        return { success: false as const, error: "Queue item not found" };
+        if (!item) return { claimed: false as const, reason: "not_found" } as const;
+        if (item.pipelineTriageId) return { claimed: false as const, reason: "already_triaged", triageId: item.pipelineTriageId } as const;
+        if (item.autoTriageStatus === "running") return { claimed: false as const, reason: "already_running" } as const;
+
+        await tx
+          .update(alertQueue)
+          .set({ autoTriageStatus: "running" })
+          .where(eq(alertQueue.id, input.queueItemId));
+
+        return { claimed: true as const, item } as const;
+      });
+
+      // Handle non-claimed cases
+      if (!claimResult.claimed) {
+        if (claimResult.reason === "not_found") return { success: false as const, error: "Queue item not found" };
+        if (claimResult.reason === "already_triaged") return { success: true as const, alreadyTriaged: true, triageId: claimResult.triageId };
+        return { success: false as const, error: "Auto-triage already in progress" };
       }
 
-      // Check if already triaged
-      if (item.pipelineTriageId) {
-        return {
-          success: true as const,
-          alreadyTriaged: true,
-          triageId: item.pipelineTriageId,
-        };
-      }
-
-      // Mark as running
-      await db
-        .update(alertQueue)
-        .set({ autoTriageStatus: "running" })
-        .where(eq(alertQueue.id, input.queueItemId));
+      const item = claimResult.item;
 
       try {
         // Build the raw alert from queue item
@@ -732,17 +739,32 @@ export const pipelineRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
-      // Get all queued items without a triage
-      const pendingItems = await db
-        .select({ id: alertQueue.id, alertId: alertQueue.alertId })
-        .from(alertQueue)
-        .where(
-          and(
-            eq(alertQueue.autoTriageStatus, "pending"),
-            sql`${alertQueue.pipelineTriageId} IS NULL`
+      // ── BUG-2 Fix: Atomic batch claim via transaction + FOR UPDATE ─────────
+      // Prevents two concurrent autoTriageAllPending calls from both selecting
+      // the same pending items and double-processing them.
+      const pendingItems = await db.transaction(async (tx) => {
+        const pending = await tx
+          .select({ id: alertQueue.id, alertId: alertQueue.alertId })
+          .from(alertQueue)
+          .where(
+            and(
+              eq(alertQueue.autoTriageStatus, "pending"),
+              sql`${alertQueue.pipelineTriageId} IS NULL`
+            )
           )
-        )
-        .limit(10);
+          .limit(10)
+          .for("update");
+
+        if (pending.length === 0) return [];
+
+        const ids = pending.map(p => p.id);
+        await tx
+          .update(alertQueue)
+          .set({ autoTriageStatus: "running" })
+          .where(inArray(alertQueue.id, ids));
+
+        return pending;
+      });
 
       if (pendingItems.length === 0) {
         return { success: true as const, triaged: 0, message: "No pending items to triage" };
@@ -754,13 +776,8 @@ export const pipelineRouter = router({
 
       for (const item of pendingItems) {
         try {
-          // Mark as running
-          await db
-            .update(alertQueue)
-            .set({ autoTriageStatus: "running" })
-            .where(eq(alertQueue.id, item.id));
-
-          // Get full item data
+          // autoTriageStatus already set to "running" by the atomic claim above.
+          // Get full item data (belt-and-suspenders: skip if already triaged).
           const [fullItem] = await db
             .select()
             .from(alertQueue)
@@ -768,6 +785,10 @@ export const pipelineRouter = router({
             .limit(1);
 
           if (!fullItem) continue;
+
+          // Belt-and-suspenders: if another path triaged this item between our
+          // claim and now, skip it to avoid duplicate triage work.
+          if (fullItem.pipelineTriageId) continue;
 
           const rawAlert = fullItem.rawJson ?? {
             id: fullItem.alertId,

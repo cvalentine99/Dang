@@ -9,7 +9,8 @@
  * - Copy as cURL: generate Wazuh API cURL command from validated params
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { GlassPanel } from "@/components/shared/GlassPanel";
@@ -39,6 +40,8 @@ import {
   Terminal,
   Bookmark,
   Zap,
+  X,
+  ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -387,6 +390,7 @@ function TypeBadge({ type }: { type: string }) {
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export default function BrokerPlayground() {
+  const [, navigate] = useLocation();
   const { data: configs, isLoading } = trpc.wazuh.brokerConfigList.useQuery();
   const playgroundMutation = trpc.wazuh.brokerPlayground.useMutation();
 
@@ -397,6 +401,49 @@ export default function BrokerPlayground() {
   ]);
   const [result, setResult] = useState<PlaygroundResult | null>(null);
   const [showCurl, setShowCurl] = useState(false);
+
+  // Context from Broker Coverage deep-link
+  const [coverageContext, setCoverageContext] = useState<{
+    procedure?: string;
+    wazuhPath?: string;
+    wiringLevel?: string;
+    config?: string;
+  } | null>(null);
+
+  // Deep-link: auto-select config from URL query param (?config=CONFIG_NAME)
+  // Also consume optional context params (procedure, wazuhPath, wiringLevel)
+  useEffect(() => {
+    if (!configs) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const preselect = urlParams.get("config");
+    const procedure = urlParams.get("procedure");
+    const wazuhPath = urlParams.get("wazuhPath");
+    const wiringLevel = urlParams.get("wiringLevel");
+
+    // Build context if any coverage params are present
+    if ((preselect || procedure) && !selectedConfig) {
+      if (procedure || wazuhPath || wiringLevel) {
+        setCoverageContext({
+          procedure: procedure || undefined,
+          wazuhPath: wazuhPath || undefined,
+          wiringLevel: wiringLevel || undefined,
+          config: preselect || undefined,
+        });
+      }
+
+      if (preselect) {
+        const match = configs.find(c => c.name === preselect);
+        if (match) {
+          setSelectedConfig(match.name);
+        }
+      }
+
+      // Clean up the URL without navigation
+      const url = new URL(window.location.href);
+      url.search = "";
+      window.history.replaceState({}, "", url.pathname);
+    }
+  }, [configs, selectedConfig]);
 
   // Filtered configs for the dropdown
   const filteredConfigs = useMemo(() => {
@@ -524,6 +571,53 @@ export default function BrokerPlayground() {
           title="Broker Param Playground"
           subtitle="Test query parameters against any broker config without making Wazuh API calls. Pure server-side validation."
       />
+
+      {/* ── Context banner from Broker Coverage deep-link ── */}
+      {coverageContext && (
+        <GlassPanel className="flex items-center gap-3 p-3 border-cyan-500/20">
+          <button
+            onClick={() => navigate("/admin/broker-coverage")}
+            className="flex items-center gap-1.5 text-[11px] text-cyan-400/70 hover:text-cyan-400 transition-colors shrink-0"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Coverage
+          </button>
+          <div className="h-4 w-px bg-white/10 shrink-0" />
+          <div className="flex items-center gap-2 flex-wrap flex-1 text-[11px]">
+            {coverageContext.procedure && (
+              <span className="font-mono text-foreground/90 font-medium">
+                {coverageContext.procedure}
+              </span>
+            )}
+            {coverageContext.config && coverageContext.procedure && (
+              <span className="text-muted-foreground/40">via</span>
+            )}
+            {coverageContext.config && (
+              <span className="font-mono text-[10px] text-violet-400/80">{coverageContext.config}</span>
+            )}
+            {coverageContext.wazuhPath && (
+              <span className="font-mono text-[10px] text-muted-foreground/60">{coverageContext.wazuhPath}</span>
+            )}
+            {coverageContext.wiringLevel && (
+              <Badge variant="outline" className={`text-[9px] font-mono ${
+                coverageContext.wiringLevel === "broker"
+                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                  : coverageContext.wiringLevel === "manual"
+                    ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                    : "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"
+              }`}>
+                {coverageContext.wiringLevel}
+              </Badge>
+            )}
+          </div>
+          <button
+            onClick={() => setCoverageContext(null)}
+            className="text-muted-foreground/40 hover:text-foreground transition-colors p-1 rounded hover:bg-white/5 shrink-0"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </GlassPanel>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         {/* ── Left: Config Selector + Param Reference ── */}
