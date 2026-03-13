@@ -1,9 +1,9 @@
 # UI → Router Schema Parity Report
 
-**Generated:** 2026-03-10  
+**Generated:** 2026-03-13  
 **Script:** `scripts/audit-ui-param-parity.mjs`  
 **Callsites audited:** 182  
-**Unique procedures consumed:** 128 of 129 total  
+**Unique procedures consumed:** 128 of 130 total  
 
 ---
 
@@ -14,10 +14,10 @@
 |--------|-------|
 | Total callsites | 182 |
 | Unique procedures consumed | 128 |
-| Router procedures available | 129 |
+| Router procedures available | 130 |
 | Parameters surfaced in UI | 99 |
 | Parameters hardcoded/constant | 128 |
-| Parameters not supported (classified) | 909 |
+| Parameters not supported (classified) | 913 |
 | Violations | 0 |
 
 **No violations found.** All UI callsites pass only schema-valid keys, all required params are present, and every optional param is classified.
@@ -27,6 +27,7 @@
 | Procedure | Input Keys | Disposition |
 |-----------|-----------|-------------|
 | `remoted` | (void) | Backend-only / Not yet wired to UI |
+| `securityTokenInfo` | (void) | Backend-only / Not yet wired to UI |
 
 ## client/src/components/DriftComparison.tsx
 
@@ -307,7 +308,6 @@ Input: void (no parameters) — **OK**
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
 | `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
-| `mac` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `mtu` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `name` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
@@ -399,9 +399,11 @@ Input: void (no parameters) — **OK**
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
+| `cis` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `PAGE_SIZE`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `page * PAGE_SIZE`) |
+| `pci_dss` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
@@ -567,17 +569,17 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/BrokerCoverage.tsx
 
-### Line 142: `wazuh.brokerCoverage`
+### Line 301: `wazuh.brokerCoverage`
 
 Input: void (no parameters) — **OK**
 
 ## client/src/pages/BrokerPlayground.tsx
 
-### Line 390: `wazuh.brokerConfigList`
+### Line 394: `wazuh.brokerConfigList`
 
 Input: void (no parameters) — **OK**
 
-### Line 391: `wazuh.brokerPlayground`
+### Line 395: `wazuh.brokerPlayground`
 
 Input: mutation (params passed at call time via mutateAsync) — **OK**
 
@@ -1070,7 +1072,6 @@ Input: void (no parameters) — **OK**
 | `agents_list` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Surfaced** |
-| `mac` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `mtu` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `name` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `offset` | Optional | No | Passed | **Surfaced** |
@@ -1398,7 +1399,6 @@ Input: void (no parameters) — **OK**
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
 | `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | — | **Not supported** — optional, not exposed in this view |
-| `mac` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `mtu` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `name` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `offset` | Optional | No | — | **Not supported** — optional, not exposed in this view |
@@ -1628,6 +1628,7 @@ Input: void (no parameters) — **OK**
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `referencesPage * MITRE_PAGE_SIZE`) |
 | `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
@@ -1803,11 +1804,15 @@ Input: void (no parameters) — **OK**
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
+| `distinct` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `limit` | Optional | No | Passed | **Constant** (hardcoded: `500`) |
 | `offset` | Optional | No | Passed | **Constant** (hardcoded: `0`) |
+| `q` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `rule_ids` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ### Line 201: `wazuh.securityActions`
 
@@ -2067,6 +2072,7 @@ Input: void (no parameters) — **OK**
 | `status` | Optional | No | Passed | **Constant** (hardcoded: `"active"`) |
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+
 
 
 

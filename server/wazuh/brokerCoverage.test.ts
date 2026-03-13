@@ -495,3 +495,144 @@ describe("brokerCoverage — classification matches wazuhRouter.ts runtime", () 
     });
   }
 });
+
+// ── Registry ↔ Router Structural Parity Guard ────────────────────────────────
+// This test detects drift between the tRPC router (wazuhRouter.ts) and the
+// ENDPOINT_REGISTRY in brokerCoverage.ts. It catches two failure modes:
+//   1. A new procedure is added to the router but NOT to the registry (missing)
+//   2. A registry entry references a procedure that no longer exists (ghost)
+//
+// This is a STRUCTURAL guard — it only checks presence, not wiring level.
+// Classification truth is verified by the tests above.
+
+describe("brokerCoverage — registry ↔ router structural parity", () => {
+  /**
+   * Procedures in wazuhRouter.ts that are intentionally excluded from
+   * ENDPOINT_REGISTRY because they are NOT Wazuh API proxy endpoints.
+   *
+   * Each exclusion must have a documented reason. If you add a new procedure
+   * to the router and it IS a Wazuh API endpoint, add it to ENDPOINT_REGISTRY
+   * instead of adding it here.
+   */
+  const INTENTIONALLY_EXCLUDED = new Set([
+    // ── Meta / infrastructure procedures (not Wazuh API proxies) ──
+    "brokerCoverage",   // Returns broker coverage analysis report
+    "brokerPlayground", // Dev tool for testing broker param configs
+    "brokerConfigList", // Returns list of broker configs for UI
+
+    // ── Cache management procedures (internal plumbing, not Wazuh API) ──
+    "cacheStats",       // Returns request cache statistics
+    "cacheClear",       // Clears the request cache (mutation)
+    "cacheSetTtl",      // Sets cache TTL (mutation)
+    "cacheSetEnabled",  // Enables/disables cache (mutation)
+
+    // ── Sensitive admin-only procedures (special handling, not standard reads) ──
+    "agentKey",         // Reveals agent registration key; admin-only with audit trail
+
+    // ── Auth-related procedures (not standard Wazuh data endpoints) ──
+    "securityTokenInfo", // GET /security/user/authenticate — token introspection
+  ]);
+
+  let routerProcedures: Set<string>;
+  let registryProcedures: Set<string>;
+
+  beforeAll(() => {
+    // Extract procedure names from wazuhRouter.ts source using regex.
+    // Pattern: "  procedureName: wazuhProcedure|protectedProcedure|adminProcedure"
+    const routerPath = path.resolve(__dirname, "wazuhRouter.ts");
+    const routerSource = fs.readFileSync(routerPath, "utf-8");
+
+    const procedurePattern = /^\s{2}(\w+):\s+(?:wazuhProcedure|protectedProcedure|adminProcedure)/gm;
+    routerProcedures = new Set<string>();
+    let match;
+    while ((match = procedurePattern.exec(routerSource)) !== null) {
+      routerProcedures.add(match[1]);
+    }
+
+    // Extract procedure names from the coverage report (which reads ENDPOINT_REGISTRY)
+    const report = generateCoverageReport();
+    registryProcedures = new Set(report.endpoints.map(e => e.procedure));
+  });
+
+  it("discovers a reasonable number of router procedures", () => {
+    // Sanity check: the router should have many procedures. If this fails,
+    // the regex pattern may need updating to match a new procedure style.
+    expect(routerProcedures.size).toBeGreaterThan(80);
+  });
+
+  it("registry has a reasonable number of entries", () => {
+    expect(registryProcedures.size).toBeGreaterThan(80);
+  });
+
+  it("every router procedure is either in the registry or intentionally excluded", () => {
+    const missing: string[] = [];
+    for (const proc of routerProcedures) {
+      if (!registryProcedures.has(proc) && !INTENTIONALLY_EXCLUDED.has(proc)) {
+        missing.push(proc);
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new Error(
+        `${missing.length} router procedure(s) missing from ENDPOINT_REGISTRY in brokerCoverage.ts:\n` +
+        missing.map(p => `  - ${p}`).join("\n") +
+        "\n\nIf this is a Wazuh API endpoint, add it to ENDPOINT_REGISTRY.\n" +
+        "If it is NOT a Wazuh API endpoint (meta, cache, admin), add it to INTENTIONALLY_EXCLUDED in this test."
+      );
+    }
+  });
+
+  it("every registry entry corresponds to an actual router procedure", () => {
+    const ghosts: string[] = [];
+    for (const proc of registryProcedures) {
+      if (!routerProcedures.has(proc)) {
+        ghosts.push(proc);
+      }
+    }
+
+    if (ghosts.length > 0) {
+      throw new Error(
+        `${ghosts.length} ghost entry/entries in ENDPOINT_REGISTRY — procedure(s) not found in wazuhRouter.ts:\n` +
+        ghosts.map(p => `  - ${p}`).join("\n") +
+        "\n\nRemove these from ENDPOINT_REGISTRY or re-add the procedures to the router."
+      );
+    }
+  });
+
+  it("every intentionally excluded procedure actually exists in the router", () => {
+    // Guard against stale exclusions — if an excluded procedure is removed
+    // from the router, the exclusion should be removed too.
+    const stale: string[] = [];
+    for (const proc of INTENTIONALLY_EXCLUDED) {
+      if (!routerProcedures.has(proc)) {
+        stale.push(proc);
+      }
+    }
+
+    if (stale.length > 0) {
+      throw new Error(
+        `${stale.length} stale exclusion(s) — procedure(s) no longer exist in wazuhRouter.ts:\n` +
+        stale.map(p => `  - ${p}`).join("\n") +
+        "\n\nRemove these from INTENTIONALLY_EXCLUDED."
+      );
+    }
+  });
+
+  it("no intentionally excluded procedure is also in the registry (double-entry)", () => {
+    // If a procedure is both excluded AND in the registry, something is wrong.
+    const doubleEntries: string[] = [];
+    for (const proc of INTENTIONALLY_EXCLUDED) {
+      if (registryProcedures.has(proc)) {
+        doubleEntries.push(proc);
+      }
+    }
+
+    if (doubleEntries.length > 0) {
+      throw new Error(
+        `${doubleEntries.length} procedure(s) are both in INTENTIONALLY_EXCLUDED and ENDPOINT_REGISTRY:\n` +
+        doubleEntries.map(p => `  - ${p}`).join("\n") +
+        "\n\nRemove from INTENTIONALLY_EXCLUDED if it belongs in the registry, or vice versa."
+      );
+    }
+  });
+});

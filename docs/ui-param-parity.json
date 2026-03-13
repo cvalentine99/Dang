@@ -1,7 +1,7 @@
 {
-  "generated": "2026-03-10T20:09:26.518Z",
+  "generated": "2026-03-13T00:14:58.364Z",
   "callsiteCount": 182,
-  "procedureCount": 129,
+  "procedureCount": 130,
   "consumedProcedures": [
     "agentBrowserExtensions",
     "agentById",
@@ -481,21 +481,21 @@
     },
     {
       "file": "client/src/pages/BrokerCoverage.tsx",
-      "line": 142,
+      "line": 301,
       "procedure": "brokerCoverage",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/BrokerPlayground.tsx",
-      "line": 390,
+      "line": 394,
       "procedure": "brokerConfigList",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/BrokerPlayground.tsx",
-      "line": 391,
+      "line": 395,
       "procedure": "brokerPlayground",
       "passedKeys": {},
       "isVoid": true
@@ -2787,10 +2787,6 @@
           "required": false,
           "default": null
         },
-        "mac": {
-          "required": false,
-          "default": null
-        },
         "wait_for_complete": {
           "required": false,
           "default": null
@@ -3404,10 +3400,6 @@
           "default": null
         },
         "mtu": {
-          "required": false,
-          "default": null
-        },
-        "mac": {
           "required": false,
           "default": null
         }
@@ -4059,6 +4051,10 @@
           "required": false,
           "default": null
         },
+        "select": {
+          "required": false,
+          "default": null
+        },
         "q": {
           "required": false,
           "default": null
@@ -4406,6 +4402,14 @@
           "default": null
         },
         "status": {
+          "required": false,
+          "default": null
+        },
+        "pci_dss": {
+          "required": false,
+          "default": null
+        },
+        "cis": {
           "required": false,
           "default": null
         },
@@ -4798,6 +4802,10 @@
         }
       }
     },
+    "securityTokenInfo": {
+      "inputType": "object",
+      "keys": {}
+    },
     "securityRbacRules": {
       "inputType": "object",
       "keys": {
@@ -4818,6 +4826,22 @@
           "default": null
         },
         "sort": {
+          "required": false,
+          "default": null
+        },
+        "select": {
+          "required": false,
+          "default": null
+        },
+        "q": {
+          "required": false,
+          "default": null
+        },
+        "distinct": {
+          "required": false,
+          "default": null
+        },
+        "wait_for_complete": {
           "required": false,
           "default": null
         }

@@ -10,10 +10,18 @@
  */
 
 import * as broker from "./paramBroker";
+import { readFileSync, statSync } from "fs";
+import { resolve } from "path";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type WiringLevel = "broker" | "manual" | "passthrough";
+
+export interface ParityCallsite {
+  file: string;
+  line: number;
+  passedKeys: Record<string, string>;
+}
 
 export interface EndpointCoverage {
   /** tRPC procedure name */
@@ -30,6 +38,10 @@ export interface EndpointCoverage {
   paramCount: number;
   /** Category grouping */
   category: string;
+  /** Frontend callsites from wiring ledger */
+  callsites: string[];
+  /** Parity info: which params each callsite sends */
+  parityCallsites: ParityCallsite[];
 }
 
 export interface BrokerConfigSummary {
@@ -43,6 +55,23 @@ export interface BrokerConfigSummary {
   universalParams: string[];
   /** Endpoint-specific params */
   specificParams: string[];
+}
+
+export interface EnrichmentMeta {
+  /** Whether the wiring ledger JSON was loaded successfully */
+  wiringLedgerLoaded: boolean;
+  /** Whether the parity artifact JSON was loaded successfully */
+  parityArtifactLoaded: boolean;
+  /** Generation timestamp from the wiring ledger artifact (if available) */
+  wiringLedgerGeneratedAt?: string;
+  /** Generation timestamp from the parity artifact (if available) */
+  parityArtifactGeneratedAt?: string;
+  /** mtime of wazuhRouter.ts — the primary source artifacts derive from */
+  sourceLastModified?: string;
+  /** true when wiring ledger artifact file is older than the source file */
+  wiringLedgerStale?: boolean;
+  /** true when parity artifact file is older than the source file */
+  parityArtifactStale?: boolean;
 }
 
 export interface CoverageReport {
@@ -83,6 +112,8 @@ export interface CoverageReport {
   brokerConfigs: BrokerConfigSummary[];
   /** Category breakdown */
   categories: CategoryBreakdown[];
+  /** Enrichment artifact availability */
+  enrichment: EnrichmentMeta;
 }
 
 export interface CategoryBreakdown {
@@ -402,6 +433,75 @@ export const BROKER_CONFIG_REGISTRY: Array<{ name: string; config: broker.Endpoi
   { name: "SECURITY_CURRENT_USER_POLICIES_CONFIG", config: broker.SECURITY_CURRENT_USER_POLICIES_CONFIG },
 ];
 
+// ── Artifact Loaders ────────────────────────────────────────────────────────
+
+interface WiringLedgerEntry {
+  name: string;
+  routerLine: number;
+  wired: boolean;
+  callsites: string[];
+}
+
+interface ParityEntry {
+  file: string;
+  line: number;
+  procedure: string;
+  passedKeys: Record<string, string>;
+  isVoid: boolean;
+}
+
+function loadWiringLedger(): { map: Map<string, string[]>; loaded: boolean; generatedAt?: string } {
+  const map = new Map<string, string[]>();
+  try {
+    const raw = readFileSync(resolve(process.cwd(), "docs/wiring-ledger.json"), "utf-8");
+    const data = JSON.parse(raw) as { generated?: string; procedures: WiringLedgerEntry[] };
+    for (const proc of data.procedures) {
+      map.set(proc.name, proc.callsites || []);
+    }
+    return { map, loaded: true, generatedAt: data.generated };
+  } catch {
+    // Graceful degradation — file may not exist
+    return { map, loaded: false };
+  }
+}
+
+function loadParityCallsites(): { map: Map<string, ParityCallsite[]>; loaded: boolean; generatedAt?: string } {
+  const map = new Map<string, ParityCallsite[]>();
+  try {
+    const raw = readFileSync(resolve(process.cwd(), "docs/ui-param-parity.json"), "utf-8");
+    const data = JSON.parse(raw) as { generated?: string; callsites: ParityEntry[] };
+    for (const cs of data.callsites) {
+      const existing = map.get(cs.procedure) || [];
+      existing.push({ file: cs.file, line: cs.line, passedKeys: cs.passedKeys });
+      map.set(cs.procedure, existing);
+    }
+    return { map, loaded: true, generatedAt: data.generated };
+  } catch {
+    // Graceful degradation
+    return { map, loaded: false };
+  }
+}
+
+// ── Staleness Detection ──────────────────────────────────────────────────────
+
+/** Safely get a file's mtime as ISO string, or undefined on any error. */
+function getFileMtimeISO(filePath: string): string | undefined {
+  try {
+    return statSync(filePath).mtime.toISOString();
+  } catch {
+    return undefined;
+  }
+}
+
+/** Safely get a file's mtime as epoch ms, or undefined on any error. */
+function getFileMtimeMs(filePath: string): number | undefined {
+  try {
+    return statSync(filePath).mtime.getTime();
+  } catch {
+    return undefined;
+  }
+}
+
 // ── Analysis Functions ───────────────────────────────────────────────────────
 
 function analyzeBrokerConfig(entry: { name: string; config: broker.EndpointParamConfig }): BrokerConfigSummary {
@@ -416,6 +516,28 @@ function analyzeBrokerConfig(entry: { name: string; config: broker.EndpointParam
 }
 
 export function generateCoverageReport(): CoverageReport {
+  const wiring = loadWiringLedger();
+  const parity = loadParityCallsites();
+
+  // ── Staleness detection ──
+  // Compare artifact file mtimes against the primary source file (wazuhRouter.ts).
+  // If the source has been modified more recently than an artifact, the artifact is stale.
+  const sourcePath = resolve(__dirname, "wazuhRouter.ts");
+  const wiringArtifactPath = resolve(process.cwd(), "docs/wiring-ledger.json");
+  const parityArtifactPath = resolve(process.cwd(), "docs/ui-param-parity.json");
+
+  const sourceMtimeISO = getFileMtimeISO(sourcePath);
+  const sourceMtimeMs = getFileMtimeMs(sourcePath);
+  const wiringMtimeMs = getFileMtimeMs(wiringArtifactPath);
+  const parityMtimeMs = getFileMtimeMs(parityArtifactPath);
+
+  const wiringLedgerStale = (wiring.loaded && sourceMtimeMs != null && wiringMtimeMs != null)
+    ? wiringMtimeMs < sourceMtimeMs
+    : undefined;
+  const parityArtifactStale = (parity.loaded && sourceMtimeMs != null && parityMtimeMs != null)
+    ? parityMtimeMs < sourceMtimeMs
+    : undefined;
+
   const endpoints: EndpointCoverage[] = ENDPOINT_REGISTRY.map(e => ({
     procedure: e.procedure,
     wazuhPath: e.wazuhPath,
@@ -424,6 +546,8 @@ export function generateCoverageReport(): CoverageReport {
     brokerConfig: e.brokerConfig,
     paramCount: e.paramCount,
     category: e.category,
+    callsites: wiring.map.get(e.procedure) || [],
+    parityCallsites: parity.map.get(e.procedure) || [],
   }));
 
   const brokerWired = endpoints.filter(e => e.wiringLevel === "broker").length;
@@ -469,5 +593,14 @@ export function generateCoverageReport(): CoverageReport {
     endpoints,
     brokerConfigs,
     categories,
+    enrichment: {
+      wiringLedgerLoaded: wiring.loaded,
+      parityArtifactLoaded: parity.loaded,
+      wiringLedgerGeneratedAt: wiring.generatedAt,
+      parityArtifactGeneratedAt: parity.generatedAt,
+      sourceLastModified: sourceMtimeISO,
+      wiringLedgerStale,
+      parityArtifactStale,
+    },
   };
 }

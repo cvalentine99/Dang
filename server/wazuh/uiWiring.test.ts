@@ -158,6 +158,7 @@ describe("Security Explorer Page — RBAC Endpoint Wiring", () => {
 describe("Navigation & Route Registration", () => {
   const appSrc = readFile("client/src/App.tsx");
   const layoutSrc = readFile("client/src/components/DashboardLayout.tsx");
+  const registrySrc = readFile("client/src/lib/routeRegistry.ts");
 
   it("should import FleetInventory page in App.tsx", () => {
     expect(appSrc).toContain("FleetInventory");
@@ -167,12 +168,12 @@ describe("Navigation & Route Registration", () => {
     expect(appSrc).toContain("SecurityExplorer");
   });
 
-  it("should register /fleet-inventory route", () => {
-    expect(appSrc).toContain("/fleet-inventory");
+  it("should register /fleet-inventory route in ROUTE_REGISTRY", () => {
+    expect(registrySrc).toContain("/fleet-inventory");
   });
 
-  it("should register /security route", () => {
-    expect(appSrc).toContain("/security");
+  it("should register /security route in ROUTE_REGISTRY", () => {
+    expect(registrySrc).toContain("/security");
   });
 
   it("should have Fleet Inventory nav item in sidebar", () => {
