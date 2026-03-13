@@ -33,6 +33,8 @@ interface QueueItemCardProps {
   ticketingDegraded?: boolean;
   ticketingReason?: string | null;
   hasSuccessfulTicket?: boolean;
+  /** Latest successful artifact ticket ID — used for Splunk deep links. Canonical truth. */
+  artifactTicketId?: string | null;
 }
 
 export function QueueItemCard({
@@ -44,6 +46,7 @@ export function QueueItemCard({
   ticketingDegraded = false,
   ticketingReason = null,
   hasSuccessfulTicket = false,
+  artifactTicketId = null,
 }: QueueItemCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
@@ -286,16 +289,24 @@ export function QueueItemCard({
           )}
           {(item.status === "completed" || item.status === "failed") && (
             <div className="flex items-center gap-1.5">
-              {item.status === "completed" && triage?.answer && splunkEnabled.data?.enabled && (
-                hasSuccessfulTicket && !triage?.splunkTicketId ? (
-                  <span
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/8 border border-emerald-500/15 text-emerald-400/70 text-xs font-medium cursor-default"
-                    title="Ticket already created for this queue item"
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Ticketed
-                  </span>
-                ) : !triage?.splunkTicketId && !hasSuccessfulTicket ? (
+              {/* Splunk ticket actions — artifact-only truth model.
+                  Ticket existence is determined solely by ticket_artifacts.success = true.
+                  Legacy triageResult.splunkTicketId is NOT consulted for any logic. */}
+              {splunkEnabled.data?.enabled && (!!item.pipelineTriageId || (item.status === "completed" && triage?.answer)) && (
+                hasSuccessfulTicket ? (
+                  <>
+                    <span
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/8 border border-emerald-500/15 text-emerald-400/70 text-xs font-medium cursor-default"
+                      title="Ticket already created for this queue item"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Ticketed
+                    </span>
+                    {artifactTicketId && (
+                      <SplunkTicketLink ticketId={artifactTicketId} />
+                    )}
+                  </>
+                ) : (
                   <button
                     onClick={() => createTicketMutation.mutate({ queueItemId: item.id })}
                     disabled={createTicketMutation.isPending || !canRunTicketing}
@@ -328,10 +339,7 @@ export function QueueItemCard({
                       <span className="ml-0.5 text-[9px] text-amber-400/60">(degraded)</span>
                     )}
                   </button>
-                ) : null
-              )}
-              {triage?.splunkTicketId && (
-                <SplunkTicketLink ticketId={triage.splunkTicketId} />
+                )
               )}
               {item.pipelineTriageId && (
                 <button

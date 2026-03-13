@@ -14,6 +14,11 @@
  * Every ticket is explicitly triggered by an analyst — no background automation.
  * Both success and failure are recorded in the ticket_artifacts table as forensic audit trail.
  *
+ * Truth model:
+ *   - Ticket existence: ticket_artifacts (success = true) — CANONICAL, sole source
+ *   - Triage data: triage_objects.triageData via resolveTriageData() — CANONICAL
+ *   - Legacy triageResult.splunkTicketId: NO LONGER WRITTEN — was compatibility only
+ *
  * Workflow lineage (ticket_artifacts):
  *   ticket → triageId → triage_objects (primary linkage to the triage that produced the ticket data)
  *   ticket → pipelineRunId → pipeline_runs (linkage to the run that executed the triage)
@@ -33,9 +38,10 @@ import {
   isSplunkEnabled,
 } from "./splunkService";
 import { getDb } from "../db";
-import { alertQueue, ticketArtifacts, pipelineRuns } from "../../drizzle/schema";
-import { eq, and, inArray, isNull, sql } from "drizzle-orm";
+import { alertQueue, ticketArtifacts } from "../../drizzle/schema";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { resolveTriageData } from "./resolveTriageData";
+import { resolveLineageIds, recordTicketArtifact } from "./splunkHelpers";
 
 /**
  * In-memory batch progress tracker.
@@ -205,39 +211,32 @@ export const splunkRouter = router({
         });
       }
 
-      // Create the Splunk ticket with the full enriched payload
+      // Create the Splunk ticket with deterministic ID
+      const createdBy = ctx.user?.name ?? ctx.user?.email ?? "unknown";
       const result = await createSplunkTicket({
         ...resolved.payload,
-        createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
+        createdBy,
+        queueItemId: input.queueItemId,
       });
 
-      // Look up the associated pipeline run + triageId for first-class artifact linkage
-      // Workflow lineage: ticket → triage → alert (via triageId)
-      //                   ticket → pipelineRun (via pipelineRunId)
-      //                   ticket → queueItem (via queueItemId)
-      const [associatedRun] = await db
-        .select({ id: pipelineRuns.id, triageId: pipelineRuns.triageId })
-        .from(pipelineRuns)
-        .where(eq(pipelineRuns.queueItemId, input.queueItemId))
-        .orderBy(sql`${pipelineRuns.startedAt} DESC`)
-        .limit(1);
+      // Resolve lineage IDs via shared helper
+      const lineage = await resolveLineageIds(
+        input.queueItemId,
+        resolved.triageId,
+        item.pipelineTriageId || null,
+      );
 
-      // Record the ticket artifact — both success and failure get recorded
-      // This is the first-class audit trail for ticket creation
-      // IMPORTANT: Drizzle passes `undefined` as empty string to MySQL, which breaks
-      // nullable int/varchar columns. Explicitly coerce to `null`.
-      const effectiveTriageId = resolved.triageId || associatedRun?.triageId || item.pipelineTriageId || null;
-      const effectivePipelineRunId = associatedRun?.id ?? null;
-      await db.insert(ticketArtifacts).values({
+      // Record the ticket artifact — canonical audit trail for ticket creation
+      // Both success and failure are recorded for forensic completeness
+      await recordTicketArtifact({
         ticketId: result.ticketId ?? `failed-${Date.now()}`,
-        system: "splunk_es",
         queueItemId: input.queueItemId,
-        pipelineRunId: effectivePipelineRunId === undefined ? null : effectivePipelineRunId,
-        triageId: effectiveTriageId === undefined ? null : effectiveTriageId,
+        triageId: lineage.triageId,
+        pipelineRunId: lineage.pipelineRunId,
         alertId: item.alertId,
         ruleId: item.ruleId ?? null,
         ruleLevel: item.ruleLevel,
-        createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
+        createdBy,
         success: result.success === true && !!result.ticketId,
         statusMessage: result.message ?? null,
         rawResponse: {
@@ -247,24 +246,11 @@ export const splunkRouter = router({
           triageFound: resolved.found,
           payloadFields: Object.keys(resolved.payload),
         },
-        httpStatusCode: null,
+        httpStatusCode: result.statusCode ?? null,
       });
 
-      // If successful, also update the queue item with ticket info (legacy linkage)
-      if (result.success && result.ticketId) {
-        const existingTriage = (item.triageResult as Record<string, unknown>) ?? {};
-        const updatedTriage = {
-          ...existingTriage,
-          splunkTicketId: result.ticketId,
-          splunkTicketCreatedAt: new Date().toISOString(),
-          splunkTicketCreatedBy: ctx.user?.name ?? ctx.user?.email,
-          triageSource: resolved.source,
-        } as unknown as typeof item.triageResult;
-        await db
-          .update(alertQueue)
-          .set({ triageResult: updatedTriage })
-          .where(eq(alertQueue.id, input.queueItemId));
-      }
+      // NOTE: Legacy write-back of splunkTicketId into alertQueue.triageResult
+      // has been removed. Canonical ticket truth lives in ticket_artifacts only.
 
       // Explicit success/failure return — never ambiguous
       // The UI must be able to distinguish these without guessing
@@ -428,6 +414,7 @@ export const splunkRouter = router({
         results: [],
       };
 
+      const createdBy = ctx.user?.name ?? ctx.user?.email ?? "unknown";
       let sent = 0;
       let failed = 0;
       const results: Array<{ id: number; alertId: string; ticketId?: string; error?: string }> = [];
@@ -456,31 +443,26 @@ export const splunkRouter = router({
 
           const result = await createSplunkTicket({
             ...resolved.payload,
-            createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
+            createdBy,
+            queueItemId: item.id,
           });
 
-          // Look up associated pipeline run + triageId for first-class artifact linkage
-          const [associatedRun] = await db
-            .select({ id: pipelineRuns.id, triageId: pipelineRuns.triageId })
-            .from(pipelineRuns)
-            .where(eq(pipelineRuns.queueItemId, item.id))
-            .orderBy(sql`${pipelineRuns.startedAt} DESC`)
-            .limit(1);
+          // Resolve lineage and record artifact via shared helpers
+          const lineage = await resolveLineageIds(
+            item.id,
+            resolved.triageId,
+            item.pipelineTriageId || null,
+          );
 
-          // Record ticket artifact — both success and failure, with full workflow lineage
-          // Coerce undefined → null to prevent Drizzle from sending empty strings to MySQL
-          const batchTriageId = resolved.triageId || associatedRun?.triageId || item.pipelineTriageId || null;
-          const batchRunId = associatedRun?.id ?? null;
-          await db.insert(ticketArtifacts).values({
+          await recordTicketArtifact({
             ticketId: result.ticketId ?? `failed-${Date.now()}`,
-            system: "splunk_es",
             queueItemId: item.id,
-            pipelineRunId: batchRunId === undefined ? null : batchRunId,
-            triageId: batchTriageId === undefined ? null : batchTriageId,
+            triageId: lineage.triageId,
+            pipelineRunId: lineage.pipelineRunId,
             alertId: item.alertId,
             ruleId: item.ruleId ?? null,
             ruleLevel: item.ruleLevel,
-            createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
+            createdBy,
             success: result.success === true && !!result.ticketId,
             statusMessage: result.message ?? null,
             rawResponse: {
@@ -489,23 +471,13 @@ export const splunkRouter = router({
               triageSource: resolved.source,
               triageFound: resolved.found,
             },
-            httpStatusCode: null,
+            httpStatusCode: result.statusCode ?? null,
           });
 
-          if (result.success && result.ticketId) {
-            const existingTriage = (item.triageResult as Record<string, unknown>) ?? {};
-            const updatedTriage = {
-              ...existingTriage,
-              splunkTicketId: result.ticketId,
-              splunkTicketCreatedAt: new Date().toISOString(),
-              splunkTicketCreatedBy: ctx.user?.name ?? ctx.user?.email,
-              triageSource: resolved.source,
-            } as unknown as typeof item.triageResult;
-            await db
-              .update(alertQueue)
-              .set({ triageResult: updatedTriage })
-              .where(eq(alertQueue.id, item.id));
+          // NOTE: Legacy write-back of splunkTicketId into alertQueue.triageResult
+          // has been removed. Canonical ticket truth lives in ticket_artifacts only.
 
+          if (result.success && result.ticketId) {
             sent++;
             results.push({ id: item.id, alertId: item.alertId, ticketId: result.ticketId });
             currentBatch.sent = sent;
@@ -517,19 +489,19 @@ export const splunkRouter = router({
         } catch (err) {
           // Record failed ticket artifact for exception-path failures too
           try {
-            await db.insert(ticketArtifacts).values({
+            await recordTicketArtifact({
               ticketId: `exception-${Date.now()}`,
-              system: "splunk_es",
               queueItemId: item.id,
-              // pipelineRunId omitted — defaults to NULL (no pipeline run for exception path)
               triageId: item.pipelineTriageId || null,
+              pipelineRunId: null,
               alertId: item.alertId,
               ruleId: item.ruleId ?? null,
               ruleLevel: item.ruleLevel,
-              createdBy: ctx.user?.name ?? ctx.user?.email ?? "unknown",
+              createdBy,
               success: false,
               statusMessage: err instanceof Error ? err.message : "Unknown error",
-              // rawResponse and httpStatusCode omitted — default to NULL for exception path
+              rawResponse: null,
+              httpStatusCode: null,
             });
           } catch { /* don't let artifact recording break the batch loop */ }
 
@@ -688,18 +660,22 @@ export const splunkRouter = router({
           total: sql<number>`COUNT(*)`,
           success: sql<number>`SUM(CASE WHEN ${ticketArtifacts.success} = true THEN 1 ELSE 0 END)`,
           failed: sql<number>`SUM(CASE WHEN ${ticketArtifacts.success} = false THEN 1 ELSE 0 END)`,
+          // Latest successful ticket ID for rendering Splunk deep links.
+          // MAX works because dedup ensures at most one successful artifact per queue item.
+          latestTicketId: sql<string | null>`MAX(CASE WHEN ${ticketArtifacts.success} = true THEN ${ticketArtifacts.ticketId} ELSE NULL END)`,
         })
         .from(ticketArtifacts)
         .where(inArray(ticketArtifacts.queueItemId, input.queueItemIds))
         .groupBy(ticketArtifacts.queueItemId);
 
-      const counts: Record<number, { total: number; success: number; failed: number }> = {};
+      const counts: Record<number, { total: number; success: number; failed: number; latestTicketId: string | null }> = {};
       for (const row of rows) {
         if (row.queueItemId != null) {
           counts[row.queueItemId] = {
             total: Number(row.total),
             success: Number(row.success),
             failed: Number(row.failed),
+            latestTicketId: row.latestTicketId ?? null,
           };
         }
       }
