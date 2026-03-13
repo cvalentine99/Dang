@@ -1304,6 +1304,20 @@ async function materializeResponseActions(
         console.warn(`[HypothesisAgent] Missing target: Category '${category}' requires a target value`);
       }
 
+      // ── Ticket 1: Hard-enforce requiresApproval for critical/destructive categories ──
+      // The LLM prompt instructs requiresApproval=true for these categories, and the
+      // Zod schema defaults to true, but neither is a code guarantee. This block is
+      // the authoritative enforcement point — model output cannot override it.
+      const FORCE_APPROVAL_CATEGORIES = new Set([
+        "isolate_host",
+        "disable_account",
+        "block_ioc",
+        "escalate_ir",
+      ]);
+      const enforceApproval = FORCE_APPROVAL_CATEGORIES.has(category)
+        ? true
+        : (rec.requiresApproval ?? true);
+
       // Wrap INSERT + audit in a single transaction so the action is never
       // created without its corresponding audit trail entry.
       await db.transaction(async (tx) => {
@@ -1313,7 +1327,7 @@ async function materializeResponseActions(
           title: (rec.action ?? "Unnamed action").slice(0, 512),
           description: rec.evidenceBasis?.join("; ") ?? null,
           urgency: urgency as typeof responseActions.$inferInsert["urgency"],
-          requiresApproval: rec.requiresApproval ? 1 : 0,
+          requiresApproval: enforceApproval ? 1 : 0,
           state: "proposed",
           proposedBy: "hypothesis_agent",
           evidenceBasis: rec.evidenceBasis ?? null,

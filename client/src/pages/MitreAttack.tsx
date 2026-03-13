@@ -242,15 +242,40 @@ export default function MitreAttack() {
     };
   }, [mitreAggQ.data, indexerHealthy]);
 
+  // ── STIX tactic ID → slug resolver ──────────────────────────────────
+  // Wazuh returns tactics as STIX UUIDs (e.g. "x-mitre-tactic--ffd5bcee-...")
+  // We need to resolve these to slugs like "initial-access" for matrix keys.
+  const tacticIdToSlug = useMemo(() => {
+    const map = new Map<string, string>();
+    mitreTactics.forEach(t => {
+      const id = String(t.id ?? "");
+      const name = String(t.name ?? "");
+      if (id && name) {
+        map.set(id, name.toLowerCase().replace(/\s+/g, "-"));
+      }
+    });
+    return map;
+  }, [mitreTactics]);
+
+  /** Resolve a tactic value (STIX ID or name) to a matrix slug */
+  const resolveTacticSlug = useCallback((tac: string): string => {
+    // If it's a STIX ID, look it up
+    if (tac.startsWith("x-mitre-tactic--")) {
+      return tacticIdToSlug.get(tac) ?? "";
+    }
+    // Otherwise treat as a name (e.g. from rules data)
+    return tac.toLowerCase().replace(/\s+/g, "-");
+  }, [tacticIdToSlug]);
+
   // ── Tactic counts from dedicated MITRE techniques ─────────────────────
   const dedicatedTacticCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     mitreTechniques.forEach(t => {
       const tactics = (t.tactics as string[]) ?? [];
-      tactics.forEach(tac => { const key = tac.toLowerCase().replace(/\s+/g, "-"); counts[key] = (counts[key] ?? 0) + 1; });
+      tactics.forEach(tac => { const key = resolveTacticSlug(tac); if (key) counts[key] = (counts[key] ?? 0) + 1; });
     });
     return counts;
-  }, [mitreTechniques]);
+  }, [mitreTechniques, resolveTacticSlug]);
 
   const tacticChartData = useMemo(() => {
     const merged: Record<string, number> = { ...tacticCounts };
@@ -267,8 +292,8 @@ export default function MitreAttack() {
       const techName = String(tech.name ?? "");
       const techDesc = String(tech.description ?? "");
       tactics.forEach(tac => {
-        const key = tac.toLowerCase().replace(/\s+/g, "-");
-        if (matrix[key]) {
+        const key = resolveTacticSlug(tac);
+        if (key && matrix[key]) {
           matrix[key].push({ id: techId, name: techName, description: techDesc, tactics: [key], ruleIds: [], ruleCount: 1 });
         }
       });
@@ -281,7 +306,7 @@ export default function MitreAttack() {
       });
     });
     return matrix;
-  }, [mitreTechniques, techniques]);
+  }, [mitreTechniques, techniques, resolveTacticSlug]);
 
   // ── Detection coverage heatmap data ───────────────────────────────────
   const heatmapData = useMemo(() => {

@@ -30,6 +30,7 @@ import type {
   Uncertainty,
   Confidence,
 } from "../../shared/agenticSchemas";
+import { sanitizeForPrompt } from "./sanitizeForPrompt";
 
 // ── Triage JSON Schema (for structured LLM output) ──────────────────────────
 
@@ -354,10 +355,16 @@ export async function runTriageAgent(input: {
     // ── LLM Invocation ───────────────────────────────────────────────────
     const systemPrompt = buildTriageSystemPrompt(recentTriagesStr, activeInvestigationsStr);
 
+    // ── Ticket 2: Sanitize raw alert body before prompt insertion ──────────
+    // Raw Wazuh alert bodies can contain attacker-controlled content (e.g.,
+    // malicious filenames, command arguments, log messages). sanitizeForPrompt()
+    // strips control characters and escapes code fences before interpolation.
+    const sanitizedAlert = sanitizeForPrompt(input.rawAlert) as Record<string, unknown>;
+
     const userMessage = `Analyze this Wazuh alert and produce a structured triage assessment:
 
 \`\`\`json
-${JSON.stringify(input.rawAlert, null, 2).slice(0, 12000)}
+${JSON.stringify(sanitizedAlert, null, 2).slice(0, 12000)}
 \`\`\`
 
 Agent context:

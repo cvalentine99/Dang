@@ -994,8 +994,13 @@ Example: {"suggestions": ["What MITRE techniques are associated with agent 001?"
       },
     });
 
-    const parsed = JSON.parse((followUpResponse.choices?.[0]?.message?.content as string | undefined) ?? "{}");
-    suggestedFollowUps = parsed.suggestions ?? [];
+    const rawFollowUp = JSON.parse((followUpResponse.choices?.[0]?.message?.content as string | undefined) ?? "{}");
+    // Zod boundary for follow-up suggestions — completes coverage across all structured outputs
+    const FollowUpSchema = z.object({
+      suggestions: z.array(z.string()).catch([]),
+    }).strip();
+    const validatedFollowUp = FollowUpSchema.parse(rawFollowUp);
+    suggestedFollowUps = validatedFollowUp.suggestions;
   } catch {
     suggestedFollowUps = [
       "Show me the most critical alerts from the last 24 hours",
