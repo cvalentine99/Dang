@@ -545,25 +545,9 @@ Rules:
 - For campaign assessment: require at least 3 correlated signals across 2+ hosts to suggest "likely campaign"
 - For case action: recommend "merge_existing" only if there's a clear entity overlap with an active investigation`;
 
-/** Sanitize raw data before embedding in LLM prompts to prevent prompt injection */
-function sanitizeForPrompt(obj: unknown): unknown {
-  if (typeof obj === "string") {
-    // Strip control characters, null bytes, and common prompt injection patterns
-    return obj
-      .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "") // control chars (keep \n, \r, \t)
-      .replace(/```/g, "\u2018\u2018\u2018") // prevent markdown code fence escapes
-      .slice(0, 4096); // hard length cap per field
-  }
-  if (Array.isArray(obj)) return obj.map(sanitizeForPrompt);
-  if (obj && typeof obj === "object") {
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      result[k] = sanitizeForPrompt(v);
-    }
-    return result;
-  }
-  return obj;
-}
+// Re-export from shared module for backward compatibility — the canonical
+// implementation now lives in sanitizeForPrompt.ts (Ticket 2 / Ticket 3).
+import { sanitizeForPrompt } from "./sanitizeForPrompt";
 
 function buildCorrelationPrompt(triage: TriageObject, pack: EvidencePack): string {
   const parts: string[] = [
