@@ -31,6 +31,7 @@ import type {
   Confidence,
 } from "../../shared/agenticSchemas";
 import { sanitizeForPrompt } from "./sanitizeForPrompt";
+import { assertValidTriageObject } from "../../shared/agenticZodSchemas";
 
 // ── Triage JSON Schema (for structured LLM output) ──────────────────────────
 
@@ -476,6 +477,13 @@ Agent context:
       ),
     ];
 
+    // ── CR-5: Runtime validation before DB persistence ─────────────────
+    // Validate the post-normalized triageObject against the Zod schema
+    // before writing to the triageData JSON column. This catches malformed
+    // LLM output that passed the Zod parse but was corrupted during
+    // normalization (entity merging, MITRE dedup, etc.).
+    assertValidTriageObject(triageObject);
+
     // ── Persist ──────────────────────────────────────────────────────────
     // DB UPDATE is mandatory — if it fails, the triage row stays as a
     // "processing" placeholder with empty triageData, which is worse than
@@ -736,30 +744,118 @@ function buildKeyEvidence(raw: Record<string, unknown>, agent: TriageObject["age
     relevance: 1.0,
   }];
 
-  // FIM (syscheck) evidence
+  // Agent metadata evidence
+  if (agent.id && agent.id !== "unknown") {
+    evidence.push({
+      id: `evidence-agent-${agent.id}`,
+      label: `Agent: ${agent.name || agent.id}${agent.os ? ` (${agent.os})` : ""}`,
+      type: "agent_metadata",
+      source: "wazuh_agent",
+      data: { id: agent.id, name: agent.name, ip: agent.ip, os: agent.os, groups: agent.groups },
+      collectedAt: ts,
+      relevance: 0.8,
+    });
+  }
+
+  // FIM / syscheck data — file integrity evidence if present
   const syscheck = raw.syscheck as Record<string, unknown> | undefined;
   if (syscheck?.path) {
     evidence.push({
       id: `evidence-fim-${alertId}`,
-      label: `FIM event: ${syscheck.path}`,
+      label: `File change: ${String(syscheck.path).slice(0, 120)}`,
       type: "fim_event",
       source: "wazuh_fim",
-      data: syscheck,
+      data: {
+        path: syscheck.path,
+        event: syscheck.event,
+        md5_before: syscheck.md5_before,
+        md5_after: syscheck.md5_after,
+        sha256_before: syscheck.sha256_before,
+        sha256_after: syscheck.sha256_after,
+        uid_before: syscheck.uid_before,
+        uid_after: syscheck.uid_after,
+        gid_before: syscheck.gid_before,
+        gid_after: syscheck.gid_after,
+        perm_before: syscheck.perm_before,
+        perm_after: syscheck.perm_after,
+        size_before: syscheck.size_before,
+        size_after: syscheck.size_after,
+      },
       collectedAt: ts,
       relevance: 0.9,
     });
   }
 
-  // Agent metadata evidence
-  if (agent.id && agent.id !== "unknown") {
+  // Network context — source/dest IPs, users, protocol info
+  const data = raw.data as Record<string, unknown> | undefined;
+  if (data) {
+    const networkFields: Record<string, unknown> = {};
+    const networkKeys = ["srcip", "dstip", "srcport", "dstport", "srcuser", "dstuser", "protocol", "action"];
+    let hasNetworkData = false;
+    for (const key of networkKeys) {
+      if (data[key] != null) {
+        networkFields[key] = data[key];
+        hasNetworkData = true;
+      }
+    }
+    if (hasNetworkData) {
+      const src = data.srcip ? String(data.srcip) : "";
+      const dst = data.dstip ? String(data.dstip) : "";
+      const label = src && dst ? `Network: ${src} → ${dst}` : src ? `Source: ${src}` : dst ? `Destination: ${dst}` : "Network context";
+      evidence.push({
+        id: `evidence-network-${alertId}`,
+        label,
+        type: "network_event",
+        source: "wazuh_alert",
+        data: networkFields,
+        collectedAt: ts,
+        relevance: 0.85,
+      });
+    }
+
+    // Process context — if process-related fields exist
+    const processFields: Record<string, unknown> = {};
+    const processKeys = ["command", "exe", "name", "pid", "ppid", "parentName"];
+    let hasProcessData = false;
+    for (const key of processKeys) {
+      if (data[key] != null) {
+        processFields[key] = data[key];
+        hasProcessData = true;
+      }
+    }
+    if (hasProcessData) {
+      evidence.push({
+        id: `evidence-process-${alertId}`,
+        label: `Process: ${data.exe || data.name || data.command || "unknown"}`,
+        type: "process_event",
+        source: "wazuh_alert",
+        data: processFields,
+        collectedAt: ts,
+        relevance: 0.85,
+      });
+    }
+  }
+
+  // Vulnerability data — if the alert contains CVE references
+  const vulnData = raw.data as Record<string, unknown> | undefined;
+  const vulnerability = vulnData?.vulnerability as Record<string, unknown> | undefined;
+  if (vulnerability && (vulnerability.cve || vulnerability.reference)) {
     evidence.push({
-      id: `evidence-agent-${agent.id}`,
-      label: `Agent: ${agent.name || agent.id}`,
-      type: "agent_metadata",
-      source: "wazuh_agent",
-      data: { id: agent.id, name: agent.name, ip: agent.ip, os: agent.os, groups: agent.groups },
+      id: `evidence-vuln-${alertId}`,
+      label: `Vulnerability: ${vulnerability.cve || vulnerability.reference || "unknown CVE"}`,
+      type: "vulnerability",
+      source: "wazuh_vuln",
+      data: {
+        cve: vulnerability.cve,
+        reference: vulnerability.reference,
+        severity: vulnerability.severity,
+        package: vulnerability.package,
+        title: vulnerability.title,
+        rationale: vulnerability.rationale,
+        status: vulnerability.status,
+      },
       collectedAt: ts,
-      relevance: 0.7,
+      relevance: 0.9,
     });
   }
 

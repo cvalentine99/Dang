@@ -875,8 +875,15 @@ export const pipelineRouter = router({
 
       const runId = `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
       const rawAlertId = input.rawAlert.id ?? input.rawAlert._id ?? input.rawAlert.alert_id ?? input.rawAlert.alertId;
-      const alertId = rawAlertId
-        ? String(rawAlertId)
+
+      // T2-04 Fix: Sentinel values like "unknown", "none", "null", or empty string
+      // are not real alert identifiers. If the raw alert carries one of these, fall
+      // through to the content-hash approach so each distinct alert body gets its
+      // own dedup key instead of ALL sentinel-ID alerts blocking each other.
+      const SENTINEL_IDS = new Set(["unknown", "none", "null", "undefined", "n/a", ""]);
+      const resolvedRawId = rawAlertId ? String(rawAlertId).trim() : "";
+      const alertId = (resolvedRawId && !SENTINEL_IDS.has(resolvedRawId.toLowerCase()))
+        ? resolvedRawId
         : `hash-${createHash("sha256").update(JSON.stringify(input.rawAlert)).digest("hex").slice(0, 16)}`;
       const startTime = Date.now();
 
@@ -1013,6 +1020,12 @@ export const pipelineRouter = router({
           totalLatencyMs: Date.now() - startTime,
           completedAt: new Date(),
         }).where(eq(pipelineRuns.id, runRow.id));
+        // T2-03 Fix: Triage failed before it could set "triaged", so queue item
+        // is still "processing". Mark it failed so it doesn't appear stuck.
+        if (input.queueItemId) {
+          await db.update(alertQueue).set({ status: "failed" })
+            .where(eq(alertQueue.id, input.queueItemId));
+        }
         result.totalLatencyMs = Date.now() - startTime;
         return result;
       }
@@ -1050,6 +1063,12 @@ export const pipelineRouter = router({
           totalLatencyMs: Date.now() - startTime,
           completedAt: new Date(),
         }).where(eq(pipelineRuns.id, runRow.id));
+        // T2-03 Fix: Queue item was set to "triaged" after triage succeeded,
+        // but correlation failed. Demote to "failed" so it doesn't stay stuck.
+        if (input.queueItemId) {
+          await db.update(alertQueue).set({ status: "failed" })
+            .where(eq(alertQueue.id, input.queueItemId));
+        }
         result.totalLatencyMs = Date.now() - startTime;
         return result;
       }
@@ -1113,6 +1132,16 @@ export const pipelineRouter = router({
           totalLatencyMs: Date.now() - startTime,
           completedAt: new Date(),
         }).where(eq(pipelineRuns.id, runRow.id));
+
+        // T2-03 Fix: Update queue item to "completed" now that the full pipeline
+        // (triage + correlation + hypothesis + response_actions) has finished.
+        // The triage success path above only sets status:"triaged" because at that
+        // point only triage is done. Now all stages are done, so promote to "completed".
+        if (input.queueItemId) {
+          await db.update(alertQueue).set({
+            status: "completed",
+          }).where(eq(alertQueue.id, input.queueItemId));
+        }
       } catch (err) {
         // BUG-04 Fix: If hypothesis itself succeeded (livingCaseId captured) but
         // post-materialization sync threw, preserve truth-bearing fields so
@@ -1149,6 +1178,13 @@ export const pipelineRouter = router({
             totalLatencyMs: Date.now() - startTime,
             completedAt: new Date(),
           }).where(eq(pipelineRuns.id, runRow.id));
+        }
+        // T2-03 Fix: Queue item was set to "triaged" after triage succeeded,
+        // but hypothesis/response_actions failed. Demote to "failed" so it
+        // doesn't stay stuck at "triaged" when the pipeline actually errored.
+        if (input.queueItemId) {
+          await db.update(alertQueue).set({ status: "failed" })
+            .where(eq(alertQueue.id, input.queueItemId));
         }
         result.totalLatencyMs = Date.now() - startTime;
         return result;
