@@ -48,6 +48,15 @@ async function startServer() {
   }
 
   const app = express();
+
+  // Configure trust proxy from environment.
+  // Required when running behind nginx/caddy so req.ip reflects the real client.
+  // Values: "1" (one hop), "2", "loopback", "true" (all), or unset (direct exposure).
+  if (process.env.TRUST_PROXY) {
+    const tp = process.env.TRUST_PROXY;
+    app.set("trust proxy", tp === "true" ? true : /^\d+$/.test(tp) ? Number(tp) : tp);
+  }
+
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));

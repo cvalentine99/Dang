@@ -35,6 +35,7 @@ import type {
 } from "../../shared/agenticSchemas";
 import { parseLLMCorrelation } from "./types/LLMCorrelationRaw";
 import { normalizeCorrelationBundle } from "./normalizeCorrelationBundle";
+import { assertValidCorrelationBundle } from "../../shared/agenticZodSchemas";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -854,11 +855,16 @@ export async function runCorrelationAgent(
       triageId: input.triageId,
     });
     
-    // 7. Calculate tokens used
+    // 7. CR-5: Runtime validation before DB persistence
+    // Validate the canonical bundle against the Zod schema before writing
+    // to the bundleData JSON column. Catches normalization errors.
+    assertValidCorrelationBundle(bundle);
+
+    // 8. Calculate tokens used
     const tokensUsed = extractTokenCount(llmResult);
     const latencyMs = Date.now() - startTime;
-    
-    // 8. Persist the completed correlation bundle
+
+    // 9. Persist the completed correlation bundle
     // All fields now read from the CANONICAL bundle, not raw LLM output.
     // blastRadius.affectedHosts is a number (count), not string[]
     // blastRadius.affectedUsers is a number (count), not string[]

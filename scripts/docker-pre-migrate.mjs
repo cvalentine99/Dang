@@ -108,6 +108,7 @@ async function main() {
     // Read migration files from the drizzle directory
     const fs = await import("fs");
     const path = await import("path");
+    const crypto = await import("crypto");
     const drizzleDir = path.resolve(process.cwd(), "drizzle");
 
     // Read the journal to get the expected migration list
@@ -124,9 +125,11 @@ async function main() {
       const sqlFile = path.join(drizzleDir, `${entry.tag}.sql`);
       if (!fs.existsSync(sqlFile)) continue;
 
-      // Check if this migration's hash is in the applied set
-      // Drizzle uses the tag as the hash
-      if (appliedHashes.has(entry.tag)) {
+      // Check if this migration's hash is in the applied set.
+      // Drizzle stores SHA-256 of the SQL file content, not the tag name.
+      const fileContent = fs.readFileSync(sqlFile);
+      const fileHash = crypto.createHash("sha256").update(fileContent).digest("hex");
+      if (appliedHashes.has(fileHash)) {
         // Already fully applied — skip
         continue;
       }

@@ -150,12 +150,10 @@ export const localAuthRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Login is currently disabled." });
       }
 
-      // Audit #25 + S-5: Rate limit login attempts per IP (trust x-forwarded-for behind proxy)
-      const forwarded = ctx.req.headers["x-forwarded-for"];
-      const clientIp = (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null)
-        || ctx.req.ip
-        || ctx.req.socket.remoteAddress
-        || "unknown";
+      // Audit #25 + S-5: Rate limit login attempts per IP.
+      // Uses req.ip which respects Express trust proxy setting (TRUST_PROXY env var).
+      // Never read raw X-Forwarded-For — attacker-controlled without a trusted proxy.
+      const clientIp = ctx.req.ip || ctx.req.socket.remoteAddress || "unknown";
       checkLoginRateLimit(clientIp);
 
       const result = await loginLocalUser(input);

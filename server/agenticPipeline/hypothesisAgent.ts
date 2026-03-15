@@ -38,6 +38,7 @@ import type {
   ExtractedEntity,
   ProvenanceSource,
 } from "../../shared/agenticSchemas";
+import { assertValidLivingCaseObject } from "../../shared/agenticZodSchemas";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -145,8 +146,9 @@ async function resolveSession(
   }
 
   // Check if the correlation bundle's case recommendation suggests merging
-  // CR-8: Validate that the merge target is an active session — prevents LLM
-  // from merging into arbitrary session IDs (e.g., closed, deleted, or unrelated).
+  // CR-8: Validate that the merge target is an active session AND shares at
+  // least one entity with the current alert — prevents LLM from merging into
+  // arbitrary session IDs (e.g., closed, deleted, or unrelated investigations).
   const caseRec = ctx.bundle.caseRecommendation;
   if (caseRec?.action === "merge_existing" && caseRec.mergeTargetId) {
     const [target] = await db
@@ -159,9 +161,22 @@ async function resolveSession(
       .limit(1);
 
     if (target) {
-      return { sessionId: target.id, isNew: false };
+      // CR-8 entity overlap: verify the target session shares at least one
+      // entity (host, IP, user, hash, etc.) with the current alert's entities.
+      const overlapOk = await validateEntityOverlap(
+        db, target.id, ctx.triage, ctx.bundle
+      );
+      if (overlapOk) {
+        return { sessionId: target.id, isNew: false };
+      }
+      console.warn(
+        `[HypothesisAgent] CR-8: Merge target session ${target.id} is active ` +
+        `but shares no entities with alert ${ctx.triage.alertId}. ` +
+        `Falling through to create new session.`
+      );
     }
-    // If target doesn't exist or isn't active, fall through to create new session
+    // If target doesn't exist, isn't active, or has no entity overlap,
+    // fall through to create new session
   }
 
   // Create a new investigation session
@@ -177,6 +192,90 @@ async function resolveSession(
   }).$returningId();
 
   return { sessionId: result.id, isNew: true };
+}
+
+/**
+ * CR-8: Entity overlap validation for merge targets.
+ *
+ * Verifies that the target session's living case shares at least one entity
+ * (host, IP, user, hash, domain, etc.) with the current alert's entities.
+ * This prevents the LLM from hallucinating a valid session ID that has
+ * nothing to do with the current investigation.
+ *
+ * Entity comparison uses normalized type+value keys (lowercased, trimmed).
+ * Entities are drawn from:
+ *   - Current alert: triage.entities + bundle.discoveredEntities
+ *   - Target session: livingCaseState.caseData.linkedEntities
+ *
+ * Returns true if at least one entity overlaps, false otherwise.
+ * If the target session has no living case state, returns false (defensive).
+ */
+async function validateEntityOverlap(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  targetSessionId: number,
+  triage: TriageObject,
+  bundle: CorrelationBundle
+): Promise<boolean> {
+  try {
+    // Build the current alert's entity set (type:value normalized)
+    const currentEntities = new Set<string>();
+    const addEntity = (e: ExtractedEntity) => {
+      const key = `${e.type}:${(e.value ?? "").trim().toLowerCase()}`;
+      if (e.value?.trim()) currentEntities.add(key);
+    };
+    (triage.entities ?? []).forEach(addEntity);
+    (bundle.discoveredEntities ?? []).forEach(addEntity);
+
+    // If the current alert has no entities, we can't validate overlap.
+    // Allow the merge to proceed (don't block on missing data).
+    if (currentEntities.size === 0) {
+      console.warn(
+        `[HypothesisAgent] CR-8: Current alert ${triage.alertId} has no entities; ` +
+        `skipping overlap check for session ${targetSessionId}`
+      );
+      return true;
+    }
+
+    // Fetch the target session's living case
+    const [targetCase] = await db
+      .select({ caseData: livingCaseState.caseData })
+      .from(livingCaseState)
+      .where(eq(livingCaseState.sessionId, targetSessionId))
+      .limit(1);
+
+    if (!targetCase?.caseData) {
+      // No living case yet for this session — can't validate overlap.
+      console.warn(
+        `[HypothesisAgent] CR-8: Target session ${targetSessionId} has no living case; ` +
+        `rejecting merge (no entity data to compare)`
+      );
+      return false;
+    }
+
+    const targetEntities = (targetCase.caseData as LivingCaseObject).linkedEntities ?? [];
+    if (targetEntities.length === 0) {
+      console.warn(
+        `[HypothesisAgent] CR-8: Target session ${targetSessionId} has empty linkedEntities; ` +
+        `rejecting merge`
+      );
+      return false;
+    }
+
+    // Check for at least one overlapping entity
+    for (const te of targetEntities) {
+      const key = `${te.type}:${(te.value ?? "").trim().toLowerCase()}`;
+      if (currentEntities.has(key)) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (err) {
+    // Defensive: if overlap check fails, reject the merge rather than
+    // silently allowing unscoped merges.
+    console.error(`[HypothesisAgent] CR-8: Entity overlap check failed:`, err);
+    return false;
+  }
 }
 
 function buildSessionTitle(triage: TriageObject, bundle: CorrelationBundle): string {
@@ -712,6 +811,9 @@ async function persistLivingCase(
         const currentCase = existing.caseData as LivingCaseObject;
         const merged = mergeLivingCases(currentCase, livingCase);
 
+        // CR-5: Validate merged case before DB persistence
+        assertValidLivingCaseObject(merged);
+
         await tx
           .update(livingCaseState)
           .set({
@@ -881,6 +983,9 @@ export async function runHypothesisAgent(
   // 5. Assemble the LivingCaseObject
   const livingCase = assembleLivingCase(sessionId, ctx, llmOutput);
 
+  // 5b. CR-5: Runtime validation before DB persistence
+  assertValidLivingCaseObject(livingCase);
+
   // 6. Persist to database — pass exact lineage IDs, not recency-based
   const caseStateId = await persistLivingCase(
     sessionId,
@@ -921,6 +1026,9 @@ export async function runHypothesisAgent(
         if (freshSummary) {
           persistedCase.actionSummary = freshSummary;
         }
+
+        // CR-5: Validate before writing back with action references
+        assertValidLivingCaseObject(persistedCase);
 
         // Write back the merged case with action references + fresh summary
         await tx.update(livingCaseState)

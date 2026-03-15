@@ -55,6 +55,10 @@ services:
       # Run drizzle migrations on startup (set to "true" on first run or after schema changes)
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
 
+      # Trust proxy — set to "1" when running behind nginx/caddy reverse proxy.
+      # Required for correct client IP in rate limiting. Leave unset for direct exposure.
+      TRUST_PROXY: ${TRUST_PROXY:-}
+
       # Auth — generate with: openssl rand -hex 32
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — generate with openssl rand -hex 32}
 

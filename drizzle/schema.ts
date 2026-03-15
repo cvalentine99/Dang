@@ -1381,7 +1381,8 @@ export const pipelineRuns = mysqlTable("pipeline_runs", {
   startedAt: timestamp("startedAt").defaultNow().notNull(),
   completedAt: timestamp("completedAt"),
 }, (table) => ([
-  index("pr_runId_idx").on(table.runId),
+  // Note: pr_runId_idx removed — runId column is declared .unique() which creates
+  // a unique constraint. Migration 0017 upgrades the DB index to UNIQUE.
   index("pr_status_idx").on(table.status),
   index("pr_queueItemId_idx").on(table.queueItemId),
   index("pr_alertId_idx").on(table.alertId),
