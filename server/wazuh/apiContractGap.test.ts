@@ -321,18 +321,22 @@ describe("M-1 through M-18: Router input schemas accept expanded params", () => 
     expect(block).toContain("daemons_list");
   });
 
-  it("M-7: ruleGroups accepts offset, limit, sort, search", () => {
+  it("M-7: ruleGroups accepts offset, limit, sort, search (broker-wired)", () => {
     const block = extractProcedureBlock(src, "ruleGroups");
-    for (const p of ["sort", "search", "limit", "offset"]) {
-      expect(block).toContain(p);
-    }
+    // sort/search are in the Zod schema; limit/offset come from paginationSchema.
+    // Now broker-wired: params are validated by RULE_GROUPS_CONFIG via brokerParams().
+    expect(block).toContain("sort");
+    expect(block).toContain("search");
+    expect(block).toContain("brokerParams(");
+    expect(block).toContain("RULE_GROUPS_CONFIG");
   });
 
-  it("M-8: rulesByRequirement accepts offset, limit, sort, search", () => {
+  it("M-8: rulesByRequirement accepts offset, limit, sort, search (broker-wired)", () => {
     const block = extractProcedureBlock(src, "rulesByRequirement");
-    for (const p of ["sort", "search", "limit", "offset"]) {
-      expect(block).toContain(p);
-    }
+    expect(block).toContain("sort");
+    expect(block).toContain("search");
+    expect(block).toContain("brokerParams(");
+    expect(block).toContain("RULES_BY_REQUIREMENT_CONFIG");
   });
 
   it("M-9: decoderParents accepts sort, select", () => {
@@ -341,10 +345,12 @@ describe("M-1 through M-18: Router input schemas accept expanded params", () => 
     expect(block).toContain("select");
   });
 
-  it("M-10: groupConfiguration accepts offset, limit", () => {
+  it("M-10: groupConfiguration accepts offset, limit (broker-wired)", () => {
     const block = extractProcedureBlock(src, "groupConfiguration");
-    expect(block).toContain("limit");
-    expect(block).toContain("offset");
+    // limit/offset come from paginationSchema; now broker-wired via GROUP_CONFIGURATION_CONFIG.
+    expect(block).toContain("paginationSchema");
+    expect(block).toContain("brokerParams(");
+    expect(block).toContain("GROUP_CONFIGURATION_CONFIG");
   });
 
   it("M-11: groupFileContent accepts type_agents, raw", () => {
