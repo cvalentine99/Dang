@@ -250,7 +250,7 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
             v{agent?.version ?? "—"}
           </div>
           <div className="text-muted-foreground font-mono">
-            {agent?.group?.join(", ") ?? "No group"}
+            {Array.isArray(agent?.group) ? agent.group.join(", ") : "No group"}
           </div>
         </div>
       </GlassPanel>

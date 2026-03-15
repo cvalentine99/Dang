@@ -1194,7 +1194,7 @@ export default function ThreatHunting() {
                                             </span>
                                           </td>
                                           <td className="px-4 py-2 text-muted-foreground">{String((m.os as Record<string, unknown>)?.name ?? "")}</td>
-                                          <td className="px-4 py-2 text-muted-foreground">{(m.group as string[] ?? []).join(", ")}</td>
+                                          <td className="px-4 py-2 text-muted-foreground">{Array.isArray(m.group) ? (m.group as string[]).join(", ") : "—"}</td>
                                         </>
                                       )}
 
