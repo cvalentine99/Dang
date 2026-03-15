@@ -62,8 +62,14 @@ import {
   Lock,
   FolderOpen,
   Cpu,
+  ChevronDown,
 } from "lucide-react";
-import { CSSProperties, useEffect, useRef, useState } from "react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
@@ -216,6 +222,21 @@ const menuItems = [
   // { icon: Bot, label: "AI Assistant", path: "/assistant", group: "Tools" },
 ];
 
+// ── Group menu items for collapsible sections ──────────────────────────────
+const GROUPS = (() => {
+  const ordered: { name: string; items: typeof menuItems }[] = [];
+  const seen = new Set<string>();
+  for (const item of menuItems) {
+    if (!seen.has(item.group)) {
+      seen.add(item.group);
+      ordered.push({ name: item.group, items: [] });
+    }
+    ordered.find(g => g.name === item.group)!.items.push(item);
+  }
+  return ordered;
+})();
+
+const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed-groups";
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 260;
 const MIN_WIDTH = 200;
@@ -322,6 +343,46 @@ function DashboardLayoutContent({
   const activeMenuItem = menuItems.find((item) => item.path === location);
   const isMobile = useIsMobile();
 
+  // ── Collapsible group state ──────────────────────────────────────────────
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+      return saved ? new Set(JSON.parse(saved)) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  });
+
+  // Persist collapsed state
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, JSON.stringify(Array.from(collapsedGroups)));
+  }, [collapsedGroups]);
+
+  // Auto-expand group containing the active route
+  useEffect(() => {
+    if (!activeMenuItem) return;
+    const activeGroup = activeMenuItem.group;
+    if (collapsedGroups.has(activeGroup)) {
+      setCollapsedGroups(prev => {
+        const next = new Set(prev);
+        next.delete(activeGroup);
+        return next;
+      });
+    }
+  }, [location]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleGroup = useCallback((groupName: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupName)) {
+        next.delete(groupName);
+      } else {
+        next.add(groupName);
+      }
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
   }, [isCollapsed]);
@@ -386,50 +447,74 @@ function DashboardLayoutContent({
           {/* ── Navigation ──────────────────────────────────── */}
           <SidebarContent className="gap-0 pt-2">
             <SidebarMenu className="px-2 py-1 space-y-0.5">
-              {(() => {
-                let lastGroup = "";
-                return menuItems.map((item) => {
-                  const isActive = location === item.path;
-                  const showGroup = item.group !== lastGroup;
-                  if (showGroup) lastGroup = item.group;
-                  return (
-                    <div key={item.path}>
-                      {showGroup && !isCollapsed && (
-                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 px-3 pt-4 pb-1 font-medium">{item.group}</p>
-                      )}
-                      <SidebarMenuItem>
-                        <SidebarMenuButton
-                          isActive={isActive}
-                          onClick={() => setLocation(item.path)}
-                          tooltip={item.label}
-                          className={`h-10 transition-all font-normal ${
-                            isActive
-                              ? "bg-primary/15 text-foreground border-l-2 border-primary"
-                              : "text-sidebar-foreground hover:bg-sidebar-accent"
-                          }`}
+              {GROUPS.map((group) => {
+                const isOpen = !collapsedGroups.has(group.name);
+                const groupHasActive = group.items.some(i => i.path === location);
+
+                return (
+                  <Collapsible
+                    key={group.name}
+                    open={isCollapsed ? true : isOpen}
+                    onOpenChange={() => !isCollapsed && toggleGroup(group.name)}
+                  >
+                    {/* Group header — clickable to collapse/expand */}
+                    {!isCollapsed && (
+                      <CollapsibleTrigger asChild>
+                        <button
+                          className="flex items-center w-full px-3 pt-4 pb-1 group/trigger focus:outline-none"
                         >
-                          <item.icon
-                            className={`h-4 w-4 ${
-                              isActive ? "text-primary" : "text-muted-foreground"
+                          <span className={`text-[10px] uppercase tracking-widest font-medium transition-colors ${
+                            groupHasActive ? "text-primary/80" : "text-muted-foreground/60 group-hover/trigger:text-muted-foreground"
+                          }`}>
+                            {group.name}
+                          </span>
+                          <ChevronDown
+                            className={`ml-auto h-3 w-3 text-muted-foreground/40 transition-transform duration-200 ${
+                              isOpen ? "" : "-rotate-90"
                             }`}
                           />
-                          <span className="text-sm">{item.label}</span>
-                          {(item as typeof menuItems[number] & { hasQueueBadge?: boolean }).hasQueueBadge && (
-                            <AlertQueueBadge />
-                          )}
-                          {(item as typeof menuItems[number] & { hasAnomalyBadge?: boolean }).hasAnomalyBadge && (
-                            <AnomalyBadge />
-                          )}
-                          {item.path === "/analyst" && (
-                            <LLMHealthDot />
-                          )}
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    </div>
-                  );
-                });
-              })()}
-            
+                        </button>
+                      </CollapsibleTrigger>
+                    )}
+
+                    <CollapsibleContent className="transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                      {group.items.map((item) => {
+                        const isActive = location === item.path;
+                        return (
+                          <SidebarMenuItem key={item.path}>
+                            <SidebarMenuButton
+                              isActive={isActive}
+                              onClick={() => setLocation(item.path)}
+                              tooltip={item.label}
+                              className={`h-10 transition-all font-normal ${
+                                isActive
+                                  ? "bg-primary/15 text-foreground border-l-2 border-primary"
+                                  : "text-sidebar-foreground hover:bg-sidebar-accent"
+                              }`}
+                            >
+                              <item.icon
+                                className={`h-4 w-4 ${
+                                  isActive ? "text-primary" : "text-muted-foreground"
+                                }`}
+                              />
+                              <span className="text-sm">{item.label}</span>
+                              {(item as typeof menuItems[number] & { hasQueueBadge?: boolean }).hasQueueBadge && (
+                                <AlertQueueBadge />
+                              )}
+                              {(item as typeof menuItems[number] & { hasAnomalyBadge?: boolean }).hasAnomalyBadge && (
+                                <AnomalyBadge />
+                              )}
+                              {item.path === "/analyst" && (
+                                <LLMHealthDot />
+                              )}
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
             </SidebarMenu>
           </SidebarContent>
 
