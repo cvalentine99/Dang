@@ -174,7 +174,7 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "statsWeekly", wazuhPath: "/manager/stats/weekly", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
   { procedure: "analysisd", wazuhPath: "/manager/stats/analysisd", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
   { procedure: "remoted", wazuhPath: "/manager/stats/remoted", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
-  { procedure: "daemonStats", wazuhPath: "/manager/daemons/stats", wiringLevel: "manual", paramCount: 2, category: "Manager" },
+  { procedure: "daemonStats", wazuhPath: "/manager/daemons/stats", wiringLevel: "broker", brokerConfig: "MANAGER_DAEMON_STATS_CONFIG", paramCount: 2, category: "Manager" },
   { procedure: "managerLogs", wazuhPath: "/manager/logs", wiringLevel: "broker", brokerConfig: "MANAGER_LOGS_CONFIG", paramCount: 9, category: "Manager" },
   { procedure: "managerLogsSummary", wazuhPath: "/manager/logs/summary", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
   { procedure: "managerVersionCheck", wazuhPath: "/manager/version/check", wiringLevel: "broker", brokerConfig: "MANAGER_VERSION_CHECK_CONFIG", paramCount: 1, category: "Manager" },
@@ -212,7 +212,7 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "agentDaemonStats", wazuhPath: "/agents/{agent_id}/daemons/stats", wiringLevel: "broker", brokerConfig: "AGENT_DAEMON_STATS_CONFIG", paramCount: 2, category: "Agents" },
   { procedure: "agentStats", wazuhPath: "/agents/{agent_id}/stats/{component}", wiringLevel: "passthrough", paramCount: 1, category: "Agents" },
   { procedure: "agentConfig", wazuhPath: "/agents/{agent_id}/config/{component}/{configuration}", wiringLevel: "passthrough", paramCount: 1, category: "Agents" },
-  { procedure: "agentsUpgradeResult", wazuhPath: "/agents/upgrade_result", wiringLevel: "manual", paramCount: 13, category: "Agents" },
+  { procedure: "agentsUpgradeResult", wazuhPath: "/agents/upgrade_result", wiringLevel: "broker", brokerConfig: "AGENTS_UPGRADE_RESULT_CONFIG", paramCount: 13, category: "Agents" },
   { procedure: "agentsUninstallPermission", wazuhPath: "N/A (permission check)", wiringLevel: "passthrough", paramCount: 0, category: "Agents" },
   { procedure: "agentGroupSync", wazuhPath: "/agents/{agent_id}/group/is_sync", wiringLevel: "passthrough", paramCount: 1, category: "Agents" },
   { procedure: "apiInfo", wazuhPath: "/", wiringLevel: "passthrough", paramCount: 0, category: "Agents" },
@@ -312,7 +312,7 @@ const ENDPOINT_REGISTRY: Array<{
 
   // ── Groups ──
   { procedure: "groupConfiguration", wazuhPath: "/groups/{group_id}/configuration", wiringLevel: "broker", brokerConfig: "GROUP_CONFIGURATION_CONFIG", paramCount: 3, category: "Groups" },
-  { procedure: "groupFileContent", wazuhPath: "/groups/{group_id}/files/{file_name}", wiringLevel: "manual", paramCount: 3, category: "Groups" },
+  { procedure: "groupFileContent", wazuhPath: "/groups/{group_id}/files/{file_name}", wiringLevel: "broker", brokerConfig: "GROUP_FILE_CONTENT_CONFIG", paramCount: 3, category: "Groups" },
 ];
 
 // ── Broker Config Registry ───────────────────────────────────────────────────

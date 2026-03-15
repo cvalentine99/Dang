@@ -15,6 +15,10 @@ import {
   RULES_BY_REQUIREMENT_CONFIG,
   GROUP_CONFIGURATION_CONFIG,
   LISTS_FILE_CONTENT_CONFIG,
+  // Batch 2 promotion configs
+  MANAGER_DAEMON_STATS_CONFIG,
+  AGENTS_UPGRADE_RESULT_CONFIG,
+  GROUP_FILE_CONTENT_CONFIG,
 } from "./paramBroker";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -415,6 +419,10 @@ describe("brokerCoverage — classification matches wazuhRouter.ts runtime", () 
     "rulesByRequirement",
     "groupConfiguration",
     "listsFileContent",
+    // Batch 2 promotion — alias-required manual → broker (3 endpoints)
+    "daemonStats",
+    "agentsUpgradeResult",
+    "groupFileContent",
   ];
 
   for (const proc of expectedBroker) {
@@ -430,12 +438,9 @@ describe("brokerCoverage — classification matches wazuhRouter.ts runtime", () 
   }
 
   // ── Manual procedures: MUST NOT contain brokerParams() call ──
-  // After Batch 1 promotion, 5 manual endpoints remain (need alias additions or spec fixes)
+  // After Batch 2 promotion, 2 manual endpoints remain (need spec fixes — Batch 3)
   const expectedManual: Array<{ proc: string; reason: string }> = [
-    { proc: "daemonStats", reason: "inline daemons_list join (input key mismatch: daemons vs daemons_list)" },
-    { proc: "agentsUpgradeResult", reason: "inline 12-param assembly (needs os_* aliases)" },
     { proc: "ruleFileContent", reason: "inline raw + get_dirnames_path (param name mismatch)" },
-    { proc: "groupFileContent", reason: "inline type_agents + raw (needs type_agents alias)" },
     { proc: "securityResources", reason: "inline resource param (outbound name mismatch)" },
   ];
 
@@ -746,9 +751,9 @@ describe("Batch 1 promotion — manual → broker (11 endpoints)", () => {
     }
   });
 
-  it("coverage counts reflect Batch 1 promotion: 73 broker, 5 manual, 43 passthrough", () => {
-    expect(report.brokerWired).toBe(73);
-    expect(report.manualParam).toBe(5);
+  it("coverage counts reflect Batch 2 promotion: 76 broker, 2 manual, 43 passthrough", () => {
+    expect(report.brokerWired).toBe(76);
+    expect(report.manualParam).toBe(2);
     expect(report.passthrough).toBe(43);
     expect(report.totalProcedures).toBe(121);
   });
@@ -843,6 +848,176 @@ describe("Batch 1 — brokerParams forwarding contract", () => {
       AGENT_DAEMON_STATS_CONFIG, RULE_GROUPS_CONFIG, RULES_BY_REQUIREMENT_CONFIG,
       GROUP_CONFIGURATION_CONFIG, LISTS_FILE_CONTENT_CONFIG,
     ];
+    for (const config of configs) {
+      const result = brokerParams(config, { bogus_param: "test" });
+      expect(result.unsupportedParams).toContain("bogus_param");
+      expect(result.forwardedQuery).not.toHaveProperty("bogus_param");
+    }
+  });
+});
+
+// ── Batch 2 Promotion Verification ─────────────────────────────────────────
+// These tests verify that the 3 alias-required endpoints promoted in Batch 2 are:
+//   1. Classified as "broker" in ENDPOINT_REGISTRY
+//   2. Have the correct brokerConfig name
+//   3. Actually call brokerParams() in wazuhRouter.ts
+//   4. Alias mapping resolves correctly (the core Batch 2 requirement)
+
+describe("Batch 2 promotion — alias-required manual → broker (3 endpoints)", () => {
+  let report: CoverageReport;
+  let routerSource: string;
+
+  beforeAll(() => {
+    report = generateCoverageReport();
+    const routerPath = path.resolve(__dirname, "wazuhRouter.ts");
+    routerSource = fs.readFileSync(routerPath, "utf-8");
+  });
+
+  const batch2Endpoints: Array<{
+    procedure: string;
+    brokerConfig: string;
+    configRef: import("./paramBroker").EndpointParamConfig;
+    wazuhPath: string;
+  }> = [
+    { procedure: "daemonStats", brokerConfig: "MANAGER_DAEMON_STATS_CONFIG", configRef: MANAGER_DAEMON_STATS_CONFIG, wazuhPath: "/manager/daemons/stats" },
+    { procedure: "agentsUpgradeResult", brokerConfig: "AGENTS_UPGRADE_RESULT_CONFIG", configRef: AGENTS_UPGRADE_RESULT_CONFIG, wazuhPath: "/agents/upgrade_result" },
+    { procedure: "groupFileContent", brokerConfig: "GROUP_FILE_CONTENT_CONFIG", configRef: GROUP_FILE_CONTENT_CONFIG, wazuhPath: "/groups/{group_id}/files/{file_name}" },
+  ];
+
+  for (const ep of batch2Endpoints) {
+    describe(ep.procedure, () => {
+      it("is classified as broker in ENDPOINT_REGISTRY", () => {
+        const entry = report.endpoints.find(e => e.procedure === ep.procedure);
+        expect(entry).toBeDefined();
+        expect(entry!.wiringLevel).toBe("broker");
+      });
+
+      it(`has brokerConfig = ${ep.brokerConfig}`, () => {
+        const entry = report.endpoints.find(e => e.procedure === ep.procedure);
+        expect(entry!.brokerConfig).toBe(ep.brokerConfig);
+      });
+
+      it("calls brokerParams() in wazuhRouter.ts", () => {
+        const regex = new RegExp(`\\b${ep.procedure}:\\s`, "m");
+        const match = regex.exec(routerSource);
+        expect(match).toBeTruthy();
+        const start = match!.index;
+        const rest = routerSource.slice(start + match![0].length);
+        const nextProc = /\n\s{2}\w+:\s(?:wazuhProcedure|protectedProcedure|adminProcedure)/m.exec(rest);
+        const body = routerSource.slice(start, nextProc ? start + match![0].length + nextProc.index : start + 2000);
+        expect(body).toContain("brokerParams(");
+      });
+
+      it("broker config endpoint matches registry wazuhPath", () => {
+        expect(ep.configRef.endpoint).toBe(ep.wazuhPath);
+      });
+    });
+  }
+});
+
+// ── Anti-Drift Guard: brokerParams alias contract for Batch 2 configs ───────
+
+describe("Batch 2 — alias resolution and forwarding contract", () => {
+
+  // ── daemonStats: daemons → daemons_list ──
+  it("MANAGER_DAEMON_STATS_CONFIG resolves alias 'daemons' to daemons_list (csv)", () => {
+    const result = brokerParams(MANAGER_DAEMON_STATS_CONFIG, { daemons: ["wazuh-modulesd", "wazuh-analysisd"] });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.daemons_list).toBe("wazuh-modulesd,wazuh-analysisd");
+  });
+
+  it("MANAGER_DAEMON_STATS_CONFIG also accepts canonical key daemons_list", () => {
+    const result = brokerParams(MANAGER_DAEMON_STATS_CONFIG, { daemons_list: "wazuh-modulesd" });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.daemons_list).toBe("wazuh-modulesd");
+  });
+
+  it("MANAGER_DAEMON_STATS_CONFIG forwards empty input without error", () => {
+    const result = brokerParams(MANAGER_DAEMON_STATS_CONFIG, {});
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(Object.keys(result.forwardedQuery)).toHaveLength(0);
+  });
+
+  // ── agentsUpgradeResult: os_platform → os.platform, os_version → os.version, os_name → os.name ──
+  it("AGENTS_UPGRADE_RESULT_CONFIG resolves alias 'os_platform' to os.platform", () => {
+    const result = brokerParams(AGENTS_UPGRADE_RESULT_CONFIG, { os_platform: "ubuntu" });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery["os.platform"]).toBe("ubuntu");
+  });
+
+  it("AGENTS_UPGRADE_RESULT_CONFIG resolves alias 'os_version' to os.version", () => {
+    const result = brokerParams(AGENTS_UPGRADE_RESULT_CONFIG, { os_version: "22.04" });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery["os.version"]).toBe("22.04");
+  });
+
+  it("AGENTS_UPGRADE_RESULT_CONFIG resolves alias 'os_name' to os.name", () => {
+    const result = brokerParams(AGENTS_UPGRADE_RESULT_CONFIG, { os_name: "Ubuntu" });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery["os.name"]).toBe("Ubuntu");
+  });
+
+  it("AGENTS_UPGRADE_RESULT_CONFIG also accepts canonical dotted keys directly", () => {
+    const result = brokerParams(AGENTS_UPGRADE_RESULT_CONFIG, {
+      "os.platform": "centos",
+      "os.version": "8",
+      "os.name": "CentOS",
+    });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery["os.platform"]).toBe("centos");
+    expect(result.forwardedQuery["os.version"]).toBe("8");
+    expect(result.forwardedQuery["os.name"]).toBe("CentOS");
+  });
+
+  it("AGENTS_UPGRADE_RESULT_CONFIG forwards all params including agents_list csv", () => {
+    const result = brokerParams(AGENTS_UPGRADE_RESULT_CONFIG, {
+      agents_list: ["001", "002"],
+      q: "status=active",
+      os_platform: "ubuntu",
+      manager: "wazuh-master",
+      version: "4.14.3",
+      group: "default",
+      node_name: "node01",
+      name: "web-server",
+      ip: "10.0.0.1",
+      registerIP: "10.0.0.1",
+    });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.agents_list).toBe("001,002");
+    expect(result.forwardedQuery.q).toBe("status=active");
+    expect(result.forwardedQuery["os.platform"]).toBe("ubuntu");
+    expect(result.forwardedQuery.manager).toBe("wazuh-master");
+  });
+
+  // ── groupFileContent: type_agents → type ──
+  it("GROUP_FILE_CONTENT_CONFIG resolves alias 'type_agents' to type", () => {
+    const result = brokerParams(GROUP_FILE_CONTENT_CONFIG, { type_agents: "conf" });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.type).toBe("conf");
+  });
+
+  it("GROUP_FILE_CONTENT_CONFIG also accepts canonical key 'type' directly", () => {
+    const result = brokerParams(GROUP_FILE_CONTENT_CONFIG, { type: "rootkit_files" });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.type).toBe("rootkit_files");
+  });
+
+  it("GROUP_FILE_CONTENT_CONFIG forwards raw boolean param", () => {
+    const result = brokerParams(GROUP_FILE_CONTENT_CONFIG, { type_agents: "conf", raw: true });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.type).toBe("conf");
+    expect(result.forwardedQuery.raw).toBe("true");
+  });
+
+  it("GROUP_FILE_CONTENT_CONFIG omits raw when false (flag semantics)", () => {
+    const result = brokerParams(GROUP_FILE_CONTENT_CONFIG, { raw: false });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery).not.toHaveProperty("raw");
+  });
+
+  // ── All Batch 2 configs reject unsupported params ──
+  it("all Batch 2 configs reject unsupported params", () => {
+    const configs = [MANAGER_DAEMON_STATS_CONFIG, AGENTS_UPGRADE_RESULT_CONFIG, GROUP_FILE_CONTENT_CONFIG];
     for (const config of configs) {
       const result = brokerParams(config, { bogus_param: "test" });
       expect(result.unsupportedParams).toContain("bogus_param");
