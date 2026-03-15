@@ -61,10 +61,13 @@ if [ "$RUN_MIGRATIONS" = "true" ] && [ -n "$DATABASE_URL" ]; then
 
   if [ "$MIGRATE_EXIT" -ne 0 ]; then
     echo "[entrypoint] ╔═══════════════════════════════════════════════════════════╗"
-    echo "[entrypoint] ║  ERROR: drizzle-kit migrate failed (exit code $MIGRATE_EXIT)       ║"
-    echo "[entrypoint] ║  The server will start, but some features may not work.  ║"
-    echo "[entrypoint] ║  Check the migration SQL for TiDB/MySQL compatibility.   ║"
+    echo "[entrypoint] ║  FATAL: drizzle-kit migrate failed (exit $MIGRATE_EXIT)             ║"
+    echo "[entrypoint] ║  Cannot start with broken schema — fix migrations first. ║"
     echo "[entrypoint] ╚═══════════════════════════════════════════════════════════╝"
+    if [ "$ALLOW_MIGRATION_FAILURE" != "true" ]; then
+      exit 1
+    fi
+    echo "[entrypoint] WARNING: ALLOW_MIGRATION_FAILURE=true — starting with broken schema (unsafe)."
   else
     echo "[entrypoint] Migrations applied successfully."
   fi

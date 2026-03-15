@@ -127,6 +127,27 @@
       "when": 1772395800000,
       "tag": "0017_runid_unique_constraint",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1772395900000,
+      "tag": "0018_schema_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1772396000000,
+      "tag": "0019_nullability_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1772396100000,
+      "tag": "0020_foreign_keys",
+      "breakpoints": true
     }
   ]
 }
