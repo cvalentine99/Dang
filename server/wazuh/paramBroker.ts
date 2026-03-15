@@ -2592,7 +2592,7 @@ export const MANAGER_DAEMON_STATS_CONFIG: EndpointParamConfig = {
   params: {
     daemons_list: {
       type: "csv",
-
+      aliases: ["daemons"],
       enumValues: ["true", "false"],
       wazuhName: "daemons_list",
       description: "List of daemon names (comma-separated)",
@@ -2948,16 +2948,19 @@ export const AGENTS_UPGRADE_RESULT_CONFIG: EndpointParamConfig = {
     q: UNIVERSAL_PARAMS.q,
     "os.platform": {
       type: "string",
+      aliases: ["os_platform"],
       wazuhName: "os.platform",
       description: "Filter by OS platform",
     },
     "os.version": {
       type: "string",
+      aliases: ["os_version"],
       wazuhName: "os.version",
       description: "Filter by OS version",
     },
     "os.name": {
       type: "string",
+      aliases: ["os_name"],
       wazuhName: "os.name",
       description: "Filter by OS name",
     },
@@ -3164,7 +3167,7 @@ export const GROUP_FILE_CONTENT_CONFIG: EndpointParamConfig = {
   params: {
     type: {
       type: "string",
-
+      aliases: ["type_agents"],
       enumValues: ["true", "false"],
       wazuhName: "type",
       description: "Type of file (conf, rootkit_files, rootkit_trojans, rcl)",

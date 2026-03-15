@@ -93,6 +93,10 @@ import {
   RULES_BY_REQUIREMENT_CONFIG,
   GROUP_CONFIGURATION_CONFIG,
   LISTS_FILE_CONTENT_CONFIG,
+  // Batch 2 promotion — alias-required manual → broker (3 endpoints)
+  MANAGER_DAEMON_STATS_CONFIG,
+  AGENTS_UPGRADE_RESULT_CONFIG,
+  GROUP_FILE_CONTENT_CONFIG,
 } from "./paramBroker";
 import { generateCoverageReport, BROKER_CONFIG_REGISTRY } from "./brokerCoverage";
 
@@ -287,14 +291,19 @@ export const wazuhRouter = router({
   analysisd: wazuhProcedure.query(() => proxyGet("/manager/stats/analysisd")),
   remoted: wazuhProcedure.query(() => proxyGet("/manager/stats/remoted")),
 
-  // ── Manager daemon stats (4.14+ enhanced) ─────────────────────────────────
+  // ── Manager daemon stats (4.14+ enhanced, broker-wired via alias: daemons → daemons_list) ──
   daemonStats: wazuhProcedure
     .input(z.object({
       daemons: z.array(z.string()).optional(),
     }).optional())
-    .query(({ input }) =>
-      proxyGet("/manager/daemons/stats", input?.daemons ? { daemons_list: input.daemons.join(",") } : {})
-    ),
+    .query(({ input }) => {
+      if (!input) return proxyGet("/manager/daemons/stats");
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(MANAGER_DAEMON_STATS_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /manager/daemons/stats: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/manager/daemons/stats", forwardedQuery), errors);
+    }),
 
   // ── Manager logs ──────────────────────────────────────────────────────────
   /**
@@ -621,20 +630,12 @@ export const wazuhRouter = router({
       }).optional()
     )
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input?.agents_list) params.agents_list = Array.isArray(input.agents_list) ? input.agents_list.join(",") : input.agents_list;
-      if (input?.q) params.q = input.q;
-      if (input?.os_platform) params["os.platform"] = input.os_platform;
-      if (input?.os_version) params["os.version"] = input.os_version;
-      if (input?.os_name) params["os.name"] = input.os_name;
-      if (input?.manager) params.manager = input.manager;
-      if (input?.version) params.version = input.version;
-      if (input?.group) params.group = input.group;
-      if (input?.node_name) params.node_name = input.node_name;
-      if (input?.name) params.name = input.name;
-      if (input?.ip) params.ip = input.ip;
-      if (input?.registerIP) params.registerIP = input.registerIP;
-      return proxyGet("/agents/upgrade_result", params);
+      if (!input) return proxyGet("/agents/upgrade_result");
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(AGENTS_UPGRADE_RESULT_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /agents/upgrade_result: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/agents/upgrade_result", forwardedQuery), errors);
     }),
 
   /**
@@ -2195,7 +2196,7 @@ export const wazuhRouter = router({
       return withBrokerWarnings(proxyGet(`/lists/files/${filename}`, forwardedQuery), errors);
     }),
 
-  /** GET /groups/{group_id}/files/{file_name} — Specific group file content (M-11 expanded) */
+  /** GET /groups/{group_id}/files/{file_name} — Specific group file content (broker-wired via alias: type_agents → type) */
   groupFileContent: wazuhProcedure
     .input(z.object({
       groupId: groupIdSchema,
@@ -2204,10 +2205,12 @@ export const wazuhRouter = router({
       raw: z.boolean().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string | boolean> = {};
-      if (input.type_agents) params.type = input.type_agents;
-      if (input.raw !== undefined) params.raw = input.raw;
-      return proxyGet(`/groups/${input.groupId}/files/${input.fileName}`, params);
+      const { groupId, fileName, ...rest } = input;
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(GROUP_FILE_CONTENT_CONFIG, rest);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /groups/{group_id}/files/{file_name}: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet(`/groups/${groupId}/files/${fileName}`, forwardedQuery), errors);
     }),
 
   // ══════════════════════════════════════════════════════════════════════════════
