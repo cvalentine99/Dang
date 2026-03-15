@@ -29,8 +29,12 @@
  */
 
 import { readFileSync } from "fs";
-import { resolve } from "path";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import yaml from "js-yaml";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import { getDb } from "../db";
 import { kgSyncStatus } from "../../drizzle/schema";
 import { extract } from "./kgExtractor";

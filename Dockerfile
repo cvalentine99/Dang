@@ -63,6 +63,9 @@ COPY --from=builder /app/dist ./dist
 COPY drizzle/ ./drizzle/
 COPY drizzle.config.ts ./
 
+# Copy broker coverage audit artifacts (read by generateCoverageReport at runtime)
+COPY docs/wiring-ledger.json docs/ui-param-parity.json ./docs/
+
 # Copy pre-migration repair script, journal backfill, and KG seeder
 COPY scripts/docker-pre-migrate.mjs scripts/backfill-migrations.mjs ./scripts/
 COPY seed-kg.mjs ./
