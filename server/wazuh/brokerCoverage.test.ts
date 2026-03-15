@@ -4,6 +4,17 @@ import {
   brokerParams,
   EXPERIMENTAL_CISCAT_RESULTS_CONFIG,
   CISCAT_CONFIG,
+  MANAGER_STATS_CONFIG,
+  MANAGER_VERSION_CHECK_CONFIG,
+  CLUSTER_HEALTHCHECK_CONFIG,
+  CLUSTER_NODE_STATS_CONFIG,
+  CLUSTER_NODE_DAEMON_STATS_CONFIG,
+  AGENTS_SUMMARY_CONFIG,
+  AGENT_DAEMON_STATS_CONFIG,
+  RULE_GROUPS_CONFIG,
+  RULES_BY_REQUIREMENT_CONFIG,
+  GROUP_CONFIGURATION_CONFIG,
+  LISTS_FILE_CONTENT_CONFIG,
 } from "./paramBroker";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -392,6 +403,18 @@ describe("brokerCoverage — classification matches wazuhRouter.ts runtime", () 
     "clusterNodeConfiguration",
     "clusterNodeLogs",
     "expCiscatResults",
+    // Batch 1 promotion — manual → broker (11 endpoints)
+    "managerStats",
+    "managerVersionCheck",
+    "clusterHealthcheck",
+    "clusterNodeStats",
+    "clusterNodeDaemonStats",
+    "agentsSummary",
+    "agentDaemonStats",
+    "ruleGroups",
+    "rulesByRequirement",
+    "groupConfiguration",
+    "listsFileContent",
   ];
 
   for (const proc of expectedBroker) {
@@ -407,23 +430,13 @@ describe("brokerCoverage — classification matches wazuhRouter.ts runtime", () 
   }
 
   // ── Manual procedures: MUST NOT contain brokerParams() call ──
+  // After Batch 1 promotion, 5 manual endpoints remain (need alias additions or spec fixes)
   const expectedManual: Array<{ proc: string; reason: string }> = [
-    { proc: "managerStats", reason: "inline date param" },
-    { proc: "daemonStats", reason: "inline daemons_list join" },
-    { proc: "managerVersionCheck", reason: "inline force_query param" },
-    { proc: "clusterHealthcheck", reason: "inline nodes_list join" },
-    { proc: "clusterNodeStats", reason: "inline date param" },
-    { proc: "clusterNodeDaemonStats", reason: "inline daemons_list join" },
-    { proc: "agentsSummary", reason: "inline agents_list join" },
-    { proc: "agentDaemonStats", reason: "inline daemons_list join" },
-    { proc: "agentsUpgradeResult", reason: "inline 12-param assembly" },
-    { proc: "ruleGroups", reason: "inline pagination + sort/search" },
-    { proc: "rulesByRequirement", reason: "inline pagination + sort/search" },
-    { proc: "ruleFileContent", reason: "inline raw + get_dirnames_path" },
-    { proc: "groupConfiguration", reason: "inline pagination" },
-    { proc: "groupFileContent", reason: "inline type_agents + raw" },
-    { proc: "listsFileContent", reason: "inline raw param" },
-    { proc: "securityResources", reason: "inline resource param" },
+    { proc: "daemonStats", reason: "inline daemons_list join (input key mismatch: daemons vs daemons_list)" },
+    { proc: "agentsUpgradeResult", reason: "inline 12-param assembly (needs os_* aliases)" },
+    { proc: "ruleFileContent", reason: "inline raw + get_dirnames_path (param name mismatch)" },
+    { proc: "groupFileContent", reason: "inline type_agents + raw (needs type_agents alias)" },
+    { proc: "securityResources", reason: "inline resource param (outbound name mismatch)" },
   ];
 
   for (const { proc, reason } of expectedManual) {
@@ -633,6 +646,207 @@ describe("brokerCoverage — registry ↔ router structural parity", () => {
         doubleEntries.map(p => `  - ${p}`).join("\n") +
         "\n\nRemove from INTENTIONALLY_EXCLUDED if it belongs in the registry, or vice versa."
       );
+    }
+  });
+});
+
+// ── Batch 1 Promotion Verification ─────────────────────────────────────────
+// These tests verify that the 11 endpoints promoted in Batch 1 are:
+//   1. Classified as "broker" in ENDPOINT_REGISTRY
+//   2. Have the correct brokerConfig name
+//   3. Actually call brokerParams() in wazuhRouter.ts
+//   4. Route params through the broker correctly
+
+describe("Batch 1 promotion — manual → broker (11 endpoints)", () => {
+  let report: CoverageReport;
+  let routerSource: string;
+
+  beforeAll(() => {
+    report = generateCoverageReport();
+    const routerPath = path.resolve(__dirname, "wazuhRouter.ts");
+    routerSource = fs.readFileSync(routerPath, "utf-8");
+  });
+
+  const batch1Endpoints: Array<{
+    procedure: string;
+    brokerConfig: string;
+    configRef: import("./paramBroker").EndpointParamConfig;
+    wazuhPath: string;
+  }> = [
+    { procedure: "managerStats", brokerConfig: "MANAGER_STATS_CONFIG", configRef: MANAGER_STATS_CONFIG, wazuhPath: "/manager/stats" },
+    { procedure: "managerVersionCheck", brokerConfig: "MANAGER_VERSION_CHECK_CONFIG", configRef: MANAGER_VERSION_CHECK_CONFIG, wazuhPath: "/manager/version/check" },
+    { procedure: "clusterHealthcheck", brokerConfig: "CLUSTER_HEALTHCHECK_CONFIG", configRef: CLUSTER_HEALTHCHECK_CONFIG, wazuhPath: "/cluster/healthcheck" },
+    { procedure: "clusterNodeStats", brokerConfig: "CLUSTER_NODE_STATS_CONFIG", configRef: CLUSTER_NODE_STATS_CONFIG, wazuhPath: "/cluster/{node_id}/stats" },
+    { procedure: "clusterNodeDaemonStats", brokerConfig: "CLUSTER_NODE_DAEMON_STATS_CONFIG", configRef: CLUSTER_NODE_DAEMON_STATS_CONFIG, wazuhPath: "/cluster/{node_id}/daemons/stats" },
+    { procedure: "agentsSummary", brokerConfig: "AGENTS_SUMMARY_CONFIG", configRef: AGENTS_SUMMARY_CONFIG, wazuhPath: "/agents/summary" },
+    { procedure: "agentDaemonStats", brokerConfig: "AGENT_DAEMON_STATS_CONFIG", configRef: AGENT_DAEMON_STATS_CONFIG, wazuhPath: "/agents/{agent_id}/daemons/stats" },
+    { procedure: "ruleGroups", brokerConfig: "RULE_GROUPS_CONFIG", configRef: RULE_GROUPS_CONFIG, wazuhPath: "/rules/groups" },
+    { procedure: "rulesByRequirement", brokerConfig: "RULES_BY_REQUIREMENT_CONFIG", configRef: RULES_BY_REQUIREMENT_CONFIG, wazuhPath: "/rules/requirement/{requirement}" },
+    { procedure: "groupConfiguration", brokerConfig: "GROUP_CONFIGURATION_CONFIG", configRef: GROUP_CONFIGURATION_CONFIG, wazuhPath: "/groups/{group_id}/configuration" },
+    { procedure: "listsFileContent", brokerConfig: "LISTS_FILE_CONTENT_CONFIG", configRef: LISTS_FILE_CONTENT_CONFIG, wazuhPath: "/lists/files/{filename}" },
+  ];
+
+  for (const ep of batch1Endpoints) {
+    describe(ep.procedure, () => {
+      it("is classified as broker in ENDPOINT_REGISTRY", () => {
+        const entry = report.endpoints.find(e => e.procedure === ep.procedure);
+        expect(entry).toBeDefined();
+        expect(entry!.wiringLevel).toBe("broker");
+      });
+
+      it(`has brokerConfig = ${ep.brokerConfig}`, () => {
+        const entry = report.endpoints.find(e => e.procedure === ep.procedure);
+        expect(entry!.brokerConfig).toBe(ep.brokerConfig);
+      });
+
+      it("calls brokerParams() in wazuhRouter.ts", () => {
+        const regex = new RegExp(`\\b${ep.procedure}:\\s`, "m");
+        const match = regex.exec(routerSource);
+        expect(match).toBeTruthy();
+        const start = match!.index;
+        const rest = routerSource.slice(start + match![0].length);
+        const nextProc = /\n\s{2}\w+:\s(?:wazuhProcedure|protectedProcedure|adminProcedure)/m.exec(rest);
+        const body = routerSource.slice(start, nextProc ? start + match![0].length + nextProc.index : start + 2000);
+        expect(body).toContain("brokerParams(");
+      });
+
+      it("broker config endpoint matches registry wazuhPath", () => {
+        expect(ep.configRef.endpoint).toBe(ep.wazuhPath);
+      });
+    });
+  }
+
+  // ── Structural guard: registry broker label requires real brokerParams() call ──
+  it("every broker-labeled endpoint actually calls brokerParams() in the router", () => {
+    const brokerEndpoints = report.endpoints.filter(e => e.wiringLevel === "broker");
+    const failures: string[] = [];
+
+    for (const ep of brokerEndpoints) {
+      const regex = new RegExp(`\\b${ep.procedure}:\\s`, "m");
+      const match = regex.exec(routerSource);
+      if (!match) {
+        failures.push(`${ep.procedure}: procedure not found in router source`);
+        continue;
+      }
+      const start = match.index;
+      const rest = routerSource.slice(start + match[0].length);
+      const nextProc = /\n\s{2}\w+:\s(?:wazuhProcedure|protectedProcedure|adminProcedure)/m.exec(rest);
+      const body = routerSource.slice(start, nextProc ? start + match[0].length + nextProc.index : start + 2000);
+      if (!body.includes("brokerParams(")) {
+        failures.push(`${ep.procedure}: labeled broker but does NOT call brokerParams()`);
+      }
+    }
+
+    if (failures.length > 0) {
+      throw new Error(
+        `${failures.length} endpoint(s) labeled "broker" without a real brokerParams() callsite:\n` +
+        failures.map(f => `  - ${f}`).join("\n") +
+        "\n\nDo not relabel an endpoint as broker until the router actually calls brokerParams()."
+      );
+    }
+  });
+
+  it("coverage counts reflect Batch 1 promotion: 73 broker, 5 manual, 43 passthrough", () => {
+    expect(report.brokerWired).toBe(73);
+    expect(report.manualParam).toBe(5);
+    expect(report.passthrough).toBe(43);
+    expect(report.totalProcedures).toBe(121);
+  });
+});
+
+// ── Anti-Drift Guard: brokerParams forwarding contract for Batch 1 configs ──
+
+describe("Batch 1 — brokerParams forwarding contract", () => {
+  it("MANAGER_STATS_CONFIG forwards date param", () => {
+    const result = brokerParams(MANAGER_STATS_CONFIG, { date: "2026-03-15" });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.date).toBe("2026-03-15");
+  });
+
+  it("MANAGER_VERSION_CHECK_CONFIG forwards force_query param", () => {
+    const result = brokerParams(MANAGER_VERSION_CHECK_CONFIG, { force_query: true });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.force_query).toBe("true");
+  });
+
+  it("CLUSTER_HEALTHCHECK_CONFIG forwards nodes_list as csv", () => {
+    const result = brokerParams(CLUSTER_HEALTHCHECK_CONFIG, { nodes_list: ["node1", "node2"] });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.nodes_list).toBe("node1,node2");
+  });
+
+  it("CLUSTER_NODE_STATS_CONFIG forwards date param", () => {
+    const result = brokerParams(CLUSTER_NODE_STATS_CONFIG, { date: "2026-03-15" });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.date).toBe("2026-03-15");
+  });
+
+  it("CLUSTER_NODE_DAEMON_STATS_CONFIG forwards daemons_list as csv", () => {
+    const result = brokerParams(CLUSTER_NODE_DAEMON_STATS_CONFIG, { daemons_list: ["wazuh-modulesd", "wazuh-analysisd"] });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.daemons_list).toBe("wazuh-modulesd,wazuh-analysisd");
+  });
+
+  it("AGENTS_SUMMARY_CONFIG forwards agents_list as csv", () => {
+    const result = brokerParams(AGENTS_SUMMARY_CONFIG, { agents_list: ["001", "002"] });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.agents_list).toBe("001,002");
+  });
+
+  it("AGENT_DAEMON_STATS_CONFIG forwards daemons_list as csv", () => {
+    const result = brokerParams(AGENT_DAEMON_STATS_CONFIG, { daemons_list: "wazuh-modulesd" });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.daemons_list).toBe("wazuh-modulesd");
+  });
+
+  it("RULE_GROUPS_CONFIG forwards pagination and sort/search", () => {
+    const result = brokerParams(RULE_GROUPS_CONFIG, { offset: 0, limit: 50, sort: "+name", search: "web" });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.offset).toBe("0");
+    expect(result.forwardedQuery.limit).toBe("50");
+    expect(result.forwardedQuery.sort).toBe("+name");
+    expect(result.forwardedQuery.search).toBe("web");
+  });
+
+  it("RULES_BY_REQUIREMENT_CONFIG forwards pagination and sort/search", () => {
+    const result = brokerParams(RULES_BY_REQUIREMENT_CONFIG, { offset: 10, limit: 25, sort: "-level", search: "pci" });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.offset).toBe("10");
+    expect(result.forwardedQuery.limit).toBe("25");
+    expect(result.forwardedQuery.sort).toBe("-level");
+    expect(result.forwardedQuery.search).toBe("pci");
+  });
+
+  it("GROUP_CONFIGURATION_CONFIG forwards pagination", () => {
+    const result = brokerParams(GROUP_CONFIGURATION_CONFIG, { offset: 0, limit: 100 });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.offset).toBe("0");
+    expect(result.forwardedQuery.limit).toBe("100");
+  });
+
+  it("LISTS_FILE_CONTENT_CONFIG forwards raw param", () => {
+    const result = brokerParams(LISTS_FILE_CONTENT_CONFIG, { raw: true });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery.raw).toBe("true");
+  });
+
+  it("LISTS_FILE_CONTENT_CONFIG omits raw when false (flag semantics)", () => {
+    const result = brokerParams(LISTS_FILE_CONTENT_CONFIG, { raw: false });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery).not.toHaveProperty("raw");
+  });
+
+  it("all Batch 1 configs reject unsupported params", () => {
+    const configs = [
+      MANAGER_STATS_CONFIG, MANAGER_VERSION_CHECK_CONFIG, CLUSTER_HEALTHCHECK_CONFIG,
+      CLUSTER_NODE_STATS_CONFIG, CLUSTER_NODE_DAEMON_STATS_CONFIG, AGENTS_SUMMARY_CONFIG,
+      AGENT_DAEMON_STATS_CONFIG, RULE_GROUPS_CONFIG, RULES_BY_REQUIREMENT_CONFIG,
+      GROUP_CONFIGURATION_CONFIG, LISTS_FILE_CONTENT_CONFIG,
+    ];
+    for (const config of configs) {
+      const result = brokerParams(config, { bogus_param: "test" });
+      expect(result.unsupportedParams).toContain("bogus_param");
+      expect(result.forwardedQuery).not.toHaveProperty("bogus_param");
     }
   });
 });
