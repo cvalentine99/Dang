@@ -149,7 +149,7 @@ function AlertDetail({ alert }: { alert: StreamedAlert }) {
           </div>
         )}
       </div>
-      {alert.rule.groups && alert.rule.groups.length > 0 && (
+      {Array.isArray(alert.rule.groups) && alert.rule.groups.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {alert.rule.groups.slice(0, 8).map((g) => (
             <span

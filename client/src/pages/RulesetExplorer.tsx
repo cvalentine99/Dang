@@ -79,15 +79,23 @@ function ViewSourceButton({ type, filename }: { type: "rules" | "decoders"; file
   const [loading, setLoading] = useState(false);
 
   const fileQ = type === "rules"
-    ? trpc.wazuh.ruleFileContent.useQuery({ filename }, { enabled: open })
-    : trpc.wazuh.decoderFileContent.useQuery({ filename }, { enabled: open });
+    ? trpc.wazuh.ruleFileContent.useQuery({ filename, raw: true }, { enabled: open })
+    : trpc.wazuh.decoderFileContent.useQuery({ filename, raw: true }, { enabled: open });
 
   useEffect(() => {
     if (fileQ.data) {
       const raw = fileQ.data as Record<string, unknown>;
-      const data = raw?.data as Record<string, unknown> | undefined;
-      const items = data?.affected_items as string[] | undefined;
-      setContent(items?.[0] ?? JSON.stringify(raw, null, 2));
+      // With raw: true, Wazuh returns plain text. Without it, affected_items
+      // contains parsed rule/decoder OBJECTS (not strings), which crash React
+      // if rendered directly (error #31: object with keys {group}).
+      if (typeof raw === "string") {
+        setContent(raw);
+      } else {
+        const data = raw?.data as Record<string, unknown> | undefined;
+        const items = data?.affected_items;
+        const first = Array.isArray(items) ? items[0] : undefined;
+        setContent(typeof first === "string" ? first : JSON.stringify(raw, null, 2));
+      }
       setLoading(false);
     }
     if (fileQ.isLoading) setLoading(true);

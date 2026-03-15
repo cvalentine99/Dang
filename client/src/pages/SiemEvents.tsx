@@ -1076,9 +1076,9 @@ export default function SiemEvents() {
                           <div>
                             <span className="text-slate-500">Groups</span>
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {event.rule.groups.map((g) => (
-                                <span key={g} className="px-1.5 py-0.5 bg-white/5 rounded text-[10px] font-mono text-slate-400">
-                                  {g}
+                              {Array.isArray(event.rule.groups) && event.rule.groups.map((g) => (
+                                <span key={String(g)} className="px-1.5 py-0.5 bg-white/5 rounded text-[10px] font-mono text-slate-400">
+                                  {String(g)}
                                 </span>
                               ))}
                             </div>
