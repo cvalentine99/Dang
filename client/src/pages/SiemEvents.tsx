@@ -151,7 +151,7 @@ export default function SiemEvents() {
   const indexerStatusQ = trpc.indexer.status.useQuery(undefined, { retry: 1, staleTime: 60_000 });
   const indexerHealthy = indexerStatusQ.data?.configured === true && indexerStatusQ.data?.healthy === true;
   const timeRangeMs = useMemo(() => {
-    const map: Record<string, number> = { "1h": 3600000, "6h": 21600000, "24h": 86400000, "7d": 604800000 };
+    const map: Record<string, number> = { "15m": 900000, "1h": 3600000, "6h": 21600000, "24h": 86400000, "7d": 604800000 };
     return map[timeRange] ?? 86400000;
   }, [timeRange]);
   const timeWindow = useMemo(() => ({
