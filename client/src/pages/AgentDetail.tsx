@@ -354,6 +354,8 @@ function AlertsTab({ agentId }: { agentId: string }) {
   const totalHits = (alertsQ.data as any)?.data?.hits?.total?.value ?? alerts.length;
   const totalPages = Math.max(1, Math.ceil(totalHits / pageSize));
 
+  const PIE_COLORS = ["oklch(0.765 0.177 163.223)", "oklch(0.795 0.184 86.047)", "oklch(0.705 0.191 47)", "oklch(0.637 0.237 25.331)", "oklch(0.541 0.281 293.009)"];
+
   const severityData = useMemo(() => {
     const buckets = (severityQ.data as any)?.data?.aggregations?.severity_total?.buckets ?? [];
     return (buckets as any[]).map((b: any, i: number) => ({
@@ -362,8 +364,6 @@ function AlertsTab({ agentId }: { agentId: string }) {
       fill: PIE_COLORS[i % PIE_COLORS.length],
     }));
   }, [severityQ.data]);
-
-  const PIE_COLORS = ["oklch(0.765 0.177 163.223)", "oklch(0.795 0.184 86.047)", "oklch(0.705 0.191 47)", "oklch(0.637 0.237 25.331)", "oklch(0.541 0.281 293.009)"];
 
   return (
     <div className="space-y-6">
