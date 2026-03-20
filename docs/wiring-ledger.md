@@ -5,134 +5,156 @@
 > `client/src/**/*.{ts,tsx}` for `trpc.wazuh.*.useQuery` callsites.
 > To regenerate: `node scripts/generate-wiring-ledger.mjs`
 
-Generated: 2026-03-06T23:45:30.564Z
+Generated: 2026-03-19T23:21:34.056Z
 
 ## Summary
 
 | Metric | Count |
 |--------|-------|
-| Total procedures | 113 |
-| Wired (UI callsite exists) | 113 |
-| Unwired (no UI callsite) | 0 |
-| Parity | 113/113 |
+| Total procedures | 130 |
+| Wired (UI callsite exists) | 128 |
+| Unwired (no UI callsite) | 2 |
+| Parity | 128/130 |
 
 ## Full Ledger
 
 | # | Procedure | Status | Router Line | UI Callsite(s) |
 |---|-----------|--------|-------------|----------------|
-| 1 | `status` | **Wired** | L121 | `client/src/components/shared/WazuhGuard.tsx:21`, `client/src/components/shared/WazuhGuard.tsx:72`, `client/src/pages/AgentHealth.tsx:87`, `client/src/pages/AlertsTimeline.tsx:169`, `client/src/pages/ClusterHealth.tsx:516`, `client/src/pages/Compliance.tsx:145`, `client/src/pages/FileIntegrity.tsx:64`, `client/src/pages/FleetInventory.tsx:147`, `client/src/pages/GroupManagement.tsx:56`, `client/src/pages/Home.tsx:157`, `client/src/pages/ITHygiene.tsx:92`, `client/src/pages/MitreAttack.tsx:109`, `client/src/pages/RulesetExplorer.tsx:181`, `client/src/pages/SecurityExplorer.tsx:51`, `client/src/pages/SiemEvents.tsx:113`, `client/src/pages/Vulnerabilities.tsx:105` |
-| 2 | `isConfigured` | **Wired** | L135 | `client/src/pages/Status.tsx:555` |
-| 3 | `managerInfo` | **Wired** | L147 | `client/src/pages/ClusterHealth.tsx:519` |
-| 4 | `managerStatus` | **Wired** | L148 | `client/src/pages/ClusterHealth.tsx:518`, `client/src/pages/Home.tsx:163` |
-| 5 | `managerConfiguration` | **Wired** | L156 | `client/src/pages/ClusterHealth.tsx:538` |
-| 6 | `managerConfigValidation` | **Wired** | L176 | `client/src/pages/ClusterHealth.tsx:522` |
-| 7 | `managerStats` | **Wired** | L179 | `client/src/pages/Home.tsx:169`, `client/src/pages/Status.tsx:550` |
-| 8 | `statsHourly` | **Wired** | L180 | `client/src/pages/AlertsTimeline.tsx:172`, `client/src/pages/ClusterHealth.tsx:520`, `client/src/pages/Home.tsx:162` |
-| 9 | `statsWeekly` | **Wired** | L181 | `client/src/pages/AlertsTimeline.tsx:173` |
-| 10 | `analysisd` | **Wired** | L182 | `client/src/pages/Home.tsx:161` |
-| 11 | `remoted` | **Wired** | L183 | `client/src/pages/Home.tsx:170` |
-| 12 | `daemonStats` | **Wired** | L186 | `client/src/pages/ClusterHealth.tsx:521` |
-| 13 | `managerLogs` | **Wired** | L201 | `client/src/pages/ClusterHealth.tsx:532` |
-| 14 | `managerLogsSummary` | **Wired** | L224 | `client/src/pages/Home.tsx:168` |
-| 15 | `managerVersionCheck` | **Wired** | L232 | `client/src/pages/Status.tsx:540` |
-| 16 | `managerComponentConfig` | **Wired** | L246 | `client/src/pages/Status.tsx:562` |
-| 17 | `clusterStatus` | **Wired** | L258 | `client/src/pages/ClusterHealth.tsx:523` |
-| 18 | `clusterNodes` | **Wired** | L265 | `client/src/pages/ClusterHealth.tsx:524` |
-| 19 | `clusterHealthcheck` | **Wired** | L288 | `client/src/pages/ClusterHealth.tsx:525` |
-| 20 | `clusterLocalInfo` | **Wired** | L289 | `client/src/pages/ClusterHealth.tsx:526` |
-| 21 | `clusterLocalConfig` | **Wired** | L290 | `client/src/pages/ClusterHealth.tsx:527` |
-| 22 | `clusterNodeInfo` | **Wired** | L292 | `client/src/pages/ClusterHealth.tsx:208` |
-| 23 | `clusterNodeStats` | **Wired** | L296 | `client/src/pages/ClusterHealth.tsx:212` |
-| 24 | `clusterNodeStatsHourly` | **Wired** | L300 | `client/src/pages/ClusterHealth.tsx:216` |
-| 25 | `agents` | **Wired** | L317 | `client/src/components/DriftComparison.tsx:413`, `client/src/pages/AgentCompare.tsx:53`, `client/src/pages/AgentHealth.tsx:107`, `client/src/pages/Compliance.tsx:153`, `client/src/pages/FileIntegrity.tsx:67`, `client/src/pages/Home.tsx:165`, `client/src/pages/ITHygiene.tsx:100`, `client/src/pages/SiemEvents.tsx:120`, `client/src/pages/Vulnerabilities.tsx:112` |
-| 26 | `agentSummaryStatus` | **Wired** | L356 | `client/src/pages/AgentHealth.tsx:90`, `client/src/pages/Home.tsx:160`, `client/src/pages/ThreatHunting.tsx:248` |
-| 27 | `agentSummaryOs` | **Wired** | L360 | `client/src/pages/AgentHealth.tsx:91` |
-| 28 | `agentsSummary` | **Wired** | L368 | `client/src/pages/Home.tsx:171` |
-| 29 | `agentOverview` | **Wired** | L382 | `client/src/pages/Home.tsx:167` |
-| 30 | `agentById` | **Wired** | L386 | `client/src/pages/AgentCompare.tsx:424`, `client/src/pages/AgentDetail.tsx:1719`, `client/src/pages/AgentHealth.tsx:131` |
-| 31 | `agentKey` | **Wired** | L398 | `client/src/pages/AgentDetail.tsx:1044` |
-| 32 | `agentDaemonStats` | **Wired** | L435 | `client/src/pages/AgentDetail.tsx:1036` |
-| 33 | `agentStats` | **Wired** | L441 | `client/src/pages/AgentDetail.tsx:1030` |
-| 34 | `agentConfig` | **Wired** | L447 | `client/src/pages/AgentDetail.tsx:1023` |
-| 35 | `agentsUpgradeResult` | **Wired** | L461 | `client/src/pages/AgentHealth.tsx:126` |
-| 36 | `agentsUninstallPermission` | **Wired** | L499 | `client/src/pages/Status.tsx:567` |
-| 37 | `agentGroupSync` | **Wired** | L505 | `client/src/pages/AgentDetail.tsx:68` |
-| 38 | `apiInfo` | **Wired** | L513 | `client/src/pages/Status.tsx:535` |
-| 39 | `agentGroups` | **Wired** | L521 | `client/src/pages/AgentHealth.tsx:92`, `client/src/pages/GroupManagement.tsx:60` |
-| 40 | `agentsOutdated` | **Wired** | L546 | `client/src/pages/AgentHealth.tsx:113`, `client/src/pages/GroupManagement.tsx:64` |
-| 41 | `agentsNoGroup` | **Wired** | L553 | `client/src/pages/AgentHealth.tsx:114`, `client/src/pages/GroupManagement.tsx:68` |
-| 42 | `agentsStatsDistinct` | **Wired** | L560 | `client/src/pages/GroupManagement.tsx:72` |
-| 43 | `agentGroupMembers` | **Wired** | L572 | `client/src/pages/GroupManagement.tsx:76` |
-| 44 | `agentOs` | **Wired** | L598 | `client/src/pages/AgentDetail.tsx:64`, `client/src/pages/AgentHealth.tsx:132` |
-| 45 | `agentHardware` | **Wired** | L604 | `client/src/pages/AgentDetail.tsx:65`, `client/src/pages/AgentHealth.tsx:133` |
-| 46 | `agentPackages` | **Wired** | L610 | `client/src/components/DriftComparison.tsx:438`, `client/src/pages/AgentDetail.tsx:651`, `client/src/pages/ITHygiene.tsx:110` |
-| 47 | `agentPorts` | **Wired** | L638 | `client/src/pages/AgentDetail.tsx:652`, `client/src/pages/ITHygiene.tsx:114` |
-| 48 | `agentProcesses` | **Wired** | L669 | `client/src/pages/AgentDetail.tsx:653`, `client/src/pages/ITHygiene.tsx:118` |
-| 49 | `agentNetaddr` | **Wired** | L706 | `client/src/pages/AgentDetail.tsx:655`, `client/src/pages/ITHygiene.tsx:126` |
-| 50 | `agentNetiface` | **Wired** | L712 | `client/src/pages/AgentDetail.tsx:654`, `client/src/pages/ITHygiene.tsx:122` |
-| 51 | `agentHotfixes` | **Wired** | L718 | `client/src/pages/ITHygiene.tsx:134` |
-| 52 | `agentBrowserExtensions` | **Wired** | L732 | `client/src/pages/ITHygiene.tsx:140` |
-| 53 | `agentServices` | **Wired** | L742 | `client/src/components/DriftComparison.tsx:447`, `client/src/pages/ITHygiene.tsx:146` |
-| 54 | `agentUsers` | **Wired** | L767 | `client/src/components/DriftComparison.tsx:456`, `client/src/pages/ITHygiene.tsx:152` |
-| 55 | `agentGroups2` | **Wired** | L777 | `client/src/pages/ITHygiene.tsx:156` |
-| 56 | `agentNetproto` | **Wired** | L787 | `client/src/pages/ITHygiene.tsx:130` |
-| 57 | `expSyscollectorPackages` | **Wired** | L801 | `client/src/pages/FleetInventory.tsx:164` |
-| 58 | `expSyscollectorProcesses` | **Wired** | L834 | `client/src/pages/FleetInventory.tsx:165` |
-| 59 | `expSyscollectorPorts` | **Wired** | L885 | `client/src/pages/FleetInventory.tsx:166` |
-| 60 | `expSyscollectorNetaddr` | **Wired** | L924 | `client/src/pages/FleetInventory.tsx:170` |
-| 61 | `expSyscollectorNetiface` | **Wired** | L947 | `client/src/pages/FleetInventory.tsx:171` |
-| 62 | `expSyscollectorNetproto` | **Wired** | L970 | `client/src/pages/FleetInventory.tsx:172` |
-| 63 | `expSyscollectorOs` | **Wired** | L993 | `client/src/pages/FleetInventory.tsx:167` |
-| 64 | `expSyscollectorHardware` | **Wired** | L1016 | `client/src/pages/FleetInventory.tsx:168` |
-| 65 | `expSyscollectorHotfixes` | **Wired** | L1039 | `client/src/pages/FleetInventory.tsx:169` |
-| 66 | `rules` | **Wired** | L1070 | `client/src/pages/Home.tsx:164`, `client/src/pages/MitreAttack.tsx:122`, `client/src/pages/RulesetExplorer.tsx:225`, `client/src/pages/SiemEvents.tsx:116`, `client/src/pages/ThreatHunting.tsx:249` |
-| 67 | `ruleGroups` | **Wired** | L1104 | `client/src/pages/RulesetExplorer.tsx:233` |
-| 68 | `rulesByRequirement` | **Wired** | L1106 | `client/src/pages/RulesetExplorer.tsx:266` |
-| 69 | `rulesFiles` | **Wired** | L1112 | `client/src/pages/RulesetExplorer.tsx:238` |
-| 70 | `ruleFileContent` | **Wired** | L1119 | `client/src/pages/RulesetExplorer.tsx:86` |
-| 71 | `mitreTactics` | **Wired** | L1128 | `client/src/pages/Home.tsx:166`, `client/src/pages/MitreAttack.tsx:119` |
-| 72 | `mitreTechniques` | **Wired** | L1138 | `client/src/pages/MitreAttack.tsx:120` |
-| 73 | `mitreMitigations` | **Wired** | L1158 | `client/src/pages/MitreAttack.tsx:132` |
-| 74 | `mitreSoftware` | **Wired** | L1164 | `client/src/pages/MitreAttack.tsx:128` |
-| 75 | `mitreGroups` | **Wired** | L1170 | `client/src/pages/MitreAttack.tsx:121` |
-| 76 | `mitreMetadata` | **Wired** | L1176 | `client/src/pages/MitreAttack.tsx:123` |
-| 77 | `mitreReferences` | **Wired** | L1178 | `client/src/pages/MitreAttack.tsx:136` |
-| 78 | `scaPolicies` | **Wired** | L1200 | `client/src/pages/AgentCompare.tsx:429`, `client/src/pages/AgentDetail.tsx:66`, `client/src/pages/Compliance.tsx:159` |
-| 79 | `scaChecks` | **Wired** | L1233 | `client/src/pages/Compliance.tsx:160` |
-| 80 | `ciscatResults` | **Wired** | L1278 | `client/src/pages/AgentDetail.tsx:1544` |
-| 81 | `syscheckFiles` | **Wired** | L1318 | `client/src/pages/AgentDetail.tsx:568`, `client/src/pages/AgentDetail.tsx:803`, `client/src/pages/FileIntegrity.tsx:73` |
-| 82 | `syscheckLastScan` | **Wired** | L1352 | `client/src/pages/AgentDetail.tsx:67`, `client/src/pages/AgentDetail.tsx:574`, `client/src/pages/FileIntegrity.tsx:77` |
-| 83 | `rootcheckResults` | **Wired** | L1367 | `client/src/pages/AgentDetail.tsx:1317` |
-| 84 | `rootcheckLastScan` | **Wired** | L1392 | `client/src/pages/AgentDetail.tsx:1312` |
-| 85 | `decoders` | **Wired** | L1407 | `client/src/pages/RulesetExplorer.tsx:229` |
-| 86 | `decoderFiles` | **Wired** | L1430 | `client/src/pages/RulesetExplorer.tsx:242` |
-| 87 | `decoderParents` | **Wired** | L1437 | `client/src/pages/RulesetExplorer.tsx:259` |
-| 88 | `decoderFileContent` | **Wired** | L1444 | `client/src/pages/RulesetExplorer.tsx:87` |
-| 89 | `taskStatus` | **Wired** | L1453 | `client/src/pages/Status.tsx:572` |
-| 90 | `securityRoles` | **Wired** | L1468 | `client/src/pages/SecurityExplorer.tsx:58` |
-| 91 | `securityPolicies` | **Wired** | L1469 | `client/src/pages/SecurityExplorer.tsx:60` |
-| 92 | `securityUsers` | **Wired** | L1470 | `client/src/pages/SecurityExplorer.tsx:59` |
-| 93 | `securityConfig` | **Wired** | L1476 | `client/src/pages/Status.tsx:545` |
-| 94 | `securityCurrentUser` | **Wired** | L1482 | `client/src/pages/SecurityExplorer.tsx:61` |
-| 95 | `securityRbacRules` | **Wired** | L1488 | `client/src/pages/SecurityExplorer.tsx:54` |
-| 96 | `securityActions` | **Wired** | L1515 | `client/src/pages/SecurityExplorer.tsx:55` |
-| 97 | `securityResources` | **Wired** | L1527 | `client/src/pages/SecurityExplorer.tsx:56` |
-| 98 | `securityCurrentUserPolicies` | **Wired** | L1539 | `client/src/pages/SecurityExplorer.tsx:57` |
-| 99 | `lists` | **Wired** | L1544 | `client/src/pages/RulesetExplorer.tsx:246` |
-| 100 | `listsFiles` | **Wired** | L1550 | `client/src/pages/RulesetExplorer.tsx:250` |
-| 101 | `groupConfiguration` | **Wired** | L1560 | `client/src/pages/GroupManagement.tsx:80` |
-| 102 | `groupFiles` | **Wired** | L1567 | `client/src/pages/GroupManagement.tsx:84` |
-| 103 | `listsFileContent` | **Wired** | L1574 | `client/src/pages/RulesetExplorer.tsx:272` |
-| 104 | `groupFileContent` | **Wired** | L1581 | `client/src/pages/GroupManagement.tsx:88` |
-| 105 | `clusterNodeStatus` | **Wired** | L1592 | `client/src/pages/ClusterHealth.tsx:176` |
-| 106 | `clusterNodeConfiguration` | **Wired** | L1597 | `client/src/pages/ClusterHealth.tsx:180` |
-| 107 | `clusterNodeComponentConfig` | **Wired** | L1602 | `client/src/pages/ClusterHealth.tsx:222` |
-| 108 | `clusterNodeDaemonStats` | **Wired** | L1607 | `client/src/pages/ClusterHealth.tsx:184` |
-| 109 | `clusterNodeLogs` | **Wired** | L1612 | `client/src/pages/ClusterHealth.tsx:188` |
-| 110 | `clusterNodeLogsSummary` | **Wired** | L1636 | `client/src/pages/ClusterHealth.tsx:192` |
-| 111 | `clusterNodeStatsAnalysisd` | **Wired** | L1641 | `client/src/pages/ClusterHealth.tsx:196` |
-| 112 | `clusterNodeStatsRemoted` | **Wired** | L1646 | `client/src/pages/ClusterHealth.tsx:200` |
-| 113 | `clusterNodeStatsWeekly` | **Wired** | L1651 | `client/src/pages/ClusterHealth.tsx:204` |
+| 1 | `status` | **Wired** | L222 | `client/src/components/shared/WazuhGuard.tsx:21`, `client/src/components/shared/WazuhGuard.tsx:72`, `client/src/pages/AgentHealth.tsx:89`, `client/src/pages/AlertsTimeline.tsx:171`, `client/src/pages/ClusterHealth.tsx:617`, `client/src/pages/Compliance.tsx:158`, `client/src/pages/FileIntegrity.tsx:65`, `client/src/pages/FleetInventory.tsx:206`, `client/src/pages/GroupManagement.tsx:62`, `client/src/pages/Home.tsx:240`, `client/src/pages/ITHygiene.tsx:94`, `client/src/pages/MitreAttack.tsx:110`, `client/src/pages/RulesetExplorer.tsx:185`, `client/src/pages/SecurityExplorer.tsx:197`, `client/src/pages/SiemEvents.tsx:110`, `client/src/pages/Vulnerabilities.tsx:106` |
+| 2 | `isConfigured` | **Wired** | L236 | `client/src/pages/Status.tsx:571` |
+| 3 | `managerInfo` | **Wired** | L248 | `client/src/pages/ClusterHealth.tsx:620` |
+| 4 | `managerStatus` | **Wired** | L249 | `client/src/pages/ClusterHealth.tsx:619`, `client/src/pages/Home.tsx:246` |
+| 5 | `managerConfiguration` | **Wired** | L257 | `client/src/pages/ClusterHealth.tsx:639` |
+| 6 | `managerConfigValidation` | **Wired** | L277 | `client/src/pages/ClusterHealth.tsx:623` |
+| 7 | `managerStats` | **Wired** | L281 | `client/src/pages/Status.tsx:566` |
+| 8 | `statsHourly` | **Wired** | L291 | `client/src/pages/AlertsTimeline.tsx:174`, `client/src/pages/ClusterHealth.tsx:621`, `client/src/pages/Home.tsx:245` |
+| 9 | `statsWeekly` | **Wired** | L292 | `client/src/pages/AlertsTimeline.tsx:175` |
+| 10 | `analysisd` | **Wired** | L293 | `client/src/pages/Home.tsx:244` |
+| 11 | `remoted` | Unwired | L294 | — |
+| 12 | `daemonStats` | **Wired** | L297 | `client/src/pages/ClusterHealth.tsx:622` |
+| 13 | `managerLogs` | **Wired** | L317 | `client/src/pages/ClusterHealth.tsx:633` |
+| 14 | `managerLogsSummary` | **Wired** | L340 | `client/src/pages/Home.tsx:250` |
+| 15 | `managerVersionCheck` | **Wired** | L348 | `client/src/pages/Status.tsx:546` |
+| 16 | `managerComponentConfig` | **Wired** | L365 | `client/src/pages/Status.tsx:580` |
+| 17 | `clusterStatus` | **Wired** | L377 | `client/src/pages/ClusterHealth.tsx:624` |
+| 18 | `clusterNodes` | **Wired** | L384 | `client/src/pages/ClusterHealth.tsx:625` |
+| 19 | `clusterHealthcheck` | **Wired** | L407 | `client/src/pages/ClusterHealth.tsx:626` |
+| 20 | `clusterLocalInfo` | **Wired** | L417 | `client/src/pages/ClusterHealth.tsx:627` |
+| 21 | `clusterLocalConfig` | **Wired** | L418 | `client/src/pages/ClusterHealth.tsx:628` |
+| 22 | `clusterRulesetSync` | **Wired** | L421 | `client/src/pages/ClusterHealth.tsx:654` |
+| 23 | `clusterApiConfig` | **Wired** | L424 | `client/src/pages/ClusterHealth.tsx:652` |
+| 24 | `clusterConfigValidation` | **Wired** | L427 | `client/src/pages/ClusterHealth.tsx:653` |
+| 25 | `managerApiConfig` | **Wired** | L430 | `client/src/pages/ClusterHealth.tsx:655` |
+| 26 | `clusterNodeInfo` | **Wired** | L432 | `client/src/pages/ClusterHealth.tsx:253` |
+| 27 | `clusterNodeStats` | **Wired** | L437 | `client/src/pages/ClusterHealth.tsx:257` |
+| 28 | `clusterNodeStatsHourly` | **Wired** | L448 | `client/src/pages/ClusterHealth.tsx:261` |
+| 29 | `agents` | **Wired** | L465 | `client/src/components/DriftComparison.tsx:413`, `client/src/pages/AgentCompare.tsx:66`, `client/src/pages/AgentHealth.tsx:109`, `client/src/pages/Compliance.tsx:166`, `client/src/pages/FileIntegrity.tsx:68`, `client/src/pages/Home.tsx:248`, `client/src/pages/ITHygiene.tsx:102`, `client/src/pages/SiemEvents.tsx:117`, `client/src/pages/Vulnerabilities.tsx:113` |
+| 30 | `agentSummaryStatus` | **Wired** | L505 | `client/src/pages/AgentHealth.tsx:92`, `client/src/pages/Home.tsx:243`, `client/src/pages/ThreatHunting.tsx:248` |
+| 31 | `agentSummaryOs` | **Wired** | L509 | `client/src/pages/AgentHealth.tsx:93` |
+| 32 | `agentsSummary` | **Wired** | L517 | `client/src/pages/Home.tsx:252` |
+| 33 | `agentOverview` | **Wired** | L530 | `client/src/pages/Home.tsx:251` |
+| 34 | `agentById` | **Wired** | L534 | `client/src/pages/AgentCompare.tsx:437`, `client/src/pages/AgentDetail.tsx:1718`, `client/src/pages/AgentHealth.tsx:135` |
+| 35 | `agentKey` | **Wired** | L546 | `client/src/pages/AgentDetail.tsx:1043` |
+| 36 | `agentDaemonStats` | **Wired** | L583 | `client/src/pages/AgentDetail.tsx:1035` |
+| 37 | `agentStats` | **Wired** | L597 | `client/src/pages/AgentDetail.tsx:1029` |
+| 38 | `agentConfig` | **Wired** | L603 | `client/src/pages/AgentDetail.tsx:1022` |
+| 39 | `agentsUpgradeResult` | **Wired** | L617 | `client/src/pages/AgentHealth.tsx:128` |
+| 40 | `agentsUninstallPermission` | **Wired** | L647 | `client/src/pages/Status.tsx:585` |
+| 41 | `agentGroupSync` | **Wired** | L653 | `client/src/pages/AgentDetail.tsx:68` |
+| 42 | `apiInfo` | **Wired** | L661 | `client/src/pages/Status.tsx:541` |
+| 43 | `agentGroups` | **Wired** | L669 | `client/src/pages/AgentHealth.tsx:94`, `client/src/pages/GroupManagement.tsx:66` |
+| 44 | `agentsOutdated` | **Wired** | L695 | `client/src/pages/AgentHealth.tsx:115`, `client/src/pages/GroupManagement.tsx:70` |
+| 45 | `agentsNoGroup` | **Wired** | L711 | `client/src/pages/AgentHealth.tsx:116`, `client/src/pages/GroupManagement.tsx:79` |
+| 46 | `agentsStatsDistinct` | **Wired** | L727 | `client/src/pages/GroupManagement.tsx:88` |
+| 47 | `agentGroupMembers` | **Wired** | L749 | `client/src/pages/GroupManagement.tsx:96` |
+| 48 | `agentOs` | **Wired** | L775 | `client/src/pages/AgentDetail.tsx:64`, `client/src/pages/AgentHealth.tsx:136` |
+| 49 | `agentHardware` | **Wired** | L787 | `client/src/pages/AgentDetail.tsx:65`, `client/src/pages/AgentHealth.tsx:137` |
+| 50 | `agentPackages` | **Wired** | L799 | `client/src/components/DriftComparison.tsx:446`, `client/src/pages/AgentDetail.tsx:650`, `client/src/pages/ITHygiene.tsx:112` |
+| 51 | `agentPorts` | **Wired** | L828 | `client/src/pages/AgentDetail.tsx:651`, `client/src/pages/ITHygiene.tsx:116` |
+| 52 | `agentProcesses` | **Wired** | L860 | `client/src/pages/AgentDetail.tsx:652`, `client/src/pages/ITHygiene.tsx:120` |
+| 53 | `agentNetaddr` | **Wired** | L898 | `client/src/pages/AgentDetail.tsx:654`, `client/src/pages/ITHygiene.tsx:128` |
+| 54 | `agentNetiface` | **Wired** | L923 | `client/src/pages/AgentDetail.tsx:653`, `client/src/pages/ITHygiene.tsx:124` |
+| 55 | `agentHotfixes` | **Wired** | L956 | `client/src/pages/ITHygiene.tsx:136` |
+| 56 | `groupFiles` | **Wired** | L977 | `client/src/pages/GroupManagement.tsx:104` |
+| 57 | `agentBrowserExtensions` | **Wired** | L1004 | `client/src/pages/ITHygiene.tsx:142` |
+| 58 | `agentServices` | **Wired** | L1027 | `client/src/components/DriftComparison.tsx:455`, `client/src/pages/ITHygiene.tsx:148` |
+| 59 | `agentUsers` | **Wired** | L1054 | `client/src/components/DriftComparison.tsx:464`, `client/src/pages/ITHygiene.tsx:154` |
+| 60 | `agentGroups2` | **Wired** | L1077 | `client/src/pages/ITHygiene.tsx:158` |
+| 61 | `agentNetproto` | **Wired** | L1100 | `client/src/pages/ITHygiene.tsx:132` |
+| 62 | `expSyscollectorPackages` | **Wired** | L1132 | `client/src/pages/FleetInventory.tsx:226` |
+| 63 | `expSyscollectorProcesses` | **Wired** | L1155 | `client/src/pages/FleetInventory.tsx:227` |
+| 64 | `expSyscollectorPorts` | **Wired** | L1187 | `client/src/pages/FleetInventory.tsx:228` |
+| 65 | `expSyscollectorNetaddr` | **Wired** | L1213 | `client/src/pages/FleetInventory.tsx:232` |
+| 66 | `expSyscollectorNetiface` | **Wired** | L1235 | `client/src/pages/FleetInventory.tsx:233` |
+| 67 | `expSyscollectorNetproto` | **Wired** | L1266 | `client/src/pages/FleetInventory.tsx:234` |
+| 68 | `expSyscollectorOs` | **Wired** | L1284 | `client/src/pages/FleetInventory.tsx:229` |
+| 69 | `expSyscollectorHardware` | **Wired** | L1302 | `client/src/pages/FleetInventory.tsx:230` |
+| 70 | `expSyscollectorHotfixes` | **Wired** | L1320 | `client/src/pages/FleetInventory.tsx:231` |
+| 71 | `expCiscatResults` | **Wired** | L1344 | `client/src/pages/Compliance.tsx:190` |
+| 72 | `rules` | **Wired** | L1382 | `client/src/pages/Home.tsx:247`, `client/src/pages/MitreAttack.tsx:123`, `client/src/pages/RulesetExplorer.tsx:229`, `client/src/pages/SiemEvents.tsx:113`, `client/src/pages/ThreatHunting.tsx:249` |
+| 73 | `ruleGroups` | **Wired** | L1417 | `client/src/pages/RulesetExplorer.tsx:237` |
+| 74 | `rulesByRequirement` | **Wired** | L1431 | `client/src/pages/RulesetExplorer.tsx:270` |
+| 75 | `rulesFiles` | **Wired** | L1447 | `client/src/pages/RulesetExplorer.tsx:242` |
+| 76 | `ruleFileContent` | **Wired** | L1468 | `client/src/pages/RulesetExplorer.tsx:82` |
+| 77 | `mitreTactics` | **Wired** | L1486 | `client/src/pages/Home.tsx:249`, `client/src/pages/MitreAttack.tsx:120` |
+| 78 | `mitreTechniques` | **Wired** | L1511 | `client/src/pages/MitreAttack.tsx:121` |
+| 79 | `mitreMitigations` | **Wired** | L1532 | `client/src/pages/MitreAttack.tsx:133` |
+| 80 | `mitreSoftware` | **Wired** | L1550 | `client/src/pages/MitreAttack.tsx:129` |
+| 81 | `mitreGroups` | **Wired** | L1568 | `client/src/pages/MitreAttack.tsx:122` |
+| 82 | `mitreMetadata` | **Wired** | L1586 | `client/src/pages/MitreAttack.tsx:124` |
+| 83 | `mitreReferences` | **Wired** | L1588 | `client/src/pages/MitreAttack.tsx:137` |
+| 84 | `scaPolicies` | **Wired** | L1621 | `client/src/pages/AgentCompare.tsx:442`, `client/src/pages/AgentDetail.tsx:66`, `client/src/pages/Compliance.tsx:172` |
+| 85 | `scaChecks` | **Wired** | L1654 | `client/src/pages/Compliance.tsx:173` |
+| 86 | `ciscatResults` | **Wired** | L1699 | `client/src/pages/AgentDetail.tsx:1543` |
+| 87 | `syscheckFiles` | **Wired** | L1740 | `client/src/pages/AgentDetail.tsx:567`, `client/src/pages/AgentDetail.tsx:802`, `client/src/pages/FileIntegrity.tsx:74` |
+| 88 | `syscheckLastScan` | **Wired** | L1775 | `client/src/pages/AgentDetail.tsx:67`, `client/src/pages/AgentDetail.tsx:573`, `client/src/pages/FileIntegrity.tsx:78` |
+| 89 | `rootcheckResults` | **Wired** | L1790 | `client/src/pages/AgentDetail.tsx:1316` |
+| 90 | `rootcheckLastScan` | **Wired** | L1816 | `client/src/pages/AgentDetail.tsx:1311` |
+| 91 | `decoders` | **Wired** | L1831 | `client/src/pages/RulesetExplorer.tsx:233` |
+| 92 | `decoderFiles` | **Wired** | L1855 | `client/src/pages/RulesetExplorer.tsx:246` |
+| 93 | `decoderParents` | **Wired** | L1876 | `client/src/pages/RulesetExplorer.tsx:263` |
+| 94 | `decoderFileContent` | **Wired** | L1893 | `client/src/pages/RulesetExplorer.tsx:83` |
+| 95 | `taskStatus` | **Wired** | L1913 | `client/src/pages/Status.tsx:590` |
+| 96 | `securityRoles` | **Wired** | L1946 | `client/src/pages/SecurityExplorer.tsx:209` |
+| 97 | `securityPolicies` | **Wired** | L1968 | `client/src/pages/SecurityExplorer.tsx:227` |
+| 98 | `securityUsers` | **Wired** | L1990 | `client/src/pages/SecurityExplorer.tsx:218` |
+| 99 | `securityUserById` | **Wired** | L2013 | `client/src/pages/SecurityExplorer.tsx:240` |
+| 100 | `securityRoleById` | **Wired** | L2021 | `client/src/pages/SecurityExplorer.tsx:239` |
+| 101 | `securityPolicyById` | **Wired** | L2029 | `client/src/pages/SecurityExplorer.tsx:241` |
+| 102 | `securityRuleById` | **Wired** | L2037 | `client/src/pages/SecurityExplorer.tsx:242` |
+| 103 | `securityConfig` | **Wired** | L2044 | `client/src/pages/Status.tsx:551` |
+| 104 | `securityCurrentUser` | **Wired** | L2057 | `client/src/pages/SecurityExplorer.tsx:236` |
+| 105 | `securityTokenInfo` | Unwired | L2071 | — |
+| 106 | `securityRbacRules` | **Wired** | L2079 | `client/src/pages/SecurityExplorer.tsx:200` |
+| 107 | `securityActions` | **Wired** | L2102 | `client/src/pages/SecurityExplorer.tsx:201` |
+| 108 | `securityResources` | **Wired** | L2116 | `client/src/pages/SecurityExplorer.tsx:207` |
+| 109 | `securityCurrentUserPolicies` | **Wired** | L2131 | `client/src/pages/SecurityExplorer.tsx:208` |
+| 110 | `lists` | **Wired** | L2136 | `client/src/pages/RulesetExplorer.tsx:250` |
+| 111 | `listsFiles` | **Wired** | L2155 | `client/src/pages/RulesetExplorer.tsx:254` |
+| 112 | `groupConfiguration` | **Wired** | L2175 | `client/src/pages/GroupManagement.tsx:100` |
+| 113 | `listsFileContent` | **Wired** | L2192 | `client/src/pages/RulesetExplorer.tsx:276` |
+| 114 | `groupFileContent` | **Wired** | L2207 | `client/src/pages/GroupManagement.tsx:108` |
+| 115 | `clusterNodeStatus` | **Wired** | L2228 | `client/src/pages/ClusterHealth.tsx:221` |
+| 116 | `clusterNodeConfiguration` | **Wired** | L2233 | `client/src/pages/ClusterHealth.tsx:225` |
+| 117 | `clusterNodeComponentConfig` | **Wired** | L2250 | `client/src/pages/ClusterHealth.tsx:267` |
+| 118 | `clusterNodeDaemonStats` | **Wired** | L2255 | `client/src/pages/ClusterHealth.tsx:229` |
+| 119 | `clusterNodeLogs` | **Wired** | L2270 | `client/src/pages/ClusterHealth.tsx:233` |
+| 120 | `clusterNodeLogsSummary` | **Wired** | L2290 | `client/src/pages/ClusterHealth.tsx:237` |
+| 121 | `clusterNodeStatsAnalysisd` | **Wired** | L2295 | `client/src/pages/ClusterHealth.tsx:241` |
+| 122 | `clusterNodeStatsRemoted` | **Wired** | L2300 | `client/src/pages/ClusterHealth.tsx:245` |
+| 123 | `clusterNodeStatsWeekly` | **Wired** | L2305 | `client/src/pages/ClusterHealth.tsx:249` |
+| 124 | `brokerCoverage` | **Wired** | L2317 | `client/src/pages/BrokerCoverage.tsx:304` |
+| 125 | `brokerPlayground` | **Wired** | L2327 | `client/src/pages/BrokerPlayground.tsx:398` |
+| 126 | `brokerConfigList` | **Wired** | L2358 | `client/src/pages/BrokerPlayground.tsx:397` |
+| 127 | `cacheStats` | **Wired** | L2382 | `client/src/pages/ClusterHealth.tsx:644` |
+| 128 | `cacheClear` | **Wired** | L2386 | `client/src/pages/ClusterHealth.tsx:645` |
+| 129 | `cacheSetTtl` | **Wired** | L2393 | `client/src/pages/ClusterHealth.tsx:647` |
+| 130 | `cacheSetEnabled` | **Wired** | L2401 | `client/src/pages/ClusterHealth.tsx:646` |
+
+## Unwired Procedures
+
+- `remoted` (router L294)
+- `securityTokenInfo` (router L2071)
 
 ---
 

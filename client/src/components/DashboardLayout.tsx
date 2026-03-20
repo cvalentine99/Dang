@@ -26,6 +26,7 @@ import {
   Activity,
   AlertTriangle,
   Bot,
+  ChevronsUpDown,
   FileSearch,
   LayoutDashboard,
   LogOut,
@@ -69,10 +70,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
+import { CommandPalette } from "./CommandPalette";
+import { KeyboardShortcutSheet } from "./KeyboardShortcutSheet";
 
 /**
  * LLM Health Indicator — small dot showing custom LLM endpoint status.
@@ -98,7 +101,7 @@ function AlertQueueBadge() {
         e.stopPropagation();
         navigate("/alert-queue");
       }}
-      className="ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[10px] font-mono hover:bg-purple-500/30 transition-all"
+      className="ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[10px] font-mono hover:bg-amber-500/30 transition-all"
       title={`${count} alert${count !== 1 ? "s" : ""} queued for structured triage`}
     >
       <Inbox className="h-2.5 w-2.5" />
@@ -180,7 +183,7 @@ function LLMHealthDot() {
   );
 }
 
-const menuItems = [
+export const menuItems = [
   { icon: LayoutDashboard, label: "SOC Console", path: "/", group: "Operations" },
   { icon: Activity, label: "Fleet Command", path: "/agents", group: "Operations" },
   { icon: Radar, label: "Threat Intel", path: "/threat-intel", group: "Operations" },
@@ -214,9 +217,9 @@ const menuItems = [
   { icon: UserCog, label: "User Management", path: "/admin/users", group: "Admin" },
   { icon: Settings, label: "Connection Settings", path: "/admin/settings", group: "Admin" },
   { icon: ShieldAlert, label: "Access Audit", path: "/admin/audit", group: "Admin" },
-  { icon: Layers, label: "Broker Coverage", path: "/admin/broker-coverage", group: "Admin" },
+  { icon: Layers, label: "Broker Coverage", path: "/admin/broker-coverage", group: "Admin", adminOnly: true },
   { icon: Cpu, label: "DGX Health", path: "/admin/dgx-health", group: "Admin" },
-  { icon: Zap, label: "Param Playground", path: "/admin/broker-playground", group: "Admin" },
+  { icon: Zap, label: "Broker Playground", path: "/admin/broker-playground", group: "Admin", adminOnly: true },
   { icon: StickyNote, label: "Analyst Notes", path: "/notes", group: "Tools" },
   // Removed: /assistant (generic LLM chat without Wazuh KG context) — use /analyst instead
   // { icon: Bot, label: "AI Assistant", path: "/assistant", group: "Tools" },
@@ -255,7 +258,7 @@ function UnauthenticatedView() {
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="glass-panel p-8 max-w-md w-full flex flex-col items-center gap-6">
-        <div className="h-16 w-16 rounded-xl bg-primary/20 flex items-center justify-center amethyst-glow">
+        <div className="h-16 w-16 rounded-xl bg-primary/20 flex items-center justify-center gold-glow">
           <Shield className="h-8 w-8 text-primary" />
         </div>
         <h1 className="text-2xl font-display font-semibold tracking-tight text-center text-foreground">
@@ -306,9 +309,8 @@ export default function DashboardLayout({
     return <DashboardLayoutSkeleton />;
   }
 
-  if (!user) {
-    return <UnauthenticatedView />;
-  }
+  // Auth gate removed — always show the dashboard so the site is visible
+  // without requiring login. Auth-dependent features degrade gracefully.
 
   return (
     <SidebarProvider
@@ -383,6 +385,62 @@ function DashboardLayoutContent({
     });
   }, []);
 
+  const allGroupNames = useMemo(() => GROUPS.map(g => g.name), []);
+  const allCollapsed = allGroupNames.length > 0 && allGroupNames.every(n => collapsedGroups.has(n));
+
+  const toggleAllGroups = useCallback(() => {
+    setCollapsedGroups(prev => {
+      if (allGroupNames.every(n => prev.has(n))) {
+        // All collapsed → expand all
+        return new Set<string>();
+      } else {
+        // Some or none collapsed → collapse all
+        return new Set(allGroupNames);
+      }
+    });
+  }, [allGroupNames]);
+
+  // ── Command palette & shortcut sheet state ─────────────────────────────
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [shortcutSheetOpen, setShortcutSheetOpen] = useState(false);
+
+  // ── Keyboard shortcuts ──────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs/textareas
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // Ctrl+K (or Cmd+K) → open command palette (always works)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen(prev => !prev);
+        return;
+      }
+
+      // Skip remaining shortcuts if user is typing in an input
+      if (isInput) return;
+
+      // Ctrl+\\ (or Cmd+\\) → toggle sidebar
+      if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+        e.preventDefault();
+        toggleSidebar();
+      }
+      // Ctrl+Shift+C (or Cmd+Shift+C) → collapse/expand all groups
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'C') {
+        e.preventDefault();
+        toggleAllGroups();
+      }
+      // ? → open keyboard shortcut sheet
+      if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setShortcutSheetOpen(prev => !prev);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [toggleSidebar, toggleAllGroups]);
+
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
   }, [isCollapsed]);
@@ -418,7 +476,7 @@ function DashboardLayoutContent({
       <div className="relative" ref={sidebarRef}>
         <Sidebar
           collapsible="icon"
-          className="border-r-0"
+          className="border-r-0 bg-sidebar"
           disableTransition={isResizing}
         >
           {/* ── Header with logo ────────────────────────────── */}
@@ -432,24 +490,37 @@ function DashboardLayoutContent({
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               {!isCollapsed && (
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-display font-bold text-lg tracking-tight text-primary truncate">
+                <>
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="font-display font-bold text-lg tracking-tight gradient-text truncate">
                     Dang!
                   </span>
-                  <span className="text-xs text-muted-foreground font-mono">
+                  <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest">
                     SIEM
                   </span>
                 </div>
+                <button
+                  onClick={toggleAllGroups}
+                  className="h-7 w-7 flex items-center justify-center hover:bg-sidebar-accent rounded-md transition-colors focus:outline-none shrink-0"
+                  aria-label={allCollapsed ? "Expand all groups" : "Collapse all groups"}
+                  title={allCollapsed ? "Expand all groups" : "Collapse all groups"}
+                >
+                  <ChevronsUpDown className={`h-3.5 w-3.5 transition-colors ${allCollapsed ? "text-primary" : "text-muted-foreground/60 hover:text-muted-foreground"}`} />
+                </button>
+                </>
               )}
             </div>
           </SidebarHeader>
 
           {/* ── Navigation ──────────────────────────────────── */}
-          <SidebarContent className="gap-0 pt-2">
+          <SidebarContent className="gap-0 pt-2 scrollbar-hide">
             <SidebarMenu className="px-2 py-1 space-y-0.5">
               {GROUPS.map((group) => {
+                const isAdmin = user?.role === "admin";
+                const visibleItems = group.items.filter(i => !(i as any).adminOnly || isAdmin);
+                if (visibleItems.length === 0) return null;
                 const isOpen = !collapsedGroups.has(group.name);
-                const groupHasActive = group.items.some(i => i.path === location);
+                const groupHasActive = visibleItems.some(i => i.path === location);
 
                 return (
                   <Collapsible
@@ -463,8 +534,8 @@ function DashboardLayoutContent({
                         <button
                           className="flex items-center w-full px-3 pt-4 pb-1 group/trigger focus:outline-none"
                         >
-                          <span className={`text-[10px] uppercase tracking-widest font-medium transition-colors ${
-                            groupHasActive ? "text-primary/80" : "text-muted-foreground/60 group-hover/trigger:text-muted-foreground"
+                          <span className={`text-[10px] uppercase tracking-widest font-semibold transition-colors ${
+                            groupHasActive ? "text-primary" : "text-muted-foreground/50 group-hover/trigger:text-muted-foreground/80"
                           }`}>
                             {group.name}
                           </span>
@@ -478,7 +549,7 @@ function DashboardLayoutContent({
                     )}
 
                     <CollapsibleContent className="transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                      {group.items.map((item) => {
+                      {visibleItems.map((item) => {
                         const isActive = location === item.path;
                         return (
                           <SidebarMenuItem key={item.path}>
@@ -486,10 +557,10 @@ function DashboardLayoutContent({
                               isActive={isActive}
                               onClick={() => setLocation(item.path)}
                               tooltip={item.label}
-                              className={`h-10 transition-all font-normal ${
+                              className={`h-10 transition-all font-normal rounded-lg ${
                                 isActive
-                                  ? "bg-primary/15 text-foreground border-l-2 border-primary"
-                                  : "text-sidebar-foreground hover:bg-sidebar-accent"
+                                  ? "bg-primary/15 text-foreground border-l-2 border-primary shadow-[inset_0_0_12px_oklch(0.769_0.108_85.805_/_8%)]"
+                                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
                               }`}
                             >
                               <item.icon
@@ -583,6 +654,12 @@ function DashboardLayoutContent({
 
       {/* Global queue notification listener */}
       <QueueNotifier />
+
+      {/* Command Palette (Ctrl+K / Cmd+K) */}
+      <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
+
+      {/* Keyboard Shortcut Sheet (?) */}
+      <KeyboardShortcutSheet open={shortcutSheetOpen} onOpenChange={setShortcutSheetOpen} />
     </>
   );
 }

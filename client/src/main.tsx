@@ -14,13 +14,13 @@ const queryClient = new QueryClient();
  * No Manus OAuth. No external auth providers.
  */
 const redirectToLoginIfUnauthorized = (error: unknown) => {
-  if (!(error instanceof TRPCClientError)) return;
-  if (typeof window === "undefined") return;
-
-  const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
-  if (!isUnauthorized) return;
-
-  window.location.href = "/login";
+  if (
+    error instanceof TRPCClientError &&
+    error.message === UNAUTHED_ERR_MSG &&
+    !window.location.pathname.startsWith("/login")
+  ) {
+    window.location.href = "/login";
+  }
 };
 
 queryClient.getQueryCache().subscribe(event => {

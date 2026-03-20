@@ -314,6 +314,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       "content-type": "application/json",
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(120_000), // 2 minute timeout for large model inference
   });
 
   if (!response.ok) {

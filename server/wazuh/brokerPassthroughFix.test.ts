@@ -169,9 +169,9 @@ describe("Truthful classification — 4 previously-overstated endpoints", () => 
       }
     });
 
-    it("broker coverage is truthful — less than 100% since not all procedures call brokerParams()", () => {
+    it("broker coverage is truthful — less than 100% due to passthrough endpoints", () => {
       expect(report.passthrough).toBeGreaterThan(0);
-      expect(report.manualParam).toBeGreaterThan(0);
+      expect(report.manualParam).toBe(0);
       expect(report.brokerCoveragePercent).toBeLessThan(100);
       // Broker + manual + passthrough = total
       expect(report.brokerWired + report.manualParam + report.passthrough).toBe(report.totalProcedures);

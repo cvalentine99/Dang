@@ -45,7 +45,7 @@ services:
     container_name: dang-llm
     restart: unless-stopped
     ports:
-      - "${LLM_EXTERNAL_PORT:-8080}:8080"
+      - "127.0.0.1:${LLM_EXTERNAL_PORT:-8080}:8080"
     volumes:
       - llm-models:/models
     environment:

@@ -25,10 +25,10 @@ export function AnomalyDetailPanel({
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
         className="relative w-full max-w-lg overflow-y-auto border-l shadow-2xl"
-        style={{ background: "oklch(0.14 0.025 286)", borderColor: BORDER }}
+        style={{ background: "oklch(0.14 0.025 60)", borderColor: BORDER }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b px-5 py-4" style={{ background: "oklch(0.14 0.025 286)", borderColor: BORDER }}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b px-5 py-4" style={{ background: "oklch(0.14 0.025 60)", borderColor: BORDER }}>
           <h3 className="font-display text-sm font-semibold flex items-center gap-2">
             <TriangleAlert className="h-4 w-4" style={{ color: RED }} />
             Anomaly Detail
@@ -46,7 +46,7 @@ export function AnomalyDetailPanel({
           ) : anomaly ? (
             (() => {
               const a = anomaly;
-              const sevColor = a.severity === "critical" ? RED : a.severity === "high" ? "oklch(0.705 0.191 22.216)" : AMBER;
+              const sevColor = a.severity === "critical" ? RED : a.severity === "high" ? "oklch(0.705 0.213 47.604)" : AMBER;
               const byCat = a.byCategory as { packages: { added: number; removed: number; changed: number }; services: { added: number; removed: number; changed: number }; users: { added: number; removed: number; changed: number } } | null;
               const topItems = (a.topDriftItems as Array<{ category: string; agentId: string; name: string; changeType: string; previousValue?: string; currentValue?: string }>) || [];
 
@@ -87,7 +87,7 @@ export function AnomalyDetailPanel({
                     </div>
                     <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER }}>
                       <div className="text-[10px] uppercase" style={{ color: MUTED }}>Z-Score</div>
-                      <div className="font-display text-2xl font-bold" style={{ color: "oklch(0.9 0.005 286)" }}>
+                      <div className="font-display text-2xl font-bold" style={{ color: "oklch(0.9 0.005 60)" }}>
                         {a.zScore.toFixed(2)}σ
                       </div>
                     </div>
@@ -105,15 +105,15 @@ export function AnomalyDetailPanel({
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between">
                         <span style={{ color: MUTED }}>Rolling Average</span>
-                        <span className="font-mono" style={{ color: "oklch(0.85 0.01 286)" }}>{a.rollingAvg.toFixed(2)}%</span>
+                        <span className="font-mono" style={{ color: "oklch(0.85 0.01 60)" }}>{a.rollingAvg.toFixed(2)}%</span>
                       </div>
                       <div className="flex justify-between">
                         <span style={{ color: MUTED }}>Standard Deviation</span>
-                        <span className="font-mono" style={{ color: "oklch(0.85 0.01 286)" }}>±{a.rollingStdDev.toFixed(2)}%</span>
+                        <span className="font-mono" style={{ color: "oklch(0.85 0.01 60)" }}>±{a.rollingStdDev.toFixed(2)}%</span>
                       </div>
                       <div className="flex justify-between">
                         <span style={{ color: MUTED }}>Expected Range</span>
-                        <span className="font-mono" style={{ color: "oklch(0.85 0.01 286)" }}>
+                        <span className="font-mono" style={{ color: "oklch(0.85 0.01 60)" }}>
                           {Math.max(0, a.rollingAvg - a.sigmaThreshold * a.rollingStdDev).toFixed(2)}% – {(a.rollingAvg + a.sigmaThreshold * a.rollingStdDev).toFixed(2)}%
                         </span>
                       </div>
@@ -123,7 +123,7 @@ export function AnomalyDetailPanel({
                       </div>
                       {/* Visual deviation bar */}
                       <div className="mt-2">
-                        <div className="h-3 rounded-full relative overflow-hidden" style={{ background: "oklch(0.2 0.02 286 / 50%)" }}>
+                        <div className="h-3 rounded-full relative overflow-hidden" style={{ background: "oklch(0.2 0.02 60 / 50%)" }}>
                           <div
                             className="absolute h-full rounded-full"
                             style={{
@@ -160,7 +160,7 @@ export function AnomalyDetailPanel({
                           const total = d.added + d.removed + d.changed;
                           return (
                             <div key={cat} className="flex items-center gap-3 text-xs">
-                              <span className="w-16 capitalize" style={{ color: "oklch(0.85 0.01 286)" }}>{cat}</span>
+                              <span className="w-16 capitalize" style={{ color: "oklch(0.85 0.01 60)" }}>{cat}</span>
                               <div className="flex gap-2 font-mono" style={{ color: MUTED }}>
                                 {d.added > 0 && <span style={{ color: GREEN }}>+{d.added}</span>}
                                 {d.changed > 0 && <span style={{ color: AMBER }}>~{d.changed}</span>}
@@ -183,7 +183,7 @@ export function AnomalyDetailPanel({
                           <div
                             key={i}
                             className="flex items-center gap-2 rounded border px-2 py-1.5 text-xs"
-                            style={{ borderColor: "oklch(0.25 0.02 286 / 30%)" }}
+                            style={{ borderColor: "oklch(0.25 0.02 60 / 30%)" }}
                           >
                             <span
                               className="shrink-0 rounded px-1 py-0.5 text-[10px] font-bold"
@@ -194,7 +194,7 @@ export function AnomalyDetailPanel({
                             >
                               {item.changeType === "added" ? "+" : item.changeType === "removed" ? "−" : "~"}
                             </span>
-                            <span className="font-mono truncate" style={{ color: "oklch(0.85 0.01 286)" }}>
+                            <span className="font-mono truncate" style={{ color: "oklch(0.85 0.01 60)" }}>
                               {item.name}
                             </span>
                             <span className="shrink-0 text-[10px]" style={{ color: MUTED }}>[{item.category}]</span>
@@ -207,7 +207,7 @@ export function AnomalyDetailPanel({
                   {/* Metadata */}
                   <div className="rounded-lg border p-3 text-xs" style={{ borderColor: BORDER }}>
                     <h4 className="font-semibold mb-1.5" style={{ color: MUTED }}>Metadata</h4>
-                    <div className="space-y-1 font-mono" style={{ color: "oklch(0.75 0.01 286)" }}>
+                    <div className="space-y-1 font-mono" style={{ color: "oklch(0.75 0.01 60)" }}>
                       <div>Anomaly ID: {a.id}</div>
                       <div>Snapshot ID: {a.snapshotId}</div>
                       <div>Schedule: {a.scheduleName} (ID: {a.scheduleId})</div>
@@ -229,7 +229,7 @@ export function AnomalyDetailPanel({
                     </summary>
                     <pre
                       className="mt-2 max-h-64 overflow-auto rounded-lg border p-3 font-mono text-[10px] leading-relaxed"
-                      style={{ background: "oklch(0.12 0.02 286)", borderColor: BORDER, color: "oklch(0.75 0.01 286)" }}
+                      style={{ background: "oklch(0.12 0.02 60)", borderColor: BORDER, color: "oklch(0.75 0.01 60)" }}
                     >
                       {JSON.stringify(a, null, 2)}
                     </pre>

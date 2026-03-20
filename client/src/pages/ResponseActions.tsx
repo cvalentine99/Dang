@@ -48,11 +48,11 @@ const CATEGORY_CONFIG: Record<string, { icon: LucideIcon; label: string; color: 
   block_ioc: { icon: ShieldX, label: "Block IOC", color: "text-red-400", guidance: "Add the IOC (IP/domain/hash) to firewall/proxy blocklists to prevent communication." },
   escalate_ir: { icon: AlertTriangle, label: "Escalate to IR", color: "text-yellow-400", guidance: "Escalate to the Incident Response team for hands-on investigation and containment." },
   suppress_alert: { icon: Bell, label: "Suppress Alert", color: "text-blue-400", guidance: "Suppress this alert rule to reduce noise. Verify it is a confirmed false positive first." },
-  tune_rule: { icon: Wrench, label: "Tune Rule", color: "text-violet-400", guidance: "Adjust detection rule thresholds or conditions to improve signal-to-noise ratio." },
+  tune_rule: { icon: Wrench, label: "Tune Rule", color: "text-amber-400", guidance: "Adjust detection rule thresholds or conditions to improve signal-to-noise ratio." },
   add_watchlist: { icon: Eye, label: "Add to Watchlist", color: "text-cyan-400", guidance: "Add the entity to a monitoring watchlist for enhanced visibility without blocking." },
   collect_evidence: { icon: Search, label: "Collect Evidence", color: "text-emerald-400", guidance: "Collect forensic artifacts (logs, memory dumps, disk images) for analysis." },
   notify_stakeholder: { icon: Bell, label: "Notify Stakeholder", color: "text-amber-400", guidance: "Notify relevant stakeholders (management, legal, compliance) about the incident." },
-  custom: { icon: Zap, label: "Custom Action", color: "text-violet-300", guidance: "Custom response action. Review the description for specific instructions." },
+  custom: { icon: Zap, label: "Custom Action", color: "text-amber-300", guidance: "Custom response action. Review the description for specific instructions." },
 };
 
 const STATE_CONFIG: Record<string, { icon: LucideIcon; color: string; bg: string; label: string }> = {
@@ -201,7 +201,7 @@ export default function ResponseActions() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold font-heading tracking-tight flex items-center gap-3">
-            <ShieldAlert className="h-7 w-7 text-violet-400" />
+            <ShieldAlert className="h-7 w-7 text-amber-400" />
             Response Actions
           </h1>
           <p className="text-sm text-muted-foreground/60 mt-1">
@@ -220,7 +220,7 @@ export default function ResponseActions() {
                 onClick={() => setViewMode(mode)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   viewMode === mode
-                    ? "bg-violet-500/20 border border-violet-500/40 text-violet-300"
+                    ? "bg-amber-500/20 border border-amber-500/40 text-amber-300"
                     : "bg-white/[0.03] border border-white/[0.06] text-muted-foreground/60 hover:bg-white/[0.06]"
                 }`}
               >
@@ -318,7 +318,7 @@ export default function ResponseActions() {
                 <Filter className="h-3.5 w-3.5" />
                 Filters
                 {activeFilterCount > 0 && (
-                  <span className="px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 text-[10px] font-mono">
+                  <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-mono">
                     {activeFilterCount}
                   </span>
                 )}
@@ -329,7 +329,7 @@ export default function ResponseActions() {
                 {activeFilterCount > 0 && (
                   <button
                     onClick={() => { setFilters({}); setPage(0); }}
-                    className="flex items-center gap-1 text-violet-400 hover:text-violet-300"
+                    className="flex items-center gap-1 text-amber-400 hover:text-amber-300"
                   >
                     <RotateCcw className="h-3 w-3" />
                     Clear
@@ -600,7 +600,7 @@ function ResponseActionCard({
               <ul className="space-y-1">
                 {(action.evidenceBasis as string[]).map((e: string, i: number) => (
                   <li key={i} className="text-xs text-foreground/60 flex items-start gap-2">
-                    <span className="text-violet-400 mt-0.5">•</span>
+                    <span className="text-amber-400 mt-0.5">•</span>
                     <span>{e}</span>
                   </li>
                 ))}
@@ -684,7 +684,7 @@ function ResponseActionCard({
                   <label className="text-[10px] text-muted-foreground/40 mb-1 block uppercase tracking-wider">Linked Agents</label>
                   <div className="flex flex-wrap gap-1">
                     {(action.linkedAgentIds as string[]).map((id: string) => (
-                      <span key={id} className="px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-300 text-[10px] font-mono">{id}</span>
+                      <span key={id} className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-mono">{id}</span>
                     ))}
                   </div>
                 </div>
@@ -708,7 +708,7 @@ function ResponseActionCard({
           {/* Lineage Links */}
           <div className="flex items-center gap-4 text-[10px]">
             {action.caseId && (
-              <a href={`/living-cases/${action.caseId}`} className="text-violet-400 hover:text-violet-300 hover:underline transition-colors">
+              <a href={`/living-cases/${action.caseId}`} className="text-amber-400 hover:text-amber-300 hover:underline transition-colors">
                 Case #{action.caseId}
               </a>
             )}
@@ -788,7 +788,7 @@ function ResponseActionCard({
               <button
                 onClick={onRepropose}
                 disabled={isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/15 border border-violet-500/30 text-violet-300 text-xs font-medium hover:bg-violet-500/25 transition-all disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-medium hover:bg-amber-500/25 transition-all disabled:opacity-50"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 Re-propose
@@ -909,7 +909,7 @@ function StatsView({ stats }: { stats: any }) {
       {/* By State */}
       <GlassPanel className="p-5">
         <h3 className="text-sm font-semibold text-foreground/80 mb-4 flex items-center gap-2">
-          <ArrowUpDown className="h-4 w-4 text-violet-400" />
+          <ArrowUpDown className="h-4 w-4 text-amber-400" />
           Actions by State
         </h3>
         <div className="grid grid-cols-5 gap-3">
@@ -932,7 +932,7 @@ function StatsView({ stats }: { stats: any }) {
       {/* By Category */}
       <GlassPanel className="p-5">
         <h3 className="text-sm font-semibold text-foreground/80 mb-4 flex items-center gap-2">
-          <Shield className="h-4 w-4 text-violet-400" />
+          <Shield className="h-4 w-4 text-amber-400" />
           Actions by Category
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -956,7 +956,7 @@ function StatsView({ stats }: { stats: any }) {
       {/* By Urgency */}
       <GlassPanel className="p-5">
         <h3 className="text-sm font-semibold text-foreground/80 mb-4 flex items-center gap-2">
-          <Zap className="h-4 w-4 text-violet-400" />
+          <Zap className="h-4 w-4 text-amber-400" />
           Actions by Urgency
         </h3>
         <div className="grid grid-cols-4 gap-3">
@@ -1001,7 +1001,7 @@ function AuditLogView() {
         {/* Header */}
         <div className="p-4 border-b border-white/[0.06]">
           <h3 className="text-sm font-semibold text-foreground/80 flex items-center gap-2">
-            <History className="h-4 w-4 text-violet-400" />
+            <History className="h-4 w-4 text-amber-400" />
             Full Audit Log
           </h3>
           <p className="text-[10px] text-muted-foreground/40 mt-1">
@@ -1045,7 +1045,7 @@ function AuditLogView() {
                       <td className="p-3 font-mono text-muted-foreground/50">
                         {new Date(entry.performedAt).toLocaleString()}
                       </td>
-                      <td className="p-3 font-mono text-violet-300/70">{entry.actionIdStr}</td>
+                      <td className="p-3 font-mono text-amber-300/70">{entry.actionIdStr}</td>
                       <td className="p-3">
                         <span className={fromConfig ? fromConfig.color : "text-muted-foreground/40"}>
                           {entry.fromState}

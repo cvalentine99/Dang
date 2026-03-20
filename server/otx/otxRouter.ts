@@ -153,10 +153,10 @@ export const otxRouter = router({
         return { configured: false, data: null };
       }
 
-      // URL indicators need encoding
-      const encodedValue = input.type === "url"
-        ? encodeURIComponent(input.value)
-        : input.value;
+      // Encode all indicator values for safe path construction.
+      // Previously only URL type was encoded, leaving other types
+      // vulnerable to path traversal via crafted indicator values.
+      const encodedValue = encodeURIComponent(input.value);
 
       const data = await otxGet(
         `/api/v1/indicators/${input.type}/${encodedValue}/${input.section}`,

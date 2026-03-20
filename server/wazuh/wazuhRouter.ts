@@ -93,12 +93,14 @@ import {
   RULES_BY_REQUIREMENT_CONFIG,
   GROUP_CONFIGURATION_CONFIG,
   LISTS_FILE_CONTENT_CONFIG,
-  // Batch 2 promotion — alias-required manual → broker (3 endpoints)
+  // Batch 2 promotion — final 5 manual → broker
   MANAGER_DAEMON_STATS_CONFIG,
   AGENTS_UPGRADE_RESULT_CONFIG,
+  RULE_FILE_CONTENT_CONFIG,
+  SECURITY_RESOURCES_CONFIG,
   GROUP_FILE_CONTENT_CONFIG,
 } from "./paramBroker";
-import { generateCoverageReport, BROKER_CONFIG_REGISTRY } from "./brokerCoverage";
+import { generateCoverageReport, BROKER_CONFIG_REGISTRY, getRuntimeWiredConfigs } from "./brokerCoverage";
 
 // ── Per-request user context for rate limiting ──────────────────────────────
 // AsyncLocalStorage carries the authenticated user's ID through the call stack
@@ -232,11 +234,11 @@ export const wazuhRouter = router({
   }),
 
   isConfigured: wazuhProcedure.query(async () => {
-    const configured = await isWazuhEffectivelyConfigured();
+    const config = await getEffectiveWazuhConfig();
     return {
-      configured,
-      host: process.env.WAZUH_HOST ?? null,
-      port: process.env.WAZUH_PORT ?? "55000",
+      configured: config !== null,
+      host: config?.host ?? null,
+      port: String(config?.port ?? "55000"),
     };
   }),
 
@@ -291,10 +293,10 @@ export const wazuhRouter = router({
   analysisd: wazuhProcedure.query(() => proxyGet("/manager/stats/analysisd")),
   remoted: wazuhProcedure.query(() => proxyGet("/manager/stats/remoted")),
 
-  // ── Manager daemon stats (4.14+ enhanced, broker-wired via alias: daemons → daemons_list) ──
+  // ── Manager daemon stats (4.14+ enhanced) ─────────────────────────────────
   daemonStats: wazuhProcedure
     .input(z.object({
-      daemons: z.array(z.string()).optional(),
+      daemons: z.union([z.string(), z.array(z.string())]).optional(),
     }).optional())
     .query(({ input }) => {
       if (!input) return proxyGet("/manager/daemons/stats");
@@ -1470,10 +1472,12 @@ export const wazuhRouter = router({
       get_dirnames_path: z.string().optional(),
     }))
     .query(({ input }) => {
-      const params: Record<string, string | boolean> = {};
-      if (input.raw !== undefined) params.raw = input.raw;
-      if (input.get_dirnames_path) params.get_dirnames_path = input.get_dirnames_path;
-      return proxyGet(`/rules/files/${input.filename}`, params);
+      const { filename, ...rest } = input;
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(RULE_FILE_CONTENT_CONFIG, rest);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /rules/files/{filename}: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet(`/rules/files/${filename}`, forwardedQuery), errors);
     }),
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -2112,9 +2116,12 @@ export const wazuhRouter = router({
   securityResources: wazuhProcedure
     .input(z.object({ resource: z.string().optional() }).optional())
     .query(({ input }) => {
-      const params: Record<string, string> = {};
-      if (input?.resource) params.resource_list = input.resource;
-      return proxyGet("/security/resources", params);
+      if (!input) return proxyGet("/security/resources");
+      const { forwardedQuery, unsupportedParams, errors } = brokerParams(SECURITY_RESOURCES_CONFIG, input);
+      if (unsupportedParams.length > 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /security/resources: ${unsupportedParams.join(", ")}` });
+      }
+      return withBrokerWarnings(proxyGet("/security/resources", forwardedQuery), errors);
     }),
 
   /**
@@ -2196,7 +2203,7 @@ export const wazuhRouter = router({
       return withBrokerWarnings(proxyGet(`/lists/files/${filename}`, forwardedQuery), errors);
     }),
 
-  /** GET /groups/{group_id}/files/{file_name} — Specific group file content (broker-wired via alias: type_agents → type) */
+  /** GET /groups/{group_id}/files/{file_name} — Specific group file content (M-11 expanded) */
   groupFileContent: wazuhProcedure
     .input(z.object({
       groupId: groupIdSchema,
@@ -2307,7 +2314,7 @@ export const wazuhRouter = router({
    * Returns coverage metrics, per-endpoint wiring levels, and broker config summaries.
    * No Wazuh API calls are made — this is pure server-side introspection.
    */
-  brokerCoverage: protectedProcedure
+  brokerCoverage: adminProcedure
     .query(() => {
       return generateCoverageReport();
     }),
@@ -2317,7 +2324,7 @@ export const wazuhRouter = router({
    * Returns the broker result (forwarded, unsupported, errors) without making
    * any actual Wazuh API call. Pure server-side validation.
    */
-  brokerPlayground: protectedProcedure
+  brokerPlayground: adminProcedure
     .input(z.object({
       configName: z.string(),
       params: z.record(z.string(), z.unknown()),
@@ -2348,12 +2355,14 @@ export const wazuhRouter = router({
     }),
 
   /** List all available broker configs for the playground dropdown */
-  brokerConfigList: protectedProcedure
+  brokerConfigList: adminProcedure
     .query(() => {
+      const wiredConfigs = getRuntimeWiredConfigs();
       return BROKER_CONFIG_REGISTRY.map(e => ({
         name: e.name,
         endpoint: e.config.endpoint,
         paramCount: Object.keys(e.config.params).length,
+        isWiredAtRuntime: wiredConfigs.has(e.name),
         params: Object.entries(e.config.params).map(([key, def]) => ({
           key,
           wazuhName: def.wazuhName,

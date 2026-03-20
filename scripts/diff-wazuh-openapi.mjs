@@ -27,16 +27,29 @@
  *   - Human-readable summary to stdout
  *   - JSON artifact to spec/openapi-diff-result.json
  */
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { resolve, dirname } from "path";
+import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
+import { resolve, dirname, join } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
 
+// ── Discover newest spec file ───────────────────────────────────────────────
+function findNewestSpec() {
+  const specDir = join(projectRoot, "spec");
+  try {
+    const files = readdirSync(specDir)
+      .filter(f => f.startsWith("wazuh-api-v") && f.endsWith(".yaml"))
+      .sort()
+      .reverse();
+    if (files.length > 0) return resolve(specDir, files[0]);
+  } catch { /* ignore */ }
+  return null;
+}
+
 // ── Parse args ──────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
-let specPath = resolve(projectRoot, "spec/wazuh-api-v4.14.3.yaml");
+let specPath = findNewestSpec();
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--spec" && args[i + 1]) {
     specPath = resolve(args[i + 1]);
@@ -45,10 +58,9 @@ for (let i = 0; i < args.length; i++) {
 }
 
 // ── Load spec ───────────────────────────────────────────────────────────────
-if (!existsSync(specPath)) {
-  console.error(`ERROR: Spec file not found at ${specPath}`);
-  console.error("Download it with:");
-  console.error('  curl -sL "https://raw.githubusercontent.com/wazuh/wazuh/v4.14.3/api/api/spec/spec.yaml" -o spec/wazuh-api-v4.14.3.yaml');
+if (!specPath || !existsSync(specPath)) {
+  console.error(`ERROR: No spec file found in spec/ directory`);
+  console.error("Place a Wazuh OpenAPI spec as spec/wazuh-api-v<VERSION>.yaml");
   process.exit(1);
 }
 

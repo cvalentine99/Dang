@@ -77,7 +77,7 @@ const EFFORT_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 const ACTION_STATE_CONFIG: Record<string, { icon: typeof CheckSquare; color: string; label: string }> = {
-  proposed: { icon: CircleDot, color: "text-violet-400", label: "Proposed" },
+  proposed: { icon: CircleDot, color: "text-amber-400", label: "Proposed" },
   approved: { icon: CheckSquare, color: "text-emerald-400", label: "Approved" },
   rejected: { icon: XSquare, color: "text-red-400", label: "Rejected" },
   deferred: { icon: PauseCircle, color: "text-yellow-400", label: "Deferred" },
@@ -89,8 +89,8 @@ const TIMELINE_SOURCE_COLORS: Record<string, string> = {
   wazuh_vuln: "border-l-yellow-500/60",
   wazuh_agent: "border-l-blue-500/60",
   wazuh_sca: "border-l-cyan-500/60",
-  threat_intel: "border-l-purple-500/60",
-  llm_inference: "border-l-violet-500/60",
+  threat_intel: "border-l-amber-500/60",
+  llm_inference: "border-l-amber-500/60",
   analyst_input: "border-l-emerald-500/60",
   system_computed: "border-l-slate-500/60",
 };
@@ -119,16 +119,16 @@ function WorkingTheoryCard({ theory }: { theory: any }) {
   if (!theory) return null;
 
   return (
-    <GlassPanel className="p-0 overflow-hidden border-violet-500/20">
-      <div className="p-5 bg-gradient-to-r from-violet-500/[0.06] to-transparent">
+    <GlassPanel className="p-0 overflow-hidden border-amber-500/20">
+      <div className="p-5 bg-gradient-to-r from-amber-500/[0.06] to-transparent">
         <div className="flex items-start gap-4">
           <div className="shrink-0 mt-1">
             <ConfidenceGauge value={theory.confidence} size="lg" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
-              <Lightbulb className="w-5 h-5 text-violet-400" />
-              <h3 className="text-sm font-semibold font-[Space_Grotesk] text-violet-300 uppercase tracking-wider">Working Theory</h3>
+              <Lightbulb className="w-5 h-5 text-amber-400" />
+              <h3 className="text-sm font-semibold font-[Space_Grotesk] text-amber-300 uppercase tracking-wider">Working Theory</h3>
             </div>
             <p className="text-sm text-foreground/90 leading-relaxed">{theory.statement}</p>
           </div>
@@ -139,7 +139,7 @@ function WorkingTheoryCard({ theory }: { theory: any }) {
       <div className="px-5 py-3 border-t border-white/[0.04]">
         <button
           onClick={() => setShowEvidence(!showEvidence)}
-          className="flex items-center gap-1.5 text-xs text-violet-400/70 hover:text-violet-400 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-amber-400/70 hover:text-amber-400 transition-colors"
         >
           {showEvidence ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           {showEvidence ? "Hide" : "Show"} Evidence ({theory.supportingEvidence?.length ?? 0} supporting, {theory.conflictingEvidence?.length ?? 0} conflicting)
@@ -313,7 +313,7 @@ function EvidenceGapsCard({ gaps }: { gaps: any[] }) {
                 <p className="text-[11px] text-muted-foreground/50 mt-1">
                   <span className="text-muted-foreground/40">Impact:</span> {gap.impact}
                 </p>
-                <p className="text-[11px] text-violet-400/60 mt-0.5">
+                <p className="text-[11px] text-amber-400/60 mt-0.5">
                   <span className="text-muted-foreground/40">Action:</span> {gap.suggestedAction}
                 </p>
               </div>
@@ -442,7 +442,7 @@ function RecommendedActionsCard({
       <div className="flex items-center gap-2 mb-4">
         <ListChecks className="w-4 h-4 text-orange-400" />
         <h3 className="text-sm font-semibold font-[Space_Grotesk] text-orange-300 uppercase tracking-wider">Response Actions</h3>
-        <span className="text-[10px] bg-violet-500/10 border border-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded">
+        <span className="text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">
           DB-backed
         </span>
         <span className="text-[10px] text-muted-foreground/40 ml-auto">
@@ -547,7 +547,7 @@ function RecommendedActionsCard({
                           <button
                             onClick={() => executeMut.mutate({ actionId: action.actionId })}
                             disabled={isPending}
-                            className="p-1.5 rounded hover:bg-violet-500/15 text-violet-400/60 hover:text-violet-400 transition-colors"
+                            className="p-1.5 rounded hover:bg-amber-500/15 text-amber-400/60 hover:text-amber-400 transition-colors"
                             title="Mark Executed"
                           >
                             <Play className="w-3.5 h-3.5" />
@@ -577,7 +577,7 @@ function RecommendedActionsCard({
               value={reasonText}
               onChange={(e) => setReasonText(e.target.value)}
               placeholder="Enter reason..."
-              className="w-full h-24 bg-white/[0.04] border border-white/[0.08] rounded-lg p-3 text-xs text-foreground/80 placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-violet-500/40 resize-none"
+              className="w-full h-24 bg-white/[0.04] border border-white/[0.08] rounded-lg p-3 text-xs text-foreground/80 placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-amber-500/40 resize-none"
             />
             <div className="flex justify-end gap-2 mt-3">
               <button
@@ -589,7 +589,7 @@ function RecommendedActionsCard({
               <button
                 onClick={handleReasonSubmit}
                 disabled={!reasonText.trim() || isPending}
-                className="px-3 py-1.5 rounded-lg text-xs bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:bg-violet-500/30 disabled:opacity-30 transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30 disabled:opacity-30 transition-colors"
               >
                 {reasonDialogAction.targetState === "rejected" ? "Reject" : "Defer"}
               </button>
@@ -652,7 +652,7 @@ function CompletedPivotsCard({
               value={action}
               onChange={(e) => setAction(e.target.value)}
               placeholder="e.g., Checked DHCP logs for IP 10.0.1.45 reassignment..."
-              className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1.5 text-xs text-foreground/80 focus:outline-none focus:border-violet-500/40"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1.5 text-xs text-foreground/80 focus:outline-none focus:border-amber-500/40"
             />
           </div>
           <div>
@@ -661,7 +661,7 @@ function CompletedPivotsCard({
               value={finding}
               onChange={(e) => setFinding(e.target.value)}
               placeholder="Findings from this investigative step..."
-              className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1.5 text-xs text-foreground/80 focus:outline-none focus:border-violet-500/40 resize-none h-16"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1.5 text-xs text-foreground/80 focus:outline-none focus:border-amber-500/40 resize-none h-16"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -707,7 +707,7 @@ function CompletedPivotsCard({
                       {pivot.performedAt ? new Date(pivot.performedAt).toLocaleString() : ""}
                     </span>
                     {pivot.impactedTheory && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-300">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300">
                         Theory Impact
                       </span>
                     )}
@@ -750,7 +750,7 @@ function ReportGeneratorButton({ caseId }: { caseId: number }) {
   });
 
   const reportTypes = [
-    { value: "full", label: "Full Investigation Report", icon: FileText, color: "text-violet-400" },
+    { value: "full", label: "Full Investigation Report", icon: FileText, color: "text-amber-400" },
     { value: "executive", label: "Executive Summary", icon: BarChart3, color: "text-blue-400" },
     { value: "handoff", label: "Shift Handoff", icon: ScrollText, color: "text-emerald-400" },
     { value: "escalation", label: "Escalation Brief", icon: AlertTriangle, color: "text-red-400" },
@@ -809,7 +809,7 @@ function ReportGeneratorButton({ caseId }: { caseId: number }) {
           <div className="w-full max-w-4xl max-h-[85vh] rounded-xl border border-white/10 bg-slate-900/95 backdrop-blur-xl shadow-2xl flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-white/10">
               <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-violet-400" />
+                <FileText className="w-4 h-4 text-amber-400" />
                 <span className="text-sm font-semibold text-foreground/90 font-[Space_Grotesk]">
                   {reportTypes.find((r) => r.value === reportType)?.label ?? "Report"}
                 </span>
@@ -817,7 +817,7 @@ function ReportGeneratorButton({ caseId }: { caseId: number }) {
               <div className="flex items-center gap-2">
                 <button
                   onClick={copyToClipboard}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 text-xs transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs transition-colors"
                 >
                   <ClipboardCopy className="w-3 h-3" />
                   Copy
@@ -851,7 +851,7 @@ function DraftDocumentationCard({ docs }: { docs: any }) {
   const sections = [
     { key: "shiftHandoff", label: "Shift Handoff", icon: ScrollText, color: "text-blue-400" },
     { key: "escalationSummary", label: "Escalation Summary", icon: AlertTriangle, color: "text-red-400" },
-    { key: "executiveSummary", label: "Executive Summary", icon: FileText, color: "text-violet-400" },
+    { key: "executiveSummary", label: "Executive Summary", icon: FileText, color: "text-amber-400" },
     { key: "tuningSuggestions", label: "Tuning Suggestions", icon: Target, color: "text-emerald-400" },
   ].filter((s) => docs[s.key]);
 
@@ -918,7 +918,7 @@ function LivingCaseListView() {
           label="Active Cases"
           value={total}
           icon={Brain}
-          colorClass="text-violet-400"
+          colorClass="text-amber-400"
         />
         <StatCard
           label="Pending Actions"
@@ -945,7 +945,7 @@ function LivingCaseListView() {
         <button
           onClick={() => refetch()}
           disabled={isFetching}
-          className="flex items-center gap-1.5 px-3 py-1 rounded bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 text-xs transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-3 h-3 ${isFetching ? "animate-spin" : ""}`} />
           Refresh
@@ -961,7 +961,7 @@ function LivingCaseListView() {
         </div>
       ) : cases.length === 0 ? (
         <GlassPanel className="p-12 text-center">
-          <Brain className="w-12 h-12 text-violet-400/30 mx-auto mb-4" />
+          <Brain className="w-12 h-12 text-amber-400/30 mx-auto mb-4" />
           <h3 className="text-lg font-[Space_Grotesk] text-foreground/60 mb-2">No Living Cases Yet</h3>
           <p className="text-sm text-muted-foreground/40 max-w-md mx-auto">
             Living cases are created when the Hypothesis Agent processes a correlation bundle.
@@ -971,7 +971,7 @@ function LivingCaseListView() {
       ) : (
         <div className="space-y-2">
           {cases.map((c: any) => (
-            <GlassPanel key={c.id} className="p-0 overflow-hidden hover:border-violet-500/20 transition-colors">
+            <GlassPanel key={c.id} className="p-0 overflow-hidden hover:border-amber-500/20 transition-colors">
               <button
                 onClick={() => navigate(`/living-cases/${c.id}`)}
                 className="w-full flex items-center gap-4 p-4 text-left hover:bg-white/[0.02] transition-colors"
@@ -985,12 +985,12 @@ function LivingCaseListView() {
                     <span className="text-[10px] text-muted-foreground/40">
                       {c.updatedAt ? new Date(c.updatedAt).toLocaleString() : ""}
                     </span>
-                    <span className="text-[10px] text-violet-400/50">{c.lastUpdatedBy}</span>
+                    <span className="text-[10px] text-amber-400/50">{c.lastUpdatedBy}</span>
                     {c.sourceTriageId && (
                       <span
                         role="link"
                         onClick={(e) => { e.stopPropagation(); navigate(`/triage?highlight=${c.sourceTriageId}`); }}
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-violet-500/10 border border-violet-500/20 text-violet-300 hover:bg-violet-500/20 cursor-pointer transition-colors"
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 border border-amber-500/20 text-amber-300 hover:bg-amber-500/20 cursor-pointer transition-colors"
                         title={`Source Triage: ${c.sourceTriageId}`}
                       >
                         <Brain className="w-2.5 h-2.5" />
@@ -1097,7 +1097,7 @@ function LivingCaseDetailView({ caseId }: { caseId: number }) {
           <p className="text-sm text-muted-foreground/40 mb-4">Case ID {caseId} does not exist.</p>
           <button
             onClick={() => navigate("/living-cases")}
-            className="px-4 py-2 rounded-lg bg-violet-500/15 border border-violet-500/30 text-violet-300 text-sm hover:bg-violet-500/25 transition-colors"
+            className="px-4 py-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-sm hover:bg-amber-500/25 transition-colors"
           >
             Back to Cases
           </button>
@@ -1115,7 +1115,7 @@ function LivingCaseDetailView({ caseId }: { caseId: number }) {
         <div>
           <button
             onClick={() => navigate("/living-cases")}
-            className="text-xs text-violet-400/60 hover:text-violet-400 mb-2 flex items-center gap-1 transition-colors"
+            className="text-xs text-amber-400/60 hover:text-amber-400 mb-2 flex items-center gap-1 transition-colors"
           >
             <ChevronRight className="w-3 h-3 rotate-180" />
             Back to Cases
@@ -1130,7 +1130,7 @@ function LivingCaseDetailView({ caseId }: { caseId: number }) {
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 text-xs transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3 h-3 ${isFetching ? "animate-spin" : ""}`} />
             Refresh
@@ -1144,7 +1144,7 @@ function LivingCaseDetailView({ caseId }: { caseId: number }) {
           label="Theory Confidence"
           value={`${Math.round((row.theoryConfidence ?? 0) * 100)}%`}
           icon={Brain}
-          colorClass="text-violet-400"
+          colorClass="text-amber-400"
         />
         <StatCard
           label="Completed Pivots"
@@ -1214,7 +1214,7 @@ function LivingCaseDetailView({ caseId }: { caseId: number }) {
                 <button
                   key={i}
                   onClick={() => navigate(`/triage?highlight=${id}`)}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-violet-500/10 border border-violet-500/20 text-violet-300 hover:bg-violet-500/20 cursor-pointer transition-colors"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 border border-amber-500/20 text-amber-300 hover:bg-amber-500/20 cursor-pointer transition-colors"
                   title={`View triage: ${id}`}
                 >
                   <Brain className="w-2.5 h-2.5" />

@@ -1,27 +1,31 @@
 # Wazuh Broker Coverage — GAP Assessment
 
-**Date:** 2026-03-10
+> **STALE DOCUMENT** — The numbers below were captured on 2026-03-10 before Batch 1/2
+> promotion sprints. Current state (2026-03-19): **78 broker / 0 manual / 43 passthrough**
+> out of 121 endpoints. The category-level gaps below are largely resolved. See
+> `generateCoverageReport()` in `server/wazuh/brokerCoverage.ts` for live truth.
+
+**Date:** 2026-03-10 (snapshot — see notice above)
 **Spec Version:** Wazuh REST API v4.14.3
 **Source:** Broker Coverage Report (`/admin/broker-coverage`)
 **Assessor:** Claude (automated static analysis)
 
 ---
 
-## Executive Summary
+## Executive Summary (current as of 2026-03-19)
 
-The Dang! SIEM proxies **121 Wazuh API endpoints** through its tRPC router. Of these, only **33% (40)** are fully broker-wired with validated parameter handling. Another **33% (40)** use manual inline Zod schemas. The remaining **34% (41)** are raw passthrough with **zero query parameter support**, meaning users cannot filter, sort, search, or paginate those results.
+The Dang! SIEM proxies **121 Wazuh API endpoints** through its tRPC router. After Batch 1 and Batch 2 promotion sprints, **64% (78)** are fully broker-wired with validated parameter handling. **0** use manual inline Zod schemas (all promoted). The remaining **36% (43)** are passthrough endpoints that either have zero spec-defined query params or use single-param path forwarding.
 
-**Overall param coverage: 66%** — one-third of the API surface silently drops all query parameters.
+**Overall param coverage: 64%** broker-wired. The 43 passthrough endpoints are low-param or zero-param by spec.
 
 | Metric | Value |
 |---|---|
 | Total Endpoints | 121 |
-| Broker-Wired (full validation) | 40 (33%) |
-| Manual-Param (inline Zod) | 40 (33%) |
-| Passthrough (no params) | 41 (34%) |
-| Total Broker Configs | 33 |
-| Total Broker Params | 373 |
-| Missing Spec Params on Passthrough | 31+ |
+| Broker-Wired (full validation) | 78 (64%) |
+| Manual-Param (inline Zod) | 0 (0%) |
+| Passthrough (no params) | 43 (36%) |
+| Total Broker Configs | 116 |
+| Spec Version | 4.14.3 |
 
 ---
 

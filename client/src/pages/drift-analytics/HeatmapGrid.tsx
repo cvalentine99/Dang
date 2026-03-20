@@ -50,7 +50,7 @@ export function HeatmapGrid({
           <div key={agentId} className="flex items-center gap-0.5 mb-0.5">
             <div
               className="w-20 shrink-0 truncate text-xs font-mono"
-              style={{ color: "oklch(0.85 0.01 286)" }}
+              style={{ color: "oklch(0.85 0.01 60)" }}
               title={agentId}
             >
               {agentId}
@@ -59,12 +59,12 @@ export function HeatmapGrid({
               const val = lookup[agentId]?.[b] ?? 0;
               const intensity = Math.min(val / 50, 1);
               const bg = val === 0
-                ? "oklch(0.2 0.02 286 / 30%)"
-                : `oklch(${0.5 + intensity * 0.15} ${0.1 + intensity * 0.17} ${val > 30 ? 25 : 293} / ${0.3 + intensity * 0.7})`;
+                ? "oklch(0.2 0.02 60 / 30%)"
+                : `oklch(${0.5 + intensity * 0.15} ${0.1 + intensity * 0.17} ${val > 30 ? 25 : 85} / ${0.3 + intensity * 0.7})`;
               return (
                 <div
                   key={b}
-                  className="flex-1 h-7 rounded-sm flex items-center justify-center text-[10px] font-mono cursor-default transition-all hover:ring-1 hover:ring-purple-400/40"
+                  className="flex-1 h-7 rounded-sm flex items-center justify-center text-[10px] font-mono cursor-default transition-all hover:ring-1 hover:ring-amber-400/40"
                   style={{ background: bg, color: val > 0 ? "oklch(0.95 0 0)" : "transparent" }}
                   title={`Agent ${agentId} | ${formatDate(b)} | ${formatPct(val)} drift`}
                 >
@@ -79,15 +79,15 @@ export function HeatmapGrid({
         <div className="flex items-center gap-3 mt-3 text-[10px]" style={{ color: MUTED }}>
           <span>Drift intensity:</span>
           <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-sm" style={{ background: "oklch(0.2 0.02 286 / 30%)" }} />
+            <div className="h-3 w-3 rounded-sm" style={{ background: "oklch(0.2 0.02 60 / 30%)" }} />
             <span>0%</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-sm" style={{ background: "oklch(0.55 0.15 293 / 50%)" }} />
+            <div className="h-3 w-3 rounded-sm" style={{ background: "oklch(0.65 0.14 85 / 50%)" }} />
             <span>Low</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-3 w-3 rounded-sm" style={{ background: "oklch(0.6 0.2 293 / 80%)" }} />
+            <div className="h-3 w-3 rounded-sm" style={{ background: "oklch(0.7 0.16 85 / 80%)" }} />
             <span>Medium</span>
           </div>
           <div className="flex items-center gap-1">

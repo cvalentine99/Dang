@@ -177,6 +177,11 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Disable the modulepreload polyfill — modern browsers support
+    // <link rel="modulepreload"> natively (Chrome 66+, Firefox 67+, Safari 17+).
+    // This eliminates the only inline <script> from the production build,
+    // allowing CSP script-src to use 'self' without 'unsafe-inline'.
+    modulePreload: { polyfill: false },
   },
   server: {
     host: true,

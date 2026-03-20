@@ -148,6 +148,20 @@
       "when": 1772396100000,
       "tag": "0020_foreign_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1772396200000,
+      "tag": "0021_audit_fk_restrict",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1772396300000,
+      "tag": "0022_analyst_notes_created_by",
+      "breakpoints": true
     }
   ]
 }

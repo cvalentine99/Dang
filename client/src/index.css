@@ -1,13 +1,84 @@
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  OBSIDIAN INSTRUMENT PANEL — Design System CSS
+ *  Version: 1.0.0
+ *  Origin:  ExtraHop Next-Gen Dashboards (Manus)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ *  HOW TO USE:
+ *  1. Copy this file into your Manus project at client/src/index.css
+ *  2. Add Google Fonts to client/index.html (see §1 below)
+ *  3. Set ThemeProvider defaultTheme="dark" in App.tsx
+ *  4. Use the utility classes documented in each section
+ *
+ *  This file is self-contained — it includes Tailwind 4 imports, theme
+ *  tokens, component classes, and animation keyframes. Everything uses
+ *  the OKLCH color space for perceptual uniformity.
+ *
+ *  REQUIRED in client/index.html <head>:
+ *    <link rel="preconnect" href="https://fonts.googleapis.com">
+ *    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ *    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+ *
+ *  REQUIRED npm packages:
+ *    pnpm add framer-motion lucide-react
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+
+/* ─── §0  Tailwind 4 Imports ──────────────────────────────────────────────── */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
+
+/* ─── §1  Theme Tokens (OKLCH) ────────────────────────────────────────────── */
+/*
+ *  All colors use OKLCH for perceptual uniformity.
+ *  Format: oklch(lightness chroma hue / alpha?)
+ *
+ *  COLOR PALETTE QUICK REFERENCE:
+ *  ┌──────────────┬──────────────────────────────────┬──────────────────────┐
+ *  │ Name         │ OKLCH Value                      │ Usage                │
+ *  ├──────────────┼──────────────────────────────────┼──────────────────────┤
+ *  │ Gold         │ oklch(0.769 0.108 85.805)        │ Primary accent       │
+ *  │ Cyan         │ oklch(0.75 0.15 195)             │ Secondary accent     │
+ *  │ Green        │ oklch(0.723 0.219 149.579)       │ Success / verified   │
+ *  │ Red          │ oklch(0.628 0.258 29.234)        │ Critical / error     │
+ *  │ Orange       │ oklch(0.705 0.213 47.604)        │ Warning / high       │
+ *  │ Amber        │ oklch(0.769 0.188 70.08)         │ Medium severity      │
+ *  │ Purple       │ oklch(0.795 0.184 85)             │ Tertiary accent      │
+ *  │ Muted        │ oklch(0.6 0.01 260)              │ Secondary text       │
+ *  │ Bright       │ oklch(0.95 0.005 85)             │ Primary text         │
+ *  │ Surface      │ oklch(0.06 0.005 260)            │ Card backgrounds     │
+ *  │ Deep Black   │ oklch(0.03 0.005 260)            │ Deepest background   │
+ *  │ Page BG      │ oklch(0.05 0 0)                  │ Page background      │
+ *  └──────────────┴──────────────────────────────────┴──────────────────────┘
+ *
+ *  OPACITY SCALE (for accent overlays):
+ *    /5%   — barely visible glow
+ *    /8%   — subtle border
+ *    /10%  — input background
+ *    /12%  — badge background
+ *    /15%  — accent background
+ *    /20%  — hover border
+ *    /25%  — badge border
+ *    /30%  — glow / shadow
+ *    /40%  — pulse animation peak
+ *    /50%  — focus ring
+ *    /80%  — code text
+ */
+
 @theme inline {
+  /* Border radius scale */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Semantic color bindings (Tailwind 4 convention) */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -40,71 +111,125 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-threat-critical: oklch(0.637 0.237 25.331);
-  --color-threat-high: oklch(0.705 0.191 22.216);
-  --color-threat-medium: oklch(0.795 0.184 86.047);
-  --color-threat-low: oklch(0.765 0.177 163.223);
-  --color-threat-safe: oklch(0.765 0.177 163.223);
-  --color-info-cyan: oklch(0.789 0.154 211.53);
-  --color-glass: var(--glass);
-  --color-glass-border: var(--glass-border);
-  --color-glass-hover: var(--glass-hover);
-  --font-display: "Space Grotesk", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
-  --font-sans: "Inter", sans-serif;
+
+  /* Named accent colors (use in inline styles or extend Tailwind) */
+  --color-gold: oklch(0.769 0.108 85.805);
+  --color-gold-dim: oklch(0.769 0.108 85.805 / 15%);
+  --color-gold-glow: oklch(0.769 0.108 85.805 / 30%);
+  --color-severity-critical: oklch(0.628 0.258 29.234);
+  --color-severity-high: oklch(0.705 0.213 47.604);
+  --color-severity-medium: oklch(0.769 0.188 70.08);
+  --color-severity-low: oklch(0.723 0.219 149.579);
+
+  /* Typography */
+  --font-sans: 'Inter', 'SF Pro Display', 'Segoe UI', 'Roboto', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
 }
 
+
+/* ─── §2  Dark Theme Variables ────────────────────────────────────────────── */
+/*
+ *  The Obsidian palette is dark-first. Both :root and .dark use the same
+ *  values so the design works regardless of ThemeProvider configuration.
+ *  If you want a light variant, override these in a .light {} block.
+ */
+
 :root {
-  --radius: 0.75rem;
-  --primary: oklch(0.541 0.281 293.009);
-  --primary-foreground: oklch(0.98 0.005 285);
-  --sidebar-primary: oklch(0.541 0.281 293.009);
-  --sidebar-primary-foreground: oklch(0.98 0.005 285);
-  --background: oklch(0.13 0.028 286);
-  --foreground: oklch(0.93 0.005 286);
-  --card: oklch(0.17 0.025 286);
-  --card-foreground: oklch(0.93 0.005 286);
-  --popover: oklch(0.17 0.025 286);
-  --popover-foreground: oklch(0.93 0.005 286);
-  --secondary: oklch(0.22 0.03 286);
-  --secondary-foreground: oklch(0.85 0.01 286);
-  --muted: oklch(0.22 0.025 286);
-  --muted-foreground: oklch(0.65 0.02 286);
-  --accent: oklch(0.25 0.04 286);
-  --accent-foreground: oklch(0.93 0.005 286);
-  --destructive: oklch(0.637 0.237 25.331);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.3 0.04 286 / 40%);
-  --input: oklch(0.25 0.03 286 / 50%);
-  --ring: oklch(0.541 0.281 293.009);
-  --chart-1: oklch(0.541 0.281 293.009);
-  --chart-2: oklch(0.789 0.154 211.53);
-  --chart-3: oklch(0.765 0.177 163.223);
-  --chart-4: oklch(0.795 0.184 86.047);
-  --chart-5: oklch(0.637 0.237 25.331);
-  --sidebar: oklch(0.15 0.03 286);
-  --sidebar-foreground: oklch(0.85 0.01 286);
-  --sidebar-accent: oklch(0.25 0.05 286);
-  --sidebar-accent-foreground: oklch(0.93 0.005 286);
-  --sidebar-border: oklch(0.3 0.04 286 / 30%);
-  --sidebar-ring: oklch(0.541 0.281 293.009);
-  --glass: oklch(0.2 0.03 286 / 40%);
-  --glass-border: oklch(0.5 0.15 286 / 15%);
-  --glass-hover: oklch(0.25 0.04 286 / 50%);
+  --radius: 0.5rem;
+
+  /* Surfaces */
+  --background: oklch(0.05 0 0);
+  --foreground: oklch(0.95 0.005 85);
+  --card: oklch(0.12 0.005 260 / 60%);
+  --card-foreground: oklch(0.95 0.005 85);
+  --popover: oklch(0.15 0.008 260 / 80%);
+  --popover-foreground: oklch(0.95 0.005 85);
+
+  /* Brand */
+  --primary: oklch(0.769 0.108 85.805);
+  --primary-foreground: oklch(0.1 0 0);
+  --secondary: oklch(0.18 0.008 260);
+  --secondary-foreground: oklch(0.85 0.005 85);
+
+  /* Neutral */
+  --muted: oklch(0.22 0.008 260);
+  --muted-foreground: oklch(0.6 0.01 260);
+  --accent: oklch(0.769 0.108 85.805 / 15%);
+  --accent-foreground: oklch(0.95 0.005 85);
+
+  /* Destructive */
+  --destructive: oklch(0.628 0.258 29.234);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  /* Borders & inputs */
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.769 0.108 85.805 / 50%);
+
+  /* Chart palette (5-color) */
+  --chart-1: oklch(0.769 0.108 85.805);   /* Gold    */
+  --chart-2: oklch(0.75 0.15 195);         /* Cyan    */
+  --chart-3: oklch(0.723 0.219 149.579);   /* Green   */
+  --chart-4: oklch(0.769 0.188 70.08);     /* Amber   */
+  --chart-5: oklch(0.628 0.258 29.234);    /* Red     */
+
+  /* Sidebar */
+  --sidebar: oklch(0.08 0.005 260);
+  --sidebar-foreground: oklch(0.85 0.005 85);
+  --sidebar-primary: oklch(0.769 0.108 85.805);
+  --sidebar-primary-foreground: oklch(0.1 0 0);
+  --sidebar-accent: oklch(0.769 0.108 85.805 / 15%);
+  --sidebar-accent-foreground: oklch(0.95 0.005 85);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.769 0.108 85.805 / 50%);
 }
+
+.dark {
+  --background: oklch(0.05 0 0);
+  --foreground: oklch(0.95 0.005 85);
+  --card: oklch(0.12 0.005 260 / 60%);
+  --card-foreground: oklch(0.95 0.005 85);
+  --popover: oklch(0.15 0.008 260 / 80%);
+  --popover-foreground: oklch(0.95 0.005 85);
+  --primary: oklch(0.769 0.108 85.805);
+  --primary-foreground: oklch(0.1 0 0);
+  --secondary: oklch(0.18 0.008 260);
+  --secondary-foreground: oklch(0.85 0.005 85);
+  --muted: oklch(0.22 0.008 260);
+  --muted-foreground: oklch(0.6 0.01 260);
+  --accent: oklch(0.769 0.108 85.805 / 15%);
+  --accent-foreground: oklch(0.95 0.005 85);
+  --destructive: oklch(0.628 0.258 29.234);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.769 0.108 85.805 / 50%);
+  --chart-1: oklch(0.769 0.108 85.805);
+  --chart-2: oklch(0.75 0.15 195);
+  --chart-3: oklch(0.723 0.219 149.579);
+  --chart-4: oklch(0.769 0.188 70.08);
+  --chart-5: oklch(0.628 0.258 29.234);
+  --sidebar: oklch(0.08 0.005 260);
+  --sidebar-foreground: oklch(0.85 0.005 85);
+  --sidebar-primary: oklch(0.769 0.108 85.805);
+  --sidebar-primary-foreground: oklch(0.1 0 0);
+  --sidebar-accent: oklch(0.769 0.108 85.805 / 15%);
+  --sidebar-accent-foreground: oklch(0.95 0.005 85);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.769 0.108 85.805 / 50%);
+}
+
+
+/* ─── §3  Base Layer ──────────────────────────────────────────────────────── */
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  html {
-    color-scheme: dark;
-  }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    background: linear-gradient(135deg, oklch(0.1 0.035 290) 0%, oklch(0.13 0.028 286) 40%, oklch(0.11 0.02 280) 100%);
-    background-attachment: fixed;
-    min-height: 100vh;
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -115,234 +240,16 @@
   select:not(:disabled),
   input[type="checkbox"]:not(:disabled),
   input[type="radio"]:not(:disabled) {
-    cursor: pointer;
+    @apply cursor-pointer;
   }
 }
 
+
+/* ─── §4  Layout Components ───────────────────────────────────────────────── */
+
 @layer components {
-  .flex {
-    min-height: 0;
-    min-width: 0;
-  }
 
-  .glass-panel {
-    background: oklch(0.18 0.03 286 / 50%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid oklch(0.5 0.15 286 / 12%);
-    box-shadow: 0 8px 32px oklch(0 0 0 / 20%), inset 0 1px 0 oklch(1 0 0 / 5%);
-    border-radius: var(--radius);
-  }
-
-  .glass-panel-hover:hover {
-    background: oklch(0.22 0.04 286 / 55%);
-    border-color: oklch(0.541 0.281 293 / 25%);
-    box-shadow: 0 8px 32px oklch(0.541 0.281 293 / 10%), inset 0 1px 0 oklch(1 0 0 / 8%);
-  }
-
-  .glass-card {
-    background: oklch(0.18 0.03 286 / 40%);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid oklch(0.5 0.15 286 / 10%);
-    box-shadow: 0 4px 16px oklch(0 0 0 / 15%);
-    transition: all 0.2s ease;
-    border-radius: var(--radius);
-  }
-
-  .glass-card:hover {
-    background: oklch(0.22 0.04 286 / 50%);
-    border-color: oklch(0.541 0.281 293 / 20%);
-    transform: translateY(-1px);
-    box-shadow: 0 8px 24px oklch(0.541 0.281 293 / 8%);
-  }
-
-  .amethyst-glow {
-    box-shadow: 0 0 20px oklch(0.541 0.281 293 / 15%), 0 0 60px oklch(0.541 0.281 293 / 5%);
-  }
-
-  .amethyst-glow-strong {
-    box-shadow: 0 0 30px oklch(0.541 0.281 293 / 30%), 0 0 80px oklch(0.541 0.281 293 / 10%);
-  }
-
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-
-  .glass-shimmer {
-    background: linear-gradient(90deg, transparent 0%, oklch(0.541 0.281 293 / 5%) 50%, transparent 100%);
-    background-size: 200% 100%;
-    animation: shimmer 3s ease-in-out infinite;
-  }
-
-  /* Chart Skeleton Loaders */
-  .chart-skeleton-shape {
-    animation: chart-skeleton-pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes chart-skeleton-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-
-  .chart-skeleton-shimmer {
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      oklch(0.541 0.281 293 / 6%) 25%,
-      oklch(0.541 0.281 293 / 10%) 50%,
-      oklch(0.541 0.281 293 / 6%) 75%,
-      transparent 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 2.5s ease-in-out infinite;
-    pointer-events: none;
-  }
-
-  @keyframes pulse-purple {
-    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 oklch(0.541 0.281 293 / 40%); }
-    50% { opacity: 0.8; box-shadow: 0 0 0 6px oklch(0.541 0.281 293 / 0%); }
-  }
-
-  .pulse-live {
-    animation: pulse-purple 2s ease-in-out infinite;
-  }
-
-  @keyframes fade-in {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-out forwards;
-  }
-
-  /* Agent Activity Console Animations */
-
-  @keyframes step-slide-in {
-    from { opacity: 0; transform: translateX(-12px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-  .animate-step-slide-in {
-    animation: step-slide-in 0.35s ease-out both;
-  }
-
-  @keyframes scale-in {
-    from { opacity: 0; transform: scale(0); }
-    50% { transform: scale(1.3); }
-    to { opacity: 1; transform: scale(1); }
-  }
-  .animate-scale-in {
-    animation: scale-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-  }
-
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    20% { transform: translateX(-3px); }
-    40% { transform: translateX(3px); }
-    60% { transform: translateX(-2px); }
-    80% { transform: translateX(2px); }
-  }
-  .animate-shake {
-    animation: shake 0.5s ease-in-out;
-  }
-
-  @keyframes spin-slow {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-  .animate-spin-slow {
-    animation: spin-slow 3s linear infinite;
-  }
-
-  @keyframes ping-slow {
-    0% { transform: scale(1); opacity: 0.4; }
-    75%, 100% { transform: scale(1.6); opacity: 0; }
-  }
-  .animate-ping-slow {
-    animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-  }
-
-  @keyframes cursor-blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-  }
-  .animate-cursor-blink {
-    animation: cursor-blink 1s step-end infinite;
-  }
-
-  @keyframes typing-dots {
-    0% { content: ''; }
-    25% { content: '.'; }
-    50% { content: '..'; }
-    75% { content: '...'; }
-  }
-  .animate-typing-dots::after {
-    content: '';
-    animation: typing-dots 1.5s steps(4, end) infinite;
-  }
-
-  @keyframes shimmer-slide {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
-  .animate-shimmer-slide {
-    animation: shimmer-slide 2s linear infinite;
-  }
-
-  @keyframes pulse-subtle {
-    0%, 100% { opacity: 1; box-shadow: 0 0 12px oklch(0.541 0.281 293 / 15%); }
-    50% { opacity: 0.85; box-shadow: 0 0 20px oklch(0.541 0.281 293 / 30%); }
-  }
-  .animate-pulse-subtle {
-    animation: pulse-subtle 2s ease-in-out infinite;
-  }
-
-  @keyframes data-rain {
-    0% { top: -10%; opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 1; }
-    100% { top: 110%; opacity: 0; }
-  }
-  .animate-data-rain {
-    animation: data-rain 3s linear infinite;
-  }
-
-  @keyframes data-count {
-    from { opacity: 0; transform: scale(0.8); }
-    50% { transform: scale(1.1); }
-    to { opacity: 1; transform: scale(1); }
-  }
-  .animate-data-count {
-    animation: data-count 0.3s ease-out forwards;
-  }
-
-  .agent-step-glow {
-    box-shadow: inset 2px 0 0 oklch(0.6 0.2 280 / 40%);
-  }
-
-  .agent-node-active {
-    animation: agent-glow 2s ease-in-out infinite;
-  }
-  @keyframes agent-glow {
-    0%, 100% { filter: brightness(1); }
-    50% { filter: brightness(1.2); }
-  }
-
-  .agent-badge-pulse {
-    animation: badge-pulse 1.5s ease-in-out infinite;
-  }
-  @keyframes badge-pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-  }
-
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: oklch(0.4 0.08 286 / 40%); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: oklch(0.5 0.1 286 / 60%); }
-
+  /* Container — auto-centered, responsive padding, ultrawide-safe */
   .container {
     width: 100%;
     margin-left: auto;
@@ -351,36 +258,294 @@
     padding-right: 1rem;
   }
 
+  /* Flex fix — prevent overflow from flex children */
+  .flex {
+    min-height: 0;
+    min-width: 0;
+  }
+
   @media (min-width: 640px) {
-    .container { padding-left: 1.5rem; padding-right: 1.5rem; }
+    .container {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
   }
 
   @media (min-width: 1024px) {
-    .container { padding-left: 2rem; padding-right: 2rem; max-width: 2400px; }
+    .container {
+      padding-left: 2rem;
+      padding-right: 2rem;
+      max-width: 1920px;
+    }
   }
 
-  .font-display { font-family: "Space Grotesk", sans-serif; }
-  .font-mono-code { font-family: "JetBrains Mono", monospace; }
 
-  .nav-item-active {
-    background: oklch(0.541 0.281 293 / 15%);
-    border-left: 2px solid oklch(0.541 0.281 293);
-    color: oklch(0.93 0.005 286);
+  /* ─── §5  Glass Card ──────────────────────────────────────────────────── */
+  /*
+   *  Usage:  <div class="glass-card p-5">...</div>
+   *  Hover:  Border shifts to gold, shadow deepens
+   *  Combine with .gold-accent-top for the signature gold line
+   */
+  .glass-card {
+    background: linear-gradient(135deg,
+      oklch(0.15 0.005 260 / 40%) 0%,
+      oklch(0.1 0.005 260 / 30%) 100%);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid oklch(1 0 0 / 8%);
+    box-shadow:
+      0 0 0 1px oklch(1 0 0 / 5%),
+      0 4px 24px oklch(0 0 0 / 40%),
+      inset 0 1px 0 oklch(1 0 0 / 5%);
+    border-radius: var(--radius);
+    transition: all 0.3s ease;
   }
 
-  .data-row:hover {
-    background: oklch(0.22 0.04 286 / 30%);
+  .glass-card:hover {
+    border-color: oklch(0.769 0.108 85.805 / 20%);
+    box-shadow:
+      0 0 0 1px oklch(0.769 0.108 85.805 / 10%),
+      0 8px 32px oklch(0 0 0 / 50%),
+      inset 0 1px 0 oklch(1 0 0 / 8%);
   }
 
-  .threat-critical { color: oklch(0.637 0.237 25.331); }
-  .threat-high { color: oklch(0.705 0.191 22.216); }
-  .threat-medium { color: oklch(0.795 0.184 86.047); }
-  .threat-low { color: oklch(0.765 0.177 163.223); }
-  .threat-info { color: oklch(0.789 0.154 211.53); }
 
-  .bg-threat-critical { background-color: oklch(0.637 0.237 25.331 / 15%); border-color: oklch(0.637 0.237 25.331 / 30%); }
-  .bg-threat-high { background-color: oklch(0.705 0.191 22.216 / 15%); border-color: oklch(0.705 0.191 22.216 / 30%); }
-  .bg-threat-medium { background-color: oklch(0.795 0.184 86.047 / 15%); border-color: oklch(0.795 0.184 86.047 / 30%); }
-  .bg-threat-low { background-color: oklch(0.765 0.177 163.223 / 15%); border-color: oklch(0.765 0.177 163.223 / 30%); }
-  .bg-threat-info { background-color: oklch(0.789 0.154 211.53 / 15%); border-color: oklch(0.789 0.154 211.53 / 30%); }
+  /* ─── §6  Gradient Text ───────────────────────────────────────────────── */
+  /*
+   *  Usage:  <h1 class="gradient-text">Title</h1>
+   *  Effect: White → Gold gradient on text
+   */
+  .gradient-text {
+    background: linear-gradient(135deg, oklch(0.95 0.005 85) 0%, oklch(0.769 0.108 85.805) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+
+  /* ─── §7  Gold Glow ───────────────────────────────────────────────────── */
+  /*
+   *  Usage:  <button class="gold-glow">CTA</button>
+   */
+  .gold-glow {
+    box-shadow: 0 0 20px oklch(0.769 0.108 85.805 / 30%);
+  }
+
+
+  /* ─── §8  Grid Pattern Overlay ────────────────────────────────────────── */
+  /*
+   *  Usage:  <div class="grid-pattern">...</div>
+   *  Effect: Subtle 40px grid lines at 3% white opacity
+   *  Great for hero sections and empty states
+   */
+  .grid-pattern {
+    background-image:
+      linear-gradient(oklch(1 0 0 / 3%) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(1 0 0 / 3%) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+
+  /* ─── §9  Tabular Numbers ─────────────────────────────────────────────── */
+  /*
+   *  Usage:  <span class="tabular-nums">1,234.56</span>
+   *  Effect: Fixed-width digits for aligned KPI columns
+   */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+
+  /* ─── §10  Scrollbar Hide ─────────────────────────────────────────────── */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+
+  /* ─── §11  Severity Badges ────────────────────────────────────────────── */
+  /*
+   *  Usage:  <span class="severity-critical">CRITICAL</span>
+   *  Each level: colored background at 15%, text at full, border at 30%
+   */
+  .severity-critical {
+    background: oklch(0.628 0.258 29.234 / 15%);
+    color: oklch(0.628 0.258 29.234);
+    border: 1px solid oklch(0.628 0.258 29.234 / 30%);
+  }
+  .severity-high {
+    background: oklch(0.705 0.213 47.604 / 15%);
+    color: oklch(0.705 0.213 47.604);
+    border: 1px solid oklch(0.705 0.213 47.604 / 30%);
+  }
+  .severity-medium {
+    background: oklch(0.769 0.188 70.08 / 15%);
+    color: oklch(0.769 0.188 70.08);
+    border: 1px solid oklch(0.769 0.188 70.08 / 30%);
+  }
+  .severity-low {
+    background: oklch(0.723 0.219 149.579 / 15%);
+    color: oklch(0.723 0.219 149.579);
+    border: 1px solid oklch(0.723 0.219 149.579 / 30%);
+  }
+
+
+  /* ─── §12  Pulse Animation ────────────────────────────────────────────── */
+  /*
+   *  Usage:  <div class="pulse-critical">Alert</div>
+   *  Effect: Red glow pulsing every 2 seconds
+   */
+  @keyframes pulse-critical {
+    0%, 100% { box-shadow: 0 0 0 0 oklch(0.628 0.258 29.234 / 40%); }
+    50% { box-shadow: 0 0 20px 8px oklch(0.628 0.258 29.234 / 20%); }
+  }
+  .pulse-critical {
+    animation: pulse-critical 2s infinite ease-in-out;
+  }
+
+  @keyframes pulse-gold {
+    0%, 100% { box-shadow: 0 0 0 0 oklch(0.769 0.108 85.805 / 40%); }
+    50% { box-shadow: 0 0 20px 8px oklch(0.769 0.108 85.805 / 20%); }
+  }
+  .pulse-gold {
+    animation: pulse-gold 2s infinite ease-in-out;
+  }
+
+
+  /* ─── §13  Gold Accent Line ───────────────────────────────────────────── */
+  /*
+   *  Usage:  <div class="glass-card gold-accent-top p-5">...</div>
+   *  Effect: 40px gold line at top-left, expands to full width on hover
+   */
+  .gold-accent-top {
+    position: relative;
+  }
+  .gold-accent-top::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 40px;
+    height: 2px;
+    background: oklch(0.769 0.108 85.805);
+    transition: width 0.3s ease;
+    border-radius: 1px;
+  }
+  .gold-accent-top:hover::before {
+    width: 100%;
+  }
+
+
+  /* ─── §14  Status Dot ─────────────────────────────────────────────────── */
+  /*
+   *  Usage:  <span class="status-dot status-connected"></span>
+   */
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .status-connected {
+    background: oklch(0.723 0.219 149.579);
+    box-shadow: 0 0 8px oklch(0.723 0.219 149.579 / 50%);
+  }
+  .status-disconnected {
+    background: oklch(0.628 0.258 29.234);
+    box-shadow: 0 0 8px oklch(0.628 0.258 29.234 / 50%);
+  }
+  .status-pending {
+    background: oklch(0.769 0.108 85.805);
+    box-shadow: 0 0 8px oklch(0.769 0.108 85.805 / 50%);
+  }
+
+
+  /* ─── §15  Inline Color Utilities ─────────────────────────────────────── */
+  /*
+   *  For use in inline styles when Tailwind classes aren't enough.
+   *  Copy these constants into your React components:
+   *
+   *  const GOLD   = "oklch(0.769 0.108 85.805)";
+   *  const CYAN   = "oklch(0.75 0.15 195)";
+   *  const GREEN  = "oklch(0.723 0.219 149.579)";
+   *  const RED    = "oklch(0.628 0.258 29.234)";
+   *  const ORANGE = "oklch(0.705 0.213 47.604)";
+   *  const PURPLE = "oklch(0.795 0.184 85)";
+   *  const MUTED  = "oklch(0.6 0.01 260)";
+   *  const BRIGHT = "oklch(0.95 0.005 85)";
+   */
+}
+
+
+/* ─── §16  Legacy Compatibility Aliases ──────────────────────────────────── */
+/*
+ *  These aliases map old Amethyst Nexus class names to the new Obsidian
+ *  equivalents so all 40+ existing components work without modification.
+ *  The old names are kept as thin wrappers.
+ */
+
+@layer components {
+
+  /* glass-panel → glass-card (same visual, old name preserved) */
+  .glass-panel {
+    background: linear-gradient(135deg,
+      oklch(0.15 0.005 260 / 40%) 0%,
+      oklch(0.1 0.005 260 / 30%) 100%);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid oklch(1 0 0 / 8%);
+    box-shadow:
+      0 0 0 1px oklch(1 0 0 / 5%),
+      0 4px 24px oklch(0 0 0 / 40%),
+      inset 0 1px 0 oklch(1 0 0 / 5%);
+    border-radius: var(--radius);
+    transition: all 0.3s ease;
+  }
+
+  .glass-panel:hover,
+  .glass-panel-hover:hover {
+    border-color: oklch(0.769 0.108 85.805 / 20%);
+    box-shadow:
+      0 0 0 1px oklch(0.769 0.108 85.805 / 10%),
+      0 8px 32px oklch(0 0 0 / 50%),
+      inset 0 1px 0 oklch(1 0 0 / 8%);
+  }
+
+  /* gold-glow → gold-glow */
+  .gold-glow {
+    box-shadow: 0 0 20px oklch(0.769 0.108 85.805 / 30%);
+  }
+
+  /* glass-border alias */
+  .border-glass-border {
+    border-color: oklch(1 0 0 / 8%);
+  }
+
+  /* font-display alias — maps to Inter (the Obsidian display font) */
+  .font-display {
+    font-family: 'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+    font-weight: 700;
+  }
+}
+
+
+/* ─── §17  Tailwind Color Extensions for Threat Levels ───────────────────── */
+/*
+ *  These map the old threat-* and info-cyan Tailwind utilities to Obsidian
+ *  severity colors. Uses @theme inline for Tailwind 4 compatibility.
+ */
+
+@theme inline {
+  /* Threat level colors — mapped to Obsidian severity palette */
+  --color-threat-critical: oklch(0.628 0.258 29.234);
+  --color-threat-high: oklch(0.705 0.213 47.604);
+  --color-threat-medium: oklch(0.769 0.188 70.08);
+  --color-threat-low: oklch(0.723 0.219 149.579);
+  --color-info-cyan: oklch(0.75 0.15 195);
+
+  /* Font display for Tailwind font-display utility */
+  --font-display: 'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
 }

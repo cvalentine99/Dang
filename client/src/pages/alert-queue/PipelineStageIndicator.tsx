@@ -208,7 +208,7 @@ export function PipelineStageIndicator({
           {nextStage && !isRunning && (
             <button
               onClick={handleContinue}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25 transition-all"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 transition-all"
               title={`Continue pipeline from ${nextStage} stage`}
             >
               <Play className="h-3 w-3" />

@@ -42,7 +42,7 @@ const SEVERITY_COLORS: Record<string, { bg: string; text: string; border: string
   high: { bg: "bg-orange-500/15", text: "text-orange-300", border: "border-orange-500/30" },
   medium: { bg: "bg-yellow-500/15", text: "text-yellow-300", border: "border-yellow-500/30" },
   low: { bg: "bg-cyan-500/15", text: "text-cyan-300", border: "border-cyan-500/30" },
-  info: { bg: "bg-violet-500/15", text: "text-violet-300", border: "border-violet-500/30" },
+  info: { bg: "bg-amber-500/15", text: "text-amber-300", border: "border-amber-500/30" },
 };
 
 const ROUTE_LABELS: Record<string, string> = {
@@ -65,7 +65,7 @@ export default function FeedbackAnalytics() {
           subtitle="AI triage accuracy metrics and analyst feedback patterns."
         />
         <GlassPanel className="p-8 flex items-center justify-center">
-          <Loader2 className="w-5 h-5 text-violet-400 animate-spin mr-2" />
+          <Loader2 className="w-5 h-5 text-amber-400 animate-spin mr-2" />
           <span className="text-sm text-muted-foreground/50">Loading analytics...</span>
         </GlassPanel>
       </div>
@@ -124,7 +124,7 @@ export default function FeedbackAnalytics() {
         {/* Severity Accuracy by Level */}
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="w-4 h-4 text-violet-400" />
+            <BarChart3 className="w-4 h-4 text-amber-400" />
             <h3 className="text-sm font-semibold text-foreground/80 font-[Space_Grotesk]">
               AI Accuracy by Severity
             </h3>
@@ -260,7 +260,7 @@ export default function FeedbackAnalytics() {
                   {ROUTE_LABELS[row.aiRoute] ?? row.aiRoute}
                 </span>
                 <ArrowRight className="w-3 h-3 text-muted-foreground/30 shrink-0" />
-                <span className="text-[10px] px-2 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-300">
+                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300">
                   {ROUTE_LABELS[row.analystRoute] ?? row.analystRoute}
                 </span>
                 <span className="ml-auto text-[10px] font-mono text-muted-foreground/50">
@@ -276,7 +276,7 @@ export default function FeedbackAnalytics() {
       {byAnalyst.length > 0 && (
         <GlassPanel className="p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Users className="w-4 h-4 text-violet-400" />
+            <Users className="w-4 h-4 text-amber-400" />
             <h3 className="text-sm font-semibold text-foreground/80 font-[Space_Grotesk]">
               Per-Analyst Activity
             </h3>
@@ -308,7 +308,7 @@ export default function FeedbackAnalytics() {
                       <td className="py-2 px-3 text-right font-mono text-emerald-300/70">{row.confirmations ?? 0}</td>
                       <td className="py-2 px-3 text-right font-mono text-amber-300/70">{row.severityOverrides ?? 0}</td>
                       <td className="py-2 px-3 text-right font-mono text-cyan-300/70">{row.routeOverrides ?? 0}</td>
-                      <td className="py-2 px-3 text-right font-mono text-violet-300/70">{row.notesWritten ?? 0}</td>
+                      <td className="py-2 px-3 text-right font-mono text-amber-300/70">{row.notesWritten ?? 0}</td>
                       <td className="py-2 px-3 text-right">
                         <span className={`font-mono ${
                           Number(confirmRate) >= 80 ? "text-emerald-300" :
@@ -388,7 +388,7 @@ export default function FeedbackAnalytics() {
 
                     {/* Route override */}
                     {fb.analystRouteOverride && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-300">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300">
                         Route → {ROUTE_LABELS[fb.analystRouteOverride] ?? fb.analystRouteOverride}
                       </span>
                     )}

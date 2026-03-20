@@ -66,7 +66,7 @@ function CreateDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="e.g., Suspicious lateral movement from Agent 003"
-              className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-purple-500/30"
+              className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-amber-500/30"
             />
           </div>
           <div>
@@ -76,7 +76,7 @@ function CreateDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
               onChange={e => setDescription(e.target.value)}
               placeholder="Brief description of the investigation scope and initial findings..."
               rows={3}
-              className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-purple-500/30 resize-none"
+              className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-amber-500/30 resize-none"
             />
           </div>
           <div>
@@ -87,14 +87,14 @@ function CreateDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
                 onChange={e => setTagInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
                 placeholder="Add tag..."
-                className="flex-1 px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-purple-500/30"
+                className="flex-1 px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-amber-500/30"
               />
-              <button onClick={addTag} className="px-3 py-2 text-xs bg-purple-500/15 border border-purple-500/30 rounded-lg text-purple-300 hover:bg-purple-500/25 transition-colors">Add</button>
+              <button onClick={addTag} className="px-3 py-2 text-xs bg-amber-500/15 border border-amber-500/30 rounded-lg text-amber-300 hover:bg-amber-500/25 transition-colors">Add</button>
             </div>
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {tags.map(t => (
-                  <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                  <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20">
                     {t}
                     <button onClick={() => setTags(tags.filter(x => x !== t))} className="hover:text-foreground"><X className="w-2.5 h-2.5" /></button>
                   </span>
@@ -108,7 +108,7 @@ function CreateDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
           <button
             onClick={() => createMutation.mutate({ title, description: description || undefined, tags: tags.length > 0 ? tags : undefined })}
             disabled={!title.trim() || createMutation.isPending}
-            className="px-4 py-2 text-xs rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-200 hover:bg-purple-500/30 disabled:opacity-50 transition-colors"
+            className="px-4 py-2 text-xs rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-200 hover:bg-amber-500/30 disabled:opacity-50 transition-colors"
           >
             {createMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Create Investigation"}
           </button>
@@ -170,7 +170,7 @@ function ExportButton({ sessionId, format }: { sessionId: number; format: "markd
     <button
       onClick={handleExport}
       disabled={loading}
-      className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-purple-500/20 text-purple-300 hover:bg-purple-500/10 disabled:opacity-50 transition-colors"
+      className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-amber-500/20 text-amber-300 hover:bg-amber-500/10 disabled:opacity-50 transition-colors"
     >
       {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Icon className="w-3 h-3" />}
       {label}
@@ -200,7 +200,7 @@ function InvestigationDetail({ id, onBack }: { id: number; onBack: () => void })
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+        <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
       </div>
     );
   }
@@ -210,7 +210,7 @@ function InvestigationDetail({ id, onBack }: { id: number; onBack: () => void })
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <AlertTriangle className="w-8 h-8 text-threat-high" />
         <p className="text-sm text-muted-foreground">Investigation not found</p>
-        <button onClick={onBack} className="text-xs text-purple-400 hover:text-purple-300">Go back</button>
+        <button onClick={onBack} className="text-xs text-amber-400 hover:text-amber-300">Go back</button>
       </div>
     );
   }
@@ -235,7 +235,7 @@ function InvestigationDetail({ id, onBack }: { id: number; onBack: () => void })
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {tags.map((t: string) => (
-                  <span key={t} className="px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20">{t}</span>
+                  <span key={t} className="px-2 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20">{t}</span>
                 ))}
               </div>
             )}
@@ -278,7 +278,7 @@ function InvestigationDetail({ id, onBack }: { id: number; onBack: () => void })
       {/* Notes section */}
       <div className="glass-panel rounded-xl border border-white/10 overflow-hidden">
         <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2">
-          <StickyNote className="w-4 h-4 text-purple-400" />
+          <StickyNote className="w-4 h-4 text-amber-400" />
           <h3 className="text-sm font-medium text-foreground">Analyst Notes</h3>
           <span className="text-[10px] text-muted-foreground ml-auto">{notes.length} note{notes.length !== 1 ? "s" : ""}</span>
         </div>
@@ -290,13 +290,13 @@ function InvestigationDetail({ id, onBack }: { id: number; onBack: () => void })
             onChange={e => setNoteInput(e.target.value)}
             placeholder="Add investigation notes, findings, or observations..."
             rows={3}
-            className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-purple-500/30 resize-none font-mono"
+            className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-amber-500/30 resize-none font-mono"
           />
           <div className="flex justify-end mt-2">
             <button
               onClick={() => addNoteMutation.mutate({ sessionId: id, content: noteInput })}
               disabled={!noteInput.trim() || addNoteMutation.isPending}
-              className="px-3 py-1.5 text-xs rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-200 hover:bg-purple-500/30 disabled:opacity-50 transition-colors"
+              className="px-3 py-1.5 text-xs rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-200 hover:bg-amber-500/30 disabled:opacity-50 transition-colors"
             >
               {addNoteMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Add Note"}
             </button>
@@ -373,8 +373,8 @@ export default function Investigations(): React.JSX.Element {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center">
-            <FolderSearch className="w-5 h-5 text-purple-400" />
+          <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+            <FolderSearch className="w-5 h-5 text-amber-400" />
           </div>
           <div>
             <h1 className="text-lg font-display font-bold text-foreground">Investigations</h1>
@@ -392,7 +392,7 @@ export default function Investigations(): React.JSX.Element {
           </button>
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-200 hover:bg-purple-500/30 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-200 hover:bg-amber-500/30 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             New Investigation
@@ -408,7 +408,7 @@ export default function Investigations(): React.JSX.Element {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search investigations..."
-            className="w-full pl-9 pr-3 py-2 text-xs bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-purple-500/30"
+            className="w-full pl-9 pr-3 py-2 text-xs bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-amber-500/30"
           />
         </div>
         <div className="flex gap-1">
@@ -418,7 +418,7 @@ export default function Investigations(): React.JSX.Element {
               onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
                 statusFilter === s
-                  ? "border-purple-500/30 bg-purple-500/15 text-purple-200"
+                  ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
                   : "border-white/10 text-muted-foreground hover:bg-white/5"
               }`}
             >
@@ -431,7 +431,7 @@ export default function Investigations(): React.JSX.Element {
       {/* Investigation list */}
       {isLoading ? (
         <div className="flex items-center justify-center h-48">
-          <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+          <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
         <div className="glass-panel rounded-xl border border-white/10 px-8 py-12 text-center">
@@ -443,7 +443,7 @@ export default function Investigations(): React.JSX.Element {
           {!searchQuery && (
             <button
               onClick={() => setShowCreate(true)}
-              className="px-4 py-2 text-xs rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-200 hover:bg-purple-500/30 transition-colors"
+              className="px-4 py-2 text-xs rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-200 hover:bg-amber-500/30 transition-colors"
             >
               Create Investigation
             </button>
@@ -457,7 +457,7 @@ export default function Investigations(): React.JSX.Element {
               <button
                 key={session.id}
                 onClick={() => setSelectedId(session.id)}
-                className="w-full glass-panel rounded-xl border border-white/10 px-4 py-3 text-left hover:bg-white/[0.03] hover:border-purple-500/20 transition-all group"
+                className="w-full glass-panel rounded-xl border border-white/10 px-4 py-3 text-left hover:bg-white/[0.03] hover:border-amber-500/20 transition-all group"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
@@ -477,14 +477,14 @@ export default function Investigations(): React.JSX.Element {
                         <div className="flex items-center gap-1">
                           <Tag className="w-3 h-3 text-muted-foreground" />
                           {tags.slice(0, 3).map((t: string) => (
-                            <span key={t} className="text-[10px] text-purple-300">{t}</span>
+                            <span key={t} className="text-[10px] text-amber-300">{t}</span>
                           ))}
                           {tags.length > 3 && <span className="text-[10px] text-muted-foreground">+{tags.length - 3}</span>}
                         </div>
                       )}
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-purple-400 transition-colors flex-shrink-0 mt-1" />
+                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-amber-400 transition-colors flex-shrink-0 mt-1" />
                 </div>
               </button>
             );

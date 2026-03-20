@@ -72,16 +72,16 @@ interface StatusResponse {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS = {
-  connected: { bg: "oklch(0.765 0.177 163.223 / 15%)", border: "oklch(0.765 0.177 163.223 / 30%)", text: "oklch(0.765 0.177 163.223)", label: "Connected" },
-  disconnected: { bg: "oklch(0.637 0.237 25.331 / 15%)", border: "oklch(0.637 0.237 25.331 / 30%)", text: "oklch(0.637 0.237 25.331)", label: "Disconnected" },
-  not_configured: { bg: "oklch(0.795 0.184 86.047 / 15%)", border: "oklch(0.795 0.184 86.047 / 30%)", text: "oklch(0.795 0.184 86.047)", label: "Not Configured" },
-  error: { bg: "oklch(0.637 0.237 25.331 / 15%)", border: "oklch(0.637 0.237 25.331 / 30%)", text: "oklch(0.637 0.237 25.331)", label: "Error" },
+  connected: { bg: "oklch(0.765 0.177 163.223 / 15%)", border: "oklch(0.765 0.177 163.223 / 30%)", text: "oklch(0.723 0.219 149.579)", label: "Connected" },
+  disconnected: { bg: "oklch(0.637 0.237 25.331 / 15%)", border: "oklch(0.637 0.237 25.331 / 30%)", text: "oklch(0.628 0.258 29.234)", label: "Disconnected" },
+  not_configured: { bg: "oklch(0.795 0.184 86.047 / 15%)", border: "oklch(0.795 0.184 86.047 / 30%)", text: "oklch(0.769 0.188 70.08)", label: "Not Configured" },
+  error: { bg: "oklch(0.637 0.237 25.331 / 15%)", border: "oklch(0.637 0.237 25.331 / 30%)", text: "oklch(0.628 0.258 29.234)", label: "Error" },
 } as const;
 
 const OVERALL_COLORS = {
-  healthy: { bg: "oklch(0.765 0.177 163.223 / 12%)", border: "oklch(0.765 0.177 163.223 / 25%)", text: "oklch(0.765 0.177 163.223)", icon: CheckCircle2 },
-  degraded: { bg: "oklch(0.795 0.184 86.047 / 12%)", border: "oklch(0.795 0.184 86.047 / 25%)", text: "oklch(0.795 0.184 86.047)", icon: AlertTriangle },
-  unhealthy: { bg: "oklch(0.637 0.237 25.331 / 12%)", border: "oklch(0.637 0.237 25.331 / 25%)", text: "oklch(0.637 0.237 25.331)", icon: XCircle },
+  healthy: { bg: "oklch(0.765 0.177 163.223 / 12%)", border: "oklch(0.765 0.177 163.223 / 25%)", text: "oklch(0.723 0.219 149.579)", icon: CheckCircle2 },
+  degraded: { bg: "oklch(0.795 0.184 86.047 / 12%)", border: "oklch(0.795 0.184 86.047 / 25%)", text: "oklch(0.769 0.188 70.08)", icon: AlertTriangle },
+  unhealthy: { bg: "oklch(0.637 0.237 25.331 / 12%)", border: "oklch(0.637 0.237 25.331 / 25%)", text: "oklch(0.628 0.258 29.234)", icon: XCircle },
 } as const;
 
 // ── Status Icon Component ────────────────────────────────────────────────────
@@ -112,12 +112,12 @@ function LatencyBar({ ms }: { ms?: number }): React.JSX.Element | null {
   if (ms === undefined) return null;
   const maxMs = 2000;
   const pct = Math.min((ms / maxMs) * 100, 100);
-  const color = ms < 200 ? "oklch(0.765 0.177 163.223)" : ms < 500 ? "oklch(0.795 0.184 86.047)" : "oklch(0.637 0.237 25.331)";
+  const color = ms < 200 ? "oklch(0.723 0.219 149.579)" : ms < 500 ? "oklch(0.769 0.188 70.08)" : "oklch(0.628 0.258 29.234)";
 
   return (
     <div className="flex items-center gap-2 mt-2">
       <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
-      <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.2_0.02_286)]">
+      <div className="flex-1 h-1.5 rounded-full bg-[oklch(0.2_0.01_260)]">
         <div
           className="h-full rounded-full transition-all duration-700"
           style={{ width: `${pct}%`, background: color }}
@@ -149,12 +149,12 @@ function ServiceCard({
       {/* Header with status indicator */}
       <div
         className="px-5 py-4 flex items-start gap-4"
-        style={{ borderBottom: `1px solid oklch(0.3 0.04 286 / 20%)` }}
+        style={{ borderBottom: `1px solid oklch(0.3 0.01 260 / 20%)` }}
       >
         <StatusIcon status={status} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <ServiceIcon className="w-4 h-4 text-[oklch(0.7_0.15_286)]" />
+            <ServiceIcon className="w-4 h-4 text-[oklch(0.795_0.184_85)]" />
             <h3 className="text-sm font-semibold text-foreground font-[Space_Grotesk]">{title}</h3>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
@@ -286,7 +286,7 @@ export default function Status() {
         isLoading={isLoading}
       >
         {/* Auto-refresh control */}
-        <div className="flex items-center gap-1.5 rounded-lg px-1 py-1" style={{ background: "oklch(0.18 0.03 286 / 60%)", border: "1px solid oklch(0.3 0.04 286 / 30%)" }}>
+        <div className="flex items-center gap-1.5 rounded-lg px-1 py-1" style={{ background: "oklch(0.18 0.03 60 / 60%)", border: "1px solid oklch(0.3 0.01 260 / 30%)" }}>
           {refreshInterval > 0 ? (
             <Timer className="w-3.5 h-3.5 ml-2 text-primary animate-pulse" />
           ) : (
@@ -365,7 +365,7 @@ export default function Status() {
         <button
           onClick={fetchStatus}
           disabled={isLoading}
-          className="shrink-0 p-2.5 rounded-lg bg-[oklch(0.2_0.03_286/50%)] border border-[oklch(0.3_0.04_286/30%)] hover:bg-[oklch(0.25_0.04_286/60%)] transition-all disabled:opacity-50"
+          className="shrink-0 p-2.5 rounded-lg bg-[oklch(0.2_0.03_60/50%)] border border-[oklch(0.3_0.01_260/30%)] hover:bg-[oklch(0.25_0.04_60/60%)] transition-all disabled:opacity-50"
           aria-label="Refresh system status"
         >
           <RefreshCw className={`w-4 h-4 text-muted-foreground ${isLoading ? "animate-spin" : ""}`} />
@@ -414,7 +414,7 @@ export default function Status() {
           {/* Environment Info */}
           <GlassPanel>
             <h3 className="text-sm font-semibold text-foreground font-[Space_Grotesk] mb-4 flex items-center gap-2">
-              <Server className="w-4 h-4 text-[oklch(0.7_0.15_286)]" />
+              <Server className="w-4 h-4 text-[oklch(0.795_0.184_85)]" />
               Environment
             </h3>
             <div className="space-y-3">
@@ -432,7 +432,7 @@ export default function Status() {
           {/* Feature Availability */}
           <GlassPanel>
             <h3 className="text-sm font-semibold text-foreground font-[Space_Grotesk] mb-4 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-[oklch(0.7_0.15_286)]" />
+              <Activity className="w-4 h-4 text-[oklch(0.795_0.184_85)]" />
               Feature Availability
             </h3>
             <div className="space-y-2">
@@ -481,7 +481,7 @@ export default function Status() {
         data.checks.wazuhManager.details?.daemons && (
           <GlassPanel>
             <h3 className="text-sm font-semibold text-foreground font-[Space_Grotesk] mb-4 flex items-center gap-2">
-              <Users className="w-4 h-4 text-[oklch(0.7_0.15_286)]" />
+              <Users className="w-4 h-4 text-[oklch(0.795_0.184_85)]" />
               Wazuh Manager Daemons
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -499,7 +499,7 @@ export default function Status() {
         data.checks.wazuhIndexer.details && (
           <GlassPanel>
             <h3 className="text-sm font-semibold text-foreground font-[Space_Grotesk] mb-4 flex items-center gap-2">
-              <Search className="w-4 h-4 text-[oklch(0.7_0.15_286)]" />
+              <Search className="w-4 h-4 text-[oklch(0.795_0.184_85)]" />
               Indexer Cluster Details
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -512,10 +512,10 @@ export default function Status() {
                   value={String(data.checks.wazuhIndexer.details.clusterStatus)}
                   color={
                     String(data.checks.wazuhIndexer.details.clusterStatus) === "green"
-                      ? "oklch(0.765 0.177 163.223)"
+                      ? "oklch(0.723 0.219 149.579)"
                       : String(data.checks.wazuhIndexer.details.clusterStatus) === "yellow"
-                        ? "oklch(0.795 0.184 86.047)"
-                        : "oklch(0.637 0.237 25.331)"
+                        ? "oklch(0.769 0.188 70.08)"
+                        : "oklch(0.628 0.258 29.234)"
                   }
                 />
               ) : null}
@@ -603,7 +603,7 @@ function WazuhApiIntelligence() {
   return (
     <div className="space-y-5">
       <h2 className="text-lg font-semibold text-foreground font-[Space_Grotesk] flex items-center gap-2">
-        <Info className="w-5 h-5 text-[oklch(0.7_0.15_286)]" />
+        <Info className="w-5 h-5 text-[oklch(0.795_0.184_85)]" />
         Wazuh API Intelligence
       </h2>
 
@@ -647,10 +647,10 @@ function WazuhApiIntelligence() {
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-5">
         {/* API Info — GET / */}
         <GlassPanel className="p-0 overflow-hidden">
-          <div className="px-5 py-4 border-b border-[oklch(0.3_0.04_286/20%)]">
+          <div className="px-5 py-4 border-b border-[oklch(0.3_0.01_260/20%)]">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground font-[Space_Grotesk] flex items-center gap-2">
-                <Info className="w-4 h-4 text-[oklch(0.7_0.15_286)]" />
+                <Info className="w-4 h-4 text-[oklch(0.795_0.184_85)]" />
                 API Info
               </h3>
               {apiInfoQ.data ? <RawJsonViewer data={apiInfoQ.data} title="API Info JSON" /> : null}
@@ -661,7 +661,7 @@ function WazuhApiIntelligence() {
           <div className="px-5 py-3">
             {apiInfoQ.isLoading ? (
               <div className="flex items-center justify-center py-6">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-violet-400" />
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-400" />
               </div>
             ) : apiInfoQ.isError ? (
               <div className="flex items-center gap-2 text-red-400 text-xs">
@@ -685,10 +685,10 @@ function WazuhApiIntelligence() {
 
         {/* Version Check — GET /manager/version/check */}
         <GlassPanel className="p-0 overflow-hidden">
-          <div className="px-5 py-4 border-b border-[oklch(0.3_0.04_286/20%)]">
+          <div className="px-5 py-4 border-b border-[oklch(0.3_0.01_260/20%)]">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground font-[Space_Grotesk] flex items-center gap-2">
-                <GitBranch className="w-4 h-4 text-[oklch(0.7_0.15_286)]" />
+                <GitBranch className="w-4 h-4 text-[oklch(0.795_0.184_85)]" />
                 Version Check
               </h3>
               {versionCheckQ.data ? <RawJsonViewer data={versionCheckQ.data} title="Version Check JSON" /> : null}
@@ -699,7 +699,7 @@ function WazuhApiIntelligence() {
           <div className="px-5 py-3">
             {versionCheckQ.isLoading ? (
               <div className="flex items-center justify-center py-6">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-violet-400" />
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-400" />
               </div>
             ) : versionCheckQ.isError ? (
               <div className="flex items-center gap-2 text-red-400 text-xs">
@@ -723,10 +723,10 @@ function WazuhApiIntelligence() {
 
         {/* Security Config — GET /security/config */}
         <GlassPanel className="p-0 overflow-hidden">
-          <div className="px-5 py-4 border-b border-[oklch(0.3_0.04_286/20%)]">
+          <div className="px-5 py-4 border-b border-[oklch(0.3_0.01_260/20%)]">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground font-[Space_Grotesk] flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[oklch(0.7_0.15_286)]" />
+                <ShieldCheck className="w-4 h-4 text-[oklch(0.795_0.184_85)]" />
                 Security Config
               </h3>
               {securityConfigQ.data ? <RawJsonViewer data={securityConfigQ.data} title="Security Config JSON" /> : null}
@@ -737,7 +737,7 @@ function WazuhApiIntelligence() {
           <div className="px-5 py-3">
             {securityConfigQ.isLoading ? (
               <div className="flex items-center justify-center py-6">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-violet-400" />
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-400" />
               </div>
             ) : securityConfigQ.isError ? (
               <div className="flex items-center gap-2 text-red-400 text-xs">
@@ -760,10 +760,10 @@ function WazuhApiIntelligence() {
         </GlassPanel>
         {/* Manager Stats — GET /manager/stats */}
         <GlassPanel className="p-0 overflow-hidden">
-          <div className="px-5 py-4 border-b border-[oklch(0.3_0.04_286/20%)]">
+          <div className="px-5 py-4 border-b border-[oklch(0.3_0.01_260/20%)]">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground font-[Space_Grotesk] flex items-center gap-2">
-                <Activity className="w-4 h-4 text-[oklch(0.7_0.15_286)]" />
+                <Activity className="w-4 h-4 text-[oklch(0.795_0.184_85)]" />
                 Manager Stats
               </h3>
               <div className="flex items-center gap-2">
@@ -788,7 +788,7 @@ function WazuhApiIntelligence() {
           <div className="px-5 py-3">
             {managerStatsQ.isLoading ? (
               <div className="flex items-center justify-center py-6">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-violet-400" />
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-400" />
               </div>
             ) : managerStatsQ.isError ? (
               <div className="flex items-center gap-2 text-red-400 text-xs">
@@ -845,7 +845,7 @@ function WazuhApiIntelligence() {
         </div>
         {managerCompConfigQ.isLoading ? (
           <div className="flex items-center justify-center py-6">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-violet-400" />
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-400" />
           </div>
         ) : managerCompConfigQ.isError ? (
           <div className="flex items-center gap-2 text-red-400 text-xs">
@@ -874,7 +874,7 @@ function WazuhApiIntelligence() {
           <BrokerWarnings data={agentsUninstallPermQ.data} context="agentsUninstallPermission" />
           {agentsUninstallPermQ.isLoading ? (
             <div className="flex items-center justify-center py-6">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-violet-400" />
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-400" />
             </div>
           ) : agentsUninstallPermQ.isError ? (
             <div className="flex items-center gap-2 text-red-400 text-xs">
@@ -1055,7 +1055,7 @@ function formatKey(key: string): string {
 
 function ConfigRow({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {
   return (
-    <div className="flex items-center justify-between py-1.5 border-b border-[oklch(0.3_0.04_286/15%)] last:border-0">
+    <div className="flex items-center justify-between py-1.5 border-b border-[oklch(0.3_0.01_260/15%)] last:border-0">
       <span className="text-xs text-muted-foreground flex items-center gap-2">
         <Icon className="w-3.5 h-3.5" />
         {label}
@@ -1067,12 +1067,12 @@ function ConfigRow({ label, value, icon: Icon }: { label: string; value: string;
 
 function FeatureRow({ label, available, source }: { label: string; available: boolean; source: string }) {
   return (
-    <div className="flex items-center justify-between py-1.5 border-b border-[oklch(0.3_0.04_286/15%)] last:border-0">
+    <div className="flex items-center justify-between py-1.5 border-b border-[oklch(0.3_0.01_260/15%)] last:border-0">
       <div className="flex items-center gap-2">
         {available ? (
           <CheckCircle2 className="w-3.5 h-3.5 text-[oklch(0.765_0.177_163.223)]" />
         ) : (
-          <XCircle className="w-3.5 h-3.5 text-[oklch(0.5_0.02_286)]" />
+          <XCircle className="w-3.5 h-3.5 text-[oklch(0.5_0.02_60)]" />
         )}
         <span className={`text-xs ${available ? "text-foreground" : "text-muted-foreground"}`}>
           {label}
@@ -1098,7 +1098,7 @@ function DaemonCard({ name, state }: { name: string; state: string }) {
       </p>
       <p
         className="text-xs font-medium mt-0.5 capitalize"
-        style={{ color: isRunning ? "oklch(0.765 0.177 163.223)" : "oklch(0.637 0.237 25.331)" }}
+        style={{ color: isRunning ? "oklch(0.723 0.219 149.579)" : "oklch(0.628 0.258 29.234)" }}
       >
         {state}
       </p>
@@ -1108,11 +1108,11 @@ function DaemonCard({ name, state }: { name: string; state: string }) {
 
 function DetailCard({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="rounded-lg px-3 py-2 bg-[oklch(0.15_0.02_286)] border border-[oklch(0.3_0.04_286/20%)]">
+    <div className="rounded-lg px-3 py-2 bg-[oklch(0.15_0.02_60)] border border-[oklch(0.3_0.01_260/20%)]">
       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
       <p
         className="text-sm font-mono font-medium mt-0.5 capitalize"
-        style={{ color: color || "oklch(0.93 0.005 286)" }}
+        style={{ color: color || "oklch(0.95 0.005 85)" }}
       >
         {value}
       </p>

@@ -178,7 +178,8 @@ describe("RulesetExplorer.tsx — rulesByRequirement wiring", () => {
     expect(content).toMatch(/RawJsonViewer.*Rules by Requirement/is);
   });
   it("shows common requirement examples", () => {
-    expect(content).toContain("PCI_DSS_10.6.1");
+    // The uploaded code uses "pci_dss" as requirement type, with "10.6.1" as example filter
+    expect(content).toContain("pci_dss");
   });
 });
 

@@ -288,7 +288,7 @@ export default function AutoQueueRules() {
       <div className="flex-none p-6 pb-4 border-b border-white/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center amethyst-glow">
+            <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center gold-glow">
               <Zap className="h-5 w-5 text-primary" />
             </div>
             <div>
@@ -459,7 +459,7 @@ export default function AutoQueueRules() {
                       </span>
                     )}
                     {rule.agentPattern && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono text-purple-300 bg-purple-500/10 border border-purple-500/20">
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono text-amber-300 bg-amber-500/10 border border-amber-500/20">
                         <Server className="h-2.5 w-2.5" />
                         {rule.agentPattern}
                       </span>

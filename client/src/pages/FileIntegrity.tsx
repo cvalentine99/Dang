@@ -21,17 +21,18 @@ import {
   Layers, Eye, Clock, Hash, FileDiff,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
+import { motion } from "framer-motion";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip,
   ResponsiveContainer, PieChart, Pie, Legend,
 } from "recharts";
 
 const COLORS = {
-  purple: "oklch(0.541 0.281 293.009)",
-  cyan: "oklch(0.789 0.154 211.53)",
-  green: "oklch(0.765 0.177 163.223)",
-  yellow: "oklch(0.795 0.184 86.047)",
-  red: "oklch(0.637 0.237 25.331)",
+  gold: "oklch(0.795 0.184 85)",
+  cyan: "oklch(0.75 0.15 195)",
+  green: "oklch(0.723 0.219 149.579)",
+  yellow: "oklch(0.769 0.188 70.08)",
+  red: "oklch(0.628 0.258 29.234)",
 };
 
 const EVENT_COLORS: Record<string, string> = {
@@ -104,7 +105,7 @@ export default function FileIntegrity() {
   const eventDist = useMemo(() => {
     const counts: Record<string, number> = {};
     files.forEach(f => { const e = String(f.event ?? f.type ?? "unknown"); counts[e] = (counts[e] ?? 0) + 1; });
-    return Object.entries(counts).map(([name, value]) => ({ name, value, fill: EVENT_COLORS[name.toLowerCase()] ?? COLORS.purple }));
+    return Object.entries(counts).map(([name, value]) => ({ name, value, fill: EVENT_COLORS[name.toLowerCase()] ?? COLORS.gold }));
   }, [files]);
 
   const extDist = useMemo(() => {
@@ -145,13 +146,29 @@ export default function FileIntegrity() {
           ) : null}
         </GlassPanel>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <StatCard label="Total Files" value={totalFiles} icon={FileText} colorClass="text-primary" />
-          <StatCard label="Added" value={addedCount} icon={FileText} colorClass="text-threat-low" />
-          <StatCard label="Modified" value={modifiedCount} icon={FileDiff} colorClass="text-threat-medium" />
-          <StatCard label="Deleted" value={deletedCount} icon={FileText} colorClass="text-threat-critical" />
-          <StatCard label="Scan Status" value={lastScan ? "Complete" : "Unknown"} icon={Shield} colorClass="text-primary" />
-        </div>
+        <motion.div
+          className="grid grid-cols-2 md:grid-cols-5 gap-4"
+          initial="hidden" animate="visible"
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+        >
+          {[
+            { label: "Total Files", value: totalFiles, icon: FileText, colorClass: "text-primary" },
+            { label: "Added", value: addedCount, icon: FileText, colorClass: "text-threat-low" },
+            { label: "Modified", value: modifiedCount, icon: FileDiff, colorClass: "text-threat-medium" },
+            { label: "Deleted", value: deletedCount, icon: FileText, colorClass: "text-threat-critical" },
+            { label: "Scan Status", value: lastScan ? "Complete" : "Unknown", icon: Shield, colorClass: "text-primary" },
+          ].map((card) => (
+            <motion.div
+              key={card.label}
+              variants={{
+                hidden: { opacity: 0, y: 20, scale: 0.95 },
+                visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+              }}
+            >
+              <StatCard label={card.label} value={card.value} icon={card.icon} colorClass={card.colorClass} />
+            </motion.div>
+          ))}
+        </motion.div>
 
         {isLoading ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -159,31 +176,39 @@ export default function FileIntegrity() {
             <ChartSkeleton variant="bar" height={200} title="File Extensions" className="lg:col-span-8" />
           </div>
         ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <GlassPanel className="lg:col-span-4">
+        <motion.div
+          className="grid grid-cols-1 lg:grid-cols-12 gap-4"
+          initial="hidden" animate="visible"
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}
+        >
+          <motion.div className="lg:col-span-4" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+          <GlassPanel>
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Event Types</h3>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie data={eventDist} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value" stroke="none" />
                 <ReTooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.65 0.02 286)" }} />
+                <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.6 0.01 260)" }} />
               </PieChart>
             </ResponsiveContainer>
           </GlassPanel>
+          </motion.div>
 
-          <GlassPanel className="lg:col-span-8">
+          <motion.div className="lg:col-span-8" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+          <GlassPanel>
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Hash className="h-4 w-4 text-primary" /> File Extensions</h3>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={extDist}>
-                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-                <XAxis dataKey="name" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
-                <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+                <XAxis dataKey="name" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} />
+                <YAxis tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} />
                 <ReTooltip content={<ChartTooltip />} />
                 <Bar dataKey="count" fill={COLORS.cyan} name="Files" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </GlassPanel>
-        </div>
+          </motion.div>
+        </motion.div>
         )}
 
         <GlassPanel>

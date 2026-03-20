@@ -365,8 +365,9 @@ export async function getEffectiveWazuhConfig(): Promise<WazuhConfig | null> {
   try {
     const { getEffectiveWazuhConfig: getFromDb } = await import("../admin/connectionSettingsService");
     return await getFromDb();
-  } catch {
-    // If DB is not available, fall back to env
+  } catch (err) {
+    // DB unavailable or query failed — log so silent failures are diagnosable
+    console.warn("[WazuhClient] DB config lookup failed, falling back to env vars:", (err as Error)?.message ?? err);
     if (isWazuhConfigured()) return getWazuhConfig();
     return null;
   }

@@ -25,7 +25,7 @@ export function GlassPanel({
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
           <div className="flex items-center gap-2">
             {Icon && <Icon className="h-4 w-4" style={{ color: PURPLE }} />}
-            <h3 className="font-display text-sm font-semibold tracking-wide" style={{ color: "oklch(0.85 0.01 286)" }}>
+            <h3 className="font-display text-sm font-semibold tracking-wide" style={{ color: "oklch(0.85 0.01 60)" }}>
               {title}
             </h3>
           </div>

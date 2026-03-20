@@ -41,6 +41,8 @@ export function useAuth(options?: UseAuthOptions) {
     } finally {
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
+      // Navigate to login with full reload to clear all in-memory state
+      window.location.href = "/login";
     }
   }, [logoutMutation, utils]);
 

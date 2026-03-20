@@ -44,11 +44,11 @@ import { useState, useMemo, useCallback } from "react";
 
 // ── Amethyst Nexus Colors ──────────────────────────────────────────────────
 const COLORS = {
-  purple: "oklch(0.541 0.281 293.009)",
-  cyan: "oklch(0.789 0.154 211.53)",
-  green: "oklch(0.765 0.177 163.223)",
-  yellow: "oklch(0.795 0.184 86.047)",
-  red: "oklch(0.637 0.237 25.331)",
+  gold: "oklch(0.795 0.184 85)",
+  cyan: "oklch(0.75 0.15 195)",
+  green: "oklch(0.723 0.219 149.579)",
+  yellow: "oklch(0.769 0.188 70.08)",
+  red: "oklch(0.628 0.258 29.234)",
 };
 
 type TabKey = "packages" | "processes" | "ports" | "os" | "hardware" | "hotfixes" | "netaddr" | "netiface" | "netproto";

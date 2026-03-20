@@ -1189,8 +1189,8 @@ describe("Pipeline Inspector Tickets Badge", () => {
     expect(inspectorSrc).toContain("bg-red-500/10 border-red-500/20 text-red-300");
     // Mixed: amber
     expect(inspectorSrc).toContain("bg-amber-500/10 border-amber-500/20 text-amber-300");
-    // All-success: violet
-    expect(inspectorSrc).toContain("bg-violet-500/10 border-violet-500/20 text-violet-300");
+    // All-success: emerald (was violet in Amethyst theme, now emerald in Obsidian theme)
+    expect(inspectorSrc).toContain("bg-emerald-500/10 border-emerald-500/20 text-emerald-300");
   });
 
   it("should include a tooltip with success/failed counts", () => {

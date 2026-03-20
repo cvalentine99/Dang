@@ -401,9 +401,9 @@ export default function AdminSettings() {
       {/* LLM / AI Engine */}
       <div className="pt-2">
         <div className="flex items-center gap-2 mb-4">
-          <Zap className="h-4 w-4 text-violet-400" />
+          <Zap className="h-4 w-4 text-amber-400" />
           <h2 className="text-lg font-display font-semibold text-foreground">AI Engine</h2>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400 border border-violet-500/30 font-mono">
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono">
             LLM BACKEND
           </span>
         </div>
@@ -411,8 +411,8 @@ export default function AdminSettings() {
           category="llm"
           title="Custom LLM Endpoint"
           description="Self-hosted OpenAI-compatible LLM (e.g., Nemotron3 Nano via llama.cpp / vLLM / Ollama). When enabled, Dang! routes queries here first with fallback to built-in."
-          icon={<Brain className="h-5 w-5 text-violet-400" />}
-          accentClass="bg-violet-500/15"
+          icon={<Brain className="h-5 w-5 text-amber-400" />}
+          accentClass="bg-amber-500/15"
           toggleField="enabled"
           fields={[
             { key: "enabled", label: "Enabled", placeholder: "true", description: "Toggle managed by the header switch" },

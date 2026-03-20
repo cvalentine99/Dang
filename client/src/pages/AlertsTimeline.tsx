@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useSearch, useLocation } from "wouter";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip,
@@ -37,13 +38,13 @@ import {
 } from "recharts";
 
 const COLORS = {
-  purple: "oklch(0.541 0.281 293.009)",
-  cyan: "oklch(0.789 0.154 211.53)",
-  green: "oklch(0.765 0.177 163.223)",
-  yellow: "oklch(0.795 0.184 86.047)",
-  red: "oklch(0.637 0.237 25.331)",
-  orange: "oklch(0.705 0.191 22.216)",
-  pink: "oklch(0.656 0.241 354.308)",
+  gold: "oklch(0.795 0.184 85)",
+  cyan: "oklch(0.75 0.15 195)",
+  green: "oklch(0.723 0.219 149.579)",
+  yellow: "oklch(0.769 0.188 70.08)",
+  red: "oklch(0.628 0.258 29.234)",
+  orange: "oklch(0.705 0.213 47.604)",
+  pink: "oklch(0.628 0.258 29.234)",
 };
 
 const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
@@ -59,7 +60,7 @@ const TIME_PRESETS = [
 ] as const;
 
 const SEVERITY_COLORS: Record<string, string> = {
-  "0": "oklch(0.65 0.02 286)", "1": "oklch(0.65 0.02 286)", "2": "oklch(0.65 0.05 286)",
+  "0": "oklch(0.6 0.01 260)", "1": "oklch(0.6 0.01 260)", "2": "oklch(0.6 0.02 260)",
   "3": COLORS.cyan, "4": COLORS.cyan, "5": COLORS.green, "6": COLORS.green,
   "7": COLORS.yellow, "8": COLORS.yellow, "9": COLORS.orange, "10": COLORS.orange,
   "11": COLORS.red, "12": COLORS.red, "13": COLORS.red, "14": COLORS.pink, "15": COLORS.pink,
@@ -133,7 +134,7 @@ function SendToQueueButton({ alert }: { alert: Record<string, unknown> }) {
     <button
       onClick={handleClick}
       disabled={enqueueMutation.isPending}
-      className="group flex items-center gap-1 px-1.5 py-0.5 rounded border border-purple-500/20 bg-purple-500/5 text-purple-300 hover:bg-purple-500/15 hover:border-purple-500/40 transition-all disabled:opacity-50"
+      className="group flex items-center gap-1 px-1.5 py-0.5 rounded border border-amber-500/20 bg-amber-500/5 text-amber-300 hover:bg-amber-500/15 hover:border-amber-500/40 transition-all disabled:opacity-50"
       title="Send to Alert Queue for structured triage"
     >
       <Brain className={`h-3 w-3 ${enqueueMutation.isPending ? "animate-spin" : "group-hover:animate-pulse"}`} />
@@ -382,16 +383,36 @@ export default function AlertsTimeline() {
           />
         )}
 
-        {/* KPI Row */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {alertsSearchQ.isLoading ? <StatCardSkeleton count={5} /> : (<>
-          <StatCard label="Total Alerts" value={totalAlerts.toLocaleString()} icon={Zap} colorClass="text-primary" />
-          <StatCard label="Critical (12+)" value={criticalCount} icon={AlertTriangle} colorClass="text-threat-critical" />
-          <StatCard label="High (8-11)" value={highCount} icon={TrendingUp} colorClass="text-threat-high" />
-          <StatCard label="Medium (4-7)" value={mediumCount} icon={BarChart3} colorClass="text-threat-medium" />
-          <StatCard label="Low / Info" value={lowCount} icon={Shield} colorClass="text-info-cyan" />
-          </>)}
-        </div>
+        {/* KPI Row — stagger entrance */}
+        {alertsSearchQ.isLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <StatCardSkeleton count={5} />
+          </div>
+        ) : (
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-5 gap-4"
+            initial="hidden" animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+          >
+            {[
+              { label: "Total Alerts", value: totalAlerts.toLocaleString(), icon: Zap, colorClass: "text-primary" },
+              { label: "Critical (12+)", value: criticalCount, icon: AlertTriangle, colorClass: "text-threat-critical" },
+              { label: "High (8-11)", value: highCount, icon: TrendingUp, colorClass: "text-threat-high" },
+              { label: "Medium (4-7)", value: mediumCount, icon: BarChart3, colorClass: "text-threat-medium" },
+              { label: "Low / Info", value: lowCount, icon: Shield, colorClass: "text-info-cyan" },
+            ].map((card) => (
+              <motion.div
+                key={card.label}
+                variants={{
+                  hidden: { opacity: 0, y: 20, scale: 0.95 },
+                  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+                }}
+              >
+                <StatCard label={card.label} value={card.value} icon={card.icon} colorClass={card.colorClass} />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
 
         {/* Charts Row: Severity Timeline + Rule Distribution */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -401,7 +422,13 @@ export default function AlertsTimeline() {
               <ChartSkeleton variant="bar" height={240} title="Top Firing Rules" className="lg:col-span-4" />
             </>
           ) : (<>
-          <GlassPanel className="lg:col-span-8">
+          <motion.div
+            className="lg:col-span-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] as const }}
+          >
+          <GlassPanel>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" /> Severity Trends</h3>
               <SourceBadge source={timelineSource} />
@@ -415,21 +442,28 @@ export default function AlertsTimeline() {
                   <linearGradient id="lowGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.green} stopOpacity={0.3} /><stop offset="95%" stopColor={COLORS.green} stopOpacity={0} /></linearGradient>
                   <linearGradient id="infoGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.cyan} stopOpacity={0.2} /><stop offset="95%" stopColor={COLORS.cyan} stopOpacity={0} /></linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-                <XAxis dataKey="time" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} interval="preserveStartEnd" />
-                <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+                <XAxis dataKey="time" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} />
                 <ReTooltip content={<ChartTooltip />} />
                 <Area type="monotone" dataKey="critical" stackId="1" stroke={COLORS.red} fill="url(#critGrad)" name="Critical" strokeWidth={2} />
                 <Area type="monotone" dataKey="high" stackId="1" stroke={COLORS.orange} fill="url(#highGrad)" name="High" strokeWidth={1.5} />
                 <Area type="monotone" dataKey="medium" stackId="1" stroke={COLORS.yellow} fill="url(#medGrad)" name="Medium" strokeWidth={1} />
                 <Area type="monotone" dataKey="low" stackId="1" stroke={COLORS.green} fill="url(#lowGrad)" name="Low" strokeWidth={1} />
                 <Area type="monotone" dataKey="info" stackId="1" stroke={COLORS.cyan} fill="url(#infoGrad)" name="Info" strokeWidth={1} />
-                <Legend wrapperStyle={{ fontSize: 10, color: "oklch(0.65 0.02 286)" }} />
+                <Legend wrapperStyle={{ fontSize: 10, color: "oklch(0.6 0.01 260)" }} />
               </AreaChart>
             </ResponsiveContainer>
           </GlassPanel>
+          </motion.div>
 
-          <GlassPanel className="lg:col-span-4">
+          <motion.div
+            className="lg:col-span-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.35, ease: [0.25, 0.46, 0.45, 0.94] as const }}
+          >
+          <GlassPanel>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Target className="h-4 w-4 text-primary" /> Top Firing Rules</h3>
               <SourceBadge source={ruleDistSource} />
@@ -449,13 +483,14 @@ export default function AlertsTimeline() {
                       <span className="font-mono text-foreground font-medium shrink-0">{r.count.toLocaleString()}</span>
                     </div>
                     <div className="h-1 bg-secondary/30 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: r.level >= 12 ? COLORS.red : r.level >= 8 ? COLORS.orange : r.level >= 4 ? COLORS.yellow : COLORS.purple }} />
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: r.level >= 12 ? COLORS.red : r.level >= 8 ? COLORS.orange : r.level >= 4 ? COLORS.yellow : COLORS.gold }} />
                     </div>
                   </div>
                 );
               })}
             </div>
           </GlassPanel>
+          </motion.div>
           </>)}
         </div>
 
@@ -483,7 +518,7 @@ export default function AlertsTimeline() {
                       const intensity = val / maxHeatVal;
                       return (
                         <div key={hourIdx} className="flex-1 h-6 rounded-sm cursor-default" style={{
-                          backgroundColor: intensity > 0.7 ? `oklch(0.637 ${0.237 * intensity} 25.331 / ${0.3 + intensity * 0.7})` : intensity > 0.3 ? `oklch(0.795 ${0.184 * intensity} 86.047 / ${0.3 + intensity * 0.7})` : `oklch(0.541 ${0.281 * intensity} 293.009 / ${0.15 + intensity * 0.5})`,
+                          backgroundColor: intensity > 0.7 ? `oklch(0.637 ${0.237 * intensity} 25.331 / ${0.3 + intensity * 0.7})` : intensity > 0.3 ? `oklch(0.795 ${0.184 * intensity} 86.047 / ${0.3 + intensity * 0.7})` : `oklch(0.541 ${0.281 * intensity} 85.0 / ${0.15 + intensity * 0.5})`,
                         }} title={`${day} ${HOURS[hourIdx]}: ${val} events`} />
                       );
                     })}
@@ -493,7 +528,7 @@ export default function AlertsTimeline() {
               <div className="flex items-center justify-end gap-2 mt-2">
                 <span className="text-[9px] text-muted-foreground">Less</span>
                 {[0.1, 0.3, 0.5, 0.7, 0.9].map(i => (
-                  <div key={i} className="w-4 h-4 rounded-sm" style={{ backgroundColor: i > 0.7 ? `oklch(0.637 ${0.237 * i} 25.331 / ${0.3 + i * 0.7})` : i > 0.3 ? `oklch(0.795 ${0.184 * i} 86.047 / ${0.3 + i * 0.7})` : `oklch(0.541 ${0.281 * i} 293.009 / ${0.15 + i * 0.5})` }} />
+                  <div key={i} className="w-4 h-4 rounded-sm" style={{ backgroundColor: i > 0.7 ? `oklch(0.637 ${0.237 * i} 25.331 / ${0.3 + i * 0.7})` : i > 0.3 ? `oklch(0.795 ${0.184 * i} 86.047 / ${0.3 + i * 0.7})` : `oklch(0.541 ${0.281 * i} 85.0 / ${0.15 + i * 0.5})` }} />
                 ))}
                 <span className="text-[9px] text-muted-foreground">More</span>
               </div>

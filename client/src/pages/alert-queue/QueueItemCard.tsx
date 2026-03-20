@@ -219,7 +219,7 @@ export function QueueItemCard({
           {item.pipelineTriageId && (
             <button
               onClick={() => navigate(`/triage?highlight=${item.pipelineTriageId}`)}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-300 text-[10px] font-medium hover:bg-violet-500/20 transition-all"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-medium hover:bg-amber-500/20 transition-all"
               title={`Pipeline Triage: ${item.pipelineTriageId}`}
             >
               <Brain className="h-3 w-3" />
@@ -242,7 +242,7 @@ export function QueueItemCard({
                     disabled={!canRunStructuredPipeline || isAnyPipelineRunning}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       canRunStructuredPipeline
-                        ? "bg-purple-500/15 border border-purple-500/30 text-purple-300 hover:bg-purple-500/25 hover:shadow-[0_0_10px_rgba(168,85,247,0.15)]"
+                        ? "bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 hover:shadow-[0_0_10px_rgba(168,85,247,0.15)]"
                         : "bg-white/5 border border-white/10 text-muted-foreground/50 cursor-not-allowed"
                     }`}
                     title={canRunStructuredPipeline ? "Run Stage 1 only (Triage) — creates triage artifacts" : "Pipeline blocked — check readiness banner for details"}
@@ -257,7 +257,7 @@ export function QueueItemCard({
                     disabled={!canRunStructuredPipeline || isAnyPipelineRunning}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       canRunStructuredPipeline
-                        ? "bg-gradient-to-r from-violet-500/20 to-purple-500/20 border border-violet-500/40 text-violet-200 hover:from-violet-500/30 hover:to-purple-500/30 hover:shadow-[0_0_12px_rgba(139,92,246,0.2)]"
+                        ? "bg-gradient-to-r from-amber-500/20 to-amber-500/20 border border-amber-500/40 text-amber-200 hover:from-amber-500/30 hover:to-amber-500/30 hover:shadow-[0_0_12px_rgba(139,92,246,0.2)]"
                         : "bg-white/5 border border-white/10 text-muted-foreground/50 cursor-not-allowed"
                     }`}
                     title={canRunStructuredPipeline ? "Run all 4 stages: Triage → Correlation → Hypothesis → Response Actions" : "Pipeline blocked — check readiness banner for details"}
@@ -270,9 +270,9 @@ export function QueueItemCard({
 
               {/* Loading state for pipeline mutations */}
               {isAnyPipelineRunning && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/20 border border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.15)] animate-pulse-subtle">
-                  <Loader2 className="h-3.5 w-3.5 text-purple-300 animate-spin" />
-                  <span className="text-xs font-medium text-purple-200">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 shadow-[0_0_12px_rgba(168,85,247,0.15)] animate-pulse-subtle">
+                  <Loader2 className="h-3.5 w-3.5 text-amber-300 animate-spin" />
+                  <span className="text-xs font-medium text-amber-200">
                     {fullPipelineMutation.isPending ? "Running full pipeline…" : "Triaging…"}
                   </span>
                 </div>
@@ -344,7 +344,7 @@ export function QueueItemCard({
               {item.pipelineTriageId && (
                 <button
                   onClick={() => navigate(`/triage?highlight=${item.pipelineTriageId}`)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-300 text-xs font-medium hover:bg-violet-500/20 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium hover:bg-amber-500/20 transition-all"
                   title="View triage result on the Triage Pipeline page"
                 >
                   <Eye className="h-3.5 w-3.5" />
@@ -379,15 +379,15 @@ export function QueueItemCard({
       {(item.status === "processing" || item.autoTriageStatus === "running" || autoTriageMutation.isPending) && !fullPipelineMutation.isPending && (
         <div className="px-4 pb-3 pt-1">
           <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-purple-500 via-cyan-500 to-purple-500 animate-shimmer-slide" style={{ width: "80%", backgroundSize: "200% 100%" }} />
+            <div className="h-full rounded-full bg-gradient-to-r from-amber-500 via-cyan-500 to-amber-500 animate-shimmer-slide" style={{ width: "80%", backgroundSize: "200% 100%" }} />
           </div>
           <div className="flex items-center justify-between mt-1.5">
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
               </span>
-              <p className="text-[10px] text-purple-300 font-mono">
+              <p className="text-[10px] text-amber-300 font-mono">
                 Running triage pipeline…
               </p>
             </div>
@@ -399,15 +399,15 @@ export function QueueItemCard({
       {fullPipelineMutation.isPending && (
         <div className="px-4 pb-3 pt-1">
           <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-violet-500 via-purple-500 via-cyan-500 to-violet-500 animate-shimmer-slide" style={{ width: "100%", backgroundSize: "300% 100%" }} />
+            <div className="h-full rounded-full bg-gradient-to-r from-amber-500 via-amber-500 via-cyan-500 to-amber-500 animate-shimmer-slide" style={{ width: "100%", backgroundSize: "300% 100%" }} />
           </div>
           <div className="flex items-center justify-between mt-1.5">
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
               </span>
-              <p className="text-[10px] text-violet-300 font-mono">
+              <p className="text-[10px] text-amber-300 font-mono">
                 Running full pipeline (4 stages)… This may take 30–60 seconds.
               </p>
             </div>
@@ -432,7 +432,7 @@ export function QueueItemCard({
           {triage?.answer && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
                 <span className="text-xs font-medium text-foreground">Structured Triage Report</span>
                 {triage.trustScore != null && (
                   <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full border ${
@@ -453,7 +453,7 @@ export function QueueItemCard({
                   </span>
                 )}
               </div>
-              <div className="rounded-lg bg-black/30 border border-white/5 px-3 py-2 text-sm text-foreground prose prose-invert prose-sm max-w-none prose-headings:text-purple-200 prose-strong:text-foreground prose-code:text-cyan-300 prose-code:bg-black/30 prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
+              <div className="rounded-lg bg-black/30 border border-white/5 px-3 py-2 text-sm text-foreground prose prose-invert prose-sm max-w-none prose-headings:text-amber-200 prose-strong:text-foreground prose-code:text-cyan-300 prose-code:bg-black/30 prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
                 <Streamdown>{triage.answer}</Streamdown>
               </div>
               {triage.suggestedFollowUps && triage.suggestedFollowUps.length > 0 && (
@@ -462,7 +462,7 @@ export function QueueItemCard({
                     <button
                       key={i}
                       onClick={() => navigate(`/analyst?q=${encodeURIComponent(q)}`)}
-                      className="text-[10px] px-2 py-1 rounded-lg border border-purple-500/20 bg-purple-500/5 text-purple-300 hover:bg-purple-500/15 transition-all"
+                      className="text-[10px] px-2 py-1 rounded-lg border border-amber-500/20 bg-amber-500/5 text-amber-300 hover:bg-amber-500/15 transition-all"
                     >
                       {q}
                     </button>

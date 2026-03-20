@@ -70,10 +70,10 @@ export function NodeDetailPanel({
             disabled={expandLoading || isExpanded}
             className={`w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               isExpanded
-                ? "bg-purple-500/10 text-purple-300 border border-purple-500/20 cursor-default"
+                ? "bg-amber-500/10 text-amber-300 border border-amber-500/20 cursor-default"
                 : expandLoading
                   ? "bg-white/5 text-muted-foreground border border-white/10 cursor-wait"
-                  : "bg-purple-500/15 text-purple-300 border border-purple-500/30 hover:bg-purple-500/25"
+                  : "bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25"
             }`}
           >
             {expandLoading ? (

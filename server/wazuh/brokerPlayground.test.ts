@@ -17,7 +17,7 @@ import {
   DECODER_FILE_CONTENT_CONFIG,
   SECURITY_ACTIONS_CONFIG,
 } from "./paramBroker";
-import { BROKER_CONFIG_REGISTRY } from "./brokerCoverage";
+import { BROKER_CONFIG_REGISTRY, getRuntimeWiredConfigs } from "./brokerCoverage";
 
 describe("Broker Config Registry", () => {
   it("exports a non-empty array of configs", () => {
@@ -142,11 +142,13 @@ describe("Broker Playground — brokerParams validation", () => {
 });
 
 describe("Broker Config List — structure validation", () => {
-  it("produces a valid config list for the playground dropdown", () => {
+  it("produces a valid config list with isWiredAtRuntime metadata", () => {
+    const wiredConfigs = getRuntimeWiredConfigs();
     const configList = BROKER_CONFIG_REGISTRY.map(e => ({
       name: e.name,
       endpoint: e.config.endpoint,
       paramCount: Object.keys(e.config.params).length,
+      isWiredAtRuntime: wiredConfigs.has(e.name),
       params: Object.entries(e.config.params).map(([key, def]) => ({
         key,
         wazuhName: def.wazuhName,
@@ -162,6 +164,7 @@ describe("Broker Config List — structure validation", () => {
       expect(config.name).toBeTruthy();
       expect(config.endpoint).toBeTruthy();
       expect(config.paramCount).toBeGreaterThanOrEqual(0);
+      expect(typeof config.isWiredAtRuntime).toBe("boolean");
       expect(config.params.length).toBe(config.paramCount);
 
       for (const param of config.params) {

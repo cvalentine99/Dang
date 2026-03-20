@@ -23,25 +23,25 @@ import {
   ChevronRight, Sparkles, Play,
 } from "lucide-react";
 import { useMemo, useCallback, useState } from "react";
+import { motion } from "framer-motion";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { useLocation } from "wouter";
 
-// ── Amethyst Nexus OKLCH palette ──────────────────────────────────────────────
+// ── Obsidian Instrument Panel OKLCH palette ──────────────────────────────────
 const COLORS = {
-  purple: "oklch(0.541 0.281 293.009)",
-  cyan: "oklch(0.789 0.154 211.53)",
-  green: "oklch(0.765 0.177 163.223)",
-  yellow: "oklch(0.795 0.184 86.047)",
-  red: "oklch(0.637 0.237 25.331)",
-  orange: "oklch(0.705 0.191 22.216)",
-  pink: "oklch(0.656 0.241 354.308)",
+  gold: "oklch(0.769 0.108 85.805)",
+  cyan: "oklch(0.75 0.15 195)",
+  green: "oklch(0.723 0.219 149.579)",
+  amber: "oklch(0.769 0.188 70.08)",
+  red: "oklch(0.628 0.258 29.234)",
+  orange: "oklch(0.705 0.213 47.604)",
   blue: "oklch(0.623 0.214 259.815)",
 };
 
-const PIE_COLORS = [COLORS.green, COLORS.red, COLORS.yellow, COLORS.cyan, COLORS.purple, COLORS.orange];
+const PIE_COLORS = [COLORS.green, COLORS.red, COLORS.amber, COLORS.cyan, COLORS.gold, COLORS.orange];
 
 // ── Shared tooltip ────────────────────────────────────────────────────────────
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
@@ -57,13 +57,13 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 // ── EPS Gauge ─────────────────────────────────────────────────────────────────
 function EpsGauge({ eps, maxEps }: { eps: number; maxEps: number }) {
   const pct = Math.min((eps / maxEps) * 100, 100);
-  const color = pct > 80 ? COLORS.red : pct > 50 ? COLORS.yellow : COLORS.green;
+  const color = pct > 80 ? COLORS.red : pct > 50 ? COLORS.amber : COLORS.green;
   const circumference = 2 * Math.PI * 45;
   const offset = circumference - (pct / 100) * circumference * 0.75;
   return (
     <div className="flex flex-col items-center justify-center">
       <svg width="140" height="120" viewBox="0 0 120 110">
-        <circle cx="60" cy="60" r="45" fill="none" stroke="oklch(0.25 0.03 286 / 40%)" strokeWidth="10"
+        <circle cx="60" cy="60" r="45" fill="none" stroke="oklch(0.25 0.01 260 / 40%)" strokeWidth="10"
           strokeDasharray={`${circumference * 0.75} ${circumference * 0.25}`} strokeLinecap="round" transform="rotate(135 60 60)" />
         <circle cx="60" cy="60" r="45" fill="none" stroke={color} strokeWidth="10"
           strokeDasharray={`${circumference * 0.75} ${circumference * 0.25}`} strokeDashoffset={offset}
@@ -103,11 +103,19 @@ function StatusDot({ connected, label, subtitle }: { connected: boolean; label: 
 }
 
 // ── Navigation card ───────────────────────────────────────────────────────────
+const navCardVariants = {
+  hidden: { opacity: 0, y: 16, scale: 0.96 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+};
+
 function NavCard({ icon: Icon, label, path, color, description }: { icon: React.ElementType; label: string; path: string; color: string; description: string }) {
   const [, setLocation] = useLocation();
   return (
-    <button onClick={() => setLocation(path)}
-      className="group flex flex-col gap-2 p-3.5 rounded-xl border transition-all duration-200 hover:scale-[1.02] hover:shadow-lg text-left w-full"
+    <motion.button onClick={() => setLocation(path)}
+      variants={navCardVariants}
+      whileHover={{ scale: 1.03, y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      className="group flex flex-col gap-2 p-3.5 rounded-xl border transition-colors duration-200 hover:shadow-lg text-left w-full"
       style={{ borderColor: `${color}25`, background: `${color}06` }}>
       <div className="flex items-center justify-between">
         <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ background: `${color}15`, border: `1px solid ${color}25` }}>
@@ -119,7 +127,7 @@ function NavCard({ icon: Icon, label, path, color, description }: { icon: React.
         <p className="text-xs font-semibold text-foreground">{label}</p>
         <p className="text-[10px] text-muted-foreground leading-relaxed mt-0.5">{description}</p>
       </div>
-    </button>
+    </motion.button>
   );
 }
 
@@ -548,8 +556,14 @@ export default function Home() {
             ROW 2: PLATFORM HEALTH STRIP + KPI CARDS
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-          {/* Platform Health */}
-          <GlassPanel className="xl:col-span-3">
+          {/* Platform Health — fade in */}
+          <motion.div
+            className="xl:col-span-3"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const }}
+          >
+          <GlassPanel>
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
               <Radio className="h-3.5 w-3.5 text-primary" /> Platform Health
             </h3>
@@ -568,16 +582,34 @@ export default function Home() {
               </div>
             </div>
           </GlassPanel>
+          </motion.div>
 
-          {/* KPI Cards */}
-          <div className="xl:col-span-9 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <StatCard label="Total Agents" value={agentData.total} icon={Users} colorClass="text-primary" trend={agentData.active > 0 ? `${agentData.active} active` : undefined} trendUp={true} />
-            <StatCard label="Active Agents" value={agentData.active} icon={Activity} colorClass="text-threat-low" />
-            <StatCard label="Disconnected" value={agentData.disconnected} icon={AlertTriangle} colorClass="text-threat-high" trend={agentData.disconnected > 0 ? "Needs attention" : undefined} trendUp={false} />
-            <StatCard label="Audit Events" value={logSummary.info.toLocaleString()} icon={Zap} colorClass="text-info-cyan" trend={logSummary.errors > 0 ? `${logSummary.errors} failures` : undefined} trendUp={false} />
-            <StatCard label="Log Errors" value={logSummary.errors} icon={AlertTriangle} colorClass="text-threat-critical" trend={logSummary.warnings > 0 ? `${logSummary.warnings} warnings` : undefined} trendUp={false} />
-            <StatCard label="Rules Loaded" value={topRulesDef.length > 0 ? topRulesDef.length : "—"} icon={Shield} colorClass="text-primary" />
-          </div>
+          {/* KPI Cards — stagger entrance */}
+          <motion.div
+            className="xl:col-span-9 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"
+            initial="hidden"
+            animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+          >
+            {[
+              { label: "Total Agents", value: agentData.total, icon: Users, colorClass: "text-primary", trend: agentData.active > 0 ? `${agentData.active} active` : undefined, trendUp: true },
+              { label: "Active Agents", value: agentData.active, icon: Activity, colorClass: "text-threat-low", trend: undefined, trendUp: undefined },
+              { label: "Disconnected", value: agentData.disconnected, icon: AlertTriangle, colorClass: "text-threat-high", trend: agentData.disconnected > 0 ? "Needs attention" : undefined, trendUp: false },
+              { label: "Audit Events", value: logSummary.info.toLocaleString(), icon: Zap, colorClass: "text-info-cyan", trend: logSummary.errors > 0 ? `${logSummary.errors} failures` : undefined, trendUp: false },
+              { label: "Log Errors", value: logSummary.errors, icon: AlertTriangle, colorClass: "text-threat-critical", trend: logSummary.warnings > 0 ? `${logSummary.warnings} warnings` : undefined, trendUp: false },
+              { label: "Rules Loaded", value: topRulesDef.length > 0 ? topRulesDef.length : "—", icon: Shield, colorClass: "text-primary", trend: undefined, trendUp: undefined },
+            ].map((card, i) => (
+              <motion.div
+                key={card.label}
+                variants={{
+                  hidden: { opacity: 0, y: 20, scale: 0.95 },
+                  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+                }}
+              >
+                <StatCard label={card.label} value={card.value} icon={card.icon} colorClass={card.colorClass} trend={card.trend} trendUp={card.trendUp} />
+              </motion.div>
+            ))}
+          </motion.div>
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════
@@ -612,22 +644,22 @@ export default function Home() {
               <ResponsiveContainer width="100%" height={210}>
                 <AreaChart data={threatTrendsData}>
                   <defs>
-                    <linearGradient id="gradCritical" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.pink} stopOpacity={0.5} /><stop offset="95%" stopColor={COLORS.pink} stopOpacity={0} /></linearGradient>
+                    <linearGradient id="gradCritical" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.red} stopOpacity={0.5} /><stop offset="95%" stopColor={COLORS.red} stopOpacity={0} /></linearGradient>
                     <linearGradient id="gradHigh" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.red} stopOpacity={0.4} /><stop offset="95%" stopColor={COLORS.red} stopOpacity={0} /></linearGradient>
-                    <linearGradient id="gradMedium" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.yellow} stopOpacity={0.3} /><stop offset="95%" stopColor={COLORS.yellow} stopOpacity={0} /></linearGradient>
+                    <linearGradient id="gradMedium" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.amber} stopOpacity={0.3} /><stop offset="95%" stopColor={COLORS.amber} stopOpacity={0} /></linearGradient>
                     <linearGradient id="gradLow" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.green} stopOpacity={0.2} /><stop offset="95%" stopColor={COLORS.green} stopOpacity={0} /></linearGradient>
                     <linearGradient id="gradInfo" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.cyan} stopOpacity={0.15} /><stop offset="95%" stopColor={COLORS.cyan} stopOpacity={0} /></linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-                  <XAxis dataKey="hour" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
-                  <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+                  <XAxis dataKey="hour" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} />
+                  <YAxis tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} />
                   <ReTooltip content={<ChartTooltip />} />
                   <Area type="monotone" dataKey="info" stackId="1" stroke={COLORS.cyan} fill="url(#gradInfo)" strokeWidth={1} name="Info (0-2)" />
                   <Area type="monotone" dataKey="low" stackId="1" stroke={COLORS.green} fill="url(#gradLow)" strokeWidth={1} name="Low (3-5)" />
-                  <Area type="monotone" dataKey="medium" stackId="1" stroke={COLORS.yellow} fill="url(#gradMedium)" strokeWidth={1.5} name="Medium (6-8)" />
+                  <Area type="monotone" dataKey="medium" stackId="1" stroke={COLORS.amber} fill="url(#gradMedium)" strokeWidth={1.5} name="Medium (6-8)" />
                   <Area type="monotone" dataKey="high" stackId="1" stroke={COLORS.red} fill="url(#gradHigh)" strokeWidth={2} name="High (9-11)" />
-                  <Area type="monotone" dataKey="critical" stackId="1" stroke={COLORS.pink} fill="url(#gradCritical)" strokeWidth={2} name="Critical (12+)" />
-                  <Legend wrapperStyle={{ fontSize: 10, color: "oklch(0.65 0.02 286)" }} />
+                  <Area type="monotone" dataKey="critical" stackId="1" stroke={COLORS.red} fill="url(#gradCritical)" strokeWidth={2} name="Critical (12+)" />
+                  <Legend wrapperStyle={{ fontSize: 10, color: "oklch(0.6 0.01 260)" }} />
                 </AreaChart>
               </ResponsiveContainer>
             </GlassPanel>
@@ -645,7 +677,7 @@ export default function Home() {
                         {agentPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                       </Pie>
                       <ReTooltip content={<ChartTooltip />} />
-                      <Legend wrapperStyle={{ fontSize: 10, color: "oklch(0.65 0.02 286)" }} />
+                      <Legend wrapperStyle={{ fontSize: 10, color: "oklch(0.6 0.01 260)" }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -745,13 +777,13 @@ export default function Home() {
               <ResponsiveContainer width="100%" height={180}>
                 <AreaChart data={hourlyData}>
                   <defs>
-                    <linearGradient id="gradEvents" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.purple} stopOpacity={0.4} /><stop offset="95%" stopColor={COLORS.purple} stopOpacity={0} /></linearGradient>
+                    <linearGradient id="gradEvents" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.gold} stopOpacity={0.4} /><stop offset="95%" stopColor={COLORS.gold} stopOpacity={0} /></linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-                  <XAxis dataKey="hour" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
-                  <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+                  <XAxis dataKey="hour" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} />
+                  <YAxis tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} />
                   <ReTooltip content={<ChartTooltip />} />
-                  <Area type="monotone" dataKey="events" stroke={COLORS.purple} fill="url(#gradEvents)" strokeWidth={2} name="Events" />
+                  <Area type="monotone" dataKey="events" stroke={COLORS.gold} fill="url(#gradEvents)" strokeWidth={2} name="Events" />
                 </AreaChart>
               </ResponsiveContainer>
             </GlassPanel>
@@ -770,7 +802,7 @@ export default function Home() {
                       <span className="text-[10px] text-muted-foreground w-4 text-right">{i + 1}</span>
                       <span className="text-[10px] text-foreground truncate w-32">{t.tactic}</span>
                       <div className="flex-1 h-1.5 rounded-full bg-secondary/40 overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: COLORS.purple, boxShadow: `0 0 6px ${COLORS.purple}40` }} />
+                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: COLORS.gold, boxShadow: `0 0 6px ${COLORS.gold}40` }} />
                       </div>
                       <span className="text-[10px] font-mono text-foreground w-10 text-right">{t.count.toLocaleString()}</span>
                     </div>
@@ -860,44 +892,60 @@ export default function Home() {
           </div>
 
           {/* Operations & Detection */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 mb-3">
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 mb-3"
+            initial="hidden" animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04, delayChildren: 0.1 } } }}
+          >
             <NavCard icon={Activity} label="Fleet Command" path="/agents" color={COLORS.green} description="Agent health, OS, and connection status" />
-            <NavCard icon={Radar} label="Threat Intel" path="/threat-intel" color={COLORS.pink} description="AlienVault OTX pulse correlation" />
+            <NavCard icon={Radar} label="Threat Intel" path="/threat-intel" color={COLORS.red} description="AlienVault OTX pulse correlation" />
             <NavCard icon={Eye} label="Alerts Timeline" path="/alerts" color={COLORS.red} description="Real-time alert stream with severity" />
             <NavCard icon={Bug} label="Vulnerabilities" path="/vulnerabilities" color={COLORS.orange} description="CVE scanning and risk scoring" />
-            <NavCard icon={Target} label="MITRE ATT&CK" path="/mitre" color={COLORS.purple} description="Tactic/technique mapping matrix" />
+            <NavCard icon={Target} label="MITRE ATT&CK" path="/mitre" color={COLORS.gold} description="Tactic/technique mapping matrix" />
             <NavCard icon={Crosshair} label="Threat Hunting" path="/hunting" color={COLORS.red} description="Custom queries across all indices" />
-          </div>
+          </motion.div>
 
           {/* Posture & Compliance */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 mb-3">
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 mb-3"
+            initial="hidden" animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04, delayChildren: 0.2 } } }}
+          >
             <NavCard icon={ShieldCheck} label="Compliance" path="/compliance" color={COLORS.green} description="PCI-DSS, HIPAA, GDPR, CIS-CAT" />
             <NavCard icon={FileSearch} label="File Integrity" path="/fim" color={COLORS.cyan} description="FIM events and change tracking" />
-            <NavCard icon={Monitor} label="IT Hygiene" path="/hygiene" color={COLORS.yellow} description="System hardening posture checks" />
+            <NavCard icon={Monitor} label="IT Hygiene" path="/hygiene" color={COLORS.amber} description="System hardening posture checks" />
             <NavCard icon={Package} label="Fleet Inventory" path="/fleet-inventory" color={COLORS.blue} description="Syscollector hardware and packages" />
             <NavCard icon={GitCompare} label="Drift Analytics" path="/drift-analytics" color={COLORS.orange} description="Statistical anomaly detection" />
-            <NavCard icon={BookOpen} label="Ruleset Explorer" path="/rules" color={COLORS.purple} description="Rule definitions and decoders" />
-          </div>
+            <NavCard icon={BookOpen} label="Ruleset Explorer" path="/rules" color={COLORS.gold} description="Rule definitions and decoders" />
+          </motion.div>
 
           {/* Intelligence & Analyst */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 mb-3">
-            <NavCard icon={Brain} label="Security Analyst" path="/analyst" color={COLORS.purple} description="AI-powered threat analysis chat" />
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 mb-3"
+            initial="hidden" animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04, delayChildren: 0.3 } } }}
+          >
+            <NavCard icon={Brain} label="Security Analyst" path="/analyst" color={COLORS.gold} description="AI-powered threat analysis chat" />
             <NavCard icon={Network} label="Knowledge Graph" path="/graph" color={COLORS.cyan} description="Entity relationship visualization" />
             <NavCard icon={FolderSearch} label="Investigations" path="/investigations" color={COLORS.blue} description="Case management and evidence" />
             <NavCard icon={Inbox} label="Alert Queue" path="/alert-queue" color={COLORS.red} description="Prioritized triage queue" />
             <NavCard icon={Workflow} label="Triage Pipeline" path="/triage" color={COLORS.orange} description="Automated classification workflow" />
-            <NavCard icon={Lightbulb} label="Living Cases" path="/living-cases" color={COLORS.yellow} description="Evolving investigation cases" />
-          </div>
+            <NavCard icon={Lightbulb} label="Living Cases" path="/living-cases" color={COLORS.amber} description="Evolving investigation cases" />
+          </motion.div>
 
           {/* System & Admin */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3"
+            initial="hidden" animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04, delayChildren: 0.4 } } }}
+          >
             <NavCard icon={Server} label="Cluster Health" path="/cluster" color={COLORS.green} description="Nodes, daemons, cache, and config" />
             <NavCard icon={Lock} label="Security Explorer" path="/security" color={COLORS.red} description="RBAC roles, policies, and rules" />
-            <NavCard icon={Layers} label="Broker Coverage" path="/admin/broker-coverage" color={COLORS.purple} description="API endpoint wiring audit" />
-            <NavCard icon={Zap} label="Param Playground" path="/admin/broker-playground" color={COLORS.yellow} description="Test broker params interactively" />
+            <NavCard icon={Layers} label="Broker Coverage" path="/admin/broker-coverage" color={COLORS.gold} description="API endpoint wiring audit" />
+            <NavCard icon={Zap} label="Param Playground" path="/admin/broker-playground" color={COLORS.amber} description="Test broker params interactively" />
             <NavCard icon={Cpu} label="DGX Health" path="/admin/dgx-health" color={COLORS.cyan} description="Nemotron model and GPU metrics" />
             <NavCard icon={Settings} label="Connection Settings" path="/admin/settings" color={COLORS.blue} description="Wazuh, Indexer, and OTX config" />
-          </div>
+          </motion.div>
         </div>
       </div>
     </WazuhGuard>

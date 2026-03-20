@@ -1,5 +1,5 @@
 /**
- * Broker Param Playground — test query params against any broker config.
+ * Broker Playground — test query params against any broker config.
  *
  * Analysts can select a config, enter arbitrary params, and see the broker
  * result (forwarded, unsupported, errors) without making any Wazuh API call.
@@ -12,6 +12,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { GlassPanel } from "@/components/shared/GlassPanel";
 import { Badge } from "@/components/ui/badge";
@@ -377,7 +378,7 @@ function TypeBadge({ type }: { type: string }) {
   const colors: Record<string, string> = {
     string: "bg-blue-500/20 text-blue-400 border-blue-500/30",
     number: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-    boolean: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+    boolean: "bg-amber-500/20 text-amber-400 border-amber-500/30",
     enum: "bg-orange-500/20 text-orange-400 border-orange-500/30",
   };
   return (
@@ -390,8 +391,10 @@ function TypeBadge({ type }: { type: string }) {
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export default function BrokerPlayground() {
+  const { user, loading: authLoading } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [, navigate] = useLocation();
-  const { data: configs, isLoading } = trpc.wazuh.brokerConfigList.useQuery();
+  const { data: configs, isLoading } = trpc.wazuh.brokerConfigList.useQuery(undefined, { enabled: isAdmin });
   const playgroundMutation = trpc.wazuh.brokerPlayground.useMutation();
 
   const [selectedConfig, setSelectedConfig] = useState<string>("");
@@ -549,11 +552,25 @@ export default function BrokerPlayground() {
     toast.success("cURL command copied to clipboard");
   }
 
+  if (!authLoading && !isAdmin) {
+    return (
+      <div className="p-6 space-y-6 max-w-[2400px] mx-auto">
+        <PageHeader
+          title="Broker Playground"
+          subtitle="Admin access required"
+        />
+        <GlassPanel className="p-8 text-center text-muted-foreground">
+          This page is restricted to administrators.
+        </GlassPanel>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-6 max-w-[2400px] mx-auto">
         <PageHeader
-          title="Broker Param Playground"
+          title="Broker Playground"
           subtitle="Loading broker configs..."
         />
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -568,7 +585,7 @@ export default function BrokerPlayground() {
   return (
     <div className="p-6 space-y-6 max-w-[2400px] mx-auto">
         <PageHeader
-          title="Broker Param Playground"
+          title="Broker Playground"
           subtitle="Test query parameters against any broker config without making Wazuh API calls. Pure server-side validation."
       />
 
@@ -593,7 +610,7 @@ export default function BrokerPlayground() {
               <span className="text-muted-foreground/40">via</span>
             )}
             {coverageContext.config && (
-              <span className="font-mono text-[10px] text-violet-400/80">{coverageContext.config}</span>
+              <span className="font-mono text-[10px] text-amber-400/80">{coverageContext.config}</span>
             )}
             {coverageContext.wazuhPath && (
               <span className="font-mono text-[10px] text-muted-foreground/60">{coverageContext.wazuhPath}</span>
@@ -652,7 +669,12 @@ export default function BrokerPlayground() {
                         : "hover:bg-white/5 text-muted-foreground"
                     }`}
                   >
-                    <div className="font-mono font-medium truncate">{c.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-medium truncate">{c.name}</span>
+                      {(c as any).isWiredAtRuntime === false && (
+                        <span className="shrink-0 px-1 py-0.5 rounded text-[8px] font-mono bg-zinc-500/20 text-zinc-400 border border-zinc-500/20">validation-only</span>
+                      )}
+                    </div>
                     <div className="text-[10px] text-muted-foreground/60 truncate mt-0.5">
                       {c.endpoint} · {c.paramCount} params
                     </div>
@@ -666,11 +688,11 @@ export default function BrokerPlayground() {
           {selectedConfig && presets.length > 0 && (
             <GlassPanel className="p-4 space-y-3">
               <div className="flex items-center gap-2">
-                <Bookmark className="h-3.5 w-3.5 text-violet-400" />
+                <Bookmark className="h-3.5 w-3.5 text-amber-400" />
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Quick Presets
                 </h3>
-                <Badge variant="outline" className="text-[9px] font-mono border-violet-500/30 text-violet-400 bg-violet-500/10">
+                <Badge variant="outline" className="text-[9px] font-mono border-amber-500/30 text-amber-400 bg-amber-500/10">
                   {presets.length}
                 </Badge>
               </div>
@@ -682,10 +704,10 @@ export default function BrokerPlayground() {
                         <TooltipTrigger asChild>
                           <button
                             onClick={() => applyPreset(preset)}
-                            className="w-full text-left px-3 py-2 rounded-md hover:bg-violet-500/10 transition-colors group border border-transparent hover:border-violet-500/20"
+                            className="w-full text-left px-3 py-2 rounded-md hover:bg-amber-500/10 transition-colors group border border-transparent hover:border-amber-500/20"
                           >
                             <div className="flex items-center gap-2">
-                              <Zap className="h-3 w-3 text-violet-400/60 group-hover:text-violet-400 transition-colors shrink-0" />
+                              <Zap className="h-3 w-3 text-amber-400/60 group-hover:text-amber-400 transition-colors shrink-0" />
                               <span className="text-[11px] text-foreground/80 group-hover:text-foreground transition-colors truncate">
                                 {preset.name}
                               </span>
@@ -721,7 +743,7 @@ export default function BrokerPlayground() {
                   {activeConfig.paramCount} params
                 </Badge>
               </div>
-              <p className="font-mono text-[11px] text-violet-400/80">{activeConfig.endpoint}</p>
+              <p className="font-mono text-[11px] text-amber-400/80">{activeConfig.endpoint}</p>
               <ScrollArea className="max-h-[400px]">
                 <div className="space-y-1.5">
                   {activeConfig.params.map(p => (
@@ -895,7 +917,7 @@ export default function BrokerPlayground() {
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground/50">
                 <Info className="h-3 w-3" />
                 <span>
-                  Testing against <span className="font-mono text-violet-400/60">{selectedConfig}</span> — no Wazuh API call is made
+                  Testing against <span className="font-mono text-amber-400/60">{selectedConfig}</span> — no Wazuh API call is made
                 </span>
               </div>
             )}
@@ -918,7 +940,7 @@ export default function BrokerPlayground() {
                     <ResultBadge type="error" count={result.errors.length} />
                   </div>
                 </div>
-                <p className="font-mono text-[11px] text-violet-400/80">
+                <p className="font-mono text-[11px] text-amber-400/80">
                   {result.endpoint}
                 </p>
               </GlassPanel>
@@ -950,7 +972,7 @@ export default function BrokerPlayground() {
                             onClick={() => setShowCurl(prev => !prev)}
                             className={`p-1 rounded transition-colors ${
                               showCurl
-                                ? "text-violet-400 bg-violet-500/10"
+                                ? "text-amber-400 bg-amber-500/10"
                                 : "text-muted-foreground/40 hover:text-foreground hover:bg-white/5"
                             }`}
                           >
@@ -976,8 +998,8 @@ export default function BrokerPlayground() {
                 <GlassPanel className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Terminal className="h-3.5 w-3.5 text-violet-400" />
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-violet-400/80">
+                      <Terminal className="h-3.5 w-3.5 text-amber-400" />
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-400/80">
                         cURL Command
                       </h3>
                     </div>
@@ -985,22 +1007,22 @@ export default function BrokerPlayground() {
                       variant="outline"
                       size="sm"
                       onClick={copyCurlCommand}
-                      className="h-6 text-[10px] border-violet-500/20 text-violet-400 hover:bg-violet-500/10 gap-1"
+                      className="h-6 text-[10px] border-amber-500/20 text-amber-400 hover:bg-amber-500/10 gap-1"
                     >
                       <Copy className="h-3 w-3" />
                       Copy
                     </Button>
                   </div>
                   <ScrollArea className="max-h-[200px]">
-                    <pre className="text-[11px] font-mono text-violet-300/90 bg-violet-500/5 rounded-md p-3 border border-violet-500/10 whitespace-pre-wrap break-all">
+                    <pre className="text-[11px] font-mono text-amber-300/90 bg-amber-500/5 rounded-md p-3 border border-amber-500/10 whitespace-pre-wrap break-all">
                       {buildCurlCommand(result.endpoint, result.forwardedQuery)}
                     </pre>
                   </ScrollArea>
                   <div className="flex items-center gap-2 text-[9px] text-muted-foreground/40">
                     <AlertTriangle className="h-3 w-3 shrink-0" />
                     <span>
-                      Replace <code className="font-mono text-violet-400/50">&lt;WAZUH_HOST&gt;</code> and{" "}
-                      <code className="font-mono text-violet-400/50">&lt;JWT_TOKEN&gt;</code> with your actual values.
+                      Replace <code className="font-mono text-amber-400/50">&lt;WAZUH_HOST&gt;</code> and{" "}
+                      <code className="font-mono text-amber-400/50">&lt;JWT_TOKEN&gt;</code> with your actual values.
                       Token is never exposed by Dang.
                     </span>
                   </div>
@@ -1077,7 +1099,7 @@ export default function BrokerPlayground() {
                         variant="outline"
                         size="sm"
                         onClick={() => applyPreset(preset)}
-                        className="h-6 text-[10px] border-violet-500/20 text-violet-400/70 hover:text-violet-400 hover:bg-violet-500/10 gap-1"
+                        className="h-6 text-[10px] border-amber-500/20 text-amber-400/70 hover:text-amber-400 hover:bg-amber-500/10 gap-1"
                       >
                         <Zap className="h-3 w-3" />
                         {preset.name}

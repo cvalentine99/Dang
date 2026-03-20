@@ -17,6 +17,7 @@ import { connectionSettings } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { Agent } from "undici";
 import { SKIP_TLS_VERIFY } from "../_core/tlsAgent";
+import { decrypt } from "../admin/encryptionService";
 
 // Audit #28: Use centralized TLS policy for Splunk connections
 function getSplunkDispatcher() {
@@ -75,7 +76,7 @@ export async function getEffectiveSplunkConfig(): Promise<SplunkConfig> {
             if (row.settingValue) config.port = row.settingValue;
             break;
           case "hec_token":
-            if (row.settingValue) config.hecToken = row.settingValue;
+            if (row.settingValue) config.hecToken = row.isEncrypted ? decrypt(row.settingValue) : row.settingValue;
             break;
           case "hec_port":
             if (row.settingValue) config.hecPort = row.settingValue;
@@ -237,6 +238,55 @@ export async function sendHECEvent(event: SplunkHECEvent): Promise<{
 }
 
 /**
+ * SSRF-safe host validation for Splunk connection testing.
+ * Blocks cloud metadata endpoints and loopback addresses.
+ * Allows RFC 1918 and public IPs (Splunk instances can be anywhere).
+ */
+export async function validateSplunkHost(host: string): Promise<{ allowed: boolean; reason: string }> {
+  const trimmed = host.trim().toLowerCase();
+  if (!trimmed) return { allowed: false, reason: "Host is empty" };
+
+  // Block known dangerous hostnames
+  const blockedHostnames = ["localhost", "metadata.google.internal", "metadata.internal", "instance-data"];
+  for (const blocked of blockedHostnames) {
+    if (trimmed === blocked || trimmed.endsWith(`.${blocked}`)) {
+      return { allowed: false, reason: `Blocked hostname: ${host}` };
+    }
+  }
+
+  // Block loopback and metadata IPs
+  const blockedPrefixes = ["127.", "0.", "169.254."];
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(trimmed)) {
+    for (const prefix of blockedPrefixes) {
+      if (trimmed.startsWith(prefix)) {
+        return { allowed: false, reason: `Blocked IP range: ${host}` };
+      }
+    }
+    if (trimmed === "0.0.0.0" || trimmed === "255.255.255.255") {
+      return { allowed: false, reason: `Blocked IP: ${host}` };
+    }
+  }
+
+  // For hostnames, resolve and check the IP
+  if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(trimmed)) {
+    try {
+      const { lookup } = await import("dns/promises");
+      const result = await lookup(trimmed, { family: 4 });
+      const ip = result.address;
+      for (const prefix of blockedPrefixes) {
+        if (ip.startsWith(prefix)) {
+          return { allowed: false, reason: `${host} resolves to blocked IP: ${ip}` };
+        }
+      }
+    } catch {
+      return { allowed: false, reason: `Cannot resolve hostname: ${host}` };
+    }
+  }
+
+  return { allowed: true, reason: "Host allowed" };
+}
+
+/**
  * Test Splunk HEC connectivity by hitting the health endpoint.
  */
 /**
@@ -264,6 +314,14 @@ export async function testSplunkConnection(overrides?: {
     ...(overrides?.hecPort && { hecPort: overrides.hecPort }),
     ...(overrides?.protocol && { protocol: overrides.protocol }),
   };
+
+  // SSRF prevention: validate user-provided host overrides
+  if (overrides?.host) {
+    const validation = await validateSplunkHost(config.host);
+    if (!validation.allowed) {
+      return { success: false, message: `Host validation failed: ${validation.reason}` };
+    }
+  }
 
   if (!config.host || !config.hecToken) {
     return { success: false, message: "Splunk not configured (missing host or HEC token)" };

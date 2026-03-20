@@ -1,7 +1,8 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
+import { AnimatePresence, motion } from "framer-motion";
 import ErrorBoundary from "./components/ErrorBoundary";
 import DashboardLayout from "./components/DashboardLayout";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -81,6 +82,40 @@ function resolveRoute(entry: RouteEntry): RouteEntry & { component: ComponentTyp
 const authRoutes = ROUTE_REGISTRY.filter(r => r.auth).map(resolveRoute);
 const dashRoutes = ROUTE_REGISTRY.filter(r => !r.auth).map(resolveRoute);
 
+/* ── Page transition variants ─────────────────────────────────────────────── */
+const pageVariants = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+  exit: { opacity: 0, y: -8, transition: { duration: 0.15, ease: [0.55, 0, 1, 0.45] as const } },
+};
+
+/** Wraps each page in a motion.div keyed by the current path */
+function AnimatedDashboardContent() {
+  const [location] = useLocation();
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={location}
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        style={{ minHeight: "100%" }}
+      >
+        <ErrorBoundary inline label="Page">
+          <Switch location={location}>
+            {dashRoutes.map(r => (
+              <Route key={r.path} path={r.path} component={r.component} />
+            ))}
+            <Route path="/404" component={NotFound} />
+            <Route component={NotFound} />
+          </Switch>
+        </ErrorBoundary>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 function Router() {
   return (
     <Switch>
@@ -89,18 +124,10 @@ function Router() {
         <Route key={r.path} path={r.path} component={r.component} />
       ))}
 
-      {/* Dashboard routes — inside DashboardLayout */}
+      {/* Dashboard routes — inside DashboardLayout with page transitions */}
       <Route>
         <DashboardLayout>
-          <ErrorBoundary inline label="Page">
-            <Switch>
-              {dashRoutes.map(r => (
-                <Route key={r.path} path={r.path} component={r.component} />
-              ))}
-              <Route path="/404" component={NotFound} />
-              <Route component={NotFound} />
-            </Switch>
-          </ErrorBoundary>
+          <AnimatedDashboardContent />
         </DashboardLayout>
       </Route>
     </Switch>
@@ -115,9 +142,9 @@ function App() {
           <Toaster
             toastOptions={{
               style: {
-                background: "oklch(0.17 0.025 286)",
-                border: "1px solid oklch(0.3 0.04 286 / 40%)",
-                color: "oklch(0.93 0.005 286)",
+                background: "oklch(0.15 0.005 260)",
+                border: "1px solid oklch(0.3 0.01 260 / 40%)",
+                color: "oklch(0.95 0.005 85)",
               },
             }}
           />

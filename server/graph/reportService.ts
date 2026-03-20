@@ -188,7 +188,34 @@ export function generateMarkdownReport(data: ReportData): string {
 // ── HTML Generator (for PDF-like rendering) ─────────────────────────────────
 
 export function generateHtmlReport(data: ReportData): string {
-  const md = generateMarkdownReport(data);
+  // Sanitize all untrusted user content before it enters the markdown→HTML
+  // pipeline. Without this, attacker-controlled strings (titles, descriptions,
+  // tags, timeline events, evidence labels, note content) would be embedded
+  // as raw HTML after the regex-based markdown conversion.
+  const sanitized: ReportData = {
+    ...data,
+    title: escapeHtml(data.title),
+    description: data.description ? escapeHtml(data.description) : null,
+    status: escapeHtml(data.status),
+    tags: data.tags.map(t => escapeHtml(t)),
+    timeline: data.timeline.map(entry => ({
+      ...entry,
+      event: escapeHtml(entry.event),
+      source: escapeHtml(entry.source),
+      severity: entry.severity ? escapeHtml(entry.severity) : undefined,
+    })),
+    evidence: data.evidence.map(ev => ({
+      ...ev,
+      label: escapeHtml(ev.label),
+      type: escapeHtml(ev.type),
+    })),
+    notes: data.notes.map(note => ({
+      ...note,
+      content: escapeHtml(note.content),
+    })),
+  };
+
+  const md = generateMarkdownReport(sanitized);
 
   // Convert basic markdown to HTML
   let html = md

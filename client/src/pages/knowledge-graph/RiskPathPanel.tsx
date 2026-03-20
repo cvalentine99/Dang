@@ -30,7 +30,7 @@ export function RiskPathPanel({
 
       {isLoading ? (
         <div className="px-4 py-8 flex items-center justify-center">
-          <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+          <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
         </div>
       ) : paths.length === 0 ? (
         <div className="px-4 py-6 text-center">
@@ -49,7 +49,7 @@ export function RiskPathPanel({
                 key={path.id}
                 onClick={() => onSelectPath(isSelected ? null : path.id)}
                 className={`w-full text-left px-4 py-3 border-b border-white/5 transition-all hover:bg-white/[0.03] ${
-                  isSelected ? "bg-purple-500/10 border-l-2 border-l-purple-500" : ""
+                  isSelected ? "bg-amber-500/10 border-l-2 border-l-amber-500" : ""
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">

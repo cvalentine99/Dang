@@ -10,12 +10,59 @@
  */
 
 import * as broker from "./paramBroker";
-import { readFileSync, statSync } from "fs";
-import { resolve, dirname } from "path";
+import { readFileSync, statSync, readdirSync, existsSync } from "fs";
+import { resolve, dirname, join } from "path";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// ── Bundled Spec Version (derived from spec file, not hardcoded) ────────────
+
+/**
+ * Extract the version from the newest bundled OpenAPI spec YAML in spec/.
+ * Picks the highest semver filename, then reads `info.version` from inside
+ * the file by scanning for the `info:` top-level key and its nested `version:`.
+ * Falls back to filename-based extraction, then to "unknown".
+ */
+function detectBundledSpecVersion(): string {
+  const specDir = resolve(process.cwd(), "spec");
+  try {
+    const specFiles = readdirSync(specDir)
+      .filter(f => f.startsWith("wazuh-api-v") && f.endsWith(".yaml"))
+      .sort()
+      .reverse();
+    if (specFiles.length > 0) {
+      const specPath = join(specDir, specFiles[0]);
+      // Scan line-by-line for the info.version field.
+      // In OpenAPI YAML: `info:` is a top-level key (no indent),
+      // and `version:` is a direct child (2-space indent).
+      const content = readFileSync(specPath, "utf-8");
+      let inInfo = false;
+      for (const line of content.split("\n")) {
+        // Top-level key — starts at column 0 with no leading space
+        if (/^\S/.test(line)) {
+          inInfo = line.startsWith("info:");
+          continue;
+        }
+        if (inInfo) {
+          // Direct child of info: exactly 2-space indent
+          const m = line.match(/^  version:\s*'([^']+)'/);
+          if (m) return m[1];
+          // Also handle unquoted: `version: 4.14.4`
+          const m2 = line.match(/^  version:\s*(\S+)/);
+          if (m2) return m2[1].replace(/['"]/g, "");
+        }
+      }
+      // Fallback: extract from filename
+      const fileMatch = specFiles[0].match(/wazuh-api-v([\d.]+)/);
+      if (fileMatch) return fileMatch[1];
+    }
+  } catch { /* spec dir may not exist in test environments */ }
+  return "unknown";
+}
+
+const BUNDLED_SPEC_VERSION = detectBundledSpecVersion();
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +108,14 @@ export interface BrokerConfigSummary {
   specificParams: string[];
 }
 
+export interface ArtifactFreshness {
+  loaded: boolean;
+  stale?: boolean;
+  artifactMtimeIso?: string;
+  baselineMtimeIso?: string;
+  staleReason?: string;
+}
+
 export interface EnrichmentMeta {
   /** Whether the wiring ledger JSON was loaded successfully */
   wiringLedgerLoaded: boolean;
@@ -70,18 +125,26 @@ export interface EnrichmentMeta {
   wiringLedgerGeneratedAt?: string;
   /** Generation timestamp from the parity artifact (if available) */
   parityArtifactGeneratedAt?: string;
-  /** mtime of wazuhRouter.ts — the primary source artifacts derive from */
+  /** @deprecated use wiringLedger/parityArtifact freshness objects */
   sourceLastModified?: string;
   /** true when wiring ledger artifact file is older than the source file */
   wiringLedgerStale?: boolean;
   /** true when parity artifact file is older than the source file */
   parityArtifactStale?: boolean;
+  /** Per-artifact freshness detail for wiring ledger */
+  wiringLedger: ArtifactFreshness;
+  /** Per-artifact freshness detail for parity artifact */
+  parityArtifact: ArtifactFreshness;
 }
 
 export interface CoverageReport {
   /** Timestamp of analysis */
   analyzedAt: string;
-  /** Wazuh API spec version */
+  /**
+   * Version of the bundled OpenAPI spec that broker configs were built against.
+   * Derived from `spec/wazuh-api-v*.yaml` at startup — not the live server version.
+   * The running Wazuh server may be a different version.
+   */
   specVersion: string;
   /** Total procedures in router */
   totalProcedures: number;
@@ -93,19 +156,17 @@ export interface CoverageReport {
   passthrough: number;
   /**
    * Broker validation coverage: brokerWired / total.
-   * This measures how many procedures use the param broker for validated,
-   * coerced, safety-checked parameter forwarding. It does NOT measure
-   * whether a tRPC endpoint exists (that is endpointCoverage).
+   * Measures how many procedures use the param broker for validated,
+   * coerced, safety-checked parameter forwarding.
    */
   brokerCoveragePercent: number;
   /** Coverage percentage ((broker + manual) / total) — all param-aware procedures */
   paramCoveragePercent: number;
   /**
-   * Endpoint coverage: total procedures with tRPC endpoints / total procedures.
-   * Should be 100% — every entry in the registry has a corresponding tRPC procedure.
-   * This distinguishes "we have a route" from "the route uses brokerParams()".
+   * Broker validation fraction: "brokerWired/total".
+   * Shows how many procedures use the param broker out of total procedures.
    */
-  endpointCoverage: string;
+  brokerValidationFraction: string;
   /** Total broker configs */
   totalBrokerConfigs: number;
   /** Total params across all broker configs */
@@ -255,7 +316,7 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "ruleGroups", wazuhPath: "/rules/groups", wiringLevel: "broker", brokerConfig: "RULE_GROUPS_CONFIG", paramCount: 5, category: "Rules" },
   { procedure: "rulesByRequirement", wazuhPath: "/rules/requirement/{requirement}", wiringLevel: "broker", brokerConfig: "RULES_BY_REQUIREMENT_CONFIG", paramCount: 5, category: "Rules" },
   { procedure: "rulesFiles", wazuhPath: "/rules/files", wiringLevel: "broker", brokerConfig: "RULES_FILES_CONFIG", paramCount: 10, category: "Rules" },
-  { procedure: "ruleFileContent", wazuhPath: "/rules/files/{filename}", wiringLevel: "manual", paramCount: 3, category: "Rules" },
+  { procedure: "ruleFileContent", wazuhPath: "/rules/files/{filename}", wiringLevel: "broker", brokerConfig: "RULE_FILE_CONTENT_CONFIG", paramCount: 3, category: "Rules" },
 
   // ── MITRE ATT&CK ──
   { procedure: "mitreTactics", wazuhPath: "/mitre/tactics", wiringLevel: "broker", brokerConfig: "MITRE_TACTICS_CONFIG", paramCount: 8, category: "MITRE" },
@@ -302,7 +363,7 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "securityCurrentUser", wazuhPath: "/security/users/me", wiringLevel: "broker", brokerConfig: "SECURITY_CURRENT_USER_CONFIG", paramCount: 1, category: "Security" },
   { procedure: "securityRbacRules", wazuhPath: "/security/rules", wiringLevel: "broker", brokerConfig: "SECURITY_RBAC_RULES_CONFIG", paramCount: 5, category: "Security" },  // spec: offset,limit,sort,search,rule_ids
   { procedure: "securityActions", wazuhPath: "/security/actions", wiringLevel: "broker", brokerConfig: "SECURITY_ACTIONS_CONFIG", paramCount: 1, category: "Security" },
-  { procedure: "securityResources", wazuhPath: "/security/resources", wiringLevel: "manual", paramCount: 2, category: "Security" },
+  { procedure: "securityResources", wazuhPath: "/security/resources", wiringLevel: "broker", brokerConfig: "SECURITY_RESOURCES_CONFIG", paramCount: 2, category: "Security" },
   { procedure: "securityCurrentUserPolicies", wazuhPath: "/security/users/me/policies", wiringLevel: "passthrough", paramCount: 0, category: "Security" },
 
   // ── Lists (CDB) ──
@@ -437,6 +498,22 @@ export const BROKER_CONFIG_REGISTRY: Array<{ name: string; config: broker.Endpoi
   { name: "SECURITY_CURRENT_USER_POLICIES_CONFIG", config: broker.SECURITY_CURRENT_USER_POLICIES_CONFIG },
 ];
 
+/**
+ * Returns the set of broker config names that are referenced by ENDPOINT_REGISTRY
+ * entries with wiringLevel "broker". These are configs actually used at runtime
+ * for parameter validation, as opposed to configs that exist in paramBroker.ts
+ * but are not yet wired into any tRPC procedure.
+ */
+export function getRuntimeWiredConfigs(): Set<string> {
+  const wired = new Set<string>();
+  for (const ep of ENDPOINT_REGISTRY) {
+    if (ep.wiringLevel === "broker" && ep.brokerConfig) {
+      wired.add(ep.brokerConfig);
+    }
+  }
+  return wired;
+}
+
 // ── Artifact Loaders ────────────────────────────────────────────────────────
 
 interface WiringLedgerEntry {
@@ -506,6 +583,32 @@ function getFileMtimeMs(filePath: string): number | undefined {
   }
 }
 
+/** Recursively find the newest mtime (epoch ms) under a directory, or undefined on error. */
+function getNewestMtimeMs(dirPath: string): number | undefined {
+  try {
+    let newest = 0;
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        try {
+          if (entry.isDirectory()) {
+            walk(full);
+          } else {
+            const mt = statSync(full).mtime.getTime();
+            if (mt > newest) newest = mt;
+          }
+        } catch {
+          // skip unreadable entries
+        }
+      }
+    };
+    walk(dirPath);
+    return newest > 0 ? newest : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // ── Analysis Functions ───────────────────────────────────────────────────────
 
 function analyzeBrokerConfig(entry: { name: string; config: broker.EndpointParamConfig }): BrokerConfigSummary {
@@ -524,23 +627,58 @@ export function generateCoverageReport(): CoverageReport {
   const parity = loadParityCallsites();
 
   // ── Staleness detection ──
-  // Compare artifact file mtimes against the primary source file (wazuhRouter.ts).
-  // If the source has been modified more recently than an artifact, the artifact is stale.
-  const sourcePath = resolve(__dirname, "wazuhRouter.ts");
+  // Each artifact depends on different source trees:
+  //   wiring-ledger: generated by scanning client/src for trpc callsites
+  //   ui-param-parity: generated by scanning client/src AND server/wazuh/wazuhRouter.ts
+  const clientSrcDir = resolve(process.cwd(), "client/src");
+  const routerPath = resolve(__dirname, "wazuhRouter.ts");
   const wiringArtifactPath = resolve(process.cwd(), "docs/wiring-ledger.json");
   const parityArtifactPath = resolve(process.cwd(), "docs/ui-param-parity.json");
 
-  const sourceMtimeISO = getFileMtimeISO(sourcePath);
-  const sourceMtimeMs = getFileMtimeMs(sourcePath);
+  const clientSrcLatestMtimeMs = getNewestMtimeMs(clientSrcDir);
+  const routerMtimeMs = getFileMtimeMs(routerPath);
   const wiringMtimeMs = getFileMtimeMs(wiringArtifactPath);
   const parityMtimeMs = getFileMtimeMs(parityArtifactPath);
 
-  const wiringLedgerStale = (wiring.loaded && sourceMtimeMs != null && wiringMtimeMs != null)
-    ? wiringMtimeMs < sourceMtimeMs
-    : undefined;
-  const parityArtifactStale = (parity.loaded && sourceMtimeMs != null && parityMtimeMs != null)
-    ? parityMtimeMs < sourceMtimeMs
-    : undefined;
+  // Wiring ledger depends on client/src
+  let wiringLedgerStale: boolean | undefined;
+  let wiringStaleReason: string | undefined;
+  let wiringBaselineMtimeIso: string | undefined;
+  if (wiring.loaded && wiringMtimeMs != null && clientSrcLatestMtimeMs != null) {
+    wiringBaselineMtimeIso = new Date(clientSrcLatestMtimeMs).toISOString();
+    if (wiringMtimeMs < clientSrcLatestMtimeMs) {
+      wiringLedgerStale = true;
+      wiringStaleReason = "client/src changed since last generation";
+    } else {
+      wiringLedgerStale = false;
+    }
+  }
+
+  // Parity artifact depends on client/src + wazuhRouter.ts
+  let parityArtifactStale: boolean | undefined;
+  let parityStaleReason: string | undefined;
+  let parityBaselineMtimeIso: string | undefined;
+  if (parity.loaded && parityMtimeMs != null) {
+    const parityBaselineMs = Math.max(clientSrcLatestMtimeMs ?? 0, routerMtimeMs ?? 0) || undefined;
+    if (parityBaselineMs != null) {
+      parityBaselineMtimeIso = new Date(parityBaselineMs).toISOString();
+      if (parityMtimeMs < parityBaselineMs) {
+        parityArtifactStale = true;
+        // Determine which source(s) are newer
+        const clientNewer = clientSrcLatestMtimeMs != null && parityMtimeMs < clientSrcLatestMtimeMs;
+        const routerNewer = routerMtimeMs != null && parityMtimeMs < routerMtimeMs;
+        if (clientNewer && routerNewer) {
+          parityStaleReason = "client/src and wazuhRouter.ts both changed since last generation";
+        } else if (clientNewer) {
+          parityStaleReason = "client/src changed since last generation";
+        } else {
+          parityStaleReason = "wazuhRouter.ts changed since last generation";
+        }
+      } else {
+        parityArtifactStale = false;
+      }
+    }
+  }
 
   const endpoints: EndpointCoverage[] = ENDPOINT_REGISTRY.map(e => ({
     procedure: e.procedure,
@@ -584,14 +722,14 @@ export function generateCoverageReport(): CoverageReport {
 
   return {
     analyzedAt: new Date().toISOString(),
-    specVersion: "4.14.3",
+    specVersion: BUNDLED_SPEC_VERSION,
     totalProcedures: total,
     brokerWired,
     manualParam,
     passthrough,
     brokerCoveragePercent: Math.round((brokerWired / total) * 100),
     paramCoveragePercent: Math.round(((brokerWired + manualParam) / total) * 100),
-    endpointCoverage: `${total}/${total}`,
+    brokerValidationFraction: `${brokerWired}/${total}`,
     totalBrokerConfigs: brokerConfigs.length,
     totalBrokerParams,
     endpoints,
@@ -602,9 +740,23 @@ export function generateCoverageReport(): CoverageReport {
       parityArtifactLoaded: parity.loaded,
       wiringLedgerGeneratedAt: wiring.generatedAt,
       parityArtifactGeneratedAt: parity.generatedAt,
-      sourceLastModified: sourceMtimeISO,
+      sourceLastModified: routerMtimeMs != null ? new Date(routerMtimeMs).toISOString() : undefined,
       wiringLedgerStale,
       parityArtifactStale,
+      wiringLedger: {
+        loaded: wiring.loaded,
+        stale: wiringLedgerStale,
+        artifactMtimeIso: wiringMtimeMs != null ? new Date(wiringMtimeMs).toISOString() : undefined,
+        baselineMtimeIso: wiringBaselineMtimeIso,
+        staleReason: wiringStaleReason,
+      },
+      parityArtifact: {
+        loaded: parity.loaded,
+        stale: parityArtifactStale,
+        artifactMtimeIso: parityMtimeMs != null ? new Date(parityMtimeMs).toISOString() : undefined,
+        baselineMtimeIso: parityBaselineMtimeIso,
+        staleReason: parityStaleReason,
+      },
     },
   };
 }

@@ -2592,10 +2592,11 @@ export const MANAGER_DAEMON_STATS_CONFIG: EndpointParamConfig = {
   params: {
     daemons_list: {
       type: "csv",
-      aliases: ["daemons"],
+
       enumValues: ["true", "false"],
       wazuhName: "daemons_list",
       description: "List of daemon names (comma-separated)",
+      aliases: ["daemons"],
     },
     wait_for_complete: {
       type: "boolean",
@@ -2948,21 +2949,21 @@ export const AGENTS_UPGRADE_RESULT_CONFIG: EndpointParamConfig = {
     q: UNIVERSAL_PARAMS.q,
     "os.platform": {
       type: "string",
-      aliases: ["os_platform"],
       wazuhName: "os.platform",
       description: "Filter by OS platform",
+      aliases: ["os_platform"],
     },
     "os.version": {
       type: "string",
-      aliases: ["os_version"],
       wazuhName: "os.version",
       description: "Filter by OS version",
+      aliases: ["os_version"],
     },
     "os.name": {
       type: "string",
-      aliases: ["os_name"],
       wazuhName: "os.name",
       description: "Filter by OS name",
+      aliases: ["os_name"],
     },
     manager: {
       type: "string",
@@ -3071,7 +3072,7 @@ export const RULE_FILE_CONTENT_CONFIG: EndpointParamConfig = {
       type: "string",
       wazuhName: "relative_dirname",
       description: "Filter by relative directory name",
-      aliases: ["relativeDirname"],
+      aliases: ["relativeDirname", "get_dirnames_path"],
     },
     wait_for_complete: {
       type: "boolean",
@@ -3117,7 +3118,7 @@ export const SECURITY_RESOURCES_CONFIG: EndpointParamConfig = {
       type: "string",
 
       enumValues: ["true", "false"],
-      wazuhName: "resource",
+      wazuhName: "resource_list",
       description: "List of current RBAC resources",
     },
   },
@@ -3167,10 +3168,11 @@ export const GROUP_FILE_CONTENT_CONFIG: EndpointParamConfig = {
   params: {
     type: {
       type: "string",
-      aliases: ["type_agents"],
+
       enumValues: ["true", "false"],
       wazuhName: "type",
       description: "Type of file (conf, rootkit_files, rootkit_trojans, rcl)",
+      aliases: ["type_agents"],
     },
     raw: {
       type: "boolean",

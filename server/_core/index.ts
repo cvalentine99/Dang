@@ -1,5 +1,7 @@
 import "dotenv/config";
 import express from "express";
+// NOTE: requires `pnpm add cors @types/cors` — package not yet in dependencies
+import cors from "cors";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -58,9 +60,19 @@ async function startServer() {
   }
 
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // Body parser — 2mb is sufficient for JSON API payloads; the app does not
+  // handle file uploads through the JSON body parser.
+  app.use(express.json({ limit: "2mb" }));
+  app.use(express.urlencoded({ limit: "2mb", extended: true }));
+
+  // Explicit CORS policy — same-origin by default, configurable via CORS_ORIGIN
+  const corsOrigin = process.env.CORS_ORIGIN || false;
+  app.use(cors({
+    origin: corsOrigin,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }));
 
   // Audit #95: Security headers (CSP, Permissions-Policy, X-Frame-Options, etc.)
   app.use(securityHeaders);
@@ -272,6 +284,24 @@ async function startServer() {
       console.warn(`[BaselineScheduler] Failed to start: ${(err as Error).message}`);
     }
   });
+
+  // Graceful shutdown handler
+  const shutdown = (signal: string) => {
+    console.log(`\n[Shutdown] ${signal} received. Closing server...`);
+    server.close(() => {
+      console.log("[Shutdown] HTTP server closed.");
+      process.exit(0);
+    });
+
+    // Force exit after timeout if graceful shutdown stalls
+    setTimeout(() => {
+      console.error("[Shutdown] Forced exit after 10s timeout.");
+      process.exit(1);
+    }, 10_000).unref();
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 startServer().catch(console.error);

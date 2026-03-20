@@ -1,9 +1,14 @@
 # Wazuh Parameter Broker — Coverage Ledger
 
-**Spec baseline:** Wazuh REST API OpenAPI v4.14.3-rc3
-**Last updated:** Broker governance closure sprint (2026-03-07)
+> **STALE DOCUMENT** — The tables and counts below were captured on 2026-03-07 before
+> Batch 1/2 promotions. All 40 manual endpoints have been promoted to broker-wired.
+> Current state (2026-03-19): 78 broker / 0 manual / 43 passthrough.
+> The authoritative source is `ENDPOINT_REGISTRY` in `server/wazuh/brokerCoverage.ts`.
 
-This document is the single source of truth for which Wazuh API endpoints are broker-wired, what parameters each broker config accepts, and which endpoints remain manually wired or passthrough.
+**Spec baseline:** Wazuh REST API OpenAPI v4.14.3
+**Last updated:** 2026-03-19 (header only — tables below are stale snapshots)
+
+This document was the single source of truth for which Wazuh API endpoints are broker-wired. **The code is now the source of truth** — see `ENDPOINT_REGISTRY` in `server/wazuh/brokerCoverage.ts`.
 
 ## Audit Guarantee Matrix
 
@@ -198,7 +203,7 @@ The cross-agent endpoint `GET /experimental/ciscat/results` uses `EXPERIMENTAL_C
 | A2 | `search` is forwarded natively as `search`, never rewritten into `q=name~...` | 1 |
 | C-1 | `/security/resources` changed `resource` to `resource_list` | API Contract Gap |
 | C-2 | `/tasks/status` extended from 1/13 to 12/13 params | API Contract Gap |
-| C-3 | `ROOTCHECK_CONFIG` removed non-spec `pci_dss` and `cis` params | API Contract Gap |
+| C-3 | `ROOTCHECK_CONFIG` `pci_dss` and `cis` params: initially removed, then restored per spec v4.14.3 verification | API Contract Gap |
 | C-4 | Added missing security individual resource GETs (users/{id}, roles/{id}, policies/{id}, rules/{id}) | API Contract Gap |
 | C-5 | Added missing cluster/manager API config GETs | API Contract Gap |
 
@@ -229,7 +234,7 @@ pnpm audit:broker
 pnpm audit:openapi
 ```
 
-Both checks are enforced in CI via the `broker-registry` and `openapi-diff` jobs in `.github/workflows/ci.yml`. The build job depends on both passing.
+Both scripts can be run locally. No CI workflow currently exists in the repo for these checks — run them manually before merging broker changes.
 
 ## Endpoint Governance
 

@@ -190,16 +190,16 @@ export default function AlertQueue() {
           {/* Empty state */}
           {items.length === 0 && !listQuery.isLoading && (
             <div className="flex flex-col items-center justify-center py-20">
-              <div className="w-16 h-16 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mb-4">
-                <Brain className="w-8 h-8 text-purple-400/50" />
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
+                <Brain className="w-8 h-8 text-amber-400/50" />
               </div>
               <h3 className="text-lg font-display font-semibold text-foreground mb-1">No Alerts Queued</h3>
               <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
-                Send alerts to the queue from the Alerts Timeline using the <Brain className="inline h-3 w-3 text-purple-400" /> button on each alert row.
+                Send alerts to the queue from the Alerts Timeline using the <Brain className="inline h-3 w-3 text-amber-400" /> button on each alert row.
               </p>
               <button
                 onClick={() => navigate("/alerts")}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-sm hover:bg-purple-500/25 transition-all"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-sm hover:bg-amber-500/25 transition-all"
               >
                 Go to Alerts Timeline
               </button>
@@ -209,7 +209,7 @@ export default function AlertQueue() {
           {/* Loading state */}
           {listQuery.isLoading && (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-6 w-6 text-purple-400 animate-spin" />
+              <Loader2 className="h-6 w-6 text-amber-400 animate-spin" />
             </div>
           )}
 
@@ -217,10 +217,10 @@ export default function AlertQueue() {
           {queuedItems.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Activity className="h-4 w-4 text-purple-400" />
+                <Activity className="h-4 w-4 text-amber-400" />
                 <h2 className="text-sm font-medium text-foreground">Active Queue</h2>
                 <span className="text-[10px] font-mono text-muted-foreground">({queuedItems.length})</span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded border border-purple-500/20 bg-purple-500/5 text-purple-300 font-mono">severity priority</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded border border-amber-500/20 bg-amber-500/5 text-amber-300 font-mono">severity priority</span>
               </div>
               <div className="space-y-2">
                 {queuedItems.map(item => (

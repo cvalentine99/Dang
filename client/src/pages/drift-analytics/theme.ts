@@ -1,15 +1,15 @@
-// ─── Amethyst Nexus palette ─────────────────────────────────────────────────
-export const PURPLE = "oklch(0.541 0.281 293.009)";
-export const PURPLE_DIM = "oklch(0.4 0.15 293)";
-export const VIOLET = "oklch(0.6 0.2 293)";
-export const CYAN = "oklch(0.789 0.154 211.53)";
-export const AMBER = "oklch(0.795 0.184 86.047)";
-export const RED = "oklch(0.637 0.237 25.331)";
-export const GREEN = "oklch(0.765 0.177 163.223)";
-export const MUTED = "oklch(0.65 0.02 286)";
-export const CARD_BG = "oklch(0.17 0.025 286)";
-export const GLASS_BG = "oklch(0.15 0.02 286 / 70%)";
-export const BORDER = "oklch(0.3 0.04 286 / 40%)";
+// ─── Obsidian Instrument Panel palette ───────────────────────────────────────
+export const PURPLE = "oklch(0.795 0.184 85)";
+export const PURPLE_DIM = "oklch(0.5 0.12 85)";
+export const VIOLET = "oklch(0.7 0.16 85)";
+export const CYAN = "oklch(0.75 0.15 195)";
+export const AMBER = "oklch(0.769 0.188 70.08)";
+export const RED = "oklch(0.628 0.258 29.234)";
+export const GREEN = "oklch(0.723 0.219 149.579)";
+export const MUTED = "oklch(0.6 0.01 260)";
+export const CARD_BG = "oklch(0.15 0.005 260)";
+export const GLASS_BG = "oklch(0.15 0.02 60 / 70%)";
+export const BORDER = "oklch(0.3 0.01 260 / 40%)";
 
 export const SCHEDULE_COLORS = [PURPLE, CYAN, AMBER, GREEN, VIOLET, RED, "oklch(0.7 0.15 330)", "oklch(0.7 0.15 200)"];
 export const CATEGORY_COLORS = { packages: CYAN, services: VIOLET, users: AMBER };

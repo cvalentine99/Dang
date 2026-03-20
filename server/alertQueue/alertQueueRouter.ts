@@ -286,35 +286,39 @@ export const alertQueueRouter = router({
           // only triage is done. Downstream stages (correlation, hypothesis,
           // response actions) are still pending and require analyst advancement.
           // totalLatencyMs records triage latency only, not overall run time.
-          await db.insert(pipelineRuns).values({
-            runId,
-            queueItemId: item.id,
-            alertId: item.alertId,
-            currentStage: "triage",
-            status: "partial",
-            triageId: result.triageId,
-            triageStatus: "completed",
-            triageLatencyMs: result.latencyMs ?? null,
-            totalLatencyMs: result.latencyMs ?? null,
-            correlationStatus: "pending",
-            hypothesisStatus: "pending",
-            responseActionsStatus: "pending",
-            triggeredBy: ctx.user.name ?? ctx.user.openId ?? "queue",
-            startedAt: new Date(),
-            completedAt: null,  // NOT complete — awaiting analyst advancement
-          });
+          //
+          // Use transaction for atomic DB updates after triage
+          await db.transaction(async (tx) => {
+            await tx.insert(pipelineRuns).values({
+              runId,
+              queueItemId: item.id,
+              alertId: item.alertId,
+              currentStage: "triage",
+              status: "partial",
+              triageId: result.triageId,
+              triageStatus: "completed",
+              triageLatencyMs: result.latencyMs ?? null,
+              totalLatencyMs: result.latencyMs ?? null,
+              correlationStatus: "pending",
+              hypothesisStatus: "pending",
+              responseActionsStatus: "pending",
+              triggeredBy: ctx.user.name ?? ctx.user.openId ?? "queue",
+              startedAt: new Date(),
+              completedAt: null,  // NOT complete — awaiting analyst advancement
+            });
 
-          // Update queue item with triage link + backward-compatible result
-          await db
-            .update(alertQueue)
-            .set({
-              status: "completed",
-              pipelineTriageId: result.triageId,
-              autoTriageStatus: "completed",
-              triageResult,
-              completedAt: new Date(),
-            })
-            .where(eq(alertQueue.id, input.id));
+            // Update queue item with triage link + backward-compatible result
+            await tx
+              .update(alertQueue)
+              .set({
+                status: "completed",
+                pipelineTriageId: result.triageId,
+                autoTriageStatus: "completed",
+                triageResult,
+                completedAt: new Date(),
+              })
+              .where(eq(alertQueue.id, input.id));
+          });
 
           return {
             success: true,
@@ -325,34 +329,37 @@ export const alertQueueRouter = router({
         } else {
           // Triage failed — still insert a pipelineRuns row so the failure is visible
           const failRunId = `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-          await db.insert(pipelineRuns).values({
-            runId: failRunId,
-            queueItemId: item.id,
-            alertId: item.alertId,
-            currentStage: "failed",
-            status: "failed",
-            triageStatus: "failed",
-            correlationStatus: "pending",
-            hypothesisStatus: "pending",
-            responseActionsStatus: "pending",
-            triggeredBy: ctx.user.name ?? ctx.user.openId ?? "queue",
-            error: result.error ?? "Triage pipeline failed",
-            startedAt: new Date(),
-            completedAt: new Date(),
-          });
-
-          await db
-            .update(alertQueue)
-            .set({
+          // Use transaction for atomic DB updates after triage failure
+          await db.transaction(async (tx) => {
+            await tx.insert(pipelineRuns).values({
+              runId: failRunId,
+              queueItemId: item.id,
+              alertId: item.alertId,
+              currentStage: "failed",
               status: "failed",
-              autoTriageStatus: "failed",
-              triageResult: {
-                answer: `Triage failed: ${result.error ?? "Unknown error"}`,
-                reasoning: "Pipeline error during structured triage",
-              },
+              triageStatus: "failed",
+              correlationStatus: "pending",
+              hypothesisStatus: "pending",
+              responseActionsStatus: "pending",
+              triggeredBy: ctx.user.name ?? ctx.user.openId ?? "queue",
+              error: result.error ?? "Triage pipeline failed",
+              startedAt: new Date(),
               completedAt: new Date(),
-            })
-            .where(eq(alertQueue.id, input.id));
+            });
+
+            await tx
+              .update(alertQueue)
+              .set({
+                status: "failed",
+                autoTriageStatus: "failed",
+                triageResult: {
+                  answer: `Triage failed: ${result.error ?? "Unknown error"}`,
+                  reasoning: "Pipeline error during structured triage",
+                },
+                completedAt: new Date(),
+              })
+              .where(eq(alertQueue.id, input.id));
+          });
 
           return {
             success: false,

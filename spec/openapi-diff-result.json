@@ -1,13 +1,13 @@
 {
-  "timestamp": "2026-03-07T14:46:22.460Z",
-  "specFile": "/home/ubuntu/dang/spec/wazuh-api-v4.14.3.yaml",
+  "timestamp": "2026-03-19T23:00:58.540Z",
+  "specFile": "/home/cvalentine/Downloads/dang/spec/wazuh-api-v4.14.4.yaml",
   "specGetEndpoints": 115,
-  "registryEndpoints": 118,
+  "registryEndpoints": 114,
   "summary": {
     "covered": 112,
     "excluded": 3,
     "missing": 0,
-    "documentedExtras": 6,
+    "documentedExtras": 2,
     "undocumentedExtras": 0
   },
   "covered": [
@@ -147,22 +147,6 @@
     {
       "path": "/agents/{agent_id}",
       "reason": "Single-agent detail fetch by ID. The spec lists /agents with agent filtering, but the direct ID path works at runtime and is more ergonomic for detail views."
-    },
-    {
-      "path": "/security/policies/{policy_id}",
-      "reason": "Individual policy retrieval. Same pattern — spec has PUT only, runtime supports GET. Added as C-4 convenience endpoint."
-    },
-    {
-      "path": "/security/roles/{role_id}",
-      "reason": "Individual role retrieval. Same as users — spec has PUT only, runtime supports GET. Added as C-4 convenience endpoint."
-    },
-    {
-      "path": "/security/rules/{rule_id}",
-      "reason": "Individual RBAC rule retrieval. Same pattern — spec has PUT only, runtime supports GET. Added as C-4 convenience endpoint."
-    },
-    {
-      "path": "/security/users/{user_id}",
-      "reason": "Individual user retrieval. The spec only defines PUT on this path, but Wazuh accepts GET at runtime. Added as C-4 convenience endpoint."
     }
   ],
   "undocumentedExtras": []

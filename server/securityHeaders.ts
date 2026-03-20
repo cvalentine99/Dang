@@ -7,7 +7,7 @@
  *
  * CSP Policy:
  *   - default-src 'self': Only allow resources from same origin by default
- *   - script-src 'self' 'unsafe-inline': Allow inline scripts (needed for Vite HMR in dev)
+ *   - script-src 'self': Scripts from same origin only (no unsafe-inline in production)
  *   - style-src 'self' 'unsafe-inline' fonts.googleapis.com: Allow inline styles + Google Fonts CSS
  *   - font-src 'self' fonts.gstatic.com: Allow Google Fonts files
  *   - img-src 'self' data: blob:: Allow inline images and blob URLs (for charts)
@@ -26,24 +26,28 @@ import type { Request, Response, NextFunction } from "express";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-// In development, Vite HMR needs 'unsafe-eval' for script-src and ws: for connect-src
+// In development, Vite HMR needs 'unsafe-inline' and 'unsafe-eval' for hot module replacement.
+// In production, no inline scripts exist because:
+// - vite.config.ts sets build.modulePreload.polyfill: false (no inline polyfill)
+// - The built index.html only has <script type="module" src="..."> external references
+// - 'strict-dynamic' is not needed since there are no inline bootstrapping scripts
 const scriptSrc = isDev
   ? "'self' 'unsafe-inline' 'unsafe-eval'"
-  : "'self' 'unsafe-inline'";
+  : "'self'";
 
 // S-11: Tighten connect-src in production to specific origins instead of blanket https:
 const connectSrc = isDev
   ? "'self' wss: ws: https:"
   : "'self' wss: https://fonts.googleapis.com https://fonts.gstatic.com";
 
-const CSP_DIRECTIVES = [
+export const CSP_DIRECTIVES = [
   `default-src 'self'`,
   `script-src ${scriptSrc}`,
   `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
   `font-src 'self' https://fonts.gstatic.com`,
   `img-src 'self' data: blob: https:`,
   `connect-src ${connectSrc}`,
-  `frame-ancestors 'none'`,
+  isDev ? `frame-ancestors *` : `frame-ancestors 'none'`,
   `base-uri 'self'`,
   `form-action 'self'`,
   `object-src 'none'`,
@@ -77,7 +81,11 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
 
   // Additional hardening headers
   res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
+  // In dev, allow iframe embedding for the Manus Preview panel;
+  // in production, block all framing (clickjacking protection).
+  if (!isDev) {
+    res.setHeader("X-Frame-Options", "DENY");
+  }
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-DNS-Prefetch-Control", "off");
 

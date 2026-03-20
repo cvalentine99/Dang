@@ -296,7 +296,7 @@ export default function DriftAnalytics() {
   const isLoading = trendQuery.isLoading || volatilityQuery.isLoading || categoryQuery.isLoading || summaryQuery.isLoading;
 
   return (
-    <div className="min-h-screen p-6" style={{ color: "oklch(0.93 0.005 286)" }}>
+    <div className="min-h-screen p-6" style={{ color: "oklch(0.95 0.005 85)" }}>
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -349,7 +349,7 @@ export default function DriftAnalytics() {
                 <button
                   onClick={() => { setSelectedScheduleId(undefined); setShowFilters(false); }}
                   className="w-full rounded px-3 py-1.5 text-left text-xs transition-colors hover:bg-white/5"
-                  style={{ color: !selectedScheduleId ? CYAN : "oklch(0.85 0.01 286)" }}
+                  style={{ color: !selectedScheduleId ? CYAN : "oklch(0.85 0.01 60)" }}
                 >
                   All Schedules
                 </button>
@@ -358,7 +358,7 @@ export default function DriftAnalytics() {
                     key={s.id}
                     onClick={() => { setSelectedScheduleId(s.id); setShowFilters(false); }}
                     className="w-full rounded px-3 py-1.5 text-left text-xs transition-colors hover:bg-white/5"
-                    style={{ color: selectedScheduleId === s.id ? CYAN : "oklch(0.85 0.01 286)" }}
+                    style={{ color: selectedScheduleId === s.id ? CYAN : "oklch(0.85 0.01 60)" }}
                   >
                     {s.name}
                     <span className="ml-2 font-mono" style={{ color: MUTED }}>({s.captureCount} captures)</span>
@@ -410,7 +410,7 @@ export default function DriftAnalytics() {
                       } catch { setExportingType(null); }
                     }}
                     className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs transition-colors hover:bg-white/5"
-                    style={{ color: exportingType === item.key ? CYAN : "oklch(0.85 0.01 286)" }}
+                    style={{ color: exportingType === item.key ? CYAN : "oklch(0.85 0.01 60)" }}
                   >
                     <item.icon className="h-3.5 w-3.5" style={{ color: MUTED }} />
                     {exportingType === item.key ? "Exporting..." : item.label}
@@ -435,7 +435,7 @@ export default function DriftAnalytics() {
             className="flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-colors"
             style={{
               background: activeTab === tab.key ? `${PURPLE}30` : "transparent",
-              color: activeTab === tab.key ? "oklch(0.93 0.005 286)" : MUTED,
+              color: activeTab === tab.key ? "oklch(0.95 0.005 85)" : MUTED,
             }}
           >
             <tab.icon className="h-3.5 w-3.5" />
@@ -512,15 +512,15 @@ export default function DriftAnalytics() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <div className="rounded-lg border px-3 py-2 text-center" style={{ borderColor: BORDER }}>
                 <div className="text-[10px] uppercase tracking-wider" style={{ color: MUTED }}>Total</div>
-                <div className="font-display text-xl font-bold" style={{ color: "oklch(0.93 0.005 286)" }}>{anomalyStatsQ.data.total}</div>
+                <div className="font-display text-xl font-bold" style={{ color: "oklch(0.95 0.005 85)" }}>{anomalyStatsQ.data.total}</div>
               </div>
               <div className="rounded-lg border px-3 py-2 text-center" style={{ borderColor: `${RED}40` }}>
                 <div className="text-[10px] uppercase tracking-wider" style={{ color: RED }}>Critical</div>
                 <div className="font-display text-xl font-bold" style={{ color: RED }}>{anomalyStatsQ.data.critical}</div>
               </div>
               <div className="rounded-lg border px-3 py-2 text-center" style={{ borderColor: "oklch(0.705 0.191 22.216 / 40%)" }}>
-                <div className="text-[10px] uppercase tracking-wider" style={{ color: "oklch(0.705 0.191 22.216)" }}>High</div>
-                <div className="font-display text-xl font-bold" style={{ color: "oklch(0.705 0.191 22.216)" }}>{anomalyStatsQ.data.high}</div>
+                <div className="text-[10px] uppercase tracking-wider" style={{ color: "oklch(0.705 0.213 47.604)" }}>High</div>
+                <div className="font-display text-xl font-bold" style={{ color: "oklch(0.705 0.213 47.604)" }}>{anomalyStatsQ.data.high}</div>
               </div>
               <div className="rounded-lg border px-3 py-2 text-center" style={{ borderColor: `${AMBER}40` }}>
                 <div className="text-[10px] uppercase tracking-wider" style={{ color: AMBER }}>Medium</div>
@@ -555,18 +555,18 @@ export default function DriftAnalytics() {
                   </thead>
                   <tbody>
                     {anomalyListQ.data!.anomalies.map((a) => {
-                      const sevColor = a.severity === "critical" ? RED : a.severity === "high" ? "oklch(0.705 0.191 22.216)" : AMBER;
+                      const sevColor = a.severity === "critical" ? RED : a.severity === "high" ? "oklch(0.705 0.213 47.604)" : AMBER;
                       return (
                         <tr
                           key={a.id}
                           className="border-t transition-colors hover:bg-white/3 cursor-pointer"
-                          style={{ borderColor: "oklch(0.25 0.02 286 / 30%)" }}
+                          style={{ borderColor: "oklch(0.25 0.02 60 / 30%)" }}
                           onClick={() => setSelectedAnomalyId(a.id)}
                         >
                           <td className="py-2 pr-3 font-mono" style={{ color: MUTED }}>
                             {formatDateTime(a.timestamp)}
                           </td>
-                          <td className="py-2 pr-3" style={{ color: "oklch(0.85 0.01 286)" }}>
+                          <td className="py-2 pr-3" style={{ color: "oklch(0.85 0.01 60)" }}>
                             {a.scheduleName || `Schedule #${a.scheduleId}`}
                           </td>
                           <td className="py-2 pr-3">
@@ -580,7 +580,7 @@ export default function DriftAnalytics() {
                           <td className="py-2 pr-3 text-right font-mono font-semibold" style={{ color: sevColor }}>
                             {formatPct(a.driftPercent)}
                           </td>
-                          <td className="py-2 pr-3 text-right font-mono" style={{ color: "oklch(0.85 0.01 286)" }}>
+                          <td className="py-2 pr-3 text-right font-mono" style={{ color: "oklch(0.85 0.01 60)" }}>
                             {a.zScore.toFixed(2)}σ
                           </td>
                           <td className="py-2 pr-3 text-right font-mono" style={{ color: MUTED }}>
@@ -663,7 +663,7 @@ export default function DriftAnalytics() {
                         </linearGradient>
                       ))}
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.02 286 / 30%)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 30%)" />
                     <XAxis dataKey="time" tick={{ fill: MUTED, fontSize: 11 }} />
                     <YAxis
                       tick={{ fill: MUTED, fontSize: 11 }}
@@ -724,7 +724,7 @@ export default function DriftAnalytics() {
                 <>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={categoryData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.02 286 / 30%)" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 30%)" />
                       <XAxis type="number" tick={{ fill: MUTED, fontSize: 11 }} />
                       <YAxis type="category" dataKey="category" tick={{ fill: MUTED, fontSize: 11 }} width={80} />
                       <Tooltip content={<ChartTooltip />} />
@@ -788,7 +788,7 @@ export default function DriftAnalytics() {
                         {idx + 1}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-mono text-xs font-semibold" style={{ color: "oklch(0.9 0.005 286)" }}>
+                        <div className="font-mono text-xs font-semibold" style={{ color: "oklch(0.9 0.005 60)" }}>
                           Agent {agent.agentId}
                         </div>
                         <div className="text-[10px]" style={{ color: MUTED }}>
@@ -837,7 +837,7 @@ export default function DriftAnalytics() {
                       onClick={() => setSelectedScheduleId(selectedScheduleId === sched.id ? undefined : sched.id)}
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <div className="font-display text-sm font-semibold truncate" style={{ color: "oklch(0.9 0.005 286)" }}>
+                        <div className="font-display text-sm font-semibold truncate" style={{ color: "oklch(0.9 0.005 60)" }}>
                           {sched.name}
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -873,7 +873,7 @@ export default function DriftAnalytics() {
                         </div>
                         <div>
                           <span style={{ color: MUTED }}>Captures</span>
-                          <div className="font-mono font-semibold" style={{ color: "oklch(0.85 0.01 286)" }}>
+                          <div className="font-mono font-semibold" style={{ color: "oklch(0.85 0.01 60)" }}>
                             {sched.captureCount}
                           </div>
                         </div>
@@ -939,12 +939,12 @@ export default function DriftAnalytics() {
                         <tr
                           key={evt.id}
                           className="border-t transition-colors hover:bg-white/3"
-                          style={{ borderColor: "oklch(0.25 0.02 286 / 30%)" }}
+                          style={{ borderColor: "oklch(0.25 0.02 60 / 30%)" }}
                         >
                           <td className="py-2 pr-3 font-mono" style={{ color: MUTED }}>
                             {formatDateTime(evt.timestamp)}
                           </td>
-                          <td className="py-2 pr-3" style={{ color: "oklch(0.85 0.01 286)" }}>
+                          <td className="py-2 pr-3" style={{ color: "oklch(0.85 0.01 60)" }}>
                             {evt.scheduleName}
                           </td>
                           <td className="py-2 pr-3 text-right font-mono font-semibold" style={{
@@ -952,7 +952,7 @@ export default function DriftAnalytics() {
                           }}>
                             {formatPct(evt.driftPercent)}
                           </td>
-                          <td className="py-2 pr-3 text-right font-mono" style={{ color: "oklch(0.85 0.01 286)" }}>
+                          <td className="py-2 pr-3 text-right font-mono" style={{ color: "oklch(0.85 0.01 60)" }}>
                             {evt.driftCount}
                           </td>
                           <td className="py-2 pr-3 text-right font-mono" style={{ color: MUTED }}>

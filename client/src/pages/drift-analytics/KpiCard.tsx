@@ -23,7 +23,7 @@ export function KpiCard({
       </div>
       <div className="min-w-0">
         <div className="text-xs uppercase tracking-wider" style={{ color: MUTED }}>{label}</div>
-        <div className="font-display text-xl font-bold" style={{ color: "oklch(0.93 0.005 286)" }}>{value}</div>
+        <div className="font-display text-xl font-bold" style={{ color: "oklch(0.95 0.005 85)" }}>{value}</div>
         {sub && <div className="text-xs" style={{ color: MUTED }}>{sub}</div>}
       </div>
     </div>

@@ -201,13 +201,13 @@ function CorrelationBundleCard({ bundle }: { bundle: any }) {
   };
 
   return (
-    <div className="mt-3 rounded-lg bg-gradient-to-br from-violet-500/[0.04] to-cyan-500/[0.04] border border-violet-500/15 overflow-hidden">
+    <div className="mt-3 rounded-lg bg-gradient-to-br from-amber-500/[0.04] to-cyan-500/[0.04] border border-amber-500/15 overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-white/[0.04]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <GitBranch className="w-4 h-4 text-violet-400" />
-            <span className="text-sm font-semibold text-violet-300">Correlation Bundle</span>
+            <GitBranch className="w-4 h-4 text-amber-400" />
+            <span className="text-sm font-semibold text-amber-300">Correlation Bundle</span>
             <span className="text-[10px] font-mono text-muted-foreground/40">{corr.correlationId}</span>
           </div>
           <div className="flex items-center gap-2">
@@ -229,7 +229,7 @@ function CorrelationBundleCard({ bundle }: { bundle: any }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4">
         <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground/50 mb-1">Related Alerts</div>
-          <div className="text-lg font-bold font-[Space_Grotesk] text-violet-300">{relatedAlerts.length}</div>
+          <div className="text-lg font-bold font-[Space_Grotesk] text-amber-300">{relatedAlerts.length}</div>
         </div>
         <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground/50 mb-1">Blast Radius</div>
@@ -309,7 +309,7 @@ function CorrelationBundleCard({ bundle }: { bundle: any }) {
       <div className="px-4 pb-4">
         <button
           onClick={() => setShowDetails(!showDetails)}
-          className="flex items-center gap-1.5 text-xs text-violet-400/70 hover:text-violet-400 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-amber-400/70 hover:text-amber-400 transition-colors"
         >
           {showDetails ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           {showDetails ? "Hide" : "Show"} Detailed Evidence ({relatedAlerts.length} alerts, {vulnContext.length} vulns, {fimContext.length} FIM, {threatIntel.length} TI)
@@ -324,7 +324,7 @@ function CorrelationBundleCard({ bundle }: { bundle: any }) {
                 <div className="space-y-1 max-h-48 overflow-y-auto">
                   {relatedAlerts.map((a: any, i: number) => (
                     <div key={i} className="flex items-center gap-2 text-xs p-2 rounded bg-white/[0.02] border border-white/[0.04]">
-                      <span className="font-mono text-violet-300/80">{a.ruleId}</span>
+                      <span className="font-mono text-amber-300/80">{a.ruleId}</span>
                       <span className="text-foreground/70 truncate flex-1">{a.ruleDescription}</span>
                       <span className="text-muted-foreground/40 font-mono text-[10px]">{a.agentId}</span>
                       <span className="text-muted-foreground/30 text-[10px]">
@@ -417,7 +417,7 @@ function CorrelationBundleCard({ bundle }: { bundle: any }) {
                 <div className="space-y-1">
                   {priorInvestigations.map((p: any, i: number) => (
                     <div key={i} className="flex items-center gap-2 text-xs p-2 rounded bg-white/[0.02] border border-white/[0.04]">
-                      <span className="text-violet-300">#{p.investigationId}</span>
+                      <span className="text-amber-300">#{p.investigationId}</span>
                       <span className="text-foreground/70 flex-1">{p.title}</span>
                       <span className="text-muted-foreground/40">{p.status}</span>
                       <span className="text-[10px] text-muted-foreground/40">{p.linkReason}</span>
@@ -454,7 +454,7 @@ function CorrelationBundleCard({ bundle }: { bundle: any }) {
                       <div className="text-yellow-300/80">{m.description}</div>
                       <div className="text-muted-foreground/40 mt-0.5">Impact: {m.impact}</div>
                       {m.suggestedAction && (
-                        <div className="text-violet-300/60 mt-0.5">Suggested: {m.suggestedAction}</div>
+                        <div className="text-amber-300/60 mt-0.5">Suggested: {m.suggestedAction}</div>
                       )}
                     </div>
                   ))}
@@ -470,7 +470,7 @@ function CorrelationBundleCard({ bundle }: { bundle: any }) {
             <button
               onClick={() => hypothesisMutation.mutate({ correlationId: corr.correlationId })}
               disabled={hypothesisMutation.isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-violet-500/15 to-cyan-500/15 border border-violet-500/25 text-violet-300 text-xs font-medium hover:from-violet-500/25 hover:to-cyan-500/25 transition-all disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/15 to-cyan-500/15 border border-amber-500/25 text-amber-300 text-xs font-medium hover:from-amber-500/25 hover:to-cyan-500/25 transition-all disabled:opacity-50"
             >
               {hypothesisMutation.isPending ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -569,7 +569,7 @@ function TriageResultCard({ triage, onRefresh, isHighlighted, highlightCorrelati
   const routeInfo = ROUTE_LABELS[route] || ROUTE_LABELS.B_LOW_CONFIDENCE;
 
   return (
-    <GlassPanel ref={cardRef} className={`p-0 overflow-hidden transition-all duration-500 ${isHighlighted ? "ring-2 ring-violet-500/60 shadow-[0_0_20px_rgba(139,92,246,0.2)]" : ""} ${isCorrelationHighlighted ? "ring-2 ring-cyan-500/60 shadow-[0_0_20px_rgba(6,182,212,0.2)]" : ""}`}>
+    <GlassPanel ref={cardRef} className={`p-0 overflow-hidden transition-all duration-500 ${isHighlighted ? "ring-2 ring-amber-500/60 shadow-[0_0_20px_rgba(139,92,246,0.2)]" : ""} ${isCorrelationHighlighted ? "ring-2 ring-cyan-500/60 shadow-[0_0_20px_rgba(6,182,212,0.2)]" : ""}`}>
       {/* Header Row */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -588,7 +588,7 @@ function TriageResultCard({ triage, onRefresh, isHighlighted, highlightCorrelati
         </span>
 
         {/* Alert Family */}
-        <span className="text-xs font-mono text-violet-300/80">
+        <span className="text-xs font-mono text-amber-300/80">
           {triage.alertFamily || "unknown"}
         </span>
 
@@ -658,7 +658,7 @@ function TriageResultCard({ triage, onRefresh, isHighlighted, highlightCorrelati
                   const Icon = ENTITY_ICONS[entity.type] || Info;
                   return (
                     <span key={i} className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-white/[0.04] border border-white/[0.06] text-xs">
-                      <Icon className="w-3 h-3 text-violet-400/60" />
+                      <Icon className="w-3 h-3 text-amber-400/60" />
                       <span className="text-muted-foreground/50 text-[10px]">{entity.type}</span>
                       <span className="font-mono text-foreground/80">{entity.value}</span>
                       <span className="text-[9px] text-muted-foreground/30">{Math.round(entity.confidence * 100)}%</span>
@@ -675,9 +675,9 @@ function TriageResultCard({ triage, onRefresh, isHighlighted, highlightCorrelati
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground/50 mb-2">MITRE ATT&CK Mapping</div>
               <div className="flex flex-wrap gap-2">
                 {triageData.mitreMapping.map((m: any, i: number) => (
-                  <span key={i} className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-violet-500/10 border border-violet-500/20 text-xs">
-                    <Target className="w-3 h-3 text-violet-400" />
-                    <span className="font-mono text-violet-300">{m.techniqueId}</span>
+                  <span key={i} className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-xs">
+                    <Target className="w-3 h-3 text-amber-400" />
+                    <span className="font-mono text-amber-300">{m.techniqueId}</span>
                     <span className="text-muted-foreground/60">{m.techniqueName}</span>
                     <span className="text-[9px] text-muted-foreground/30">{m.tactic}</span>
                   </span>
@@ -712,11 +712,11 @@ function TriageResultCard({ triage, onRefresh, isHighlighted, highlightCorrelati
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground/50 mb-1">Case Link Suggestion</div>
               <div className="flex items-center gap-2 text-xs">
-                <FileSearch className="w-3.5 h-3.5 text-violet-400" />
+                <FileSearch className="w-3.5 h-3.5 text-amber-400" />
                 {triageData.caseLink.suggestedCaseId ? (
                   <button
                     onClick={() => navigate(`/investigations`)}
-                    className="text-violet-400 hover:text-violet-300 underline underline-offset-2"
+                    className="text-amber-400 hover:text-amber-300 underline underline-offset-2"
                   >
                     Case #{triageData.caseLink.suggestedCaseId}: {triageData.caseLink.suggestedCaseTitle || "View Case"}
                   </button>
@@ -743,7 +743,7 @@ function TriageResultCard({ triage, onRefresh, isHighlighted, highlightCorrelati
                       <p className="text-foreground/70">{u.description}</p>
                       <p className="text-muted-foreground/40 mt-0.5">Impact: {u.impact}</p>
                       {u.suggestedAction && (
-                        <p className="text-violet-400/60 mt-0.5">Suggested: {u.suggestedAction}</p>
+                        <p className="text-amber-400/60 mt-0.5">Suggested: {u.suggestedAction}</p>
                       )}
                     </div>
                   </div>
@@ -804,7 +804,7 @@ function TriageResultCard({ triage, onRefresh, isHighlighted, highlightCorrelati
                 <button
                   onClick={() => correlationMutation.mutate({ triageId: triage.triageId })}
                   disabled={correlationMutation.isPending}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-300 text-xs font-medium hover:bg-violet-500/20 transition-all disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium hover:bg-amber-500/20 transition-all disabled:opacity-50"
                 >
                   {correlationMutation.isPending ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
@@ -837,7 +837,7 @@ function TriageResultCard({ triage, onRefresh, isHighlighted, highlightCorrelati
                     <select
                       value={overrideSeverity}
                       onChange={(e) => setOverrideSeverity(e.target.value)}
-                      className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-xs text-foreground/80 focus:outline-none focus:border-violet-500/40"
+                      className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-xs text-foreground/80 focus:outline-none focus:border-amber-500/40"
                     >
                       <option value="">Keep Original</option>
                       {["critical", "high", "medium", "low", "info"].map(s => (
@@ -850,7 +850,7 @@ function TriageResultCard({ triage, onRefresh, isHighlighted, highlightCorrelati
                     <select
                       value={overrideRoute}
                       onChange={(e) => setOverrideRoute(e.target.value)}
-                      className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-xs text-foreground/80 focus:outline-none focus:border-violet-500/40"
+                      className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-xs text-foreground/80 focus:outline-none focus:border-amber-500/40"
                     >
                       <option value="">Keep Original</option>
                       {Object.entries(ROUTE_LABELS).map(([k, v]) => (
@@ -865,7 +865,7 @@ function TriageResultCard({ triage, onRefresh, isHighlighted, highlightCorrelati
                     value={feedbackNote}
                     onChange={(e) => setFeedbackNote(e.target.value)}
                     placeholder="Why is this override needed? This will be used as future retrieval context..."
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1.5 text-xs text-foreground/80 focus:outline-none focus:border-violet-500/40 resize-none h-16"
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1.5 text-xs text-foreground/80 focus:outline-none focus:border-amber-500/40 resize-none h-16"
                   />
                 </div>
                 <div className="flex gap-2">
@@ -974,7 +974,7 @@ export default function TriagePipeline() {
           <select
             value={severityFilter}
             onChange={(e) => { setSeverityFilter(e.target.value); setPage(0); }}
-            className="bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-xs text-foreground/80 focus:outline-none focus:border-violet-500/40"
+            className="bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-xs text-foreground/80 focus:outline-none focus:border-amber-500/40"
           >
             <option value="">All Severities</option>
             {["critical", "high", "medium", "low", "info"].map(s => (
@@ -985,7 +985,7 @@ export default function TriagePipeline() {
           <select
             value={routeFilter}
             onChange={(e) => { setRouteFilter(e.target.value); setPage(0); }}
-            className="bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-xs text-foreground/80 focus:outline-none focus:border-violet-500/40"
+            className="bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-xs text-foreground/80 focus:outline-none focus:border-amber-500/40"
           >
             <option value="">All Routes</option>
             {Object.entries(ROUTE_LABELS).map(([k, v]) => (
@@ -996,7 +996,7 @@ export default function TriagePipeline() {
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
-            className="bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-xs text-foreground/80 focus:outline-none focus:border-violet-500/40"
+            className="bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-xs text-foreground/80 focus:outline-none focus:border-amber-500/40"
           >
             <option value="">All Statuses</option>
             {["completed", "processing", "pending", "failed"].map(s => (
@@ -1007,7 +1007,7 @@ export default function TriagePipeline() {
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 text-xs transition-colors disabled:opacity-50"
+            className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3 h-3 ${isFetching ? "animate-spin" : ""}`} />
             Refresh
@@ -1024,7 +1024,7 @@ export default function TriagePipeline() {
         </div>
       ) : triages.length === 0 ? (
         <GlassPanel className="p-12 text-center">
-          <Brain className="w-12 h-12 text-violet-400/30 mx-auto mb-4" />
+          <Brain className="w-12 h-12 text-amber-400/30 mx-auto mb-4" />
           <h3 className="text-lg font-[Space_Grotesk] text-foreground/60 mb-2">No Triage Objects Yet</h3>
           <p className="text-sm text-muted-foreground/40 max-w-md mx-auto">
             Triage objects are created when alerts are processed through the agentic pipeline.

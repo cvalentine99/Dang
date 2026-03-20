@@ -57,8 +57,8 @@ export function QueueHeader({
     <div className="flex-shrink-0 px-6 py-4 border-b border-white/5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center">
-            <Inbox className="w-5 h-5 text-purple-400" />
+          <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+            <Inbox className="w-5 h-5 text-amber-400" />
           </div>
           <div>
             <h1 className="text-lg font-display font-bold text-foreground">Alert Queue</h1>

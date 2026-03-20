@@ -74,7 +74,7 @@ export function AddToInvestigationDialog({ node, onClose }: AddToInvestigationDi
             <label className="block text-xs text-muted-foreground mb-1.5">Select Active Investigation</label>
             {investigationsQ.isLoading ? (
               <div className="flex items-center gap-2 py-3">
-                <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
                 <span className="text-xs text-muted-foreground">Loading investigations...</span>
               </div>
             ) : investigations.length === 0 ? (
@@ -89,7 +89,7 @@ export function AddToInvestigationDialog({ node, onClose }: AddToInvestigationDi
                     onClick={() => setSelectedInvId(inv.id)}
                     className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors ${
                       selectedInvId === inv.id
-                        ? "bg-purple-500/15 border border-purple-500/30"
+                        ? "bg-amber-500/15 border border-amber-500/30"
                         : "bg-white/5 border border-white/5 hover:bg-white/10"
                     }`}
                   >
@@ -100,7 +100,7 @@ export function AddToInvestigationDialog({ node, onClose }: AddToInvestigationDi
                         {inv.tags?.length > 0 && ` \u2022 ${(inv.tags as string[]).join(", ")}`}
                       </p>
                     </div>
-                    {selectedInvId === inv.id && <Check className="w-4 h-4 text-purple-400 flex-shrink-0" />}
+                    {selectedInvId === inv.id && <Check className="w-4 h-4 text-amber-400 flex-shrink-0" />}
                   </button>
                 ))}
               </div>
@@ -120,7 +120,7 @@ export function AddToInvestigationDialog({ node, onClose }: AddToInvestigationDi
                 ? "bg-green-500/15 text-green-300 border border-green-500/30"
                 : !selectedInvId || adding
                   ? "bg-white/5 text-muted-foreground border border-white/10 cursor-not-allowed"
-                  : "bg-purple-500/15 text-purple-300 border border-purple-500/30 hover:bg-purple-500/25"
+                  : "bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25"
             }`}
           >
             {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : added ? <Check className="w-3.5 h-3.5" /> : <FolderPlus className="w-3.5 h-3.5" />}

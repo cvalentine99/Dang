@@ -465,7 +465,7 @@ export function QueueNotifier() {
     <div className="fixed bottom-4 right-4 z-50" ref={panelRef}>
       {/* Panel */}
       {panelOpen && (
-        <div className="absolute bottom-12 right-0 w-80 max-h-[480px] rounded-xl border border-white/10 bg-black/90 backdrop-blur-xl shadow-2xl shadow-purple-500/5 animate-in slide-in-from-bottom-2 fade-in duration-200 flex flex-col overflow-hidden">
+        <div className="absolute bottom-12 right-0 w-80 max-h-[480px] rounded-xl border border-white/10 bg-black/90 backdrop-blur-xl shadow-2xl shadow-amber-500/5 animate-in slide-in-from-bottom-2 fade-in duration-200 flex flex-col overflow-hidden">
           {/* Panel header */}
           <div className="flex-none flex items-center justify-between px-4 py-3 border-b border-white/5">
             {showSettings ? (
@@ -484,7 +484,7 @@ export function QueueNotifier() {
                 <h4 className="text-xs font-display font-semibold text-foreground">
                   Notifications
                   {unreadCount > 0 && (
-                    <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[9px] font-mono">
+                    <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[9px] font-mono">
                       {unreadCount}
                     </span>
                   )}
@@ -691,13 +691,13 @@ export function QueueNotifier() {
         }}
         className={`group relative w-9 h-9 rounded-full border backdrop-blur-xl flex items-center justify-center transition-all shadow-lg ${
           isAnyEnabled
-            ? "bg-purple-500/15 border-purple-500/30 hover:bg-purple-500/25 shadow-purple-500/10"
+            ? "bg-amber-500/15 border-amber-500/30 hover:bg-amber-500/25 shadow-amber-500/10"
             : "bg-black/40 border-white/10 hover:bg-white/10"
         }`}
         title="Notifications"
       >
         {isAnyEnabled ? (
-          <Bell className="h-4 w-4 text-purple-400 group-hover:text-purple-300" />
+          <Bell className="h-4 w-4 text-amber-400 group-hover:text-amber-300" />
         ) : (
           <BellOff className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
         )}
@@ -711,7 +711,7 @@ export function QueueNotifier() {
 
         {/* Active indicator (when no unread but enabled) */}
         {unreadCount === 0 && isAnyEnabled && (
-          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
         )}
       </button>
     </div>

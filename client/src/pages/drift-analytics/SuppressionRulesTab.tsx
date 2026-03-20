@@ -35,7 +35,7 @@ export function SuppressionRulesTab({
       {/* Header with Create button */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-display text-lg font-semibold" style={{ color: "oklch(0.9 0.005 286)" }}>Suppression Rules</h2>
+          <h2 className="font-display text-lg font-semibold" style={{ color: "oklch(0.9 0.005 60)" }}>Suppression Rules</h2>
           <p className="text-xs" style={{ color: MUTED }}>Mute anomaly alerts during maintenance windows or known-noisy periods</p>
         </div>
         <button
@@ -60,7 +60,7 @@ export function SuppressionRulesTab({
                   value={newRule.scheduleId ?? ""}
                   onChange={(e) => setNewRule({ ...newRule, scheduleId: e.target.value ? Number(e.target.value) : null })}
                   className="w-full rounded-lg border px-3 py-2 text-xs"
-                  style={{ background: "oklch(0.12 0.02 286)", borderColor: BORDER, color: "oklch(0.85 0.01 286)" }}
+                  style={{ background: "oklch(0.12 0.02 60)", borderColor: BORDER, color: "oklch(0.85 0.01 60)" }}
                 >
                   <option value="">All Schedules</option>
                   {schedules.map((s) => (
@@ -76,7 +76,7 @@ export function SuppressionRulesTab({
                   value={newRule.severityFilter}
                   onChange={(e) => setNewRule({ ...newRule, severityFilter: e.target.value as any })}
                   className="w-full rounded-lg border px-3 py-2 text-xs"
-                  style={{ background: "oklch(0.12 0.02 286)", borderColor: BORDER, color: "oklch(0.85 0.01 286)" }}
+                  style={{ background: "oklch(0.12 0.02 60)", borderColor: BORDER, color: "oklch(0.85 0.01 60)" }}
                 >
                   <option value="all">All Severities</option>
                   <option value="critical">Critical &amp; below</option>
@@ -95,7 +95,7 @@ export function SuppressionRulesTab({
                   value={newRule.durationHours}
                   onChange={(e) => setNewRule({ ...newRule, durationHours: Math.max(1, Math.min(720, Number(e.target.value))) })}
                   className="w-full rounded-lg border px-3 py-2 text-xs"
-                  style={{ background: "oklch(0.12 0.02 286)", borderColor: BORDER, color: "oklch(0.85 0.01 286)" }}
+                  style={{ background: "oklch(0.12 0.02 60)", borderColor: BORDER, color: "oklch(0.85 0.01 60)" }}
                 />
                 <div className="mt-1 flex gap-2">
                   {[1, 4, 8, 24, 72, 168].map((h) => (
@@ -120,7 +120,7 @@ export function SuppressionRulesTab({
                   onChange={(e) => setNewRule({ ...newRule, reason: e.target.value })}
                   placeholder="e.g., Scheduled maintenance window"
                   className="w-full rounded-lg border px-3 py-2 text-xs"
-                  style={{ background: "oklch(0.12 0.02 286)", borderColor: BORDER, color: "oklch(0.85 0.01 286)" }}
+                  style={{ background: "oklch(0.12 0.02 60)", borderColor: BORDER, color: "oklch(0.85 0.01 60)" }}
                 />
               </div>
             </div>
@@ -166,12 +166,12 @@ export function SuppressionRulesTab({
             <div className="space-y-3">
               {suppressionListQ.data!.rules.map((rule: any) => {
                 const isActive = rule.active && !rule.isExpired;
-                const sevColor = rule.severityFilter === "critical" ? RED : rule.severityFilter === "high" ? "oklch(0.705 0.191 22.216)" : rule.severityFilter === "medium" ? AMBER : VIOLET;
+                const sevColor = rule.severityFilter === "critical" ? RED : rule.severityFilter === "high" ? "oklch(0.705 0.213 47.604)" : rule.severityFilter === "medium" ? AMBER : VIOLET;
                 return (
                   <div
                     key={rule.id}
                     className="flex items-center gap-4 rounded-lg border px-4 py-3"
-                    style={{ borderColor: isActive ? `${PURPLE}40` : BORDER, background: isActive ? "oklch(0.16 0.025 286)" : "oklch(0.13 0.015 286)" }}
+                    style={{ borderColor: isActive ? `${PURPLE}40` : BORDER, background: isActive ? "oklch(0.16 0.025 60)" : "oklch(0.13 0.015 60)" }}
                   >
                     {/* Status icon */}
                     <div className="shrink-0">
@@ -185,7 +185,7 @@ export function SuppressionRulesTab({
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-semibold" style={{ color: isActive ? "oklch(0.9 0.005 286)" : MUTED }}>
+                        <span className="text-xs font-semibold" style={{ color: isActive ? "oklch(0.9 0.005 60)" : MUTED }}>
                           {rule.scheduleName || "All Schedules"}
                         </span>
                         <span
