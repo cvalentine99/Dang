@@ -1,6 +1,6 @@
 # UI → Router Schema Parity Report
 
-**Generated:** 2026-03-13  
+**Generated:** 2026-03-19  
 **Script:** `scripts/audit-ui-param-parity.mjs`  
 **Callsites audited:** 182  
 **Unique procedures consumed:** 128 of 130 total  
@@ -16,8 +16,8 @@
 | Unique procedures consumed | 128 |
 | Router procedures available | 130 |
 | Parameters surfaced in UI | 99 |
-| Parameters hardcoded/constant | 128 |
-| Parameters not supported (classified) | 913 |
+| Parameters hardcoded/constant | 130 |
+| Parameters not supported (classified) | 911 |
 | Violations | 0 |
 
 **No violations found.** All UI callsites pass only schema-valid keys, all required params are present, and every optional param is classified.
@@ -441,19 +441,19 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/AgentHealth.tsx
 
-### Line 88: `wazuh.status`
+### Line 89: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 91: `wazuh.agentSummaryStatus`
+### Line 92: `wazuh.agentSummaryStatus`
 
 Input: void (no parameters) — **OK**
 
-### Line 92: `wazuh.agentSummaryOs`
+### Line 93: `wazuh.agentSummaryOs`
 
 Input: void (no parameters) — **OK**
 
-### Line 93: `wazuh.agentGroups`
+### Line 94: `wazuh.agentGroups`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -467,7 +467,7 @@ Input: void (no parameters) — **OK**
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 108: `wazuh.agents`
+### Line 109: `wazuh.agents`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -492,7 +492,7 @@ Input: void (no parameters) — **OK**
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 114: `wazuh.agentsOutdated`
+### Line 115: `wazuh.agentsOutdated`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -503,7 +503,7 @@ Input: void (no parameters) — **OK**
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 115: `wazuh.agentsNoGroup`
+### Line 116: `wazuh.agentsNoGroup`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -514,7 +514,7 @@ Input: void (no parameters) — **OK**
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 127: `wazuh.agentsUpgradeResult`
+### Line 128: `wazuh.agentsUpgradeResult`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -531,13 +531,13 @@ Input: void (no parameters) — **OK**
 | `registerIP` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 134: `wazuh.agentById`
+### Line 135: `wazuh.agentById`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `agentId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 135: `wazuh.agentOs`
+### Line 136: `wazuh.agentOs`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -545,7 +545,7 @@ Input: void (no parameters) — **OK**
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 136: `wazuh.agentHardware`
+### Line 137: `wazuh.agentHardware`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -555,43 +555,43 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/AlertsTimeline.tsx
 
-### Line 170: `wazuh.status`
+### Line 171: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 173: `wazuh.statsHourly`
+### Line 174: `wazuh.statsHourly`
 
 Input: void (no parameters) — **OK**
 
-### Line 174: `wazuh.statsWeekly`
+### Line 175: `wazuh.statsWeekly`
 
 Input: void (no parameters) — **OK**
 
 ## client/src/pages/BrokerCoverage.tsx
 
-### Line 301: `wazuh.brokerCoverage`
+### Line 304: `wazuh.brokerCoverage`
 
 Input: void (no parameters) — **OK**
 
 ## client/src/pages/BrokerPlayground.tsx
 
-### Line 394: `wazuh.brokerConfigList`
+### Line 397: `wazuh.brokerConfigList`
 
 Input: void (no parameters) — **OK**
 
-### Line 395: `wazuh.brokerPlayground`
+### Line 398: `wazuh.brokerPlayground`
 
 Input: mutation (params passed at call time via mutateAsync) — **OK**
 
 ## client/src/pages/ClusterHealth.tsx
 
-### Line 220: `wazuh.clusterNodeStatus`
+### Line 221: `wazuh.clusterNodeStatus`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `nodeId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 224: `wazuh.clusterNodeConfiguration`
+### Line 225: `wazuh.clusterNodeConfiguration`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -600,14 +600,14 @@ Input: mutation (params passed at call time via mutateAsync) — **OK**
 | `raw` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `section` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 228: `wazuh.clusterNodeDaemonStats`
+### Line 229: `wazuh.clusterNodeDaemonStats`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `daemons_list` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `nodeId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 232: `wazuh.clusterNodeLogs`
+### Line 233: `wazuh.clusterNodeLogs`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -620,50 +620,50 @@ Input: mutation (params passed at call time via mutateAsync) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `tag` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 236: `wazuh.clusterNodeLogsSummary`
+### Line 237: `wazuh.clusterNodeLogsSummary`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `nodeId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 240: `wazuh.clusterNodeStatsAnalysisd`
+### Line 241: `wazuh.clusterNodeStatsAnalysisd`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `nodeId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 244: `wazuh.clusterNodeStatsRemoted`
+### Line 245: `wazuh.clusterNodeStatsRemoted`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `nodeId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 248: `wazuh.clusterNodeStatsWeekly`
+### Line 249: `wazuh.clusterNodeStatsWeekly`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `nodeId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 252: `wazuh.clusterNodeInfo`
+### Line 253: `wazuh.clusterNodeInfo`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `nodeId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 256: `wazuh.clusterNodeStats`
+### Line 257: `wazuh.clusterNodeStats`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `date` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `nodeId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 260: `wazuh.clusterNodeStatsHourly`
+### Line 261: `wazuh.clusterNodeStatsHourly`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `nodeId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 266: `wazuh.clusterNodeComponentConfig`
+### Line 267: `wazuh.clusterNodeComponentConfig`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -671,37 +671,37 @@ Input: mutation (params passed at call time via mutateAsync) — **OK**
 | `configuration` | Required | Yes | Passed | **Surfaced** (required) |
 | `nodeId` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 616: `wazuh.status`
+### Line 617: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 618: `wazuh.managerStatus`
+### Line 619: `wazuh.managerStatus`
 
 Input: void (no parameters) — **OK**
 
-### Line 619: `wazuh.managerInfo`
+### Line 620: `wazuh.managerInfo`
 
 Input: void (no parameters) — **OK**
 
-### Line 620: `wazuh.statsHourly`
+### Line 621: `wazuh.statsHourly`
 
 Input: void (no parameters) — **OK**
 
-### Line 621: `wazuh.daemonStats`
+### Line 622: `wazuh.daemonStats`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `daemons` | Optional | No | Passed | **Constant** (hardcoded: `["wazuh-analysisd", "wazuh-remoted", "wa`) |
 
-### Line 622: `wazuh.managerConfigValidation`
+### Line 623: `wazuh.managerConfigValidation`
 
 Input: void (no parameters) — **OK**
 
-### Line 623: `wazuh.clusterStatus`
+### Line 624: `wazuh.clusterStatus`
 
 Input: void (no parameters) — **OK**
 
-### Line 624: `wazuh.clusterNodes`
+### Line 625: `wazuh.clusterNodes`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -715,21 +715,21 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `type` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 625: `wazuh.clusterHealthcheck`
+### Line 626: `wazuh.clusterHealthcheck`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `nodes_list` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 626: `wazuh.clusterLocalInfo`
+### Line 627: `wazuh.clusterLocalInfo`
 
 Input: void (no parameters) — **OK**
 
-### Line 627: `wazuh.clusterLocalConfig`
+### Line 628: `wazuh.clusterLocalConfig`
 
 Input: void (no parameters) — **OK**
 
-### Line 632: `wazuh.managerLogs`
+### Line 633: `wazuh.managerLogs`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -743,7 +743,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `tag` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 638: `wazuh.managerConfiguration`
+### Line 639: `wazuh.managerConfiguration`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -752,45 +752,45 @@ Input: void (no parameters) — **OK**
 | `raw` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `section` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 643: `wazuh.cacheStats`
+### Line 644: `wazuh.cacheStats`
 
 Input: void (no parameters) — **OK**
 
-### Line 644: `wazuh.cacheClear`
+### Line 645: `wazuh.cacheClear`
 
 Input: mutation (params passed at call time via mutateAsync) — **OK**
 
-### Line 645: `wazuh.cacheSetEnabled`
+### Line 646: `wazuh.cacheSetEnabled`
 
 Input: mutation (params passed at call time via mutateAsync) — **OK**
 
-### Line 646: `wazuh.cacheSetTtl`
+### Line 647: `wazuh.cacheSetTtl`
 
 Input: mutation (params passed at call time via mutateAsync) — **OK**
 
-### Line 651: `wazuh.clusterApiConfig`
+### Line 652: `wazuh.clusterApiConfig`
 
 Input: void (no parameters) — **OK**
 
-### Line 652: `wazuh.clusterConfigValidation`
+### Line 653: `wazuh.clusterConfigValidation`
 
 Input: void (no parameters) — **OK**
 
-### Line 653: `wazuh.clusterRulesetSync`
+### Line 654: `wazuh.clusterRulesetSync`
 
 Input: void (no parameters) — **OK**
 
-### Line 654: `wazuh.managerApiConfig`
+### Line 655: `wazuh.managerApiConfig`
 
 Input: void (no parameters) — **OK**
 
 ## client/src/pages/Compliance.tsx
 
-### Line 157: `wazuh.status`
+### Line 158: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 165: `wazuh.agents`
+### Line 166: `wazuh.agents`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -815,7 +815,7 @@ Input: void (no parameters) — **OK**
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 171: `wazuh.scaPolicies`
+### Line 172: `wazuh.scaPolicies`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -831,7 +831,7 @@ Input: void (no parameters) — **OK**
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 172: `wazuh.scaChecks`
+### Line 173: `wazuh.scaChecks`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -858,7 +858,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `title` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 189: `wazuh.expCiscatResults`
+### Line 190: `wazuh.expCiscatResults`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -881,11 +881,11 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/FileIntegrity.tsx
 
-### Line 64: `wazuh.status`
+### Line 65: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 67: `wazuh.agents`
+### Line 68: `wazuh.agents`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -910,7 +910,7 @@ Input: void (no parameters) — **OK**
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 73: `wazuh.syscheckFiles`
+### Line 74: `wazuh.syscheckFiles`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -932,7 +932,7 @@ Input: void (no parameters) — **OK**
 | `type` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 77: `wazuh.syscheckLastScan`
+### Line 78: `wazuh.syscheckLastScan`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1196,27 +1196,27 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/Home.tsx
 
-### Line 228: `wazuh.status`
+### Line 240: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 231: `wazuh.agentSummaryStatus`
+### Line 243: `wazuh.agentSummaryStatus`
 
 Input: void (no parameters) — **OK**
 
-### Line 232: `wazuh.analysisd`
+### Line 244: `wazuh.analysisd`
 
 Input: void (no parameters) — **OK**
 
-### Line 233: `wazuh.statsHourly`
+### Line 245: `wazuh.statsHourly`
 
 Input: void (no parameters) — **OK**
 
-### Line 234: `wazuh.managerStatus`
+### Line 246: `wazuh.managerStatus`
 
 Input: void (no parameters) — **OK**
 
-### Line 235: `wazuh.rules`
+### Line 247: `wazuh.rules`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1241,7 +1241,7 @@ Input: void (no parameters) — **OK**
 | `tsc` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 236: `wazuh.agents`
+### Line 248: `wazuh.agents`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1266,7 +1266,7 @@ Input: void (no parameters) — **OK**
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 237: `wazuh.mitreTactics`
+### Line 249: `wazuh.mitreTactics`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1280,15 +1280,15 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 238: `wazuh.managerLogsSummary`
+### Line 250: `wazuh.managerLogsSummary`
 
 Input: void (no parameters) — **OK**
 
-### Line 239: `wazuh.agentOverview`
+### Line 251: `wazuh.agentOverview`
 
 Input: void (no parameters) — **OK**
 
-### Line 240: `wazuh.agentsSummary`
+### Line 252: `wazuh.agentsSummary`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1296,11 +1296,11 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/ITHygiene.tsx
 
-### Line 93: `wazuh.status`
+### Line 94: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 101: `wazuh.agents`
+### Line 102: `wazuh.agents`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1325,7 +1325,7 @@ Input: void (no parameters) — **OK**
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 111: `wazuh.agentPackages`
+### Line 112: `wazuh.agentPackages`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1344,7 +1344,7 @@ Input: void (no parameters) — **OK**
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 115: `wazuh.agentPorts`
+### Line 116: `wazuh.agentPorts`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1363,7 +1363,7 @@ Input: void (no parameters) — **OK**
 | `tx_queue` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 119: `wazuh.agentProcesses`
+### Line 120: `wazuh.agentProcesses`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1391,7 +1391,7 @@ Input: void (no parameters) — **OK**
 | `suser` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 123: `wazuh.agentNetiface`
+### Line 124: `wazuh.agentNetiface`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1410,7 +1410,7 @@ Input: void (no parameters) — **OK**
 | `type` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 127: `wazuh.agentNetaddr`
+### Line 128: `wazuh.agentNetaddr`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1429,7 +1429,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 131: `wazuh.agentNetproto`
+### Line 132: `wazuh.agentNetproto`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1447,7 +1447,7 @@ Input: void (no parameters) — **OK**
 | `type` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 135: `wazuh.agentHotfixes`
+### Line 136: `wazuh.agentHotfixes`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1462,7 +1462,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 141: `wazuh.agentBrowserExtensions`
+### Line 142: `wazuh.agentBrowserExtensions`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1475,7 +1475,7 @@ Input: void (no parameters) — **OK**
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 147: `wazuh.agentServices`
+### Line 148: `wazuh.agentServices`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1488,7 +1488,7 @@ Input: void (no parameters) — **OK**
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 153: `wazuh.agentUsers`
+### Line 154: `wazuh.agentUsers`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1501,7 +1501,7 @@ Input: void (no parameters) — **OK**
 | `select` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 157: `wazuh.agentGroups2`
+### Line 158: `wazuh.agentGroups2`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1516,11 +1516,11 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/MitreAttack.tsx
 
-### Line 109: `wazuh.status`
+### Line 110: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 119: `wazuh.mitreTactics`
+### Line 120: `wazuh.mitreTactics`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1534,7 +1534,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 120: `wazuh.mitreTechniques`
+### Line 121: `wazuh.mitreTechniques`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1548,7 +1548,7 @@ Input: void (no parameters) — **OK**
 | `technique_ids` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 121: `wazuh.mitreGroups`
+### Line 122: `wazuh.mitreGroups`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1562,7 +1562,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 122: `wazuh.rules`
+### Line 123: `wazuh.rules`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1587,11 +1587,11 @@ Input: void (no parameters) — **OK**
 | `tsc` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 123: `wazuh.mitreMetadata`
+### Line 124: `wazuh.mitreMetadata`
 
 Input: void (no parameters) — **OK**
 
-### Line 128: `wazuh.mitreSoftware`
+### Line 129: `wazuh.mitreSoftware`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1605,7 +1605,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 132: `wazuh.mitreMitigations`
+### Line 133: `wazuh.mitreMitigations`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1619,7 +1619,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 136: `wazuh.mitreReferences`
+### Line 137: `wazuh.mitreReferences`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1640,22 +1640,22 @@ Input: void (no parameters) — **OK**
 |-----------|--------|----------|-----------|----------------|
 | `filename` | Required | Yes | Passed | **Surfaced** (required) |
 | `get_dirnames_path` | Optional | No | — | **Not supported** — optional, not exposed in this view |
-| `raw` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `raw` | Optional | No | Passed | **Constant** (hardcoded: `true`) |
 
 ### Line 83: `wazuh.decoderFileContent`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `filename` | Required | Yes | Passed | **Surfaced** (required) |
-| `raw` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `raw` | Optional | No | Passed | **Constant** (hardcoded: `true`) |
 | `relative_dirname` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 177: `wazuh.status`
+### Line 185: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 221: `wazuh.rules`
+### Line 229: `wazuh.rules`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1680,7 +1680,7 @@ Input: void (no parameters) — **OK**
 | `tsc` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 225: `wazuh.decoders`
+### Line 233: `wazuh.decoders`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1697,7 +1697,7 @@ Input: void (no parameters) — **OK**
 | `status` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 229: `wazuh.ruleGroups`
+### Line 237: `wazuh.ruleGroups`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1706,7 +1706,7 @@ Input: void (no parameters) — **OK**
 | `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 234: `wazuh.rulesFiles`
+### Line 242: `wazuh.rulesFiles`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1722,7 +1722,7 @@ Input: void (no parameters) — **OK**
 | `status` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 238: `wazuh.decoderFiles`
+### Line 246: `wazuh.decoderFiles`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1738,7 +1738,7 @@ Input: void (no parameters) — **OK**
 | `status` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 242: `wazuh.lists`
+### Line 250: `wazuh.lists`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1753,7 +1753,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 246: `wazuh.listsFiles`
+### Line 254: `wazuh.listsFiles`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1765,7 +1765,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 255: `wazuh.decoderParents`
+### Line 263: `wazuh.decoderParents`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1777,7 +1777,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 262: `wazuh.rulesByRequirement`
+### Line 270: `wazuh.rulesByRequirement`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1787,7 +1787,7 @@ Input: void (no parameters) — **OK**
 | `search` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 268: `wazuh.listsFileContent`
+### Line 276: `wazuh.listsFileContent`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -2013,11 +2013,11 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/ThreatHunting.tsx
 
-### Line 247: `wazuh.agentSummaryStatus`
+### Line 248: `wazuh.agentSummaryStatus`
 
 Input: void (no parameters) — **OK**
 
-### Line 248: `wazuh.rules`
+### Line 249: `wazuh.rules`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -2044,11 +2044,11 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/Vulnerabilities.tsx
 
-### Line 105: `wazuh.status`
+### Line 106: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 112: `wazuh.agents`
+### Line 113: `wazuh.agents`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|

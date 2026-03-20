@@ -441,7 +441,7 @@ export default function TokenUsage() {
               ? `${formatTokenCount(Number(s.totalPromptTokens ?? 0))} prompt · ${formatTokenCount(Number(s.totalCompletionTokens ?? 0))} completion`
               : undefined
           }
-          color="text-violet-400"
+          color="text-amber-400"
         />
         <StatCard
           icon={Clock}

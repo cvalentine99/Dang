@@ -2,7 +2,7 @@
  * Spec-vs-Registry Audit Tests
  *
  * Validates that brokerCoverage.ts registry entries and paramBroker.ts configs
- * match the Wazuh API spec v4.14.3 (resolved $ref parameters).
+ * match the Wazuh API spec v4.14.x (resolved $ref parameters).
  *
  * These tests ensure:
  * 1. Registry paramCounts match spec (path + data params)
@@ -18,7 +18,7 @@ import * as broker from "./paramBroker";
 // 1. Broker Config Param Count Validation
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe("Broker Config Param Counts vs Spec v4.14.3", () => {
+describe("Broker Config Param Counts vs Spec v4.14.x", () => {
   const configCounts: Array<{ name: string; config: broker.EndpointParamConfig; expectedCount: number }> = [
     { name: "AGENTS_CONFIG", config: broker.AGENTS_CONFIG, expectedCount: 22 },
     { name: "RULES_CONFIG", config: broker.RULES_CONFIG, expectedCount: 21 },
@@ -32,7 +32,7 @@ describe("Broker Config Param Counts vs Spec v4.14.3", () => {
     { name: "MITRE_MITIGATIONS_CONFIG", config: broker.MITRE_MITIGATIONS_CONFIG, expectedCount: 9 },
     { name: "MITRE_SOFTWARE_CONFIG", config: broker.MITRE_SOFTWARE_CONFIG, expectedCount: 9 },
     { name: "DECODERS_CONFIG", config: broker.DECODERS_CONFIG, expectedCount: 12 },
-    { name: "SYSCOLLECTOR_NETIFACE_CONFIG", config: broker.SYSCOLLECTOR_NETIFACE_CONFIG, expectedCount: 21 },  // 7 universal + 13 specific + wait_for_complete (mac removed — not in spec v4.14.3)
+    { name: "SYSCOLLECTOR_NETIFACE_CONFIG", config: broker.SYSCOLLECTOR_NETIFACE_CONFIG, expectedCount: 21 },  // 7 universal + 13 specific + wait_for_complete (mac removed — not in spec v4.14.x)
     { name: "SYSCOLLECTOR_NETADDR_CONFIG", config: broker.SYSCOLLECTOR_NETADDR_CONFIG, expectedCount: 13 },
     { name: "SYSCOLLECTOR_HOTFIXES_CONFIG", config: broker.SYSCOLLECTOR_HOTFIXES_CONFIG, expectedCount: 9 },
     { name: "SYSCOLLECTOR_NETPROTO_CONFIG", config: broker.SYSCOLLECTOR_NETPROTO_CONFIG, expectedCount: 12 },
@@ -59,7 +59,7 @@ describe("Broker Config Param Counts vs Spec v4.14.3", () => {
 // 2. Experimental Endpoints: No q/distinct
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe("Experimental endpoints exclude q and distinct per spec v4.14.3", () => {
+describe("Experimental endpoints exclude q and distinct per spec v4.14.x", () => {
   const experimentalConfigs: Array<{ name: string; config: broker.EndpointParamConfig }> = [
     { name: "EXP_SYSCOLLECTOR_PACKAGES_CONFIG", config: broker.EXP_SYSCOLLECTOR_PACKAGES_CONFIG },
     { name: "EXP_SYSCOLLECTOR_PROCESSES_CONFIG", config: broker.EXP_SYSCOLLECTOR_PROCESSES_CONFIG },
@@ -89,13 +89,13 @@ describe("Experimental endpoints exclude q and distinct per spec v4.14.3", () =>
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("Critical param presence checks", () => {
-  it("ROOTCHECK_CONFIG includes pci_dss and cis (restored per spec v4.14.3)", () => {
+  it("ROOTCHECK_CONFIG includes pci_dss and cis (restored per spec v4.14.x)", () => {
     const params = Object.keys(broker.ROOTCHECK_CONFIG.params);
     expect(params).toContain("pci_dss");
     expect(params).toContain("cis");
   });
 
-  it("MITRE_REFERENCES_CONFIG includes select (added per spec v4.14.3)", () => {
+  it("MITRE_REFERENCES_CONFIG includes select (added per spec v4.14.x)", () => {
     const params = Object.keys(broker.MITRE_REFERENCES_CONFIG.params);
     expect(params).toContain("select");
   });
@@ -143,7 +143,7 @@ describe("Critical param presence checks", () => {
 // 4. Experimental Config Param Counts (spec-aligned)
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe("Experimental config param counts vs spec v4.14.3", () => {
+describe("Experimental config param counts vs spec v4.14.x", () => {
   const expCounts: Array<{ name: string; config: broker.EndpointParamConfig; expectedCount: number }> = [
     { name: "EXP_SYSCOLLECTOR_PACKAGES_CONFIG", config: broker.EXP_SYSCOLLECTOR_PACKAGES_CONFIG, expectedCount: 12 },
     { name: "EXP_SYSCOLLECTOR_PROCESSES_CONFIG", config: broker.EXP_SYSCOLLECTOR_PROCESSES_CONFIG, expectedCount: 21 },

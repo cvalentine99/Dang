@@ -25,7 +25,7 @@ services:
     volumes:
       - dang-db-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root --password=\"$MYSQL_ROOT_PASSWORD\" 2>/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -71,7 +71,7 @@ services:
       LOCAL_ADMIN_PASS: ${LOCAL_ADMIN_PASS:-}
 
       # TLS — Wazuh/Indexer typically use self-signed certs
-      SKIP_TLS_VERIFY: ${SKIP_TLS_VERIFY:-true}
+      SKIP_TLS_VERIFY: ${SKIP_TLS_VERIFY:-false}
 
       # Wazuh Manager API (optional — leave blank to start without Wazuh)
       WAZUH_HOST: ${WAZUH_HOST:-}

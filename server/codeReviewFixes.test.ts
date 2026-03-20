@@ -152,8 +152,8 @@ describe("Vuln #5: Prompt injection sanitization", () => {
     const src = await import("fs").then(fs =>
       fs.readFileSync("server/agenticPipeline/correlationAgent.ts", "utf-8")
     );
-    // Should have sanitizeForPrompt function
-    expect(src).toMatch(/function\s+sanitizeForPrompt/);
+    // Should import sanitizeForPrompt from its dedicated module
+    expect(src).toMatch(/import\s*\{\s*sanitizeForPrompt\s*\}\s*from/);
     // Should call sanitizeForPrompt on evidence pack data
     expect(src).toMatch(/sanitizeForPrompt\(pack\./);
     // Should call sanitizeForPrompt on triage data

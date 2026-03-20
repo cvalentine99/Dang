@@ -9,7 +9,7 @@ export const GlassPanel = forwardRef<HTMLDivElement, React.ComponentProps<"div">
         className={cn(
           "glass-panel p-4",
           hover && "glass-panel-hover",
-          glow && "amethyst-glow",
+          glow && "gold-glow",
           className
         )}
         {...rest}

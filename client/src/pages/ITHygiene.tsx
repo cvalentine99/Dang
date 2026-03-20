@@ -38,6 +38,7 @@ import {
   GitCompare,
 } from "lucide-react";
 import { useState, useMemo, useCallback, lazy, Suspense } from "react";
+import { motion } from "framer-motion";
 import { LazyTabFallback } from "@/components/shared/LazyTabFallback";
 
 // Lazy-loaded tab sub-components — each loads its own chunk on first render
@@ -357,16 +358,32 @@ export default function ITHygiene() {
         {/* ── Single-Agent View ────────────────────────────────────────── */}
         {!comparisonMode && (<>
         {/* ── KPI Row ──────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
-          <StatCard label="Packages" value={packagesData.total} icon={Package} colorClass="text-primary" />
-          <StatCard label="Open Ports" value={portsData.total} icon={Globe} colorClass="text-threat-info" />
-          <StatCard label="Processes" value={processesData.total} icon={Cpu} colorClass="text-[oklch(0.795_0.184_86.047)]" />
-          <StatCard label="Extensions" value={extensionsData.total} icon={Puzzle} colorClass="text-[oklch(0.789_0.154_211.53)]" />
-          <StatCard label="Services" value={servicesData.total} icon={Server} colorClass="text-[oklch(0.765_0.177_163.223)]" />
-          <StatCard label="Running" value={runningServices} icon={Activity} colorClass="text-[oklch(0.765_0.177_163.223)]" />
-          <StatCard label="Users" value={usersData.total} icon={UserCheck} colorClass="text-[oklch(0.705_0.191_22.216)]" />
-          <StatCard label="Interactive" value={interactiveUsers} icon={Shield} colorClass="text-threat-high" />
-        </div>
+        <motion.div
+          className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3"
+          initial="hidden" animate="visible"
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+        >
+          {[
+            { label: "Packages", value: packagesData.total, icon: Package, colorClass: "text-primary" },
+            { label: "Open Ports", value: portsData.total, icon: Globe, colorClass: "text-threat-info" },
+            { label: "Processes", value: processesData.total, icon: Cpu, colorClass: "text-[oklch(0.795_0.184_86.047)]" },
+            { label: "Extensions", value: extensionsData.total, icon: Puzzle, colorClass: "text-[oklch(0.789_0.154_211.53)]" },
+            { label: "Services", value: servicesData.total, icon: Server, colorClass: "text-[oklch(0.765_0.177_163.223)]" },
+            { label: "Running", value: runningServices, icon: Activity, colorClass: "text-[oklch(0.765_0.177_163.223)]" },
+            { label: "Users", value: usersData.total, icon: UserCheck, colorClass: "text-[oklch(0.705_0.191_22.216)]" },
+            { label: "Interactive", value: interactiveUsers, icon: Shield, colorClass: "text-threat-high" },
+          ].map((card) => (
+            <motion.div
+              key={card.label}
+              variants={{
+                hidden: { opacity: 0, y: 20, scale: 0.95 },
+                visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+              }}
+            >
+              <StatCard label={card.label} value={card.value} icon={card.icon} colorClass={card.colorClass} />
+            </motion.div>
+          ))}
+        </motion.div>
 
         {/* ── Agent Selector + Search ──────────────────────────────────── */}
         <GlassPanel className="flex flex-col sm:flex-row items-start sm:items-center gap-3">

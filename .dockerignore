@@ -1,0 +1,60 @@
+# Version control
+.git
+.gitignore
+.gitkeep
+
+# Environment and secrets
+.env
+.env.*
+env.docker.template
+
+# Dependencies (rebuilt in container)
+node_modules
+.pnpm-store
+
+# Build artifacts
+dist
+build
+
+# Test output
+test-output
+coverage
+.nyc_output
+
+# IDE and editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation (not needed in image — except broker-coverage artifacts)
+docs/architecture
+docs/*.md
+README.md
+CHANGELOG.md
+todo.md
+
+# CI/CD
+.github
+
+# Development tools
+.storybook
+.storybook-out
+.prettierrc
+.prettierignore
+.eslintcache
+
+# Manus/platform artifacts
+.manus
+.manus-logs
+__manus__
+.claude
+.serena
+.project
+
+# Spec files (JSON artifacts not needed at runtime; YAML specs ARE needed for brokerCoverage)
+spec/*.json
+spec/openapi-allowlist.json
+
+# Proxy config (mounted separately via compose)
+proxy

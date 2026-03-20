@@ -46,7 +46,7 @@ export function GraphContextMenu({
           onClick={() => onShowConnected(node)}
           className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-white/5 transition-colors"
         >
-          <Eye className="w-3.5 h-3.5 text-purple-400" />
+          <Eye className="w-3.5 h-3.5 text-amber-400" />
           Show Connected Nodes
         </button>
       )}

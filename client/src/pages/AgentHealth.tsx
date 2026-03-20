@@ -26,6 +26,7 @@ import {
   ArrowDownCircle, FolderX, BarChart3, Filter, Code, ArrowUpCircle,
 } from "lucide-react";
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import {
   PieChart, Pie, ResponsiveContainer, Tooltip as ReTooltip,
@@ -33,14 +34,14 @@ import {
 } from "recharts";
 
 const COLORS = {
-  purple: "oklch(0.541 0.281 293.009)",
-  cyan: "oklch(0.789 0.154 211.53)",
-  green: "oklch(0.765 0.177 163.223)",
-  yellow: "oklch(0.795 0.184 86.047)",
-  red: "oklch(0.637 0.237 25.331)",
-  orange: "oklch(0.705 0.191 22.216)",
+  gold: "oklch(0.795 0.184 85)",
+  cyan: "oklch(0.75 0.15 195)",
+  green: "oklch(0.723 0.219 149.579)",
+  yellow: "oklch(0.769 0.188 70.08)",
+  red: "oklch(0.628 0.258 29.234)",
+  orange: "oklch(0.705 0.213 47.604)",
 };
-const PIE_COLORS = [COLORS.green, COLORS.red, COLORS.yellow, COLORS.cyan, COLORS.purple];
+const PIE_COLORS = [COLORS.green, COLORS.red, COLORS.yellow, COLORS.cyan, COLORS.gold];
 
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null;
@@ -261,7 +262,7 @@ export default function AgentHealth() {
             variant="outline"
             size="sm"
             onClick={() => navigate("/fleet-compare")}
-            className="h-8 bg-transparent border-purple-500/30 text-purple-300 hover:bg-purple-500/10 flex-shrink-0"
+            className="h-8 bg-transparent border-amber-500/30 text-amber-300 hover:bg-amber-500/10 flex-shrink-0"
           >
             <BarChart3 className="w-3.5 h-3.5 mr-1.5" /> Compare Agents
           </Button>
@@ -278,18 +279,38 @@ export default function AgentHealth() {
           />
         )}
 
-        {/* KPI Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          {isLoading ? <StatCardSkeleton count={7} /> : (<>
-          <StatCard label="Total Agents" value={agentData.total} icon={Users} colorClass="text-primary" />
-          <StatCard label="Active" value={agentData.active} icon={Wifi} colorClass="text-threat-low" />
-          <StatCard label="Disconnected" value={agentData.disconnected} icon={WifiOff} colorClass="text-threat-high" />
-          <StatCard label="Never Connected" value={agentData.never} icon={AlertTriangle} colorClass="text-threat-medium" />
-          <StatCard label="Pending" value={agentData.pending} icon={Clock} colorClass="text-info-cyan" />
-          <StatCard label="Outdated" value={outdatedCount} icon={ArrowDownCircle} colorClass="text-threat-medium" />
-          <StatCard label="Ungrouped" value={noGroupCount} icon={FolderX} colorClass="text-threat-high" />
-          </>)}
-        </div>
+        {/* KPI Row — stagger entrance */}
+        {isLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            <StatCardSkeleton count={7} />
+          </div>
+        ) : (
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4"
+            initial="hidden" animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+          >
+            {[
+              { label: "Total Agents", value: agentData.total, icon: Users, colorClass: "text-primary" },
+              { label: "Active", value: agentData.active, icon: Wifi, colorClass: "text-threat-low" },
+              { label: "Disconnected", value: agentData.disconnected, icon: WifiOff, colorClass: "text-threat-high" },
+              { label: "Never Connected", value: agentData.never, icon: AlertTriangle, colorClass: "text-threat-medium" },
+              { label: "Pending", value: agentData.pending, icon: Clock, colorClass: "text-info-cyan" },
+              { label: "Outdated", value: outdatedCount, icon: ArrowDownCircle, colorClass: "text-threat-medium" },
+              { label: "Ungrouped", value: noGroupCount, icon: FolderX, colorClass: "text-threat-high" },
+            ].map((card) => (
+              <motion.div
+                key={card.label}
+                variants={{
+                  hidden: { opacity: 0, y: 20, scale: 0.95 },
+                  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+                }}
+              >
+                <StatCard label={card.label} value={card.value} icon={card.icon} colorClass={card.colorClass} />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
 
         {/* Charts Row */}
         {isLoading ? (
@@ -299,32 +320,41 @@ export default function AgentHealth() {
             <ChartSkeleton variant="bar" height={200} title="Agent Groups" className="lg:col-span-4" />
           </div>
         ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <GlassPanel className="lg:col-span-3">
+        <motion.div
+          className="grid grid-cols-1 lg:grid-cols-12 gap-4"
+          initial="hidden" animate="visible"
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12, delayChildren: 0.2 } } }}
+        >
+          <motion.div className="lg:col-span-3" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+          <GlassPanel>
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /> Connection Status</h3>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie data={statusPieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value" stroke="none" />
                 <ReTooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.65 0.02 286)" }} />
+                <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.6 0.01 260)" }} />
               </PieChart>
             </ResponsiveContainer>
           </GlassPanel>
+          </motion.div>
 
-          <GlassPanel className="lg:col-span-5">
+          <motion.div className="lg:col-span-5" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+          <GlassPanel>
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Monitor className="h-4 w-4 text-primary" /> OS Distribution</h3>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={osDistribution}>
-                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-                <XAxis dataKey="name" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} angle={-20} textAnchor="end" height={50} />
-                <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+                <XAxis dataKey="name" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} angle={-20} textAnchor="end" height={50} />
+                <YAxis tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} />
                 <ReTooltip content={<ChartTooltip />} />
-                <Bar dataKey="value" fill={COLORS.purple} radius={[4, 4, 0, 0]} name="Agents" />
+                <Bar dataKey="value" fill={COLORS.gold} radius={[4, 4, 0, 0]} name="Agents" />
               </BarChart>
             </ResponsiveContainer>
           </GlassPanel>
+          </motion.div>
 
-          <GlassPanel className="lg:col-span-4">
+          <motion.div className="lg:col-span-4" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+          <GlassPanel>
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Server className="h-4 w-4 text-primary" /> Agent Groups ({groups.length})</h3>
             <div className="space-y-2 max-h-[200px] overflow-y-auto">
               {groups.map(g => (
@@ -336,7 +366,8 @@ export default function AgentHealth() {
               ))}
             </div>
           </GlassPanel>
-        </div>
+          </motion.div>
+        </motion.div>
         )}
 
         {/* Upgrade Results */}

@@ -16,6 +16,7 @@ import {
   Database, Trash2, Timer, ToggleLeft, RefreshCw, Shield, Workflow,
 } from "lucide-react";
 import React, { useMemo, useCallback, useState, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -25,12 +26,12 @@ import {
 } from "recharts";
 
 const COLORS = {
-  purple: "oklch(0.541 0.281 293.009)",
-  cyan: "oklch(0.789 0.154 211.53)",
-  green: "oklch(0.765 0.177 163.223)",
-  yellow: "oklch(0.795 0.184 86.047)",
-  red: "oklch(0.637 0.237 25.331)",
-  orange: "oklch(0.705 0.191 22.216)",
+  gold: "oklch(0.795 0.184 85)",
+  cyan: "oklch(0.75 0.15 195)",
+  green: "oklch(0.723 0.219 149.579)",
+  yellow: "oklch(0.769 0.188 70.08)",
+  red: "oklch(0.628 0.258 29.234)",
+  orange: "oklch(0.705 0.213 47.604)",
 };
 
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
@@ -51,10 +52,10 @@ function QueueGauge({ label, used, total }: { label: string; used: number; total
   return (
     <div className="flex flex-col items-center">
       <svg width="90" height="90" viewBox="0 0 90 90">
-        <circle cx="45" cy="45" r="36" fill="none" stroke="oklch(0.3 0.04 286 / 20%)" strokeWidth="7" />
+        <circle cx="45" cy="45" r="36" fill="none" stroke="oklch(0.3 0.01 260 / 20%)" strokeWidth="7" />
         <circle cx="45" cy="45" r="36" fill="none" stroke={color} strokeWidth="7" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} transform="rotate(-90 45 45)" className="transition-all duration-700" />
-        <text x="45" y="42" textAnchor="middle" fill="oklch(0.93 0.005 286)" fontSize="16" fontWeight="bold">{pct}%</text>
-        <text x="45" y="56" textAnchor="middle" fill="oklch(0.65 0.02 286)" fontSize="7">USED</text>
+        <text x="45" y="42" textAnchor="middle" fill="oklch(0.95 0.005 85)" fontSize="16" fontWeight="bold">{pct}%</text>
+        <text x="45" y="56" textAnchor="middle" fill="oklch(0.6 0.01 260)" fontSize="7">USED</text>
       </svg>
       <span className="text-xs font-medium text-muted-foreground mt-1 text-center">{label}</span>
       <span className="text-[10px] text-muted-foreground">{used.toLocaleString()} / {total.toLocaleString()}</span>
@@ -433,11 +434,11 @@ function NodeDrillDown({ nodeId, nodeName, isConnected }: { nodeId: string; node
               totalall: Number(d.totalall ?? 0),
               events: Number(d.events ?? 0),
             }))}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-              <XAxis dataKey="day" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
-              <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+              <XAxis dataKey="day" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} />
+              <YAxis tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} />
               <ReTooltip content={<ChartTooltip />} />
-              <Bar dataKey="totalall" fill={COLORS.purple} name="Total" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="totalall" fill={COLORS.gold} name="Total" radius={[2, 2, 0, 0]} />
               <Bar dataKey="events" fill={COLORS.cyan} name="Events" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -574,11 +575,11 @@ function NodeDrillDown({ nodeId, nodeName, isConnected }: { nodeId: string; node
           return hourlyItems.length === 0 ? <p className="text-xs text-muted-foreground py-2">No hourly stats available.</p> : (
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={hourlyItems.map((d, i) => ({ hour: String(d.id ?? d.hour ?? i), total: Number(d.totalall ?? 0), events: Number(d.events ?? 0) }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-                <XAxis dataKey="hour" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
-                <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+                <XAxis dataKey="hour" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} />
+                <YAxis tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} />
                 <ReTooltip content={<ChartTooltip />} />
-                <Bar dataKey="total" fill={COLORS.purple} name="Total" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="total" fill={COLORS.gold} name="Total" radius={[2, 2, 0, 0]} />
                 <Bar dataKey="events" fill={COLORS.cyan} name="Events" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -720,17 +721,38 @@ export default function ClusterHealth() {
         <PageHeader title="Cluster Health" subtitle="Manager daemons, event queues, cluster topology with per-node drill-down, and configuration validation" onRefresh={handleRefresh} isLoading={isLoading} />
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <StatCard label="Daemons Running" value={runningCount} icon={CheckCircle2} colorClass="text-threat-low" />
-          <StatCard label="Daemons Stopped" value={stoppedCount} icon={XCircle} colorClass={stoppedCount > 0 ? "text-threat-critical" : "text-muted-foreground"} />
-          <StatCard label="Cluster" value={String(clusterStatus.enabled ?? "yes")} icon={Network} colorClass="text-primary" />
-          <StatCard label="Config Status" value={String(configValid.status ?? "OK")} icon={String(configValid.status) === "OK" || !configValid.status ? CheckCircle2 : AlertTriangle} colorClass={String(configValid.status) === "OK" || !configValid.status ? "text-threat-low" : "text-threat-critical"} />
-          <StatCard label="Version" value={String(managerInfo.version ?? "v4.7.2")} icon={Server} colorClass="text-primary" />
-        </div>
+        <motion.div
+          className="grid grid-cols-2 md:grid-cols-5 gap-4"
+          initial="hidden" animate="visible"
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+        >
+          {[
+            { label: "Daemons Running", value: runningCount, icon: CheckCircle2, colorClass: "text-threat-low" },
+            { label: "Daemons Stopped", value: stoppedCount, icon: XCircle, colorClass: stoppedCount > 0 ? "text-threat-critical" : "text-muted-foreground" },
+            { label: "Cluster", value: String(clusterStatus.enabled ?? "yes"), icon: Network, colorClass: "text-primary" },
+            { label: "Config Status", value: String(configValid.status ?? "OK"), icon: String(configValid.status) === "OK" || !configValid.status ? CheckCircle2 : AlertTriangle, colorClass: String(configValid.status) === "OK" || !configValid.status ? "text-threat-low" : "text-threat-critical" },
+            { label: "Version", value: String(managerInfo.version ?? "v4.7.2"), icon: Server, colorClass: "text-primary" },
+          ].map((card) => (
+            <motion.div
+              key={card.label}
+              variants={{
+                hidden: { opacity: 0, y: 20, scale: 0.95 },
+                visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+              }}
+            >
+              <StatCard label={card.label} value={card.value} icon={card.icon} colorClass={card.colorClass} />
+            </motion.div>
+          ))}
+        </motion.div>
 
         {/* Row: Daemon Status + Queue Gauges + Manager Info */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <GlassPanel className="lg:col-span-5">
+        <motion.div
+          className="grid grid-cols-1 lg:grid-cols-12 gap-4"
+          initial="hidden" animate="visible"
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12, delayChildren: 0.2 } } }}
+        >
+          <motion.div className="lg:col-span-5" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+          <GlassPanel>
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /> Daemon Status</h3>
             <div className="grid grid-cols-2 gap-2">
               {daemonEntries.map(([name, status]) => {
@@ -748,8 +770,10 @@ export default function ClusterHealth() {
             </div>
             {managerStatusQ.data ? <div className="mt-3"><RawJsonViewer data={managerStatusQ.data as Record<string, unknown>} title="Manager Status JSON" /></div> : null}
           </GlassPanel>
+          </motion.div>
 
-          <GlassPanel className="lg:col-span-3">
+          <motion.div className="lg:col-span-3" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+          <GlassPanel>
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Gauge className="h-4 w-4 text-primary" /> Event Queues</h3>
             <div className="flex flex-col items-center gap-4">
               <QueueGauge label="Remoted Queue" used={queueUsed} total={queueTotal} />
@@ -758,14 +782,16 @@ export default function ClusterHealth() {
                   <PieChart>
                     <Pie data={daemonPie} cx="50%" cy="50%" innerRadius={30} outerRadius={48} paddingAngle={3} dataKey="value" stroke="none" />
                     <ReTooltip content={<ChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 10, color: "oklch(0.65 0.02 286)" }} />
+                    <Legend wrapperStyle={{ fontSize: 10, color: "oklch(0.6 0.01 260)" }} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : null}
             </div>
           </GlassPanel>
+          </motion.div>
 
-          <GlassPanel className="lg:col-span-4">
+          <motion.div className="lg:col-span-4" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+          <GlassPanel>
             <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Server className="h-4 w-4 text-primary" /> Manager Info</h3>
             <div className="space-y-2">
               {([
@@ -788,7 +814,8 @@ export default function ClusterHealth() {
             </div>
             {managerInfoQ.data ? <div className="mt-3"><RawJsonViewer data={managerInfoQ.data as Record<string, unknown>} title="Manager Info JSON" /></div> : null}
           </GlassPanel>
-        </div>
+          </motion.div>
+        </motion.div>
 
         {/* Daemon Metrics Detail */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -854,12 +881,12 @@ export default function ClusterHealth() {
           <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" /> Hourly Event Ingestion</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={hourlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-              <XAxis dataKey="hour" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
-              <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+              <XAxis dataKey="hour" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} />
+              <YAxis tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} />
               <ReTooltip content={<ChartTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.65 0.02 286)" }} />
-              <Bar dataKey="totalall" fill={COLORS.purple} name="Total" radius={[3, 3, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.6 0.01 260)" }} />
+              <Bar dataKey="totalall" fill={COLORS.gold} name="Total" radius={[3, 3, 0, 0]} />
               <Bar dataKey="events" fill={COLORS.cyan} name="Events" radius={[3, 3, 0, 0]} />
               <Bar dataKey="syscheck" fill={COLORS.green} name="Syscheck" radius={[3, 3, 0, 0]} />
               <Bar dataKey="firewall" fill={COLORS.orange} name="Firewall" radius={[3, 3, 0, 0]} />

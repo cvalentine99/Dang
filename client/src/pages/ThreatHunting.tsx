@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { GlassPanel } from "@/components/shared/GlassPanel";
 import { StatCard } from "@/components/shared/StatCard";
@@ -72,12 +73,12 @@ const IOC_TYPES: { value: IOCType; label: string; icon: typeof Globe; placeholde
 ];
 
 const CHART_COLORS = [
-  "oklch(0.72 0.19 295)",
-  "oklch(0.637 0.237 25.331)",
-  "oklch(0.705 0.191 22.216)",
-  "oklch(0.795 0.184 86.047)",
-  "oklch(0.765 0.177 163.223)",
-  "oklch(0.789 0.154 211.53)",
+  "oklch(0.795 0.184 85)",
+  "oklch(0.628 0.258 29.234)",
+  "oklch(0.705 0.213 47.604)",
+  "oklch(0.769 0.188 70.08)",
+  "oklch(0.723 0.219 149.579)",
+  "oklch(0.75 0.15 195)",
 ];
 
 // ── Correlation result type ─────────────────────────────────────────────────────
@@ -357,15 +358,15 @@ export default function ThreatHunting() {
       });
     }
     const SEVERITY_FILL: Record<string, string> = {
-      critical: "oklch(0.637 0.237 25.331)",
-      high: "oklch(0.705 0.191 22.216)",
-      medium: "oklch(0.795 0.184 86.047)",
-      low: "oklch(0.765 0.177 163.223)",
-      info: "oklch(0.789 0.154 211.53)",
+      critical: "oklch(0.628 0.258 29.234)",
+      high: "oklch(0.705 0.213 47.604)",
+      medium: "oklch(0.769 0.188 70.08)",
+      low: "oklch(0.723 0.219 149.579)",
+      info: "oklch(0.75 0.15 195)",
     };
     return Object.entries(counts)
       .filter(([, v]) => v > 0)
-      .map(([k, v]) => ({ name: k.charAt(0).toUpperCase() + k.slice(1), value: v, level: k, fill: SEVERITY_FILL[k] ?? "oklch(0.789 0.154 211.53)" }));
+      .map(([k, v]) => ({ name: k.charAt(0).toUpperCase() + k.slice(1), value: v, level: k, fill: SEVERITY_FILL[k] ?? "oklch(0.75 0.15 195)" }));
   }, [correlationResults]);
 
   // MITRE tactic distribution from correlated rules
@@ -424,7 +425,7 @@ export default function ThreatHunting() {
               Saved ({savedSearchesQ.data?.searches?.length ?? 0})
             </Button>
             {showSavedSearches && (
-              <div className="absolute right-0 top-full mt-1 w-80 bg-[oklch(0.17_0.025_286)] border border-border rounded-lg shadow-xl z-50 max-h-[400px] overflow-y-auto">
+              <div className="absolute right-0 top-full mt-1 w-80 bg-[oklch(0.15_0.005_260)] border border-border rounded-lg shadow-xl z-50 max-h-[400px] overflow-y-auto">
                 <div className="p-3 border-b border-border">
                   <h4 className="text-xs font-semibold text-primary">Saved Hunt Queries</h4>
                 </div>
@@ -541,7 +542,7 @@ export default function ThreatHunting() {
               Saved ({savedHuntsQ.data?.total ?? 0})
             </Button>
             {showSavedHunts && (
-              <div className="absolute right-0 top-full mt-1 w-96 bg-[oklch(0.17_0.025_286)] border border-border rounded-lg shadow-xl z-50 max-h-[500px] overflow-y-auto">
+              <div className="absolute right-0 top-full mt-1 w-96 bg-[oklch(0.15_0.005_260)] border border-border rounded-lg shadow-xl z-50 max-h-[500px] overflow-y-auto">
                 <div className="p-3 border-b border-border flex items-center justify-between">
                   <h4 className="text-xs font-semibold text-primary">Saved Hunt Results</h4>
                   <span className="text-[10px] text-muted-foreground">{savedHuntsQ.data?.total ?? 0} saved</span>
@@ -640,7 +641,7 @@ export default function ThreatHunting() {
       {/* ── Save Hunt Dialog ──────────────────────────────────────────────── */}
       {showSaveDialog && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowSaveDialog(false)}>
-          <div className="bg-[oklch(0.17_0.025_286)] border border-border rounded-xl p-6 w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[oklch(0.15_0.005_260)] border border-border rounded-xl p-6 w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-sm font-semibold text-primary mb-4 flex items-center gap-2">
               <Save className="h-4 w-4" /> Save Hunt Query
             </h3>
@@ -711,7 +712,7 @@ export default function ThreatHunting() {
       {/* ── Save Hunt Results Dialog ──────────────────────────────────── */}
       {showSaveResultsDialog && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowSaveResultsDialog(false)}>
-          <div className="bg-[oklch(0.17_0.025_286)] border border-border rounded-xl p-6 w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[oklch(0.15_0.005_260)] border border-border rounded-xl p-6 w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-sm font-semibold text-primary mb-4 flex items-center gap-2">
               <Save className="h-4 w-4" /> Save Hunt Results
             </h3>
@@ -831,21 +832,32 @@ export default function ThreatHunting() {
       )}
 
       {/* ── KPI Row ──────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3 mb-6">
+      <motion.div
+        className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3 mb-6"
+        initial="hidden" animate="visible"
+        variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+      >
         {isLoading ? <StatCardSkeleton count={6} /> : (<>
-        <StatCard label="Searchable Agents" value={agentCount} icon={Activity} colorClass="text-primary" />
-        <StatCard label="Detection Rules" value={ruleCount} icon={Shield} colorClass="text-threat-info" />
-        <StatCard label="Known CVEs" value={vulnCount} icon={Bug} colorClass="text-threat-high" />
-        <StatCard label="FIM Events" value={fimCount} icon={FileWarning} colorClass="text-threat-medium" />
-        <StatCard label="Hunt Queries" value={huntHistory.length} icon={Crosshair} colorClass="text-primary" />
-        <StatCard
-          label="Last Correlation"
-          value={totalHits > 0 ? `${totalHits} hits` : "—"}
-          icon={Target}
-          colorClass={totalHits > 0 ? "text-threat-critical" : "text-muted-foreground"}
-        />
+        {[
+          { label: "Searchable Agents", value: agentCount, icon: Activity, colorClass: "text-primary" },
+          { label: "Detection Rules", value: ruleCount, icon: Shield, colorClass: "text-threat-info" },
+          { label: "Known CVEs", value: vulnCount, icon: Bug, colorClass: "text-threat-high" },
+          { label: "FIM Events", value: fimCount, icon: FileWarning, colorClass: "text-threat-medium" },
+          { label: "Hunt Queries", value: huntHistory.length, icon: Crosshair, colorClass: "text-primary" },
+          { label: "Last Correlation", value: totalHits > 0 ? `${totalHits} hits` : "—", icon: Target, colorClass: totalHits > 0 ? "text-threat-critical" : "text-muted-foreground" },
+        ].map((card) => (
+          <motion.div
+            key={card.label}
+            variants={{
+              hidden: { opacity: 0, y: 20, scale: 0.95 },
+              visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+            }}
+          >
+            <StatCard label={card.label} value={card.value} icon={card.icon} colorClass={card.colorClass} />
+          </motion.div>
+        ))}
         </>)}
-      </div>
+      </motion.div>
 
       {/* ── Query Builder ────────────────────────────────────────────────── */}
       <GlassPanel className="mb-6">
@@ -994,7 +1006,7 @@ export default function ThreatHunting() {
                       dataKey="value"
                     />
                     <Tooltip
-                      contentStyle={{ background: "oklch(0.17 0.025 286)", border: "1px solid oklch(0.3 0.04 286 / 40%)", borderRadius: "8px", color: "oklch(0.93 0.005 286)" }}
+                      contentStyle={{ background: "oklch(0.15 0.005 260)", border: "1px solid oklch(0.3 0.01 260 / 40%)", borderRadius: "8px", color: "oklch(0.95 0.005 85)" }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -1020,11 +1032,11 @@ export default function ThreatHunting() {
               {severityData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={severityData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-                    <XAxis type="number" tick={{ fill: "oklch(0.7 0.01 286)", fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" tick={{ fill: "oklch(0.7 0.01 286)", fontSize: 11 }} width={70} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+                    <XAxis type="number" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 11 }} width={70} />
                     <Tooltip
-                      contentStyle={{ background: "oklch(0.17 0.025 286)", border: "1px solid oklch(0.3 0.04 286 / 40%)", borderRadius: "8px", color: "oklch(0.93 0.005 286)" }}
+                      contentStyle={{ background: "oklch(0.15 0.005 260)", border: "1px solid oklch(0.3 0.01 260 / 40%)", borderRadius: "8px", color: "oklch(0.95 0.005 85)" }}
                     />
                     <Bar dataKey="value" radius={[0, 4, 4, 0]} />
                   </BarChart>
@@ -1043,14 +1055,14 @@ export default function ThreatHunting() {
               {mitreTacticData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={mitreTacticData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-                    <XAxis dataKey="name" tick={{ fill: "oklch(0.7 0.01 286)", fontSize: 9 }} angle={-30} textAnchor="end" height={50} />
-                    <YAxis tick={{ fill: "oklch(0.7 0.01 286)", fontSize: 11 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+                    <XAxis dataKey="name" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} angle={-30} textAnchor="end" height={50} />
+                    <YAxis tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 11 }} />
                     <Tooltip
-                      contentStyle={{ background: "oklch(0.17 0.025 286)", border: "1px solid oklch(0.3 0.04 286 / 40%)", borderRadius: "8px", color: "oklch(0.93 0.005 286)" }}
+                      contentStyle={{ background: "oklch(0.15 0.005 260)", border: "1px solid oklch(0.3 0.01 260 / 40%)", borderRadius: "8px", color: "oklch(0.95 0.005 85)" }}
                       formatter={(value, _, props) => [value ?? 0, (props?.payload as Record<string, string> | undefined)?.fullName ?? ""]}
                     />
-                    <Bar dataKey="count" fill="oklch(0.72 0.19 295)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="count" fill="oklch(0.795 0.184 85)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (

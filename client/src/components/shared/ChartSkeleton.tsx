@@ -60,7 +60,7 @@ export function ChartSkeleton({
                 y1={y}
                 x2="395"
                 y2={y}
-                stroke="oklch(0.3 0.04 286 / 12%)"
+                stroke="oklch(0.3 0.01 260 / 12%)"
                 strokeDasharray="3 3"
               />
             );
@@ -77,7 +77,7 @@ export function ChartSkeleton({
                 width="22"
                 height="6"
                 rx="2"
-                fill="oklch(0.3 0.04 286 / 15%)"
+                fill="oklch(0.3 0.01 260 / 15%)"
               />
             );
           })}
@@ -93,7 +93,7 @@ export function ChartSkeleton({
                 width="24"
                 height="6"
                 rx="2"
-                fill="oklch(0.3 0.04 286 / 15%)"
+                fill="oklch(0.3 0.01 260 / 15%)"
               />
             );
           })}
@@ -102,8 +102,8 @@ export function ChartSkeleton({
           {variant === "area" && (
             <path
               d={`M40,${height * 0.7} C100,${height * 0.5} 150,${height * 0.6} 200,${height * 0.35} C250,${height * 0.15} 300,${height * 0.4} 395,${height * 0.25} L395,${height - 12} L40,${height - 12} Z`}
-              fill="oklch(0.541 0.281 293 / 4%)"
-              stroke="oklch(0.541 0.281 293 / 10%)"
+              fill="oklch(0.795 0.184 85 / 4%)"
+              stroke="oklch(0.795 0.184 85 / 10%)"
               strokeWidth="1.5"
               className="chart-skeleton-shape"
             />
@@ -121,8 +121,8 @@ export function ChartSkeleton({
                   width="28"
                   height={barH}
                   rx="3"
-                  fill="oklch(0.541 0.281 293 / 6%)"
-                  stroke="oklch(0.541 0.281 293 / 10%)"
+                  fill="oklch(0.795 0.184 85 / 6%)"
+                  stroke="oklch(0.795 0.184 85 / 10%)"
                   strokeWidth="0.5"
                   className="chart-skeleton-shape"
                 />
@@ -136,7 +136,7 @@ export function ChartSkeleton({
                 cy={height / 2}
                 r={Math.min(height / 2 - 20, 70)}
                 fill="none"
-                stroke="oklch(0.541 0.281 293 / 8%)"
+                stroke="oklch(0.795 0.184 85 / 8%)"
                 strokeWidth="24"
                 className="chart-skeleton-shape"
               />
@@ -145,7 +145,7 @@ export function ChartSkeleton({
                 cy={height / 2}
                 r={Math.min(height / 2 - 20, 70)}
                 fill="none"
-                stroke="oklch(0.541 0.281 293 / 15%)"
+                stroke="oklch(0.795 0.184 85 / 15%)"
                 strokeWidth="24"
                 strokeDasharray={`${Math.min(height / 2 - 20, 70) * 1.2} 999`}
                 className="chart-skeleton-shape"
@@ -163,7 +163,7 @@ export function ChartSkeleton({
                   width="12"
                   height={Math.max((height - 30) / 7 - 3, 8)}
                   rx="2"
-                  fill={`oklch(0.541 0.281 293 / ${2 + Math.random() * 6}%)`}
+                  fill={`oklch(0.795 0.184 85 / ${2 + Math.random() * 6}%)`}
                   className="chart-skeleton-shape"
                 />
               ))

@@ -98,8 +98,8 @@ export default function SensitiveAccessAudit() {
       {/* ── Summary Stats ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <GlassPanel className="flex items-center gap-3 p-4">
-          <div className="p-2 rounded-lg bg-violet-500/10">
-            <BarChart3 className="w-5 h-5 text-violet-400" />
+          <div className="p-2 rounded-lg bg-amber-500/10">
+            <BarChart3 className="w-5 h-5 text-amber-400" />
           </div>
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Records</p>
@@ -130,7 +130,7 @@ export default function SensitiveAccessAudit() {
             <div className="flex gap-2 mt-1 flex-wrap">
               {statsQ.data?.resourceTypes?.length ? (
                 statsQ.data.resourceTypes.map((rt) => (
-                  <Badge key={rt.type} variant="outline" className="text-xs border-violet-500/30 text-violet-300">
+                  <Badge key={rt.type} variant="outline" className="text-xs border-amber-500/30 text-amber-300">
                     {rt.type}: {rt.count}
                   </Badge>
                 ))
@@ -174,7 +174,7 @@ export default function SensitiveAccessAudit() {
                   });
                 }
               }}
-              className="text-xs border-violet-500/30 hover:bg-violet-500/10"
+              className="text-xs border-amber-500/30 hover:bg-amber-500/10"
             >
               <Download className="w-3 h-3 mr-1" /> Export CSV
             </Button>
@@ -245,7 +245,7 @@ export default function SensitiveAccessAudit() {
       <GlassPanel className="p-0 overflow-hidden">
         {listQ.isLoading ? (
           <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-400" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400" />
           </div>
         ) : listQ.isError ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
@@ -310,7 +310,7 @@ export default function SensitiveAccessAudit() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant="outline" className="border-violet-500/30 text-violet-300 gap-1">
+                        <Badge variant="outline" className="border-amber-500/30 text-amber-300 gap-1">
                           <Key className="w-3 h-3" /> {row.resourceType}
                         </Badge>
                       </td>

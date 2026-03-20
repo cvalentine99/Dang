@@ -55,7 +55,7 @@ interface ChatMessage {
 // ── Agent Config ────────────────────────────────────────────────────────────
 
 const AGENT_CONFIG: Record<string, { label: string; icon: typeof Bot; color: string; bgClass: string }> = {
-  orchestrator:       { label: "Orchestrator",      icon: Zap,      color: "#a78bfa", bgClass: "bg-purple-500/15 border-purple-500/30 text-purple-400" },
+  orchestrator:       { label: "Orchestrator",      icon: Zap,      color: "#a78bfa", bgClass: "bg-amber-500/15 border-amber-500/30 text-amber-400" },
   graph_retriever:    { label: "Graph Retriever",   icon: Database,  color: "#818cf8", bgClass: "bg-indigo-500/15 border-indigo-500/30 text-indigo-400" },
   indexer_retriever:  { label: "Indexer Retriever",  icon: Search,    color: "#22d3ee", bgClass: "bg-cyan-500/15 border-cyan-500/30 text-cyan-400" },
   synthesizer:        { label: "Synthesizer",        icon: Sparkles,  color: "#fbbf24", bgClass: "bg-amber-500/15 border-amber-500/30 text-amber-400" },
@@ -167,7 +167,7 @@ function AgentActivityConsole({
         <div className="flex justify-end px-3 py-1 border-b border-white/5">
           <button
             onClick={() => onReplayRequest()}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-purple-500/20 bg-purple-500/5 text-purple-300 hover:bg-purple-500/15 hover:border-purple-500/30 transition-all text-[10px]"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-amber-500/20 bg-amber-500/5 text-amber-300 hover:bg-amber-500/15 hover:border-amber-500/30 transition-all text-[10px]"
             title="Replay agent activity"
           >
             <RotateCcw className="w-2.5 h-2.5" />
@@ -304,7 +304,7 @@ function TrustBadge({ trustScore, confidence, safetyStatus, provenance }: {
       {showDetails && provenance && (
         <div className="mt-2 px-3 py-2 rounded-lg bg-black/30 border border-white/5 text-[10px] font-mono text-muted-foreground grid grid-cols-2 gap-x-6 gap-y-1">
           <span>Query Hash: <span className="text-foreground">{provenance.queryHash}</span></span>
-          <span>Graph Sources: <span className="text-purple-400">{provenance.graphSourceCount}</span></span>
+          <span>Graph Sources: <span className="text-amber-400">{provenance.graphSourceCount}</span></span>
           <span>Indexer Sources: <span className="text-cyan-400">{provenance.indexerSourceCount}</span></span>
           <span>Data Points: <span className="text-foreground">{provenance.totalDataPoints}</span></span>
           <span>Retrieval: <span className="text-foreground">{provenance.retrievalLatencyMs}ms</span></span>
@@ -337,7 +337,7 @@ function SourcePanel({ sources }: { sources: ChatMessage["sources"] }): React.JS
 
   const sourceIcon = (type: string) => {
     switch (type) {
-      case "graph": return <Database className="w-3.5 h-3.5 text-purple-400" />;
+      case "graph": return <Database className="w-3.5 h-3.5 text-amber-400" />;
       case "indexer": return <Search className="w-3.5 h-3.5 text-cyan-400" />;
       case "stats": return <Sparkles className="w-3.5 h-3.5 text-amber-400" />;
       default: return <FileJson className="w-3.5 h-3.5 text-gray-400" />;
@@ -366,7 +366,7 @@ function SourcePanel({ sources }: { sources: ChatMessage["sources"] }): React.JS
                 {sourceIcon(src.type)}
                 <span className="text-muted-foreground truncate flex-1 text-left">{src.label}</span>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
-                  src.relevance === "primary" ? "bg-purple-500/20 text-purple-300" :
+                  src.relevance === "primary" ? "bg-amber-500/20 text-amber-300" :
                   src.relevance === "error" ? "bg-red-500/20 text-red-300" :
                   "bg-white/5 text-muted-foreground"
                 }`}>{src.relevance}</span>
@@ -424,22 +424,22 @@ function ChatMessageBubble({
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
       {/* Avatar */}
       <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
-        isUser ? "bg-purple-500/20 border border-purple-500/30" : "bg-cyan-500/10 border border-cyan-500/20"
+        isUser ? "bg-amber-500/20 border border-amber-500/30" : "bg-cyan-500/10 border border-cyan-500/20"
       }`}>
-        {isUser ? <User className="w-4 h-4 text-purple-300" /> : <Bot className="w-4 h-4 text-cyan-300" />}
+        {isUser ? <User className="w-4 h-4 text-amber-300" /> : <Bot className="w-4 h-4 text-cyan-300" />}
       </div>
 
       {/* Content */}
       <div className={`flex-1 min-w-0 ${isUser ? "ml-auto" : ""}`}>
         <div className={`rounded-xl px-4 py-3 ${
           isUser
-            ? "bg-purple-500/15 border border-purple-500/20"
+            ? "bg-amber-500/15 border border-amber-500/20"
             : "glass-panel"
         }`}>
           {isUser ? (
             <p className="text-sm text-foreground whitespace-pre-wrap">{message.content}</p>
           ) : (
-            <div className="text-sm text-foreground prose prose-invert prose-sm max-w-none prose-headings:text-purple-200 prose-strong:text-foreground prose-code:text-cyan-300 prose-code:bg-black/30 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-black/40 prose-pre:border prose-pre:border-white/5">
+            <div className="text-sm text-foreground prose prose-invert prose-sm max-w-none prose-headings:text-amber-200 prose-strong:text-foreground prose-code:text-cyan-300 prose-code:bg-black/30 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-black/40 prose-pre:border prose-pre:border-white/5">
               <Streamdown>{message.content}</Streamdown>
             </div>
           )}
@@ -521,7 +521,7 @@ function SuggestionChip({ text }: { text: string }): React.JSX.Element {
   return (
     <button
       onClick={handleClick}
-      className="text-left text-xs px-3 py-1.5 rounded-lg border border-purple-500/20 bg-purple-500/5 text-purple-200 hover:bg-purple-500/15 hover:border-purple-500/30 transition-all truncate"
+      className="text-left text-xs px-3 py-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5 text-amber-200 hover:bg-amber-500/15 hover:border-amber-500/30 transition-all truncate"
     >
       {text}
     </button>
@@ -724,7 +724,7 @@ function LiveAnalysisConsole({ steps }: { steps: AgentStep[] }): React.JSX.Eleme
           {/* Shimmer progress bar */}
           <div className="h-1 rounded-full bg-white/5 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-purple-500 via-cyan-500 to-amber-500 animate-shimmer-slide transition-all duration-700 ease-out"
+              className="h-full rounded-full bg-gradient-to-r from-amber-500 via-cyan-500 to-amber-500 animate-shimmer-slide transition-all duration-700 ease-out"
               style={{
                 width: `${progress}%`,
                 backgroundSize: "200% 100%",
@@ -754,8 +754,8 @@ function WelcomeScreen(): React.JSX.Element {
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-8 py-12">
-      <div className="w-16 h-16 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center mb-6">
-        <Sparkles className="w-8 h-8 text-purple-400" />
+      <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mb-6">
+        <Sparkles className="w-8 h-8 text-amber-400" />
       </div>
       <h2 className="text-2xl font-display font-bold text-foreground mb-2">Security Analyst</h2>
       <p className="text-muted-foreground text-sm text-center max-w-lg mb-2">
@@ -773,7 +773,7 @@ function WelcomeScreen(): React.JSX.Element {
           <button
             key={i}
             onClick={() => window.dispatchEvent(new CustomEvent("analyst-suggestion", { detail: q }))}
-            className="text-left text-xs px-4 py-3 rounded-xl border border-white/5 bg-white/[0.02] text-muted-foreground hover:bg-white/5 hover:border-purple-500/20 hover:text-foreground transition-all"
+            className="text-left text-xs px-4 py-3 rounded-xl border border-white/5 bg-white/[0.02] text-muted-foreground hover:bg-white/5 hover:border-amber-500/20 hover:text-foreground transition-all"
           >
             {q}
           </button>
@@ -782,7 +782,7 @@ function WelcomeScreen(): React.JSX.Element {
 
       <div className="mt-8 flex items-center gap-4 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1.5">
-          <Database className="w-3 h-3 text-purple-400" />
+          <Database className="w-3 h-3 text-amber-400" />
           <span>Knowledge Graph</span>
         </div>
         <div className="w-1 h-1 rounded-full bg-white/20" />
@@ -825,7 +825,7 @@ function SoundToggle(): React.JSX.Element {
       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${
         muted
           ? "border-white/10 text-muted-foreground hover:bg-white/5"
-          : "border-purple-500/20 bg-purple-500/5 text-purple-300 hover:bg-purple-500/15"
+          : "border-amber-500/20 bg-amber-500/5 text-amber-300 hover:bg-amber-500/15"
       }`}
       title={muted ? "Unmute sound effects" : "Mute sound effects"}
     >
@@ -1026,8 +1026,8 @@ export default function AnalystChat(): React.JSX.Element {
       <div className="flex-shrink-0 px-6 py-4 border-b border-white/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-purple-400" />
+            <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-amber-400" />
             </div>
             <div>
               <h1 className="text-lg font-display font-bold text-foreground">Security Analyst</h1>
@@ -1092,7 +1092,7 @@ export default function AnalystChat(): React.JSX.Element {
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || isAnalyzing}
-              className="flex-shrink-0 p-3 text-purple-400 hover:text-purple-300 disabled:text-muted-foreground disabled:opacity-50 transition-colors"
+              className="flex-shrink-0 p-3 text-amber-400 hover:text-amber-300 disabled:text-muted-foreground disabled:opacity-50 transition-colors"
             >
               {isAnalyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
             </button>

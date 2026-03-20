@@ -117,10 +117,10 @@ class ErrorBoundary extends Component<Props, State> {
         className="flex items-center justify-center min-h-screen p-8"
         style={{
           background:
-            "linear-gradient(135deg, oklch(0.1 0.035 290) 0%, oklch(0.13 0.028 286) 40%, oklch(0.11 0.02 280) 100%)",
+            "linear-gradient(135deg, oklch(0.1 0.005 260) 0%, oklch(0.1 0.005 260) 40%, oklch(0.08 0.005 260) 100%)",
         }}
       >
-        <div className="glass-panel p-8 max-w-2xl w-full space-y-6 amethyst-glow">
+        <div className="glass-panel p-8 max-w-2xl w-full space-y-6 gold-glow">
           {/* Header */}
           <div className="flex flex-col items-center text-center gap-4">
             <div className="h-16 w-16 rounded-2xl bg-threat-critical/10 border border-threat-critical/20 flex items-center justify-center">

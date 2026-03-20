@@ -81,7 +81,7 @@ export default function AlertClassifyButton({ alertData, agentContext, compact =
       <button
         onClick={handleClassify}
         disabled={classifyMutation.isPending}
-        className={`flex items-center gap-1 rounded-md border border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors disabled:opacity-50 ${
+        className={`flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-50 ${
           compact ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-xs"
         }`}
         title="AI Classify Alert"
@@ -100,7 +100,7 @@ export default function AlertClassifyButton({ alertData, agentContext, compact =
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Brain className="w-4 h-4 text-purple-400" />
+              <Brain className="w-4 h-4 text-amber-400" />
               <span className="text-xs font-medium text-foreground">AI Classification <span className="text-[9px] text-muted-foreground font-normal">(LLM draft)</span></span>
             </div>
             <div className="flex items-center gap-1">
@@ -162,7 +162,7 @@ export default function AlertClassifyButton({ alertData, agentContext, compact =
               </p>
               <div className="flex flex-wrap gap-1">
                 {result.mitreATechniques.map((t, i) => (
-                  <span key={i} className="px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-[10px] font-mono text-purple-400">
+                  <span key={i} className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-[10px] font-mono text-amber-400">
                     {t}
                   </span>
                 ))}

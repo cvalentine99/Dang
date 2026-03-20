@@ -284,7 +284,7 @@ export const hybridragRouter = router({
           tags: z.array(z.string()).default([]),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
@@ -297,11 +297,13 @@ export const hybridragRouter = router({
           cveId: input.cveId,
           tags: input.tags,
           resolved: 0,
+          createdBy: ctx.user.id,
         });
 
         return { id: Number(result[0].insertId), success: true };
       }),
 
+    // Ownership enforcement: owner can update their own notes, admins can update any.
     update: protectedProcedure
       .input(
         z.object({
@@ -313,9 +315,17 @@ export const hybridragRouter = router({
           tags: z.array(z.string()).optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+        // Ownership check: must be owner or admin
+        const [note] = await db.select({ createdBy: analystNotes.createdBy })
+          .from(analystNotes).where(eq(analystNotes.id, input.id)).limit(1);
+        if (!note) throw new TRPCError({ code: "NOT_FOUND", message: "Note not found" });
+        if (note.createdBy !== null && note.createdBy !== ctx.user.id && ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You can only edit your own notes" });
+        }
 
         const updates: Partial<typeof analystNotes.$inferInsert> = {};
         if (input.title !== undefined) updates.title = input.title;
@@ -328,11 +338,20 @@ export const hybridragRouter = router({
         return { success: true };
       }),
 
+    // Ownership enforcement: owner can delete their own notes, admins can delete any.
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+        const [note] = await db.select({ createdBy: analystNotes.createdBy })
+          .from(analystNotes).where(eq(analystNotes.id, input.id)).limit(1);
+        if (!note) throw new TRPCError({ code: "NOT_FOUND", message: "Note not found" });
+        if (note.createdBy !== null && note.createdBy !== ctx.user.id && ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You can only delete your own notes" });
+        }
+
         await db.delete(analystNotes).where(eq(analystNotes.id, input.id));
         return { success: true };
       }),

@@ -325,24 +325,24 @@ Frontend: `client/src/pages/PipelineInspector.tsx` (ArtifactsDrillDown), `Living
 
 ## Phase 2: Wazuh Parameter Broker
 
-**Status:** Complete
+**Status:** Complete (post Batch 1 + Batch 2 promotions)
 
 **Code Evidence:**
-- Broker core: `server/wazuh/paramBroker.ts` (552 lines — `CoerceResult` tuple pattern, 4 default coercers, `brokerParams()` with alias resolution, 7 endpoint configs)
-- Router integration: `server/wazuh/wazuhRouter.ts` (7 call sites using `brokerParams()` for agents, rules, groups, cluster/nodes, sca/policies, sca/checks, manager/configuration)
-- Coverage ledger: `docs/broker-coverage-ledger.md` (endpoint inventory, parameter families, test counts, out-of-scope list)
+- Broker core: `server/wazuh/paramBroker.ts` — `CoerceResult` tuple pattern, 4 default coercers, `brokerParams()` with alias resolution, 116 endpoint configs
+- Router integration: `server/wazuh/wazuhRouter.ts` — 78 procedures call `brokerParams()` at runtime, 43 are passthrough (low/zero params by spec)
+- Coverage analysis: `server/wazuh/brokerCoverage.ts` (ENDPOINT_REGISTRY is the source of truth, not docs)
+- Admin procedures: `brokerCoverage`, `brokerPlayground`, `brokerConfigList` use `adminProcedure`
 
 **Test Evidence:**
-`server/wazuh/paramBroker.test.ts` (~215 tests covering: broker core mechanics, Fix A1 os.platform alias resolution, Fix A2 search vs q distinction, endpoint-specific configs, universal params, compliance filter family, manager config precision params, SCA filters, cross-endpoint isolation, Phase 2 Review Fixes: errors[] contract, coerceBoolean strict semantics, status CSV array, level custom serializer, distinct flag omission)
-
-**Type-Check:** 0 errors (2026-03-04T10:28Z, fresh `npx tsc --noEmit` EXIT 0)
-
-**Runtime Validation:** `pnpm test --run` — 1,684 passed / 0 failed across 62 test files (2026-03-04T10:28Z, Manus sandbox). Broker logic is pure-function, no live Wazuh connection required for unit tests. End-to-end parameter forwarding to live Wazuh not validated (requires private network).
+- `server/wazuh/paramBroker.test.ts` — broker core mechanics, coercion, alias resolution, per-config forwarding
+- `server/wazuh/brokerCoverage.test.ts` — 231 tests: report structure, classification truth (broker vs passthrough cross-checked against router source), registry-router parity guard, admin procedure gating, runtime-wired config truth
+- `server/wazuh/brokerPlayground.test.ts` — config list structure with `isWiredAtRuntime` metadata
+- `server/wazuh/specAudit.test.ts` — 87 tests: param counts vs spec v4.14.3, experimental endpoint exclusions
 
 **Remaining Caveats:**
-1. Router call sites destructure `{ forwardedQuery, unsupportedParams }` but do not yet surface `errors[]` to API callers — coercion errors are recorded but not returned in responses. This is a future enhancement, not a correctness issue.
-2. Syscollector family (8 endpoints) not yet broker-wired — Phase 3 candidate.
-3. MITRE, syscheck, manager/logs, vulnerability endpoints not yet broker-wired.
+1. No CI workflow enforces audit scripts (`pnpm audit:broker`, `pnpm audit:openapi`) — run manually.
+2. End-to-end parameter forwarding to live Wazuh not validated (requires private network).
+3. The 43 passthrough endpoints have broker configs defined but are not yet wired at runtime — they have zero or single path params by spec, so broker-wiring provides minimal value.
 
 ---
 

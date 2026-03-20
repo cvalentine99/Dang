@@ -45,7 +45,7 @@ function CollapsibleSection({
         onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-2 p-5 hover:bg-white/[0.02] transition-colors text-left"
       >
-        <Icon className="w-4 h-4 text-purple-400 shrink-0" />
+        <Icon className="w-4 h-4 text-amber-400 shrink-0" />
         <h2 className="text-sm font-display font-semibold text-foreground flex-1">{title}</h2>
         {open ? (
           <ChevronDown className="w-4 h-4 text-muted-foreground" />
@@ -107,8 +107,8 @@ export default function DGXHealth(): React.JSX.Element {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center">
-            <Cpu className="w-5 h-5 text-purple-400" />
+          <div className="w-10 h-10 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+            <Cpu className="w-5 h-5 text-amber-400" />
           </div>
           <div>
             <h1 className="text-xl font-display font-bold text-foreground">DGX Spark Health</h1>
@@ -126,7 +126,7 @@ export default function DGXHealth(): React.JSX.Element {
 
       {dgxHealth.isLoading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+          <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
         </div>
       ) : !h ? (
         <div className="glass-panel rounded-xl p-8 text-center">
@@ -162,7 +162,7 @@ export default function DGXHealth(): React.JSX.Element {
           <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
             <div className="glass-panel rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Server className="w-4 h-4 text-purple-400" />
+                <Server className="w-4 h-4 text-amber-400" />
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Model</span>
               </div>
               <p className="text-sm font-mono text-foreground truncate" title={h.modelName}>{h.modelName}</p>
@@ -211,7 +211,7 @@ export default function DGXHealth(): React.JSX.Element {
 
             <div className="glass-panel rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Gauge className="w-4 h-4 text-violet-400" />
+                <Gauge className="w-4 h-4 text-amber-400" />
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Queue</span>
               </div>
               <p className="text-lg font-display font-bold text-foreground">{q?.queueDepth ?? h.queueDepth}</p>
@@ -222,7 +222,7 @@ export default function DGXHealth(): React.JSX.Element {
           {/* Memory Usage */}
           <div className="glass-panel rounded-xl p-5">
             <div className="flex items-center gap-2 mb-4">
-              <MemoryStick className="w-4 h-4 text-purple-400" />
+              <MemoryStick className="w-4 h-4 text-amber-400" />
               <h2 className="text-sm font-display font-semibold text-foreground">Memory Usage</h2>
               <span className="text-[10px] text-muted-foreground ml-auto">
                 {formatBytes(h.memoryUsage.totalMB)} total (assumed — not probed from hardware)
@@ -232,7 +232,7 @@ export default function DGXHealth(): React.JSX.Element {
             <div className="h-6 rounded-lg bg-white/5 overflow-hidden flex">
               {h.memoryUsage.modelWeightsMB !== null && (
                 <div
-                  className="h-full bg-purple-500/60 flex items-center justify-center text-[9px] font-mono text-white/80"
+                  className="h-full bg-amber-500/60 flex items-center justify-center text-[9px] font-mono text-white/80"
                   style={{ width: `${((h.memoryUsage.modelWeightsMB ?? 0) / (h.memoryUsage.totalMB ?? 1)) * 100}%` }}
                   title={`Model Weights: ${formatBytes(h.memoryUsage.modelWeightsMB)}`}
                 >
@@ -260,7 +260,7 @@ export default function DGXHealth(): React.JSX.Element {
 
             <div className="flex items-center gap-6 mt-3">
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-purple-500/60" />
+                <span className="w-3 h-3 rounded bg-amber-500/60" />
                 <span className="text-[10px] text-muted-foreground">
                   Model Weights: ~{formatBytes(h.memoryUsage.modelWeightsMB)} (est.)
                 </span>
@@ -283,7 +283,7 @@ export default function DGXHealth(): React.JSX.Element {
           {/* Session Types Reference */}
           <div className="glass-panel rounded-xl p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Layers className="w-4 h-4 text-purple-400" />
+              <Layers className="w-4 h-4 text-amber-400" />
               <h2 className="text-sm font-display font-semibold text-foreground">Session Type Allocation</h2>
             </div>
             <div className="overflow-x-auto">
@@ -344,7 +344,7 @@ export default function DGXHealth(): React.JSX.Element {
                         <td className="py-2.5 px-3 font-mono text-foreground">{b.name}</td>
                         <td className="py-2.5 px-3">
                           <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            b.category === "Reasoning" ? "bg-purple-500/15 text-purple-300" :
+                            b.category === "Reasoning" ? "bg-amber-500/15 text-amber-300" :
                             b.category === "Code" ? "bg-cyan-500/15 text-cyan-300" :
                             b.category === "Agentic" ? "bg-amber-500/15 text-amber-300" :
                             b.category === "Tool Calling" ? "bg-emerald-500/15 text-emerald-300" :
@@ -398,7 +398,7 @@ export default function DGXHealth(): React.JSX.Element {
             {/* XML Tool Call Format */}
             <div className="mt-4 p-3 rounded-lg bg-white/[0.03] border border-white/5">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">XML Tool-Call Format (Nemotron Native)</p>
-              <pre className="text-[11px] font-mono text-purple-300 whitespace-pre overflow-x-auto">
+              <pre className="text-[11px] font-mono text-amber-300 whitespace-pre overflow-x-auto">
 {`<tool_call>
 <function=search_alerts>
 <parameter=agentId>
@@ -437,7 +437,7 @@ export default function DGXHealth(): React.JSX.Element {
                   {MEMORY_TABLE.map(m => (
                     <tr key={m.context} className="border-b border-white/5 hover:bg-white/[0.02]">
                       <td className="py-2.5 px-3 font-mono text-foreground">{m.context}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-purple-300">{m.weights}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-amber-300">{m.weights}</td>
                       <td className="py-2.5 px-3 text-right font-mono text-cyan-300">{m.kvCache}</td>
                       <td className="py-2.5 px-3 text-right font-mono text-foreground font-semibold">{m.totalMin}</td>
                     </tr>
@@ -487,12 +487,12 @@ export default function DGXHealth(): React.JSX.Element {
               {/* vLLM */}
               <div>
                 <h3 className="text-xs font-display font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-purple-400" />
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
                   vLLM (Enterprise)
                 </h3>
                 <div className="p-3 rounded-lg bg-white/[0.03] border border-white/5 space-y-2">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Required Configuration</p>
-                  <pre className="text-[11px] font-mono text-purple-300 whitespace-pre overflow-x-auto leading-relaxed">
+                  <pre className="text-[11px] font-mono text-amber-300 whitespace-pre overflow-x-auto leading-relaxed">
 {`vllm serve nvidia/Nemotron-3-Nano-30B-A3B \\
   --tool-call-parser qwen3_coder \\
   --reasoning-parser nano_v3_reasoning_parser \\
@@ -500,8 +500,8 @@ export default function DGXHealth(): React.JSX.Element {
   --tensor-parallel-size 2`}
                   </pre>
                   <div className="text-[10px] text-muted-foreground space-y-1 mt-2">
-                    <p><span className="font-mono text-purple-400">--tool-call-parser qwen3_coder</span> — converts XML to OpenAI JSON</p>
-                    <p><span className="font-mono text-purple-400">nano_v3_reasoning_parser</span> — custom reasoning plugin</p>
+                    <p><span className="font-mono text-amber-400">--tool-call-parser qwen3_coder</span> — converts XML to OpenAI JSON</p>
+                    <p><span className="font-mono text-amber-400">nano_v3_reasoning_parser</span> — custom reasoning plugin</p>
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-2">
                     Blackwell: <span className="font-mono">VLLM_USE_FLASHINFER_MOE_FP8=1</span>
@@ -553,7 +553,7 @@ export default function DGXHealth(): React.JSX.Element {
             <div className="mt-4 p-3 rounded-lg bg-white/[0.03] border border-white/5">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Thinking Paradigm</p>
               <div className="text-xs text-muted-foreground space-y-1">
-                <p>Uses <span className="font-mono text-purple-300">&lt;think&gt;...&lt;/think&gt;</span> tags (Token IDs 12 &amp; 13) for chain-of-thought reasoning before tool calls.</p>
+                <p>Uses <span className="font-mono text-amber-300">&lt;think&gt;...&lt;/think&gt;</span> tags (Token IDs 12 &amp; 13) for chain-of-thought reasoning before tool calls.</p>
                 <p>Jinja chat template with <span className="font-mono text-cyan-300">&lt;|im_start|&gt;</span> and <span className="font-mono text-cyan-300">&lt;|im_end|&gt;</span> delimiters.</p>
                 <p>Disabling thinking traces increases tool hallucination rate — reasoning is enabled for investigation, deep_dive, and threat_hunt sessions.</p>
               </div>

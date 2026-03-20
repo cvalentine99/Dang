@@ -137,8 +137,8 @@ export default function DataPipeline(): React.JSX.Element {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center">
-            <Database className="w-5 h-5 text-purple-400" />
+          <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+            <Database className="w-5 h-5 text-amber-400" />
           </div>
           <div>
             <h1 className="text-lg font-display font-bold text-foreground">Data Pipeline</h1>
@@ -157,7 +157,7 @@ export default function DataPipeline(): React.JSX.Element {
           <button
             onClick={() => syncMutation.mutate()}
             disabled={isRunning}
-            className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-200 hover:bg-purple-500/30 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-200 hover:bg-amber-500/30 disabled:opacity-50 transition-colors"
           >
             {isRunning ? (
               <>
@@ -249,9 +249,9 @@ export default function DataPipeline(): React.JSX.Element {
             <span className="text-xs text-green-300">Deterministic Parser</span>
           </div>
           <ArrowRight className="w-4 h-4 text-muted-foreground" />
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20">
-            <Database className="w-3.5 h-3.5 text-purple-400" />
-            <span className="text-xs text-purple-300">4-Layer Knowledge Graph</span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <Database className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-xs text-amber-300">4-Layer Knowledge Graph</span>
           </div>
           <ArrowRight className="w-4 h-4 text-muted-foreground" />
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20">

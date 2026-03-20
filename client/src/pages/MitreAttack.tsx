@@ -22,19 +22,20 @@ import {
   Wrench, ShieldCheck, Link2, ChevronLeft, ChevronRight, Search,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
+import { motion } from "framer-motion";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip,
   ResponsiveContainer, AreaChart, Area, Legend,
 } from "recharts";
 
 const COLORS = {
-  purple: "oklch(0.541 0.281 293.009)",
-  cyan: "oklch(0.789 0.154 211.53)",
-  red: "oklch(0.637 0.237 25.331)",
-  orange: "oklch(0.705 0.191 22.216)",
-  green: "oklch(0.765 0.177 163.223)",
-  yellow: "oklch(0.795 0.184 86.047)",
-  gray: "oklch(0.551 0.02 286)",
+  gold: "oklch(0.795 0.184 85)",
+  cyan: "oklch(0.75 0.15 195)",
+  red: "oklch(0.628 0.258 29.234)",
+  orange: "oklch(0.705 0.213 47.604)",
+  green: "oklch(0.723 0.219 149.579)",
+  yellow: "oklch(0.769 0.188 70.08)",
+  gray: "oklch(0.55 0.01 260)",
 };
 
 const MITRE_TACTICS = [
@@ -55,9 +56,9 @@ const TACTIC_LABELS: Record<string, string> = {
 
 const TACTIC_COLORS: Record<string, string> = {
   "initial-access": COLORS.red, "execution": COLORS.orange, "persistence": COLORS.yellow,
-  "privilege-escalation": COLORS.red, "defense-evasion": COLORS.purple, "credential-access": COLORS.orange,
+  "privilege-escalation": COLORS.red, "defense-evasion": COLORS.gold, "credential-access": COLORS.orange,
   "discovery": COLORS.cyan, "lateral-movement": COLORS.red, "collection": COLORS.yellow,
-  "command-and-control": COLORS.purple, "exfiltration": COLORS.red, "impact": COLORS.red,
+  "command-and-control": COLORS.gold, "exfiltration": COLORS.red, "impact": COLORS.red,
   "reconnaissance": COLORS.cyan, "resource-development": COLORS.gray,
 };
 
@@ -329,7 +330,7 @@ export default function MitreAttack() {
         alertedTechniques: withAlerts.length,
         coverage,
         alertCoverage,
-        color: TACTIC_COLORS[tactic] ?? COLORS.purple,
+        color: TACTIC_COLORS[tactic] ?? COLORS.gold,
       };
     }).filter(d => d.totalTechniques > 0);
   }, [tacticMatrix, indexerTopTechniques]);
@@ -346,7 +347,7 @@ export default function MitreAttack() {
     return Array.from(keys).slice(0, 6);
   }, [indexerTimeline]);
 
-  const AREA_COLORS = [COLORS.purple, COLORS.red, COLORS.orange, COLORS.yellow, COLORS.cyan, COLORS.green];
+  const AREA_COLORS = [COLORS.gold, COLORS.red, COLORS.orange, COLORS.yellow, COLORS.cyan, COLORS.green];
 
   return (
     <WazuhGuard>
@@ -364,17 +365,37 @@ export default function MitreAttack() {
           />
         )}
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          {mitreAggQ.isLoading ? <StatCardSkeleton count={6} /> : (<>
-          <StatCard label="Techniques Detected" value={mitreTechniques.length || totalTechniques} icon={Crosshair} colorClass="text-primary" />
-          <StatCard label="Rules with MITRE" value={totalRulesWithMitre} icon={Shield} colorClass="text-threat-medium" />
-          <StatCard label="Tactics Covered" value={activeTactics.length} icon={Grid3X3} colorClass="text-info-cyan" />
-          <StatCard label="Threat Groups" value={threatGroups.length} icon={Target} colorClass="text-threat-high" />
-          <StatCard label="MITRE Alerts" value={totalMitreAlerts.toLocaleString()} icon={Activity} colorClass="text-threat-critical" />
-          <StatCard label="Coverage" value={`${Math.round((activeTactics.length / 14) * 100)}%`} icon={Layers} colorClass="text-primary" />
-          </>)}
-        </div>
+        {/* KPIs — stagger entrance */}
+        {mitreAggQ.isLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <StatCardSkeleton count={6} />
+          </div>
+        ) : (
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-6 gap-4"
+            initial="hidden" animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+          >
+            {[
+              { label: "Techniques Detected", value: mitreTechniques.length || totalTechniques, icon: Crosshair, colorClass: "text-primary" },
+              { label: "Rules with MITRE", value: totalRulesWithMitre, icon: Shield, colorClass: "text-threat-medium" },
+              { label: "Tactics Covered", value: activeTactics.length, icon: Grid3X3, colorClass: "text-info-cyan" },
+              { label: "Threat Groups", value: threatGroups.length, icon: Target, colorClass: "text-threat-high" },
+              { label: "MITRE Alerts", value: totalMitreAlerts.toLocaleString(), icon: Activity, colorClass: "text-threat-critical" },
+              { label: "Coverage", value: `${Math.round((activeTactics.length / 14) * 100)}%`, icon: Layers, colorClass: "text-primary" },
+            ].map((card) => (
+              <motion.div
+                key={card.label}
+                variants={{
+                  hidden: { opacity: 0, y: 20, scale: 0.95 },
+                  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+                }}
+              >
+                <StatCard label={card.label} value={card.value} icon={card.icon} colorClass={card.colorClass} />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="bg-secondary/30 border border-border/30">
@@ -393,18 +414,24 @@ export default function MitreAttack() {
             {isLoading ? (
               <ChartSkeleton variant="bar" height={240} title="Tactic Distribution" />
             ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] as const }}
+            >
             <GlassPanel>
               <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><Target className="h-4 w-4 text-primary" /> Tactic Distribution <SourceBadge source={"server"} /></h3>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={tacticChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-                  <XAxis dataKey="name" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} angle={-20} textAnchor="end" height={65} />
-                  <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+                  <XAxis dataKey="name" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} angle={-20} textAnchor="end" height={65} />
+                  <YAxis tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} />
                   <ReTooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" fill={COLORS.purple} name="Techniques" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" fill={COLORS.gold} name="Techniques" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </GlassPanel>
+            </motion.div>
             )}
 
             <GlassPanel>
@@ -427,8 +454,8 @@ export default function MitreAttack() {
                             const intensity = Math.min(tech.ruleCount / maxTechPerTactic, 1);
                             return (
                               <button key={`${tech.id}-${i}`} onClick={() => setSelectedTechnique(tech)} className="w-full text-left p-1.5 rounded border transition-all hover:scale-[1.02]" style={{
-                                backgroundColor: `oklch(0.541 ${0.281 * (0.2 + intensity * 0.8)} 293.009 / ${0.1 + intensity * 0.3})`,
-                                borderColor: `oklch(0.541 0.281 293.009 / ${0.2 + intensity * 0.4})`,
+                                backgroundColor: `oklch(0.541 ${0.281 * (0.2 + intensity * 0.8)} 85.0 / ${0.1 + intensity * 0.3})`,
+                                borderColor: `oklch(0.795 0.184 85.0 / ${0.2 + intensity * 0.4})`,
                               }}>
                                 <span className="text-[9px] font-mono text-primary block">{tech.id}</span>
                                 <span className="text-[9px] text-foreground block truncate">{tech.name}</span>
@@ -462,8 +489,8 @@ export default function MitreAttack() {
                   const borderOpacity = 0.2 + intensity * 0.5;
                   return (
                     <div key={d.tactic} className="rounded-lg p-3 border text-center transition-all hover:scale-105 cursor-default" style={{
-                      backgroundColor: `oklch(0.541 0.281 293.009 / ${bgOpacity})`,
-                      borderColor: `oklch(0.541 0.281 293.009 / ${borderOpacity})`,
+                      backgroundColor: `oklch(0.795 0.184 85.0 / ${bgOpacity})`,
+                      borderColor: `oklch(0.795 0.184 85.0 / ${borderOpacity})`,
                     }}>
                       <p className="text-[9px] font-medium text-primary uppercase tracking-wider mb-1 truncate">{d.label}</p>
                       <p className="text-2xl font-bold text-foreground">{d.coverage}%</p>
@@ -476,11 +503,11 @@ export default function MitreAttack() {
               {/* Coverage Bar Chart */}
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={heatmapData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-                  <XAxis type="number" domain={[0, 100]} tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} tickFormatter={v => `${v}%`} />
-                  <YAxis type="category" dataKey="label" width={130} tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} tickFormatter={v => `${v}%`} />
+                  <YAxis type="category" dataKey="label" width={130} tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} />
                   <ReTooltip content={<ChartTooltip />} />
-                  <Bar dataKey="coverage" fill={COLORS.purple} name="Rule Coverage %" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="coverage" fill={COLORS.gold} name="Rule Coverage %" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </GlassPanel>
@@ -492,8 +519,8 @@ export default function MitreAttack() {
                 {[0, 25, 50, 75, 100].map(pct => (
                   <div key={pct} className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded border" style={{
-                      backgroundColor: `oklch(0.541 0.281 293.009 / ${0.1 + (pct / 100) * 0.5})`,
-                      borderColor: `oklch(0.541 0.281 293.009 / ${0.2 + (pct / 100) * 0.5})`,
+                      backgroundColor: `oklch(0.795 0.184 85.0 / ${0.1 + (pct / 100) * 0.5})`,
+                      borderColor: `oklch(0.795 0.184 85.0 / ${0.2 + (pct / 100) * 0.5})`,
                     }} />
                     <span className="text-[10px] text-muted-foreground">{pct}%</span>
                   </div>
@@ -533,11 +560,11 @@ export default function MitreAttack() {
                       </linearGradient>
                     ))}
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 20%)" />
-                  <XAxis dataKey="time" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
-                  <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 20%)" />
+                  <XAxis dataKey="time" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} />
+                  <YAxis tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} />
                   <ReTooltip content={<ChartTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 10, color: "oklch(0.65 0.02 286)" }} />
+                  <Legend wrapperStyle={{ fontSize: 10, color: "oklch(0.6 0.01 260)" }} />
                   {timelineKeys.map((key, i) => (
                     <Area key={key} type="monotone" dataKey={key} stroke={AREA_COLORS[i % AREA_COLORS.length]} fill={`url(#mitreArea${i})`} name={key} strokeWidth={1.5} stackId="1" />
                   ))}
@@ -558,7 +585,7 @@ export default function MitreAttack() {
                         <span className="text-[10px] text-muted-foreground w-4 text-right">{i + 1}</span>
                         <span className="text-xs text-foreground w-36 truncate">{t.tactic}</span>
                         <div className="flex-1 h-2 bg-secondary/40 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: COLORS.purple }} />
+                          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: COLORS.gold }} />
                         </div>
                         <span className="text-xs font-mono text-foreground w-16 text-right">{t.alerts.toLocaleString()}</span>
                         {t.delta !== 0 ? (
@@ -605,7 +632,7 @@ export default function MitreAttack() {
                             <td className="py-2.5 px-3">
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 h-2 bg-secondary/40 rounded-full overflow-hidden">
-                                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: COLORS.purple }} />
+                                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: COLORS.gold }} />
                                 </div>
                                 <span className="text-[10px] text-muted-foreground w-10 text-right">{pct.toFixed(0)}%</span>
                               </div>

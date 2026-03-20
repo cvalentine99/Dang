@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { inferRouteFromCallsite, inferPrimaryRoute, inferAllRoutes } from "@/lib/routeInference";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { GlassPanel } from "@/components/shared/GlassPanel";
@@ -196,10 +197,10 @@ function computeParitySummary(parityCallsites: Array<{ passedKeys: Record<string
 }
 
 const PARITY_STYLES: Record<ParityLevel, { className: string; label: string }> = {
-  none: { className: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30", label: "No parity observed" },
-  minimal: { className: "bg-amber-500/20 text-amber-400 border-amber-500/30", label: "Minimal parity" },
-  moderate: { className: "bg-blue-500/20 text-blue-400 border-blue-500/30", label: "Moderate parity" },
-  rich: { className: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", label: "Rich parity" },
+  none: { className: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30", label: "No params observed (static scan)" },
+  minimal: { className: "bg-amber-500/20 text-amber-400 border-amber-500/30", label: "Few params passed (static scan)" },
+  moderate: { className: "bg-blue-500/20 text-blue-400 border-blue-500/30", label: "Some params passed (static scan)" },
+  rich: { className: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", label: "Many params passed (static scan)" },
 };
 
 // ── Remediation scoring ─────────────────────────────────────────────────────
@@ -298,7 +299,9 @@ function computeRemediationQueue(endpoints: Array<{
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function BrokerCoverage() {
-  const { data, isLoading, refetch } = trpc.wazuh.brokerCoverage.useQuery();
+  const { user, loading: authLoading } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const { data, isLoading, refetch } = trpc.wazuh.brokerCoverage.useQuery(undefined, { enabled: isAdmin });
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -328,6 +331,17 @@ export default function BrokerCoverage() {
     if (!data) return [];
     return computeRemediationQueue(data.endpoints);
   }, [data]);
+
+  if (!authLoading && !isAdmin) {
+    return (
+      <div className="p-6 space-y-6 max-w-[2400px] mx-auto">
+        <PageHeader title="Broker Coverage" subtitle="Admin access required" />
+        <GlassPanel className="p-8 text-center text-muted-foreground">
+          This page is restricted to administrators.
+        </GlassPanel>
+      </div>
+    );
+  }
 
   if (isLoading || !data) {
     return (
@@ -364,29 +378,40 @@ export default function BrokerCoverage() {
       {/* ── Enrichment Notice (missing or stale artifacts) ── */}
       {data.enrichment && (() => {
         const e = data.enrichment;
-        const wiringMissing = !e.wiringLedgerLoaded;
-        const parityMissing = !e.parityArtifactLoaded;
-        const wiringStale = e.wiringLedgerStale === true;
-        const parityStale = e.parityArtifactStale === true;
+        const wl = e.wiringLedger;
+        const pa = e.parityArtifact;
+        const wiringMissing = !wl?.loaded;
+        const parityMissing = !pa?.loaded;
+        const wiringStale = wl?.stale === true;
+        const parityStale = pa?.stale === true;
         const hasIssue = wiringMissing || parityMissing || wiringStale || parityStale;
         if (!hasIssue) return null;
 
         const messages: string[] = [];
+
+        // Missing artifacts
         if (wiringMissing && parityMissing) {
           messages.push("Wiring ledger and parity artifacts not loaded — callsite and parity data unavailable. Generate with audit scripts.");
         } else {
           if (wiringMissing) messages.push("Wiring ledger artifact not loaded — callsite data unavailable.");
           if (parityMissing) messages.push("Parity artifact not loaded — param parity data unavailable.");
         }
+
+        // Stale artifacts with precise reasons
         if (wiringStale) {
           messages.push(
-            `Wiring ledger may be stale — source files modified since last generation${e.wiringLedgerGeneratedAt ? ` (generated ${new Date(e.wiringLedgerGeneratedAt).toLocaleDateString()})` : ""}.`
+            `Wiring ledger is stale — ${wl?.staleReason || "source files changed since last generation"}${e.wiringLedgerGeneratedAt ? ` (generated ${new Date(e.wiringLedgerGeneratedAt).toLocaleDateString()})` : ""}. Regenerate: node scripts/generate-wiring-ledger.mjs`
           );
         }
         if (parityStale) {
           messages.push(
-            `Parity artifact may be stale — source files modified since last generation${e.parityArtifactGeneratedAt ? ` (generated ${new Date(e.parityArtifactGeneratedAt).toLocaleDateString()})` : ""}.`
+            `Parity artifact is stale — ${pa?.staleReason || "source files changed since last generation"}${e.parityArtifactGeneratedAt ? ` (generated ${new Date(e.parityArtifactGeneratedAt).toLocaleDateString()})` : ""}. Regenerate: node scripts/audit-ui-param-parity.mjs`
           );
+        }
+
+        // Clarify scope of degradation
+        if (wiringStale || parityStale || wiringMissing || parityMissing) {
+          messages.push("Note: this only affects enrichment data (callsites/parity). Core coverage counts and endpoint classifications are unaffected.");
         }
 
         return (
@@ -407,7 +432,7 @@ export default function BrokerCoverage() {
         <StatCard icon={Shield} label="Broker-Wired" value={data.brokerWired} sublabel={`${data.brokerCoveragePercent}% of total`} color="bg-emerald-500/20 text-emerald-400" />
         <StatCard icon={AlertTriangle} label="Manual Params" value={data.manualParam} sublabel="Inline Zod schemas" color="bg-amber-500/20 text-amber-400" />
         <StatCard icon={ArrowRight} label="Passthrough" value={data.passthrough} sublabel="No query params" color="bg-zinc-500/20 text-zinc-400" />
-        <StatCard icon={Layers} label="Broker Configs" value={data.totalBrokerConfigs} sublabel={`${data.totalBrokerParams} total params`} color="bg-violet-500/20 text-violet-400" />
+        <StatCard icon={Layers} label="Broker Configs" value={data.totalBrokerConfigs} sublabel={`${data.totalBrokerParams} total params`} color="bg-amber-500/20 text-amber-400" />
         <StatCard icon={Zap} label="Param Coverage" value={`${data.paramCoveragePercent}%`} sublabel="Broker + Manual" color="bg-cyan-500/20 text-cyan-400" />
       </div>
 
@@ -529,7 +554,13 @@ export default function BrokerCoverage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredEndpoints.map(ep => (
+                  {filteredEndpoints.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                        No endpoints match the current filters.
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredEndpoints.map(ep => (
                     <TableRow
                       key={ep.procedure}
                       className="border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors"
@@ -543,7 +574,7 @@ export default function BrokerCoverage() {
                         </Badge>
                       </TableCell>
                       <TableCell><WiringBadge level={ep.wiringLevel} /></TableCell>
-                      <TableCell className="font-mono text-[10px] text-violet-400/80">{ep.brokerConfig || "—"}</TableCell>
+                      <TableCell className="font-mono text-[10px] text-amber-400/80">{ep.brokerConfig || "—"}</TableCell>
                       <TableCell className="text-right font-mono text-xs text-foreground">{ep.paramCount}</TableCell>
                       <TableCell className="text-right">
                         {ep.callsites.length > 0 ? (
@@ -596,7 +627,7 @@ export default function BrokerCoverage() {
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Endpoint-Specific</p>
                     <div className="flex flex-wrap gap-1">
                       {config.specificParams.map(p => (
-                        <span key={p} className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-violet-500/10 text-violet-400">{p}</span>
+                        <span key={p} className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-400">{p}</span>
                       ))}
                     </div>
                   </div>
@@ -606,9 +637,9 @@ export default function BrokerCoverage() {
                 <div className="pt-2 border-t border-white/5">
                   <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
                     <span>Param utilization</span>
-                    <span>{config.universalParams.length}/{7} universal</span>
+                    <span>{config.universalParams.length + config.specificParams.length}/{config.totalParams} params</span>
                   </div>
-                  <Progress value={(config.universalParams.length / 7) * 100} className="h-1.5" />
+                  <Progress value={config.totalParams > 0 ? ((config.universalParams.length + config.specificParams.length) / config.totalParams) * 100 : 0} className="h-1.5" />
                 </div>
               </GlassPanel>
             ))}
@@ -620,7 +651,7 @@ export default function BrokerCoverage() {
           <GlassPanel className="p-3 flex items-center gap-3">
             <Info className="h-4 w-4 text-muted-foreground shrink-0" />
             <p className="text-[11px] text-muted-foreground">
-              Endpoints ranked by wiring attention needed. Score based on: wiring level, callsite count, param count, and parity coverage.
+              Endpoints ranked by wiring attention needed. Suggestions are informational, not automated actions. Score based on: wiring level, callsite count, param count, and parity coverage.
             </p>
           </GlassPanel>
           <GlassPanel className="p-0 overflow-hidden">
@@ -635,7 +666,7 @@ export default function BrokerCoverage() {
                     <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold text-right w-[70px]">Params</TableHead>
                     <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold text-right w-[70px]">Sites</TableHead>
                     <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Reasons</TableHead>
-                    <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold w-[160px]">Next Step</TableHead>
+                    <TableHead className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold w-[160px]">Suggestion</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -690,8 +721,8 @@ export default function BrokerCoverage() {
 
       {/* ── Spec Info ── */}
       <GlassPanel className="p-3 flex items-center justify-between text-[10px] text-muted-foreground">
-        <span>Analysis based on Wazuh REST API OpenAPI spec v{data.specVersion}</span>
-        <span className="font-mono">Generated: {new Date(data.analyzedAt).toLocaleString()}</span>
+        <span>Static analysis based on Wazuh REST API OpenAPI spec v{data.specVersion} — not a runtime probe</span>
+        <span className="font-mono">Computed: {new Date(data.analyzedAt).toLocaleString()}</span>
       </GlassPanel>
 
       {/* ── Endpoint Detail Drawer ── */}
@@ -736,7 +767,7 @@ export default function BrokerCoverage() {
                       {selectedEndpoint.brokerConfig && (
                         <div className="bg-white/[0.02] rounded-md p-2.5 col-span-2">
                           <p className="text-[9px] text-muted-foreground/60 uppercase tracking-wider">Broker Config</p>
-                          <p className="text-xs text-violet-400 font-mono mt-0.5">{selectedEndpoint.brokerConfig}</p>
+                          <p className="text-xs text-amber-400 font-mono mt-0.5">{selectedEndpoint.brokerConfig}</p>
                         </div>
                       )}
                     </div>
@@ -906,7 +937,7 @@ export default function BrokerCoverage() {
                       {parity.uniqueKeys.length > 0 && (
                         <div className="flex flex-wrap gap-1">
                           {parity.uniqueKeys.slice(0, 8).map(k => (
-                            <span key={k} className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-violet-500/10 text-violet-400/80 border border-violet-500/10">
+                            <span key={k} className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/10 text-amber-400/80 border border-amber-500/10">
                               {k}
                             </span>
                           ))}
@@ -939,7 +970,7 @@ export default function BrokerCoverage() {
                                     <TooltipProvider key={k}>
                                       <Tooltip>
                                         <TooltipTrigger asChild>
-                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-violet-500/10 text-violet-400/80 border border-violet-500/10 cursor-default">
+                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/10 text-amber-400/80 border border-amber-500/10 cursor-default">
                                             {k}
                                           </span>
                                         </TooltipTrigger>

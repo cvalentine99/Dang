@@ -187,25 +187,25 @@ export default function AdminUsers(): React.JSX.Element {
           icon={Users}
           label="Total Users"
           value={total}
-          color="oklch(0.789 0.154 211.53)"
+          color="oklch(0.75 0.15 195)"
         />
         <StatCard
           icon={Crown}
           label="Admins"
           value={usersList.filter((u) => u.role === "admin").length}
-          color="oklch(0.541 0.281 293.009)"
+          color="oklch(0.795 0.184 85)"
         />
         <StatCard
           icon={CheckCircle2}
           label="Active"
           value={usersList.filter((u) => !u.isDisabled).length}
-          color="oklch(0.765 0.177 163.223)"
+          color="oklch(0.723 0.219 149.579)"
         />
         <StatCard
           icon={Ban}
           label="Disabled"
           value={usersList.filter((u) => u.isDisabled).length}
-          color="oklch(0.637 0.237 25.331)"
+          color="oklch(0.628 0.258 29.234)"
         />
       </div>
 
@@ -249,11 +249,11 @@ export default function AdminUsers(): React.JSX.Element {
                     className="h-10 w-10 rounded-lg flex items-center justify-center text-xs font-medium shrink-0"
                     style={{
                       background: u.role === "admin"
-                        ? "oklch(0.541 0.281 293.009 / 20%)"
-                        : "oklch(0.25 0.03 286 / 60%)",
+                        ? "oklch(0.795 0.184 85.0 / 20%)"
+                        : "oklch(0.25 0.01 260 / 60%)",
                       color: u.role === "admin"
-                        ? "oklch(0.7 0.2 293)"
-                        : "oklch(0.7 0.02 286)",
+                        ? "oklch(0.795 0.184 85)"
+                        : "oklch(0.6 0.01 260)",
                     }}
                   >
                     {getInitials(u.name)}
@@ -287,9 +287,9 @@ export default function AdminUsers(): React.JSX.Element {
                       <Badge
                         className="text-xs px-2 py-0.5"
                         style={{
-                          background: "oklch(0.541 0.281 293.009 / 15%)",
-                          borderColor: "oklch(0.541 0.281 293.009 / 30%)",
-                          color: "oklch(0.7 0.2 293)",
+                          background: "oklch(0.795 0.184 85.0 / 15%)",
+                          borderColor: "oklch(0.795 0.184 85.0 / 30%)",
+                          color: "oklch(0.795 0.184 85)",
                         }}
                       >
                         <Crown className="h-3 w-3 mr-1" />
@@ -313,7 +313,7 @@ export default function AdminUsers(): React.JSX.Element {
                         style={{
                           background: "oklch(0.637 0.237 25.331 / 15%)",
                           borderColor: "oklch(0.637 0.237 25.331 / 30%)",
-                          color: "oklch(0.637 0.237 25.331)",
+                          color: "oklch(0.628 0.258 29.234)",
                         }}
                       >
                         <Ban className="h-3 w-3 mr-1" />
@@ -325,7 +325,7 @@ export default function AdminUsers(): React.JSX.Element {
                         style={{
                           background: "oklch(0.765 0.177 163.223 / 15%)",
                           borderColor: "oklch(0.765 0.177 163.223 / 30%)",
-                          color: "oklch(0.765 0.177 163.223)",
+                          color: "oklch(0.723 0.219 149.579)",
                         }}
                       >
                         <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -396,7 +396,7 @@ export default function AdminUsers(): React.JSX.Element {
                             onClick={() => setDisableDialog({ user: u, disable: false })}
                             className="text-sm"
                           >
-                            <CheckCircle2 className="h-4 w-4 mr-2" style={{ color: "oklch(0.765 0.177 163.223)" }} />
+                            <CheckCircle2 className="h-4 w-4 mr-2" style={{ color: "oklch(0.723 0.219 149.579)" }} />
                             Enable Account
                           </DropdownMenuItem>
                         ) : (
@@ -558,7 +558,7 @@ export default function AdminUsers(): React.JSX.Element {
               {disableDialog?.disable ? (
                 <Ban className="h-5 w-5 text-destructive" />
               ) : (
-                <CheckCircle2 className="h-5 w-5" style={{ color: "oklch(0.765 0.177 163.223)" }} />
+                <CheckCircle2 className="h-5 w-5" style={{ color: "oklch(0.723 0.219 149.579)" }} />
               )}
               {disableDialog?.disable ? "Disable Account" : "Enable Account"}
             </DialogTitle>

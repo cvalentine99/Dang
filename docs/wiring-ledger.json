@@ -1,332 +1,361 @@
 {
-  "generated": "2026-03-06T23:45:30.566Z",
-  "totalProcedures": 113,
-  "wired": 113,
-  "unwired": 0,
-  "parity": "113/113",
+  "generated": "2026-03-19T23:21:34.057Z",
+  "totalProcedures": 130,
+  "wired": 128,
+  "unwired": 2,
+  "parity": "128/130",
   "procedures": [
     {
       "name": "status",
-      "routerLine": 121,
+      "routerLine": 222,
       "wired": true,
       "callsites": [
         "client/src/components/shared/WazuhGuard.tsx:21",
         "client/src/components/shared/WazuhGuard.tsx:72",
-        "client/src/pages/AgentHealth.tsx:87",
-        "client/src/pages/AlertsTimeline.tsx:169",
-        "client/src/pages/ClusterHealth.tsx:516",
-        "client/src/pages/Compliance.tsx:145",
-        "client/src/pages/FileIntegrity.tsx:64",
-        "client/src/pages/FleetInventory.tsx:147",
-        "client/src/pages/GroupManagement.tsx:56",
-        "client/src/pages/Home.tsx:157",
-        "client/src/pages/ITHygiene.tsx:92",
-        "client/src/pages/MitreAttack.tsx:109",
-        "client/src/pages/RulesetExplorer.tsx:181",
-        "client/src/pages/SecurityExplorer.tsx:51",
-        "client/src/pages/SiemEvents.tsx:113",
-        "client/src/pages/Vulnerabilities.tsx:105"
+        "client/src/pages/AgentHealth.tsx:89",
+        "client/src/pages/AlertsTimeline.tsx:171",
+        "client/src/pages/ClusterHealth.tsx:617",
+        "client/src/pages/Compliance.tsx:158",
+        "client/src/pages/FileIntegrity.tsx:65",
+        "client/src/pages/FleetInventory.tsx:206",
+        "client/src/pages/GroupManagement.tsx:62",
+        "client/src/pages/Home.tsx:240",
+        "client/src/pages/ITHygiene.tsx:94",
+        "client/src/pages/MitreAttack.tsx:110",
+        "client/src/pages/RulesetExplorer.tsx:185",
+        "client/src/pages/SecurityExplorer.tsx:197",
+        "client/src/pages/SiemEvents.tsx:110",
+        "client/src/pages/Vulnerabilities.tsx:106"
       ]
     },
     {
       "name": "isConfigured",
-      "routerLine": 135,
+      "routerLine": 236,
       "wired": true,
       "callsites": [
-        "client/src/pages/Status.tsx:555"
+        "client/src/pages/Status.tsx:571"
       ]
     },
     {
       "name": "managerInfo",
-      "routerLine": 147,
+      "routerLine": 248,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:519"
+        "client/src/pages/ClusterHealth.tsx:620"
       ]
     },
     {
       "name": "managerStatus",
-      "routerLine": 148,
+      "routerLine": 249,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:518",
-        "client/src/pages/Home.tsx:163"
+        "client/src/pages/ClusterHealth.tsx:619",
+        "client/src/pages/Home.tsx:246"
       ]
     },
     {
       "name": "managerConfiguration",
-      "routerLine": 156,
+      "routerLine": 257,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:538"
+        "client/src/pages/ClusterHealth.tsx:639"
       ]
     },
     {
       "name": "managerConfigValidation",
-      "routerLine": 176,
+      "routerLine": 277,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:522"
+        "client/src/pages/ClusterHealth.tsx:623"
       ]
     },
     {
       "name": "managerStats",
-      "routerLine": 179,
+      "routerLine": 281,
       "wired": true,
       "callsites": [
-        "client/src/pages/Home.tsx:169",
-        "client/src/pages/Status.tsx:550"
+        "client/src/pages/Status.tsx:566"
       ]
     },
     {
       "name": "statsHourly",
-      "routerLine": 180,
+      "routerLine": 291,
       "wired": true,
       "callsites": [
-        "client/src/pages/AlertsTimeline.tsx:172",
-        "client/src/pages/ClusterHealth.tsx:520",
-        "client/src/pages/Home.tsx:162"
+        "client/src/pages/AlertsTimeline.tsx:174",
+        "client/src/pages/ClusterHealth.tsx:621",
+        "client/src/pages/Home.tsx:245"
       ]
     },
     {
       "name": "statsWeekly",
-      "routerLine": 181,
+      "routerLine": 292,
       "wired": true,
       "callsites": [
-        "client/src/pages/AlertsTimeline.tsx:173"
+        "client/src/pages/AlertsTimeline.tsx:175"
       ]
     },
     {
       "name": "analysisd",
-      "routerLine": 182,
+      "routerLine": 293,
       "wired": true,
       "callsites": [
-        "client/src/pages/Home.tsx:161"
+        "client/src/pages/Home.tsx:244"
       ]
     },
     {
       "name": "remoted",
-      "routerLine": 183,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/Home.tsx:170"
-      ]
+      "routerLine": 294,
+      "wired": false,
+      "callsites": []
     },
     {
       "name": "daemonStats",
-      "routerLine": 186,
+      "routerLine": 297,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:521"
+        "client/src/pages/ClusterHealth.tsx:622"
       ]
     },
     {
       "name": "managerLogs",
-      "routerLine": 201,
+      "routerLine": 317,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:532"
+        "client/src/pages/ClusterHealth.tsx:633"
       ]
     },
     {
       "name": "managerLogsSummary",
-      "routerLine": 224,
+      "routerLine": 340,
       "wired": true,
       "callsites": [
-        "client/src/pages/Home.tsx:168"
+        "client/src/pages/Home.tsx:250"
       ]
     },
     {
       "name": "managerVersionCheck",
-      "routerLine": 232,
+      "routerLine": 348,
       "wired": true,
       "callsites": [
-        "client/src/pages/Status.tsx:540"
+        "client/src/pages/Status.tsx:546"
       ]
     },
     {
       "name": "managerComponentConfig",
-      "routerLine": 246,
+      "routerLine": 365,
       "wired": true,
       "callsites": [
-        "client/src/pages/Status.tsx:562"
+        "client/src/pages/Status.tsx:580"
       ]
     },
     {
       "name": "clusterStatus",
-      "routerLine": 258,
+      "routerLine": 377,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:523"
+        "client/src/pages/ClusterHealth.tsx:624"
       ]
     },
     {
       "name": "clusterNodes",
-      "routerLine": 265,
+      "routerLine": 384,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:524"
+        "client/src/pages/ClusterHealth.tsx:625"
       ]
     },
     {
       "name": "clusterHealthcheck",
-      "routerLine": 288,
+      "routerLine": 407,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:525"
+        "client/src/pages/ClusterHealth.tsx:626"
       ]
     },
     {
       "name": "clusterLocalInfo",
-      "routerLine": 289,
+      "routerLine": 417,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:526"
+        "client/src/pages/ClusterHealth.tsx:627"
       ]
     },
     {
       "name": "clusterLocalConfig",
-      "routerLine": 290,
+      "routerLine": 418,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:527"
+        "client/src/pages/ClusterHealth.tsx:628"
+      ]
+    },
+    {
+      "name": "clusterRulesetSync",
+      "routerLine": 421,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ClusterHealth.tsx:654"
+      ]
+    },
+    {
+      "name": "clusterApiConfig",
+      "routerLine": 424,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ClusterHealth.tsx:652"
+      ]
+    },
+    {
+      "name": "clusterConfigValidation",
+      "routerLine": 427,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ClusterHealth.tsx:653"
+      ]
+    },
+    {
+      "name": "managerApiConfig",
+      "routerLine": 430,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ClusterHealth.tsx:655"
       ]
     },
     {
       "name": "clusterNodeInfo",
-      "routerLine": 292,
+      "routerLine": 432,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:208"
+        "client/src/pages/ClusterHealth.tsx:253"
       ]
     },
     {
       "name": "clusterNodeStats",
-      "routerLine": 296,
+      "routerLine": 437,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:212"
+        "client/src/pages/ClusterHealth.tsx:257"
       ]
     },
     {
       "name": "clusterNodeStatsHourly",
-      "routerLine": 300,
+      "routerLine": 448,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:216"
+        "client/src/pages/ClusterHealth.tsx:261"
       ]
     },
     {
       "name": "agents",
-      "routerLine": 317,
+      "routerLine": 465,
       "wired": true,
       "callsites": [
         "client/src/components/DriftComparison.tsx:413",
-        "client/src/pages/AgentCompare.tsx:53",
-        "client/src/pages/AgentHealth.tsx:107",
-        "client/src/pages/Compliance.tsx:153",
-        "client/src/pages/FileIntegrity.tsx:67",
-        "client/src/pages/Home.tsx:165",
-        "client/src/pages/ITHygiene.tsx:100",
-        "client/src/pages/SiemEvents.tsx:120",
-        "client/src/pages/Vulnerabilities.tsx:112"
+        "client/src/pages/AgentCompare.tsx:66",
+        "client/src/pages/AgentHealth.tsx:109",
+        "client/src/pages/Compliance.tsx:166",
+        "client/src/pages/FileIntegrity.tsx:68",
+        "client/src/pages/Home.tsx:248",
+        "client/src/pages/ITHygiene.tsx:102",
+        "client/src/pages/SiemEvents.tsx:117",
+        "client/src/pages/Vulnerabilities.tsx:113"
       ]
     },
     {
       "name": "agentSummaryStatus",
-      "routerLine": 356,
+      "routerLine": 505,
       "wired": true,
       "callsites": [
-        "client/src/pages/AgentHealth.tsx:90",
-        "client/src/pages/Home.tsx:160",
+        "client/src/pages/AgentHealth.tsx:92",
+        "client/src/pages/Home.tsx:243",
         "client/src/pages/ThreatHunting.tsx:248"
       ]
     },
     {
       "name": "agentSummaryOs",
-      "routerLine": 360,
+      "routerLine": 509,
       "wired": true,
       "callsites": [
-        "client/src/pages/AgentHealth.tsx:91"
+        "client/src/pages/AgentHealth.tsx:93"
       ]
     },
     {
       "name": "agentsSummary",
-      "routerLine": 368,
+      "routerLine": 517,
       "wired": true,
       "callsites": [
-        "client/src/pages/Home.tsx:171"
+        "client/src/pages/Home.tsx:252"
       ]
     },
     {
       "name": "agentOverview",
-      "routerLine": 382,
+      "routerLine": 530,
       "wired": true,
       "callsites": [
-        "client/src/pages/Home.tsx:167"
+        "client/src/pages/Home.tsx:251"
       ]
     },
     {
       "name": "agentById",
-      "routerLine": 386,
+      "routerLine": 534,
       "wired": true,
       "callsites": [
-        "client/src/pages/AgentCompare.tsx:424",
-        "client/src/pages/AgentDetail.tsx:1719",
-        "client/src/pages/AgentHealth.tsx:131"
+        "client/src/pages/AgentCompare.tsx:437",
+        "client/src/pages/AgentDetail.tsx:1718",
+        "client/src/pages/AgentHealth.tsx:135"
       ]
     },
     {
       "name": "agentKey",
-      "routerLine": 398,
+      "routerLine": 546,
       "wired": true,
       "callsites": [
-        "client/src/pages/AgentDetail.tsx:1044"
+        "client/src/pages/AgentDetail.tsx:1043"
       ]
     },
     {
       "name": "agentDaemonStats",
-      "routerLine": 435,
+      "routerLine": 583,
       "wired": true,
       "callsites": [
-        "client/src/pages/AgentDetail.tsx:1036"
+        "client/src/pages/AgentDetail.tsx:1035"
       ]
     },
     {
       "name": "agentStats",
-      "routerLine": 441,
+      "routerLine": 597,
       "wired": true,
       "callsites": [
-        "client/src/pages/AgentDetail.tsx:1030"
+        "client/src/pages/AgentDetail.tsx:1029"
       ]
     },
     {
       "name": "agentConfig",
-      "routerLine": 447,
+      "routerLine": 603,
       "wired": true,
       "callsites": [
-        "client/src/pages/AgentDetail.tsx:1023"
+        "client/src/pages/AgentDetail.tsx:1022"
       ]
     },
     {
       "name": "agentsUpgradeResult",
-      "routerLine": 461,
+      "routerLine": 617,
       "wired": true,
       "callsites": [
-        "client/src/pages/AgentHealth.tsx:126"
+        "client/src/pages/AgentHealth.tsx:128"
       ]
     },
     {
       "name": "agentsUninstallPermission",
-      "routerLine": 499,
+      "routerLine": 647,
       "wired": true,
       "callsites": [
-        "client/src/pages/Status.tsx:567"
+        "client/src/pages/Status.tsx:585"
       ]
     },
     {
       "name": "agentGroupSync",
-      "routerLine": 505,
+      "routerLine": 653,
       "wired": true,
       "callsites": [
         "client/src/pages/AgentDetail.tsx:68"
@@ -334,634 +363,736 @@
     },
     {
       "name": "apiInfo",
-      "routerLine": 513,
+      "routerLine": 661,
       "wired": true,
       "callsites": [
-        "client/src/pages/Status.tsx:535"
+        "client/src/pages/Status.tsx:541"
       ]
     },
     {
       "name": "agentGroups",
-      "routerLine": 521,
+      "routerLine": 669,
       "wired": true,
       "callsites": [
-        "client/src/pages/AgentHealth.tsx:92",
-        "client/src/pages/GroupManagement.tsx:60"
+        "client/src/pages/AgentHealth.tsx:94",
+        "client/src/pages/GroupManagement.tsx:66"
       ]
     },
     {
       "name": "agentsOutdated",
-      "routerLine": 546,
+      "routerLine": 695,
       "wired": true,
       "callsites": [
-        "client/src/pages/AgentHealth.tsx:113",
-        "client/src/pages/GroupManagement.tsx:64"
+        "client/src/pages/AgentHealth.tsx:115",
+        "client/src/pages/GroupManagement.tsx:70"
       ]
     },
     {
       "name": "agentsNoGroup",
-      "routerLine": 553,
+      "routerLine": 711,
       "wired": true,
       "callsites": [
-        "client/src/pages/AgentHealth.tsx:114",
-        "client/src/pages/GroupManagement.tsx:68"
+        "client/src/pages/AgentHealth.tsx:116",
+        "client/src/pages/GroupManagement.tsx:79"
       ]
     },
     {
       "name": "agentsStatsDistinct",
-      "routerLine": 560,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/GroupManagement.tsx:72"
-      ]
-    },
-    {
-      "name": "agentGroupMembers",
-      "routerLine": 572,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/GroupManagement.tsx:76"
-      ]
-    },
-    {
-      "name": "agentOs",
-      "routerLine": 598,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/AgentDetail.tsx:64",
-        "client/src/pages/AgentHealth.tsx:132"
-      ]
-    },
-    {
-      "name": "agentHardware",
-      "routerLine": 604,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/AgentDetail.tsx:65",
-        "client/src/pages/AgentHealth.tsx:133"
-      ]
-    },
-    {
-      "name": "agentPackages",
-      "routerLine": 610,
-      "wired": true,
-      "callsites": [
-        "client/src/components/DriftComparison.tsx:438",
-        "client/src/pages/AgentDetail.tsx:651",
-        "client/src/pages/ITHygiene.tsx:110"
-      ]
-    },
-    {
-      "name": "agentPorts",
-      "routerLine": 638,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/AgentDetail.tsx:652",
-        "client/src/pages/ITHygiene.tsx:114"
-      ]
-    },
-    {
-      "name": "agentProcesses",
-      "routerLine": 669,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/AgentDetail.tsx:653",
-        "client/src/pages/ITHygiene.tsx:118"
-      ]
-    },
-    {
-      "name": "agentNetaddr",
-      "routerLine": 706,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/AgentDetail.tsx:655",
-        "client/src/pages/ITHygiene.tsx:126"
-      ]
-    },
-    {
-      "name": "agentNetiface",
-      "routerLine": 712,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/AgentDetail.tsx:654",
-        "client/src/pages/ITHygiene.tsx:122"
-      ]
-    },
-    {
-      "name": "agentHotfixes",
-      "routerLine": 718,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/ITHygiene.tsx:134"
-      ]
-    },
-    {
-      "name": "agentBrowserExtensions",
-      "routerLine": 732,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/ITHygiene.tsx:140"
-      ]
-    },
-    {
-      "name": "agentServices",
-      "routerLine": 742,
-      "wired": true,
-      "callsites": [
-        "client/src/components/DriftComparison.tsx:447",
-        "client/src/pages/ITHygiene.tsx:146"
-      ]
-    },
-    {
-      "name": "agentUsers",
-      "routerLine": 767,
-      "wired": true,
-      "callsites": [
-        "client/src/components/DriftComparison.tsx:456",
-        "client/src/pages/ITHygiene.tsx:152"
-      ]
-    },
-    {
-      "name": "agentGroups2",
-      "routerLine": 777,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/ITHygiene.tsx:156"
-      ]
-    },
-    {
-      "name": "agentNetproto",
-      "routerLine": 787,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/ITHygiene.tsx:130"
-      ]
-    },
-    {
-      "name": "expSyscollectorPackages",
-      "routerLine": 801,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/FleetInventory.tsx:164"
-      ]
-    },
-    {
-      "name": "expSyscollectorProcesses",
-      "routerLine": 834,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/FleetInventory.tsx:165"
-      ]
-    },
-    {
-      "name": "expSyscollectorPorts",
-      "routerLine": 885,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/FleetInventory.tsx:166"
-      ]
-    },
-    {
-      "name": "expSyscollectorNetaddr",
-      "routerLine": 924,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/FleetInventory.tsx:170"
-      ]
-    },
-    {
-      "name": "expSyscollectorNetiface",
-      "routerLine": 947,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/FleetInventory.tsx:171"
-      ]
-    },
-    {
-      "name": "expSyscollectorNetproto",
-      "routerLine": 970,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/FleetInventory.tsx:172"
-      ]
-    },
-    {
-      "name": "expSyscollectorOs",
-      "routerLine": 993,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/FleetInventory.tsx:167"
-      ]
-    },
-    {
-      "name": "expSyscollectorHardware",
-      "routerLine": 1016,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/FleetInventory.tsx:168"
-      ]
-    },
-    {
-      "name": "expSyscollectorHotfixes",
-      "routerLine": 1039,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/FleetInventory.tsx:169"
-      ]
-    },
-    {
-      "name": "rules",
-      "routerLine": 1070,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/Home.tsx:164",
-        "client/src/pages/MitreAttack.tsx:122",
-        "client/src/pages/RulesetExplorer.tsx:225",
-        "client/src/pages/SiemEvents.tsx:116",
-        "client/src/pages/ThreatHunting.tsx:249"
-      ]
-    },
-    {
-      "name": "ruleGroups",
-      "routerLine": 1104,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/RulesetExplorer.tsx:233"
-      ]
-    },
-    {
-      "name": "rulesByRequirement",
-      "routerLine": 1106,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/RulesetExplorer.tsx:266"
-      ]
-    },
-    {
-      "name": "rulesFiles",
-      "routerLine": 1112,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/RulesetExplorer.tsx:238"
-      ]
-    },
-    {
-      "name": "ruleFileContent",
-      "routerLine": 1119,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/RulesetExplorer.tsx:86"
-      ]
-    },
-    {
-      "name": "mitreTactics",
-      "routerLine": 1128,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/Home.tsx:166",
-        "client/src/pages/MitreAttack.tsx:119"
-      ]
-    },
-    {
-      "name": "mitreTechniques",
-      "routerLine": 1138,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/MitreAttack.tsx:120"
-      ]
-    },
-    {
-      "name": "mitreMitigations",
-      "routerLine": 1158,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/MitreAttack.tsx:132"
-      ]
-    },
-    {
-      "name": "mitreSoftware",
-      "routerLine": 1164,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/MitreAttack.tsx:128"
-      ]
-    },
-    {
-      "name": "mitreGroups",
-      "routerLine": 1170,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/MitreAttack.tsx:121"
-      ]
-    },
-    {
-      "name": "mitreMetadata",
-      "routerLine": 1176,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/MitreAttack.tsx:123"
-      ]
-    },
-    {
-      "name": "mitreReferences",
-      "routerLine": 1178,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/MitreAttack.tsx:136"
-      ]
-    },
-    {
-      "name": "scaPolicies",
-      "routerLine": 1200,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/AgentCompare.tsx:429",
-        "client/src/pages/AgentDetail.tsx:66",
-        "client/src/pages/Compliance.tsx:159"
-      ]
-    },
-    {
-      "name": "scaChecks",
-      "routerLine": 1233,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/Compliance.tsx:160"
-      ]
-    },
-    {
-      "name": "ciscatResults",
-      "routerLine": 1278,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/AgentDetail.tsx:1544"
-      ]
-    },
-    {
-      "name": "syscheckFiles",
-      "routerLine": 1318,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/AgentDetail.tsx:568",
-        "client/src/pages/AgentDetail.tsx:803",
-        "client/src/pages/FileIntegrity.tsx:73"
-      ]
-    },
-    {
-      "name": "syscheckLastScan",
-      "routerLine": 1352,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/AgentDetail.tsx:67",
-        "client/src/pages/AgentDetail.tsx:574",
-        "client/src/pages/FileIntegrity.tsx:77"
-      ]
-    },
-    {
-      "name": "rootcheckResults",
-      "routerLine": 1367,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/AgentDetail.tsx:1317"
-      ]
-    },
-    {
-      "name": "rootcheckLastScan",
-      "routerLine": 1392,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/AgentDetail.tsx:1312"
-      ]
-    },
-    {
-      "name": "decoders",
-      "routerLine": 1407,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/RulesetExplorer.tsx:229"
-      ]
-    },
-    {
-      "name": "decoderFiles",
-      "routerLine": 1430,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/RulesetExplorer.tsx:242"
-      ]
-    },
-    {
-      "name": "decoderParents",
-      "routerLine": 1437,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/RulesetExplorer.tsx:259"
-      ]
-    },
-    {
-      "name": "decoderFileContent",
-      "routerLine": 1444,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/RulesetExplorer.tsx:87"
-      ]
-    },
-    {
-      "name": "taskStatus",
-      "routerLine": 1453,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/Status.tsx:572"
-      ]
-    },
-    {
-      "name": "securityRoles",
-      "routerLine": 1468,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/SecurityExplorer.tsx:58"
-      ]
-    },
-    {
-      "name": "securityPolicies",
-      "routerLine": 1469,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/SecurityExplorer.tsx:60"
-      ]
-    },
-    {
-      "name": "securityUsers",
-      "routerLine": 1470,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/SecurityExplorer.tsx:59"
-      ]
-    },
-    {
-      "name": "securityConfig",
-      "routerLine": 1476,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/Status.tsx:545"
-      ]
-    },
-    {
-      "name": "securityCurrentUser",
-      "routerLine": 1482,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/SecurityExplorer.tsx:61"
-      ]
-    },
-    {
-      "name": "securityRbacRules",
-      "routerLine": 1488,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/SecurityExplorer.tsx:54"
-      ]
-    },
-    {
-      "name": "securityActions",
-      "routerLine": 1515,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/SecurityExplorer.tsx:55"
-      ]
-    },
-    {
-      "name": "securityResources",
-      "routerLine": 1527,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/SecurityExplorer.tsx:56"
-      ]
-    },
-    {
-      "name": "securityCurrentUserPolicies",
-      "routerLine": 1539,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/SecurityExplorer.tsx:57"
-      ]
-    },
-    {
-      "name": "lists",
-      "routerLine": 1544,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/RulesetExplorer.tsx:246"
-      ]
-    },
-    {
-      "name": "listsFiles",
-      "routerLine": 1550,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/RulesetExplorer.tsx:250"
-      ]
-    },
-    {
-      "name": "groupConfiguration",
-      "routerLine": 1560,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/GroupManagement.tsx:80"
-      ]
-    },
-    {
-      "name": "groupFiles",
-      "routerLine": 1567,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/GroupManagement.tsx:84"
-      ]
-    },
-    {
-      "name": "listsFileContent",
-      "routerLine": 1574,
-      "wired": true,
-      "callsites": [
-        "client/src/pages/RulesetExplorer.tsx:272"
-      ]
-    },
-    {
-      "name": "groupFileContent",
-      "routerLine": 1581,
+      "routerLine": 727,
       "wired": true,
       "callsites": [
         "client/src/pages/GroupManagement.tsx:88"
       ]
     },
     {
-      "name": "clusterNodeStatus",
-      "routerLine": 1592,
+      "name": "agentGroupMembers",
+      "routerLine": 749,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:176"
+        "client/src/pages/GroupManagement.tsx:96"
+      ]
+    },
+    {
+      "name": "agentOs",
+      "routerLine": 775,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/AgentDetail.tsx:64",
+        "client/src/pages/AgentHealth.tsx:136"
+      ]
+    },
+    {
+      "name": "agentHardware",
+      "routerLine": 787,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/AgentDetail.tsx:65",
+        "client/src/pages/AgentHealth.tsx:137"
+      ]
+    },
+    {
+      "name": "agentPackages",
+      "routerLine": 799,
+      "wired": true,
+      "callsites": [
+        "client/src/components/DriftComparison.tsx:446",
+        "client/src/pages/AgentDetail.tsx:650",
+        "client/src/pages/ITHygiene.tsx:112"
+      ]
+    },
+    {
+      "name": "agentPorts",
+      "routerLine": 828,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/AgentDetail.tsx:651",
+        "client/src/pages/ITHygiene.tsx:116"
+      ]
+    },
+    {
+      "name": "agentProcesses",
+      "routerLine": 860,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/AgentDetail.tsx:652",
+        "client/src/pages/ITHygiene.tsx:120"
+      ]
+    },
+    {
+      "name": "agentNetaddr",
+      "routerLine": 898,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/AgentDetail.tsx:654",
+        "client/src/pages/ITHygiene.tsx:128"
+      ]
+    },
+    {
+      "name": "agentNetiface",
+      "routerLine": 923,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/AgentDetail.tsx:653",
+        "client/src/pages/ITHygiene.tsx:124"
+      ]
+    },
+    {
+      "name": "agentHotfixes",
+      "routerLine": 956,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ITHygiene.tsx:136"
+      ]
+    },
+    {
+      "name": "groupFiles",
+      "routerLine": 977,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/GroupManagement.tsx:104"
+      ]
+    },
+    {
+      "name": "agentBrowserExtensions",
+      "routerLine": 1004,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ITHygiene.tsx:142"
+      ]
+    },
+    {
+      "name": "agentServices",
+      "routerLine": 1027,
+      "wired": true,
+      "callsites": [
+        "client/src/components/DriftComparison.tsx:455",
+        "client/src/pages/ITHygiene.tsx:148"
+      ]
+    },
+    {
+      "name": "agentUsers",
+      "routerLine": 1054,
+      "wired": true,
+      "callsites": [
+        "client/src/components/DriftComparison.tsx:464",
+        "client/src/pages/ITHygiene.tsx:154"
+      ]
+    },
+    {
+      "name": "agentGroups2",
+      "routerLine": 1077,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ITHygiene.tsx:158"
+      ]
+    },
+    {
+      "name": "agentNetproto",
+      "routerLine": 1100,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ITHygiene.tsx:132"
+      ]
+    },
+    {
+      "name": "expSyscollectorPackages",
+      "routerLine": 1132,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/FleetInventory.tsx:226"
+      ]
+    },
+    {
+      "name": "expSyscollectorProcesses",
+      "routerLine": 1155,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/FleetInventory.tsx:227"
+      ]
+    },
+    {
+      "name": "expSyscollectorPorts",
+      "routerLine": 1187,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/FleetInventory.tsx:228"
+      ]
+    },
+    {
+      "name": "expSyscollectorNetaddr",
+      "routerLine": 1213,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/FleetInventory.tsx:232"
+      ]
+    },
+    {
+      "name": "expSyscollectorNetiface",
+      "routerLine": 1235,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/FleetInventory.tsx:233"
+      ]
+    },
+    {
+      "name": "expSyscollectorNetproto",
+      "routerLine": 1266,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/FleetInventory.tsx:234"
+      ]
+    },
+    {
+      "name": "expSyscollectorOs",
+      "routerLine": 1284,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/FleetInventory.tsx:229"
+      ]
+    },
+    {
+      "name": "expSyscollectorHardware",
+      "routerLine": 1302,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/FleetInventory.tsx:230"
+      ]
+    },
+    {
+      "name": "expSyscollectorHotfixes",
+      "routerLine": 1320,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/FleetInventory.tsx:231"
+      ]
+    },
+    {
+      "name": "expCiscatResults",
+      "routerLine": 1344,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/Compliance.tsx:190"
+      ]
+    },
+    {
+      "name": "rules",
+      "routerLine": 1382,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/Home.tsx:247",
+        "client/src/pages/MitreAttack.tsx:123",
+        "client/src/pages/RulesetExplorer.tsx:229",
+        "client/src/pages/SiemEvents.tsx:113",
+        "client/src/pages/ThreatHunting.tsx:249"
+      ]
+    },
+    {
+      "name": "ruleGroups",
+      "routerLine": 1417,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/RulesetExplorer.tsx:237"
+      ]
+    },
+    {
+      "name": "rulesByRequirement",
+      "routerLine": 1431,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/RulesetExplorer.tsx:270"
+      ]
+    },
+    {
+      "name": "rulesFiles",
+      "routerLine": 1447,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/RulesetExplorer.tsx:242"
+      ]
+    },
+    {
+      "name": "ruleFileContent",
+      "routerLine": 1468,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/RulesetExplorer.tsx:82"
+      ]
+    },
+    {
+      "name": "mitreTactics",
+      "routerLine": 1486,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/Home.tsx:249",
+        "client/src/pages/MitreAttack.tsx:120"
+      ]
+    },
+    {
+      "name": "mitreTechniques",
+      "routerLine": 1511,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/MitreAttack.tsx:121"
+      ]
+    },
+    {
+      "name": "mitreMitigations",
+      "routerLine": 1532,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/MitreAttack.tsx:133"
+      ]
+    },
+    {
+      "name": "mitreSoftware",
+      "routerLine": 1550,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/MitreAttack.tsx:129"
+      ]
+    },
+    {
+      "name": "mitreGroups",
+      "routerLine": 1568,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/MitreAttack.tsx:122"
+      ]
+    },
+    {
+      "name": "mitreMetadata",
+      "routerLine": 1586,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/MitreAttack.tsx:124"
+      ]
+    },
+    {
+      "name": "mitreReferences",
+      "routerLine": 1588,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/MitreAttack.tsx:137"
+      ]
+    },
+    {
+      "name": "scaPolicies",
+      "routerLine": 1621,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/AgentCompare.tsx:442",
+        "client/src/pages/AgentDetail.tsx:66",
+        "client/src/pages/Compliance.tsx:172"
+      ]
+    },
+    {
+      "name": "scaChecks",
+      "routerLine": 1654,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/Compliance.tsx:173"
+      ]
+    },
+    {
+      "name": "ciscatResults",
+      "routerLine": 1699,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/AgentDetail.tsx:1543"
+      ]
+    },
+    {
+      "name": "syscheckFiles",
+      "routerLine": 1740,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/AgentDetail.tsx:567",
+        "client/src/pages/AgentDetail.tsx:802",
+        "client/src/pages/FileIntegrity.tsx:74"
+      ]
+    },
+    {
+      "name": "syscheckLastScan",
+      "routerLine": 1775,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/AgentDetail.tsx:67",
+        "client/src/pages/AgentDetail.tsx:573",
+        "client/src/pages/FileIntegrity.tsx:78"
+      ]
+    },
+    {
+      "name": "rootcheckResults",
+      "routerLine": 1790,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/AgentDetail.tsx:1316"
+      ]
+    },
+    {
+      "name": "rootcheckLastScan",
+      "routerLine": 1816,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/AgentDetail.tsx:1311"
+      ]
+    },
+    {
+      "name": "decoders",
+      "routerLine": 1831,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/RulesetExplorer.tsx:233"
+      ]
+    },
+    {
+      "name": "decoderFiles",
+      "routerLine": 1855,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/RulesetExplorer.tsx:246"
+      ]
+    },
+    {
+      "name": "decoderParents",
+      "routerLine": 1876,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/RulesetExplorer.tsx:263"
+      ]
+    },
+    {
+      "name": "decoderFileContent",
+      "routerLine": 1893,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/RulesetExplorer.tsx:83"
+      ]
+    },
+    {
+      "name": "taskStatus",
+      "routerLine": 1913,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/Status.tsx:590"
+      ]
+    },
+    {
+      "name": "securityRoles",
+      "routerLine": 1946,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/SecurityExplorer.tsx:209"
+      ]
+    },
+    {
+      "name": "securityPolicies",
+      "routerLine": 1968,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/SecurityExplorer.tsx:227"
+      ]
+    },
+    {
+      "name": "securityUsers",
+      "routerLine": 1990,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/SecurityExplorer.tsx:218"
+      ]
+    },
+    {
+      "name": "securityUserById",
+      "routerLine": 2013,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/SecurityExplorer.tsx:240"
+      ]
+    },
+    {
+      "name": "securityRoleById",
+      "routerLine": 2021,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/SecurityExplorer.tsx:239"
+      ]
+    },
+    {
+      "name": "securityPolicyById",
+      "routerLine": 2029,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/SecurityExplorer.tsx:241"
+      ]
+    },
+    {
+      "name": "securityRuleById",
+      "routerLine": 2037,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/SecurityExplorer.tsx:242"
+      ]
+    },
+    {
+      "name": "securityConfig",
+      "routerLine": 2044,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/Status.tsx:551"
+      ]
+    },
+    {
+      "name": "securityCurrentUser",
+      "routerLine": 2057,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/SecurityExplorer.tsx:236"
+      ]
+    },
+    {
+      "name": "securityTokenInfo",
+      "routerLine": 2071,
+      "wired": false,
+      "callsites": []
+    },
+    {
+      "name": "securityRbacRules",
+      "routerLine": 2079,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/SecurityExplorer.tsx:200"
+      ]
+    },
+    {
+      "name": "securityActions",
+      "routerLine": 2102,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/SecurityExplorer.tsx:201"
+      ]
+    },
+    {
+      "name": "securityResources",
+      "routerLine": 2116,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/SecurityExplorer.tsx:207"
+      ]
+    },
+    {
+      "name": "securityCurrentUserPolicies",
+      "routerLine": 2131,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/SecurityExplorer.tsx:208"
+      ]
+    },
+    {
+      "name": "lists",
+      "routerLine": 2136,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/RulesetExplorer.tsx:250"
+      ]
+    },
+    {
+      "name": "listsFiles",
+      "routerLine": 2155,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/RulesetExplorer.tsx:254"
+      ]
+    },
+    {
+      "name": "groupConfiguration",
+      "routerLine": 2175,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/GroupManagement.tsx:100"
+      ]
+    },
+    {
+      "name": "listsFileContent",
+      "routerLine": 2192,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/RulesetExplorer.tsx:276"
+      ]
+    },
+    {
+      "name": "groupFileContent",
+      "routerLine": 2207,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/GroupManagement.tsx:108"
+      ]
+    },
+    {
+      "name": "clusterNodeStatus",
+      "routerLine": 2228,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ClusterHealth.tsx:221"
       ]
     },
     {
       "name": "clusterNodeConfiguration",
-      "routerLine": 1597,
+      "routerLine": 2233,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:180"
+        "client/src/pages/ClusterHealth.tsx:225"
       ]
     },
     {
       "name": "clusterNodeComponentConfig",
-      "routerLine": 1602,
+      "routerLine": 2250,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:222"
+        "client/src/pages/ClusterHealth.tsx:267"
       ]
     },
     {
       "name": "clusterNodeDaemonStats",
-      "routerLine": 1607,
+      "routerLine": 2255,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:184"
+        "client/src/pages/ClusterHealth.tsx:229"
       ]
     },
     {
       "name": "clusterNodeLogs",
-      "routerLine": 1612,
+      "routerLine": 2270,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:188"
+        "client/src/pages/ClusterHealth.tsx:233"
       ]
     },
     {
       "name": "clusterNodeLogsSummary",
-      "routerLine": 1636,
+      "routerLine": 2290,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:192"
+        "client/src/pages/ClusterHealth.tsx:237"
       ]
     },
     {
       "name": "clusterNodeStatsAnalysisd",
-      "routerLine": 1641,
+      "routerLine": 2295,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:196"
+        "client/src/pages/ClusterHealth.tsx:241"
       ]
     },
     {
       "name": "clusterNodeStatsRemoted",
-      "routerLine": 1646,
+      "routerLine": 2300,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:200"
+        "client/src/pages/ClusterHealth.tsx:245"
       ]
     },
     {
       "name": "clusterNodeStatsWeekly",
-      "routerLine": 1651,
+      "routerLine": 2305,
       "wired": true,
       "callsites": [
-        "client/src/pages/ClusterHealth.tsx:204"
+        "client/src/pages/ClusterHealth.tsx:249"
+      ]
+    },
+    {
+      "name": "brokerCoverage",
+      "routerLine": 2317,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/BrokerCoverage.tsx:304"
+      ]
+    },
+    {
+      "name": "brokerPlayground",
+      "routerLine": 2327,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/BrokerPlayground.tsx:398"
+      ]
+    },
+    {
+      "name": "brokerConfigList",
+      "routerLine": 2358,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/BrokerPlayground.tsx:397"
+      ]
+    },
+    {
+      "name": "cacheStats",
+      "routerLine": 2382,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ClusterHealth.tsx:644"
+      ]
+    },
+    {
+      "name": "cacheClear",
+      "routerLine": 2386,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ClusterHealth.tsx:645"
+      ]
+    },
+    {
+      "name": "cacheSetTtl",
+      "routerLine": 2393,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ClusterHealth.tsx:647"
+      ]
+    },
+    {
+      "name": "cacheSetEnabled",
+      "routerLine": 2401,
+      "wired": true,
+      "callsites": [
+        "client/src/pages/ClusterHealth.tsx:646"
       ]
     }
   ],

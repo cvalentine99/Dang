@@ -34,7 +34,7 @@ export default function NotFound() {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Button
             onClick={handleGoHome}
-            className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2.5 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+            className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
           >
             <Home className="w-4 h-4 mr-2" />
             Go Home

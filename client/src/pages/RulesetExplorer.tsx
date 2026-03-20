@@ -60,12 +60,12 @@ const SEVERITY_COLORS: Record<string, string> = {
 const LEVEL_TO_SEVERITY = threatLevelFromNumber;
 
 const CHART_COLORS = [
-  "oklch(0.72 0.19 295)",
-  "oklch(0.637 0.237 25.331)",
-  "oklch(0.705 0.191 22.216)",
-  "oklch(0.795 0.184 86.047)",
-  "oklch(0.765 0.177 163.223)",
-  "oklch(0.789 0.154 211.53)",
+  "oklch(0.795 0.184 85)",
+  "oklch(0.628 0.258 29.234)",
+  "oklch(0.705 0.213 47.604)",
+  "oklch(0.769 0.188 70.08)",
+  "oklch(0.723 0.219 149.579)",
+  "oklch(0.75 0.15 195)",
   "oklch(0.65 0.2 260)",
   "oklch(0.7 0.15 320)",
 ];
@@ -105,7 +105,7 @@ function ViewSourceButton({ type, filename }: { type: "rules" | "decoders"; file
     <div className="mt-3">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 transition-colors"
+        className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors"
       >
         <FileText className="h-3.5 w-3.5" />
         {open ? "Hide Source" : "View Source File"}
@@ -121,7 +121,7 @@ function ViewSourceButton({ type, filename }: { type: "rules" | "decoders"; file
                   navigator.clipboard.writeText(content ?? "");
                   toast.success("Source copied to clipboard");
                 }}
-                className="absolute top-2 right-2 p-1 rounded bg-white/5 hover:bg-white/10 text-slate-500 hover:text-violet-300 transition-colors z-10"
+                className="absolute top-2 right-2 p-1 rounded bg-white/5 hover:bg-white/10 text-slate-500 hover:text-amber-300 transition-colors z-10"
                 title="Copy source"
               >
                 <Copy className="h-3 w-3" />
@@ -459,7 +459,7 @@ export default function RulesetExplorer() {
           label="MITRE Mapped"
           value={mitreRuleCount}
           icon={Activity}
-          colorClass="text-violet-400"
+          colorClass="text-amber-400"
         />
         <StatCard
           label="Compliance Mapped"
@@ -473,7 +473,7 @@ export default function RulesetExplorer() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Rule Level Distribution */}
         <GlassPanel>
-          <h3 className="text-sm font-semibold text-violet-300 mb-3 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-amber-300 mb-3 flex items-center gap-2">
             <Shield className="h-4 w-4" /> Rule Severity Distribution
           </h3>
           <ResponsiveContainer width="100%" height={180}>
@@ -510,7 +510,7 @@ export default function RulesetExplorer() {
 
         {/* Top Rule Groups */}
         <GlassPanel>
-          <h3 className="text-sm font-semibold text-violet-300 mb-3 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-amber-300 mb-3 flex items-center gap-2">
             <Layers className="h-4 w-4" /> Top Rule Groups
           </h3>
           <ResponsiveContainer width="100%" height={200}>
@@ -530,14 +530,14 @@ export default function RulesetExplorer() {
                   color: "#e2e8f0",
                 }}
               />
-              <Bar dataKey="count" fill="oklch(0.72 0.19 295)" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="count" fill="oklch(0.795 0.184 85)" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </GlassPanel>
 
         {/* Decoder Files */}
         <GlassPanel>
-          <h3 className="text-sm font-semibold text-violet-300 mb-3 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-amber-300 mb-3 flex items-center gap-2">
             <Code className="h-4 w-4" /> Decoder Distribution
           </h3>
           <ResponsiveContainer width="100%" height={200}>
@@ -571,7 +571,7 @@ export default function RulesetExplorer() {
             onClick={() => setActiveTab("rules")}
             className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
               activeTab === "rules"
-                ? "bg-violet-500/20 text-violet-300 border-b-2 border-violet-400"
+                ? "bg-amber-500/20 text-amber-300 border-b-2 border-amber-400"
                 : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
             }`}
           >
@@ -582,7 +582,7 @@ export default function RulesetExplorer() {
             onClick={() => setActiveTab("decoders")}
             className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
               activeTab === "decoders"
-                ? "bg-violet-500/20 text-violet-300 border-b-2 border-violet-400"
+                ? "bg-amber-500/20 text-amber-300 border-b-2 border-amber-400"
                 : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
             }`}
           >
@@ -593,7 +593,7 @@ export default function RulesetExplorer() {
             onClick={() => setActiveTab("rulesFiles")}
             className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
               activeTab === "rulesFiles"
-                ? "bg-violet-500/20 text-violet-300 border-b-2 border-violet-400"
+                ? "bg-amber-500/20 text-amber-300 border-b-2 border-amber-400"
                 : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
             }`}
           >
@@ -604,7 +604,7 @@ export default function RulesetExplorer() {
             onClick={() => setActiveTab("decoderFiles")}
             className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
               activeTab === "decoderFiles"
-                ? "bg-violet-500/20 text-violet-300 border-b-2 border-violet-400"
+                ? "bg-amber-500/20 text-amber-300 border-b-2 border-amber-400"
                 : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
             }`}
           >
@@ -615,7 +615,7 @@ export default function RulesetExplorer() {
             onClick={() => setActiveTab("cdbLists")}
             className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
               activeTab === "cdbLists"
-                ? "bg-violet-500/20 text-violet-300 border-b-2 border-violet-400"
+                ? "bg-amber-500/20 text-amber-300 border-b-2 border-amber-400"
                 : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
             }`}
           >
@@ -626,7 +626,7 @@ export default function RulesetExplorer() {
             onClick={() => setActiveTab("decoderParents")}
             className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
               activeTab === "decoderParents"
-                ? "bg-violet-500/20 text-violet-300 border-b-2 border-violet-400"
+                ? "bg-amber-500/20 text-amber-300 border-b-2 border-amber-400"
                 : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
             }`}
           >
@@ -637,7 +637,7 @@ export default function RulesetExplorer() {
             onClick={() => setActiveTab("rulesByReq")}
             className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
               activeTab === "rulesByReq"
-                ? "bg-violet-500/20 text-violet-300 border-b-2 border-violet-400"
+                ? "bg-amber-500/20 text-amber-300 border-b-2 border-amber-400"
                 : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
             }`}
           >
@@ -659,7 +659,7 @@ export default function RulesetExplorer() {
               }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30"
+              className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30"
             />
           </div>
 
@@ -668,7 +668,7 @@ export default function RulesetExplorer() {
               <select
                 value={levelFilter}
                 onChange={(e) => setLevelFilter(e.target.value)}
-                className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-violet-500/50"
+                className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-amber-500/50"
               >
                 <option value="all">All Levels</option>
                 <option value="critical">Critical (14-16)</option>
@@ -681,7 +681,7 @@ export default function RulesetExplorer() {
               <select
                 value={groupFilter}
                 onChange={(e) => setGroupFilter(e.target.value)}
-                className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-violet-500/50 max-w-[200px]"
+                className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 max-w-[200px]"
               >
                 <option value="all">All Groups</option>
                 {ruleGroups.map((g) => (
@@ -694,7 +694,7 @@ export default function RulesetExplorer() {
               <select
                 value={filenameFilter}
                 onChange={(e) => setFilenameFilter(e.target.value)}
-                className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-violet-500/50 max-w-[180px]"
+                className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 max-w-[180px]"
               >
                 <option value="all">All Files</option>
                 {ruleFilenames.map((f) => (
@@ -705,7 +705,7 @@ export default function RulesetExplorer() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-violet-500/50"
+                className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-amber-500/50"
               >
                 <option value="all">All Status</option>
                 <option value="enabled">Enabled</option>
@@ -716,14 +716,14 @@ export default function RulesetExplorer() {
                 onClick={() => setShowComplianceFilters(!showComplianceFilters)}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-colors ${
                   showComplianceFilters || complianceFiltersActive > 0
-                    ? "bg-violet-500/20 border-violet-500/40 text-violet-300"
+                    ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
                     : "bg-white/5 border-white/10 text-slate-400 hover:text-slate-200 hover:border-white/20"
                 }`}
               >
                 <Scale className="h-3.5 w-3.5" />
                 Compliance
                 {complianceFiltersActive > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 bg-violet-500/30 rounded-full text-[10px] font-bold">
+                  <span className="ml-1 px-1.5 py-0.5 bg-amber-500/30 rounded-full text-[10px] font-bold">
                     {complianceFiltersActive}
                   </span>
                 )}
@@ -752,7 +752,7 @@ export default function RulesetExplorer() {
                   else { setSortField("level"); setSortDir("desc"); }
                 }}
                 className={`px-2 py-1 text-xs rounded transition-colors ${
-                  sortField === "level" ? "bg-violet-500/20 text-violet-300" : "text-slate-400 hover:text-slate-200"
+                  sortField === "level" ? "bg-amber-500/20 text-amber-300" : "text-slate-400 hover:text-slate-200"
                 }`}
               >
                 Level {sortField === "level" && (sortDir === "desc" ? "↓" : "↑")}
@@ -763,7 +763,7 @@ export default function RulesetExplorer() {
                   else { setSortField("id"); setSortDir("desc"); }
                 }}
                 className={`px-2 py-1 text-xs rounded transition-colors ${
-                  sortField === "id" ? "bg-violet-500/20 text-violet-300" : "text-slate-400 hover:text-slate-200"
+                  sortField === "id" ? "bg-amber-500/20 text-amber-300" : "text-slate-400 hover:text-slate-200"
                 }`}
               >
                 Rule ID {sortField === "id" && (sortDir === "desc" ? "↓" : "↑")}
@@ -776,7 +776,7 @@ export default function RulesetExplorer() {
         {activeTab === "rules" && showComplianceFilters && (
           <div className="mt-3 p-4 bg-white/[0.03] border border-white/10 rounded-lg space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-semibold text-violet-300 uppercase tracking-wider">Compliance Framework Filters</h4>
+              <h4 className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Compliance Framework Filters</h4>
               <span className="text-[10px] text-slate-500">Enter a requirement ID to filter (e.g., "10.6.1" for PCI DSS)</span>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
@@ -794,7 +794,7 @@ export default function RulesetExplorer() {
                 { label: "GPG13", value: gpg13Filter, setter: setGpg13Filter, placeholder: "e.g. 4.12",
                   labelClass: "text-orange-400", activeClass: "border-orange-500/40 focus:border-orange-500/60 ring-1 ring-orange-500/20" },
                 { label: "MITRE", value: mitreFilter, setter: setMitreFilter, placeholder: "e.g. T1110",
-                  labelClass: "text-purple-400", activeClass: "border-purple-500/40 focus:border-purple-500/60 ring-1 ring-purple-500/20" },
+                  labelClass: "text-amber-400", activeClass: "border-amber-500/40 focus:border-amber-500/60 ring-1 ring-amber-500/20" },
               ].map(({ label, value, setter, placeholder, labelClass, activeClass }) => (
                 <div key={label} className="space-y-1">
                   <label className={`text-[10px] font-semibold uppercase tracking-wider ${labelClass}`}>{label}</label>
@@ -804,7 +804,7 @@ export default function RulesetExplorer() {
                     onChange={(e) => setter(e.target.value)}
                     placeholder={placeholder}
                     className={`w-full px-2.5 py-1.5 bg-white/5 border rounded text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none transition-colors ${
-                      value ? activeClass : "border-white/10 focus:border-violet-500/50"
+                      value ? activeClass : "border-white/10 focus:border-amber-500/50"
                     }`}
                   />
                 </div>
@@ -816,7 +816,7 @@ export default function RulesetExplorer() {
         {/* Result count + loading indicator */}
         <div className="flex items-center gap-2 text-xs text-slate-500">
           {rulesQ.isFetching && (
-            <div className="h-3 w-3 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+            <div className="h-3 w-3 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
           )}
           {activeTab === "rules"
             ? `${filteredRules.length} rules found${complianceFiltersActive > 0 ? " (compliance-filtered)" : ""}`
@@ -849,7 +849,7 @@ export default function RulesetExplorer() {
                 <div key={rule.id}>
                   <div
                     className={`grid grid-cols-[60px_60px_1fr_150px_120px_100px_60px] gap-3 px-4 py-3 cursor-pointer transition-colors ${
-                      isExpanded ? "bg-violet-500/10" : "hover:bg-white/5"
+                      isExpanded ? "bg-amber-500/10" : "hover:bg-white/5"
                     }`}
                     onClick={() => setExpandedRule(isExpanded ? null : rule.id)}
                   >
@@ -868,7 +868,7 @@ export default function RulesetExplorer() {
                     </div>
 
                     {/* ID */}
-                    <div className="flex items-center text-xs font-mono text-violet-300">
+                    <div className="flex items-center text-xs font-mono text-amber-300">
                       {rule.id}
                     </div>
 
@@ -876,7 +876,7 @@ export default function RulesetExplorer() {
                     <div className="flex items-center min-w-0">
                       <div className="flex items-center gap-1.5 flex-shrink-0 mr-2">
                         {isExpanded ? (
-                          <ChevronDown className="h-3.5 w-3.5 text-violet-400" />
+                          <ChevronDown className="h-3.5 w-3.5 text-amber-400" />
                         ) : (
                           <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
                         )}
@@ -906,7 +906,7 @@ export default function RulesetExplorer() {
                         rule.mitre.id.slice(0, 2).map((id) => (
                           <span
                             key={id}
-                            className="px-1.5 py-0.5 bg-violet-500/20 text-violet-300 rounded text-[10px] font-mono"
+                            className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded text-[10px] font-mono"
                           >
                             {id}
                           </span>
@@ -928,7 +928,7 @@ export default function RulesetExplorer() {
                           e.stopPropagation();
                           setShowRawJson(showRawJson === rule.id ? null : rule.id);
                         }}
-                        className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-violet-300 transition-colors"
+                        className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-amber-300 transition-colors"
                         title="View raw JSON"
                       >
                         <FileText className="h-3.5 w-3.5" />
@@ -939,7 +939,7 @@ export default function RulesetExplorer() {
                           navigator.clipboard.writeText(JSON.stringify(rule, null, 2));
                           toast.success("Rule JSON copied");
                         }}
-                        className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-violet-300 transition-colors"
+                        className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-amber-300 transition-colors"
                         title="Copy JSON"
                       >
                         <Copy className="h-3.5 w-3.5" />
@@ -949,11 +949,11 @@ export default function RulesetExplorer() {
 
                   {/* Expanded Rule Detail */}
                   {isExpanded && (
-                    <div className="px-4 py-4 bg-violet-500/5 border-t border-violet-500/20 space-y-4">
+                    <div className="px-4 py-4 bg-amber-500/5 border-t border-amber-500/20 space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Rule Details */}
                         <div className="space-y-2">
-                          <h4 className="text-xs font-semibold text-violet-300">Rule Definition</h4>
+                          <h4 className="text-xs font-semibold text-amber-300">Rule Definition</h4>
                           <div className="space-y-1 text-xs">
                             <div className="flex justify-between">
                               <span className="text-slate-500">Rule ID</span>
@@ -980,7 +980,7 @@ export default function RulesetExplorer() {
 
                         {/* Match Logic */}
                         <div className="space-y-2">
-                          <h4 className="text-xs font-semibold text-violet-300">Match Logic</h4>
+                          <h4 className="text-xs font-semibold text-amber-300">Match Logic</h4>
                           <div className="space-y-1.5 text-xs">
                             {Object.entries(rule.details || {}).map(([key, val]) => (
                               <div key={key} className="flex justify-between gap-2">
@@ -1007,7 +1007,7 @@ export default function RulesetExplorer() {
 
                         {/* Compliance & MITRE */}
                         <div className="space-y-2">
-                          <h4 className="text-xs font-semibold text-violet-300">Compliance & MITRE</h4>
+                          <h4 className="text-xs font-semibold text-amber-300">Compliance & MITRE</h4>
                           <div className="space-y-1 text-xs">
                             {rule.mitre.id.length > 0 && (
                               <div>
@@ -1019,7 +1019,7 @@ export default function RulesetExplorer() {
                                       href={`https://attack.mitre.org/techniques/${id.replace(".", "/")}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-violet-500/20 text-violet-300 rounded text-[10px] font-mono hover:bg-violet-500/30 transition-colors"
+                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded text-[10px] font-mono hover:bg-amber-500/30 transition-colors"
                                     >
                                       {id} <ExternalLink className="h-2.5 w-2.5" />
                                     </a>
@@ -1034,7 +1034,7 @@ export default function RulesetExplorer() {
                                 </div>
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {rule.mitre.technique.map((t) => (
-                                    <span key={t} className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded text-[10px]">
+                                    <span key={t} className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded text-[10px]">
                                       {t}
                                     </span>
                                   ))}
@@ -1083,7 +1083,7 @@ export default function RulesetExplorer() {
                   {/* Raw JSON Panel */}
                   {showRawJson === rule.id && (                    <div className="px-4 py-3 bg-black/20 border-t border-white/5">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-xs font-semibold text-violet-300">Raw Rule JSON</h4>
+                        <h4 className="text-xs font-semibold text-amber-300">Raw Rule JSON</h4>
                         <button onClick={() => setShowRawJson(null)} className="text-slate-500 hover:text-slate-300">
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -1132,7 +1132,7 @@ export default function RulesetExplorer() {
                 <div key={`${decoder.name}-${decoder.position}`}>
                   <div
                     className={`grid grid-cols-[180px_80px_1fr_200px_120px_60px] gap-3 px-4 py-3 cursor-pointer transition-colors ${
-                      isExpanded ? "bg-violet-500/10" : "hover:bg-white/5"
+                      isExpanded ? "bg-amber-500/10" : "hover:bg-white/5"
                     }`}
                     onClick={() => setExpandedDecoder(isExpanded ? null : decoder.name)}
                   >
@@ -1140,12 +1140,12 @@ export default function RulesetExplorer() {
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {isExpanded ? (
-                          <ChevronDown className="h-3.5 w-3.5 text-violet-400" />
+                          <ChevronDown className="h-3.5 w-3.5 text-amber-400" />
                         ) : (
                           <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
                         )}
                       </div>
-                      <span className="font-mono text-sm text-violet-300 truncate">{decoder.name}</span>
+                      <span className="font-mono text-sm text-amber-300 truncate">{decoder.name}</span>
                     </div>
 
                     {/* Position */}
@@ -1184,7 +1184,7 @@ export default function RulesetExplorer() {
                           navigator.clipboard.writeText(JSON.stringify(decoder, null, 2));
                           toast.success("Decoder JSON copied");
                         }}
-                        className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-violet-300 transition-colors"
+                        className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-amber-300 transition-colors"
                         title="Copy JSON"
                       >
                         <Copy className="h-3.5 w-3.5" />
@@ -1194,15 +1194,15 @@ export default function RulesetExplorer() {
 
                   {/* Expanded Decoder Detail */}
                   {isExpanded && (
-                    <div className="px-4 py-4 bg-violet-500/5 border-t border-violet-500/20 space-y-4">
+                    <div className="px-4 py-4 bg-amber-500/5 border-t border-amber-500/20 space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Decoder Info */}
                         <div className="space-y-2">
-                          <h4 className="text-xs font-semibold text-violet-300">Decoder Definition</h4>
+                          <h4 className="text-xs font-semibold text-amber-300">Decoder Definition</h4>
                           <div className="space-y-1.5 text-xs">
                             <div className="flex justify-between">
                               <span className="text-slate-500">Name</span>
-                              <span className="font-mono text-violet-300">{decoder.name}</span>
+                              <span className="font-mono text-amber-300">{decoder.name}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-slate-500">Position</span>
@@ -1227,7 +1227,7 @@ export default function RulesetExplorer() {
 
                         {/* Extraction Logic */}
                         <div className="space-y-2">
-                          <h4 className="text-xs font-semibold text-violet-300">Extraction Logic</h4>
+                          <h4 className="text-xs font-semibold text-amber-300">Extraction Logic</h4>
                           <div className="space-y-1.5 text-xs">
                             {Object.entries(decoder.details || {}).map(([key, val]) => (
                               <div key={key}>
@@ -1244,13 +1244,13 @@ export default function RulesetExplorer() {
                       {/* Parent decoder chain */}
                       {decoder.details?.parent && (
                         <div>
-                          <h4 className="text-xs font-semibold text-violet-300 mb-2">Decoder Chain</h4>
+                          <h4 className="text-xs font-semibold text-amber-300 mb-2">Decoder Chain</h4>
                           <div className="flex items-center gap-2 text-xs">
                             <span className="px-2 py-1 bg-indigo-500/20 text-indigo-300 rounded font-mono">
                               {typeof decoder.details.parent === "object" && decoder.details.parent !== null ? JSON.stringify(decoder.details.parent) : String(decoder.details.parent)}
                             </span>
                             <span className="text-slate-500">→</span>
-                            <span className="px-2 py-1 bg-violet-500/20 text-violet-300 rounded font-mono">
+                            <span className="px-2 py-1 bg-amber-500/20 text-amber-300 rounded font-mono">
                               {decoder.name}
                             </span>
                           </div>
@@ -1262,7 +1262,7 @@ export default function RulesetExplorer() {
 
                       {/* Raw JSON */}
                       <div>
-                        <h4 className="text-xs font-semibold text-violet-300 mb-2">Raw Decoder JSON</h4>
+                        <h4 className="text-xs font-semibold text-amber-300 mb-2">Raw Decoder JSON</h4>
                         <RawJsonViewer data={decoder as unknown as Record<string, unknown>} />
                       </div>
                     </div>
@@ -1286,7 +1286,7 @@ export default function RulesetExplorer() {
       {activeTab === "rulesFiles" && (
         <GlassPanel>
           <BrokerWarnings data={rulesFilesQ.data} context="rulesFiles" />
-          <h3 className="text-sm font-semibold text-violet-300 mb-3">Rule Files</h3>
+          <h3 className="text-sm font-semibold text-amber-300 mb-3">Rule Files</h3>
           {rulesFilesQ.isLoading ? (
             <TableSkeleton columns={3} rows={10} />
           ) : (() => {
@@ -1310,7 +1310,7 @@ export default function RulesetExplorer() {
                     <tbody>
                       {items.map((f, i) => (
                         <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-                          <td className="py-2 px-3 font-mono text-xs text-violet-300">{String(f.filename ?? "")}</td>
+                          <td className="py-2 px-3 font-mono text-xs text-amber-300">{String(f.filename ?? "")}</td>
                           <td className="py-2 px-3 font-mono text-xs text-slate-400">{String(f.relative_dirname ?? "")}</td>
                           <td className="py-2 px-3">
                             <ViewSourceButton type="rules" filename={String(f.filename ?? "")} />
@@ -1331,7 +1331,7 @@ export default function RulesetExplorer() {
       {activeTab === "decoderFiles" && (
         <GlassPanel>
           <BrokerWarnings data={decoderFilesQ.data} context="decoderFiles" />
-          <h3 className="text-sm font-semibold text-violet-300 mb-3">Decoder Files</h3>
+          <h3 className="text-sm font-semibold text-amber-300 mb-3">Decoder Files</h3>
           {decoderFilesQ.isLoading ? (
             <TableSkeleton columns={3} rows={10} />
           ) : (() => {
@@ -1355,7 +1355,7 @@ export default function RulesetExplorer() {
                     <tbody>
                       {items.map((f, i) => (
                         <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-                          <td className="py-2 px-3 font-mono text-xs text-violet-300">{String(f.filename ?? "")}</td>
+                          <td className="py-2 px-3 font-mono text-xs text-amber-300">{String(f.filename ?? "")}</td>
                           <td className="py-2 px-3 font-mono text-xs text-slate-400">{String(f.relative_dirname ?? "")}</td>
                           <td className="py-2 px-3">
                             <ViewSourceButton type="decoders" filename={String(f.filename ?? "")} />
@@ -1377,7 +1377,7 @@ export default function RulesetExplorer() {
         <>
           <GlassPanel>
             <BrokerWarnings data={listsQ.data} context="lists" />
-            <h3 className="text-sm font-semibold text-violet-300 mb-3">CDB Lists</h3>
+            <h3 className="text-sm font-semibold text-amber-300 mb-3">CDB Lists</h3>
             {listsQ.isLoading ? (
               <TableSkeleton columns={3} rows={8} />
             ) : (() => {
@@ -1400,7 +1400,7 @@ export default function RulesetExplorer() {
                       <tbody>
                         {items.map((l, i) => (
                           <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-                            <td className="py-2 px-3 font-mono text-xs text-violet-300">{String(l.relative_dirname ?? "")}/{String(l.filename ?? "")}</td>
+                            <td className="py-2 px-3 font-mono text-xs text-amber-300">{String(l.relative_dirname ?? "")}/{String(l.filename ?? "")}</td>
                             <td className="py-2 px-3 font-mono text-xs text-slate-400">{String((l.items as any[])?.length ?? 0)}</td>
                           </tr>
                         ))}
@@ -1415,7 +1415,7 @@ export default function RulesetExplorer() {
 
           <GlassPanel>
             <BrokerWarnings data={listsFilesQ.data} context="listsFiles" />
-            <h3 className="text-sm font-semibold text-violet-300 mb-3">CDB List Files</h3>
+            <h3 className="text-sm font-semibold text-amber-300 mb-3">CDB List Files</h3>
             {listsFilesQ.isLoading ? (
               <TableSkeleton columns={3} rows={8} />
             ) : (() => {
@@ -1439,12 +1439,12 @@ export default function RulesetExplorer() {
                       <tbody>
                         {items.map((f, i) => (
                           <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-                            <td className="py-2 px-3 font-mono text-xs text-violet-300">{String(f.filename ?? "")}</td>
+                            <td className="py-2 px-3 font-mono text-xs text-amber-300">{String(f.filename ?? "")}</td>
                             <td className="py-2 px-3 font-mono text-xs text-slate-400">{String(f.relative_dirname ?? "")}</td>
                             <td className="py-2 px-3">
                               <button
                                 onClick={() => setCdbFileToView(String(f.filename ?? ""))}
-                                className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1"
+                                className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1"
                               >
                                 <Eye className="h-3 w-3" /> View Content
                               </button>
@@ -1465,7 +1465,7 @@ export default function RulesetExplorer() {
             <GlassPanel>
               <BrokerWarnings data={cdbFileContentQ.data} context="listsFileContent" />
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-violet-300">
+                <h3 className="text-sm font-semibold text-amber-300">
                   <span className="font-mono">{cdbFileToView}</span> — Content
                 </h3>
                 <button
@@ -1495,7 +1495,7 @@ export default function RulesetExplorer() {
         <GlassPanel>
           <BrokerWarnings data={decoderParentsQ.data} context="decoderParents" />
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-violet-300 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
               <Layers className="h-4 w-4" /> Decoder Parents
               <span className="text-[10px] font-mono text-slate-500">(GET /decoders/parents)</span>
             </h3>
@@ -1526,7 +1526,7 @@ export default function RulesetExplorer() {
                 placeholder="Search parent decoders..."
                 value={decoderParentsSearch}
                 onChange={(e) => { setDecoderParentsSearch(e.target.value); setDecoderParentsPage(0); }}
-                className="h-8 pl-8 pr-3 w-full rounded-lg bg-white/5 border border-white/10 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                className="h-8 pl-8 pr-3 w-full rounded-lg bg-white/5 border border-white/10 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
               />
             </div>
           </div>
@@ -1558,7 +1558,7 @@ export default function RulesetExplorer() {
                     <tbody>
                       {dpItems.map((d, i) => (
                         <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-                          <td className="py-2 px-3 font-mono text-xs text-violet-300">{String(d.name ?? "\u2014")}</td>
+                          <td className="py-2 px-3 font-mono text-xs text-amber-300">{String(d.name ?? "\u2014")}</td>
                           <td className="py-2 px-3 font-mono text-xs text-slate-400">{String(d.filename ?? d.file ?? "\u2014")}</td>
                           <td className="py-2 px-3 text-xs text-slate-400">{String(d.position ?? "\u2014")}</td>
                           <td className="py-2 px-3 text-xs text-slate-400">{String(d.status ?? "\u2014")}</td>
@@ -1585,7 +1585,7 @@ export default function RulesetExplorer() {
         <GlassPanel>
           <BrokerWarnings data={rulesByReqQ.data} context="rulesByRequirement" />
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-violet-300 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
               <Scale className="h-4 w-4" /> Rules by Requirement
               <span className="text-[10px] font-mono text-slate-500">(GET /rules/requirement/{'{requirement}'})</span>
             </h3>
@@ -1616,7 +1616,7 @@ export default function RulesetExplorer() {
               value={requirementInput}
               onChange={(e) => setRequirementInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && requirementInput.trim()) setActiveRequirement(requirementInput.trim()); }}
-              className="h-8 px-3 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 w-64"
+              className="h-8 px-3 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500/50 w-64"
             />
             <Button
               variant="outline"
@@ -1657,7 +1657,7 @@ export default function RulesetExplorer() {
                   <tbody>
                     {reqItems.map((r, i) => (
                       <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-                        <td className="py-2 px-3 font-mono text-xs text-violet-300">{String(r.id ?? "\u2014")}</td>
+                        <td className="py-2 px-3 font-mono text-xs text-amber-300">{String(r.id ?? "\u2014")}</td>
                         <td className="py-2 px-3 text-xs">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
                             Number(r.level ?? 0) >= 12 ? "bg-red-500/15 text-red-400 border border-red-500/20"

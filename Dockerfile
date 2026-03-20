@@ -63,19 +63,20 @@ COPY --from=builder /app/dist ./dist
 COPY drizzle/ ./drizzle/
 COPY drizzle.config.ts ./
 
-# Copy broker coverage audit artifacts (read by generateCoverageReport at runtime)
-COPY docs/wiring-ledger.json docs/ui-param-parity.json ./docs/
-
 # Copy pre-migration repair script, journal backfill, and KG seeder
 COPY scripts/docker-pre-migrate.mjs scripts/backfill-migrations.mjs ./scripts/
 COPY seed-kg.mjs ./
 COPY spec-v4.14.3.yaml ./
+COPY spec/ ./spec/
 
 # Copy shared KG ETL source modules (seed-kg.mjs imports these via tsx)
 COPY server/graph/kgExtractor.ts ./server/graph/
 COPY server/graph/kgLoader.ts ./server/graph/
 COPY server/graph/kgTypes.ts ./server/graph/
 COPY server/graph/kgMetadata.ts ./server/graph/
+
+# Copy broker-coverage artifact JSONs (wiring ledger + UI param parity)
+COPY docs/wiring-ledger.json docs/ui-param-parity.json ./docs/
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh ./
@@ -89,7 +90,7 @@ USER dang
 # Default environment
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV SKIP_TLS_VERIFY=true
+ENV SKIP_TLS_VERIFY=false
 
 EXPOSE 3000
 

@@ -61,7 +61,7 @@ export function EndpointTableView(): React.JSX.Element {
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return <ArrowUpDown className="w-3 h-3 text-muted-foreground/40" />;
-    return sortDir === "asc" ? <ChevronUp className="w-3 h-3 text-purple-400" /> : <ChevronDown className="w-3 h-3 text-purple-400" />;
+    return sortDir === "asc" ? <ChevronUp className="w-3 h-3 text-amber-400" /> : <ChevronDown className="w-3 h-3 text-amber-400" />;
   };
 
   const resources: string[] = useMemo(() => {
@@ -84,7 +84,7 @@ export function EndpointTableView(): React.JSX.Element {
         <select
           value={methodFilter}
           onChange={e => { setMethodFilter(e.target.value); setPage(0); }}
-          className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-foreground outline-none focus:border-purple-500/30"
+          className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-foreground outline-none focus:border-amber-500/30"
         >
           <option value="">All Methods</option>
           {["GET", "POST", "PUT", "DELETE"].map(m => <option key={m} value={m}>{m}</option>)}
@@ -93,7 +93,7 @@ export function EndpointTableView(): React.JSX.Element {
         <select
           value={riskFilter}
           onChange={e => { setRiskFilter(e.target.value); setPage(0); }}
-          className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-foreground outline-none focus:border-purple-500/30"
+          className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-foreground outline-none focus:border-amber-500/30"
         >
           <option value="">All Risk</option>
           <option value="SAFE">SAFE</option>
@@ -104,7 +104,7 @@ export function EndpointTableView(): React.JSX.Element {
         <select
           value={resourceFilter}
           onChange={e => { setResourceFilter(e.target.value); setPage(0); }}
-          className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-foreground outline-none focus:border-purple-500/30 max-w-[200px]"
+          className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-foreground outline-none focus:border-amber-500/30 max-w-[200px]"
         >
           <option value="">All Resources</option>
           {resources.map(r => <option key={r} value={r}>{r}</option>)}

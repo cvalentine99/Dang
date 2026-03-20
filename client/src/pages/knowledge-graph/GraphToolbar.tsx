@@ -55,8 +55,8 @@ export function GraphToolbar({
     <div className="flex-shrink-0 px-6 py-4 border-b border-white/5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center">
-            <Network className="w-5 h-5 text-purple-400" />
+          <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+            <Network className="w-5 h-5 text-amber-400" />
           </div>
           <div>
             <h1 className="text-lg font-display font-bold text-foreground">Knowledge Graph</h1>
@@ -75,7 +75,7 @@ export function GraphToolbar({
               onClick={() => setViewMode("graph")}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
                 viewMode === "graph"
-                  ? "bg-purple-500/15 text-purple-300 border-r border-white/10"
+                  ? "bg-amber-500/15 text-amber-300 border-r border-white/10"
                   : "text-muted-foreground hover:bg-white/5 border-r border-white/10"
               }`}
             >
@@ -86,7 +86,7 @@ export function GraphToolbar({
               onClick={() => setViewMode("table")}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
                 viewMode === "table"
-                  ? "bg-purple-500/15 text-purple-300"
+                  ? "bg-amber-500/15 text-amber-300"
                   : "text-muted-foreground hover:bg-white/5"
               }`}
             >
@@ -101,7 +101,7 @@ export function GraphToolbar({
               <select
                 value={layerFilter}
                 onChange={e => setLayerFilter(e.target.value)}
-                className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-foreground outline-none focus:border-purple-500/30"
+                className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-foreground outline-none focus:border-amber-500/30"
               >
                 <option value="all">All Layers</option>
                 <option value="api_ontology">API Ontology</option>
@@ -114,7 +114,7 @@ export function GraphToolbar({
               <select
                 value={riskFilter ?? ""}
                 onChange={e => setRiskFilter(e.target.value || undefined)}
-                className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-foreground outline-none focus:border-purple-500/30"
+                className="text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-foreground outline-none focus:border-amber-500/30"
               >
                 <option value="">All Risk</option>
                 <option value="SAFE">SAFE</option>
@@ -129,7 +129,7 @@ export function GraphToolbar({
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="Search KG..."
-                  className="pl-8 pr-3 py-1.5 text-xs bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-purple-500/30 w-44"
+                  className="pl-8 pr-3 py-1.5 text-xs bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus:border-amber-500/30 w-44"
                 />
                 {searchResults && searchResults.length > 0 && searchQuery.length >= 2 && (
                   <div className="absolute top-full mt-1 left-0 w-72 glass-panel rounded-lg border border-white/10 shadow-2xl z-30 max-h-60 overflow-y-auto">

@@ -23,6 +23,7 @@ import {
   AlertTriangle, Clock, TrendingUp, BarChart3, Eye,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
+import { motion } from "framer-motion";
 import {
   PieChart, Pie, ResponsiveContainer, Tooltip as ReTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, AreaChart, Area,
@@ -30,13 +31,13 @@ import {
 } from "recharts";
 
 const COLORS = {
-  purple: "oklch(0.541 0.281 293.009)",
-  green: "oklch(0.765 0.177 163.223)",
-  red: "oklch(0.637 0.237 25.331)",
-  yellow: "oklch(0.795 0.184 86.047)",
-  cyan: "oklch(0.789 0.154 211.53)",
-  gray: "oklch(0.551 0.02 286)",
-  orange: "oklch(0.705 0.191 22.216)",
+  gold: "oklch(0.795 0.184 85)",
+  green: "oklch(0.723 0.219 149.579)",
+  red: "oklch(0.628 0.258 29.234)",
+  yellow: "oklch(0.769 0.188 70.08)",
+  cyan: "oklch(0.75 0.15 195)",
+  gray: "oklch(0.55 0.01 260)",
+  orange: "oklch(0.705 0.213 47.604)",
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -89,14 +90,14 @@ function ScoreGauge({ score, label, size = "md" }: { score: number; label: strin
       <div className="relative">
         <svg width={dim} height={dim} viewBox="0 0 100 100" className="drop-shadow-sm">
           {/* Background track */}
-          <circle cx="50" cy="50" r="40" fill="none" stroke="oklch(0.3 0.04 286 / 15%)" strokeWidth="7" />
+          <circle cx="50" cy="50" r="40" fill="none" stroke="oklch(0.3 0.01 260 / 15%)" strokeWidth="7" />
           {/* Glow ring */}
           <circle cx="50" cy="50" r="40" fill="none" stroke={glowColor} strokeWidth="12" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} transform="rotate(-90 50 50)" className="transition-all duration-1000 ease-out" style={{ filter: `blur(4px)` }} />
           {/* Main ring */}
           <circle cx="50" cy="50" r="40" fill="none" stroke={color} strokeWidth="7" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} transform="rotate(-90 50 50)" className="transition-all duration-1000 ease-out" />
           {/* Score text */}
-          <text x="50" y="44" textAnchor="middle" fill="oklch(0.93 0.005 286)" fontSize={18 * scale} fontWeight="bold" className="font-display">{score}%</text>
-          <text x="50" y="60" textAnchor="middle" fill="oklch(0.55 0.02 286)" fontSize={8 * scale} className="uppercase tracking-wider">Score</text>
+          <text x="50" y="44" textAnchor="middle" fill="oklch(0.95 0.005 85)" fontSize={18 * scale} fontWeight="bold" className="font-display">{score}%</text>
+          <text x="50" y="60" textAnchor="middle" fill="oklch(0.55 0.01 260)" fontSize={8 * scale} className="uppercase tracking-wider">Score</text>
         </svg>
       </div>
       <span className="text-xs font-medium text-muted-foreground mt-1.5 text-center max-w-[110px] truncate group-hover:text-foreground transition-colors">{label}</span>
@@ -121,7 +122,7 @@ function PostureMeter({ score }: { score: number }) {
     <div className="relative w-[140px] h-[80px]">
       <ResponsiveContainer width="100%" height="100%">
         <RadialBarChart cx="50%" cy="100%" innerRadius="60%" outerRadius="100%" startAngle={180} endAngle={0} data={data} barSize={10}>
-          <RadialBar background={{ fill: "oklch(0.3 0.04 286 / 15%)" }} dataKey="value" cornerRadius={5} />
+          <RadialBar background={{ fill: "oklch(0.3 0.01 260 / 15%)" }} dataKey="value" cornerRadius={5} />
         </RadialBarChart>
       </ResponsiveContainer>
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
@@ -290,16 +291,36 @@ export default function Compliance() {
           />
         )}
 
-        {/* ── KPI Row ── */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {isLoading ? <StatCardSkeleton count={5} /> : (<>
-          <StatCard label="Avg Score" value={`${avgScore}%`} icon={ShieldCheck} colorClass={avgScore >= 80 ? "text-threat-low" : avgScore >= 60 ? "text-threat-medium" : "text-threat-critical"} />
-          <StatCard label="Policies" value={totalPolicies} icon={Layers} colorClass="text-primary" />
-          <StatCard label="Passed" value={totalPass} icon={CheckCircle2} colorClass="text-threat-low" />
-          <StatCard label="Failed" value={totalFail} icon={XCircle} colorClass="text-threat-critical" />
-          <StatCard label="N/A" value={totalNA} icon={MinusCircle} colorClass="text-muted-foreground" />
-          </>)}
-        </div>
+        {/* ── KPI Row — stagger entrance ── */}
+        {isLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <StatCardSkeleton count={5} />
+          </div>
+        ) : (
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-5 gap-4"
+            initial="hidden" animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+          >
+            {[
+              { label: "Avg Score", value: `${avgScore}%`, icon: ShieldCheck, colorClass: avgScore >= 80 ? "text-threat-low" : avgScore >= 60 ? "text-threat-medium" : "text-threat-critical" },
+              { label: "Policies", value: totalPolicies, icon: Layers, colorClass: "text-primary" },
+              { label: "Passed", value: totalPass, icon: CheckCircle2, colorClass: "text-threat-low" },
+              { label: "Failed", value: totalFail, icon: XCircle, colorClass: "text-threat-critical" },
+              { label: "N/A", value: totalNA, icon: MinusCircle, colorClass: "text-muted-foreground" },
+            ].map((card) => (
+              <motion.div
+                key={card.label}
+                variants={{
+                  hidden: { opacity: 0, y: 20, scale: 0.95 },
+                  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+                }}
+              >
+                <StatCard label={card.label} value={card.value} icon={card.icon} colorClass={card.colorClass} />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="bg-secondary/30 border border-border/30">
@@ -323,9 +344,14 @@ export default function Compliance() {
                 <ChartSkeleton variant="bar" height={240} title="Score by Policy" className="lg:col-span-4" />
               </div>
             ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <motion.div
+              className="grid grid-cols-1 lg:grid-cols-12 gap-4"
+              initial="hidden" animate="visible"
+              variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}
+            >
               {/* Policy Scores — enhanced with posture meter */}
-              <GlassPanel className="lg:col-span-5">
+              <motion.div className="lg:col-span-5" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+              <GlassPanel>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Policy Scores</h3>
                   <PostureMeter score={avgScore} />
@@ -334,9 +360,11 @@ export default function Compliance() {
                   {policies.slice(0, 6).map((p, i) => <ScoreGauge key={i} score={Number(p.score ?? 0)} label={String(p.name ?? "").slice(0, 25)} />)}
                 </div>
               </GlassPanel>
+              </motion.div>
 
               {/* Check Results — enhanced donut */}
-              <GlassPanel className="lg:col-span-3">
+              <motion.div className="lg:col-span-3" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+              <GlassPanel>
                 <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Check Results</h3>
                 <div className="relative">
                   <ResponsiveContainer width="100%" height={200}>
@@ -363,27 +391,30 @@ export default function Compliance() {
                   ))}
                 </div>
               </GlassPanel>
+              </motion.div>
 
               {/* Score by Policy — enhanced bar chart */}
-              <GlassPanel className="lg:col-span-4">
+              <motion.div className="lg:col-span-4" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+              <GlassPanel>
                 <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" /> Score by Policy</h3>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={policyScoreData} layout="vertical">
                     <defs>
                       <linearGradient id="scoreBarGrad" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor={COLORS.purple} stopOpacity={0.6} />
-                        <stop offset="100%" stopColor={COLORS.purple} stopOpacity={1} />
+                        <stop offset="0%" stopColor={COLORS.gold} stopOpacity={0.6} />
+                        <stop offset="100%" stopColor={COLORS.gold} stopOpacity={1} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 15%)" horizontal={false} />
-                    <XAxis type="number" domain={[0, 100]} tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
-                    <YAxis type="category" dataKey="name" width={120} tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 15%)" horizontal={false} />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} />
+                    <YAxis type="category" dataKey="name" width={120} tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} />
                     <ReTooltip content={<ChartTooltip />} />
                     <Bar dataKey="score" fill="url(#scoreBarGrad)" name="Score %" radius={[0, 6, 6, 0]} animationDuration={800} />
                   </BarChart>
                 </ResponsiveContainer>
               </GlassPanel>
-            </div>
+              </motion.div>
+            </motion.div>
             )}
 
             {/* ── Regulatory Frameworks — enhanced cards ── */}
@@ -474,15 +505,15 @@ export default function Compliance() {
                   <AreaChart data={complianceData.timeline}>
                     <defs>
                       <linearGradient id="compAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={COLORS.purple} stopOpacity={0.4} />
-                        <stop offset="95%" stopColor={COLORS.purple} stopOpacity={0} />
+                        <stop offset="5%" stopColor={COLORS.gold} stopOpacity={0.4} />
+                        <stop offset="95%" stopColor={COLORS.gold} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.04 286 / 15%)" />
-                    <XAxis dataKey="time" tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 9 }} />
-                    <YAxis tick={{ fill: "oklch(0.65 0.02 286)", fontSize: 10 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.01 260 / 15%)" />
+                    <XAxis dataKey="time" tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 9 }} />
+                    <YAxis tick={{ fill: "oklch(0.6 0.01 260)", fontSize: 10 }} />
                     <ReTooltip content={<ChartTooltip />} />
-                    <Area type="monotone" dataKey="count" stroke={COLORS.purple} fill="url(#compAreaGrad)" name="Alerts" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: COLORS.purple, stroke: "oklch(0.15 0.02 286)", strokeWidth: 2 }} />
+                    <Area type="monotone" dataKey="count" stroke={COLORS.gold} fill="url(#compAreaGrad)" name="Alerts" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: COLORS.gold, stroke: "oklch(0.15 0.02 60)", strokeWidth: 2 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </GlassPanel>
@@ -561,7 +592,7 @@ export default function Compliance() {
                           <td className="py-2.5 px-3">
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-2 bg-secondary/30 rounded-full overflow-hidden">
-                                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${COLORS.purple}80, ${COLORS.purple})` }} />
+                                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${COLORS.gold}80, ${COLORS.gold})` }} />
                               </div>
                               <span className="text-[10px] text-muted-foreground w-12 text-right font-mono">{pct.toFixed(1)}%</span>
                             </div>

@@ -25,15 +25,15 @@ interface AgentSlot {
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
-  Critical: "oklch(0.637 0.237 25.331)",
+  Critical: "oklch(0.628 0.258 29.234)",
   High: "oklch(0.705 0.191 47)",
-  Medium: "oklch(0.795 0.184 86.047)",
-  Low: "oklch(0.765 0.177 163.223)",
+  Medium: "oklch(0.769 0.188 70.08)",
+  Low: "oklch(0.723 0.219 149.579)",
 };
 
 const AGENT_COLORS = [
-  "oklch(0.541 0.281 293.009)",
-  "oklch(0.789 0.154 211.53)",
+  "oklch(0.795 0.184 85)",
+  "oklch(0.75 0.15 195)",
   "oklch(0.705 0.191 47)",
 ];
 
@@ -96,13 +96,13 @@ function AgentSelector({
           <div className="relative">
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-muted-foreground border border-dashed border-white/10 hover:border-purple-500/30 hover:text-purple-300 transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs text-muted-foreground border border-dashed border-white/10 hover:border-amber-500/30 hover:text-amber-300 transition-colors"
             >
               <Plus className="w-3 h-3" /> Add Agent ({3 - selectedIds.length} remaining)
             </button>
 
             {showDropdown && (
-              <div className="absolute top-full left-0 mt-1 w-72 rounded-lg border border-white/10 bg-[oklch(0.16_0.02_286)] shadow-xl z-50">
+              <div className="absolute top-full left-0 mt-1 w-72 rounded-lg border border-white/10 bg-[oklch(0.15_0.005_260)] shadow-xl z-50">
                 <div className="p-2 border-b border-white/5">
                   <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-white/5">
                     <Search className="w-3.5 h-3.5 text-muted-foreground" />
@@ -259,7 +259,7 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
       <GlassPanel className="p-5">
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-xs font-display font-bold text-foreground flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-purple-400" /> Alerts
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Alerts
           </h4>
           <span className="text-lg font-mono font-bold" style={{ color }}>{alertLevels.total}</span>
         </div>
@@ -385,7 +385,7 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
             className="h-full rounded-full transition-all"
             style={{
               width: `${scaScore.score}%`,
-              background: scaScore.score >= 80 ? "oklch(0.765 0.177 163.223)" : scaScore.score >= 50 ? "oklch(0.795 0.184 86.047)" : "oklch(0.637 0.237 25.331)",
+              background: scaScore.score >= 80 ? "oklch(0.723 0.219 149.579)" : scaScore.score >= 50 ? "oklch(0.769 0.188 70.08)" : "oklch(0.628 0.258 29.234)",
             }}
           />
         </div>
@@ -406,12 +406,12 @@ function AgentColumn({ slot, index, allSlots }: { slot: AgentSlot; index: number
       {/* Radar Chart */}
       <GlassPanel className="p-5">
         <h4 className="text-xs font-display font-bold text-foreground mb-3 flex items-center gap-1.5">
-          <BarChart3 className="w-3.5 h-3.5 text-purple-400" /> Risk Profile
+          <BarChart3 className="w-3.5 h-3.5 text-amber-400" /> Risk Profile
         </h4>
         <ResponsiveContainer width="100%" height={200}>
           <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
-            <PolarGrid stroke="oklch(0.3 0.02 286 / 30%)" />
-            <PolarAngleAxis dataKey="metric" tick={{ fontSize: 9, fill: "oklch(0.7 0.01 286)" }} />
+            <PolarGrid stroke="oklch(0.3 0.01 260 / 30%)" />
+            <PolarAngleAxis dataKey="metric" tick={{ fontSize: 9, fill: "oklch(0.6 0.01 260)" }} />
             <PolarRadiusAxis tick={false} axisLine={false} />
             <Radar
               dataKey="value"
@@ -533,8 +533,8 @@ export default function AgentCompare() {
       <div className="flex-1 overflow-y-auto p-6">
         {selectedIds.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full">
-            <div className="w-16 h-16 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mb-4">
-              <BarChart3 className="w-8 h-8 text-purple-400/50" />
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
+              <BarChart3 className="w-8 h-8 text-amber-400/50" />
             </div>
             <h2 className="text-lg font-display font-bold text-foreground mb-2">Select Agents to Compare</h2>
             <p className="text-sm text-muted-foreground text-center max-w-md">

@@ -65,12 +65,12 @@ export function NotificationHistoryTab({
                       <tr
                         key={n.id}
                         className="border-t transition-colors hover:bg-white/3"
-                        style={{ borderColor: "oklch(0.25 0.02 286 / 30%)" }}
+                        style={{ borderColor: "oklch(0.25 0.02 60 / 30%)" }}
                       >
                         <td className="py-2.5 pr-3 font-mono" style={{ color: MUTED }}>
                           {formatDateTime(n.sentAtTs)}
                         </td>
-                        <td className="py-2.5 pr-3" style={{ color: "oklch(0.85 0.01 286)" }}>
+                        <td className="py-2.5 pr-3" style={{ color: "oklch(0.85 0.01 60)" }}>
                           {n.scheduleName || `Schedule #${n.scheduleId}`}
                         </td>
                         <td className="py-2.5 pr-3">
@@ -92,7 +92,7 @@ export function NotificationHistoryTab({
                             {n.deliveryStatus}
                           </span>
                         </td>
-                        <td className="py-2.5 pr-3 text-right font-mono" style={{ color: "oklch(0.85 0.01 286)" }}>
+                        <td className="py-2.5 pr-3 text-right font-mono" style={{ color: "oklch(0.85 0.01 60)" }}>
                           {n.driftPercent != null ? formatPct(n.driftPercent) : "—"}
                         </td>
                         <td className="py-2.5 pr-3 text-right font-mono" style={{ color: MUTED }}>

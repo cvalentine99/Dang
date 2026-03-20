@@ -19,10 +19,10 @@ export function SnapshotDetailPanel({
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
         className="relative w-full max-w-lg overflow-y-auto border-l shadow-2xl"
-        style={{ background: "oklch(0.14 0.025 286)", borderColor: BORDER }}
+        style={{ background: "oklch(0.14 0.025 60)", borderColor: BORDER }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b px-5 py-4" style={{ background: "oklch(0.14 0.025 286)", borderColor: BORDER }}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b px-5 py-4" style={{ background: "oklch(0.14 0.025 60)", borderColor: BORDER }}>
           <h3 className="font-display text-sm font-semibold">Drift Snapshot Detail</h3>
           <button onClick={onClose} className="rounded p-1 hover:bg-white/10" aria-label="Close snapshot detail panel">
             <X className="h-4 w-4" style={{ color: MUTED }} />
@@ -52,13 +52,13 @@ export function SnapshotDetailPanel({
                     </div>
                     <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER }}>
                       <div className="text-[10px] uppercase" style={{ color: MUTED }}>Changes</div>
-                      <div className="font-display text-2xl font-bold" style={{ color: "oklch(0.9 0.005 286)" }}>
+                      <div className="font-display text-2xl font-bold" style={{ color: "oklch(0.9 0.005 60)" }}>
                         {snap.driftCount}
                       </div>
                     </div>
                     <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER }}>
                       <div className="text-[10px] uppercase" style={{ color: MUTED }}>Total</div>
-                      <div className="font-display text-2xl font-bold" style={{ color: "oklch(0.9 0.005 286)" }}>
+                      <div className="font-display text-2xl font-bold" style={{ color: "oklch(0.9 0.005 60)" }}>
                         {snap.totalItems}
                       </div>
                     </div>
@@ -74,7 +74,7 @@ export function SnapshotDetailPanel({
                           const total = d.added + d.removed + d.changed;
                           return (
                             <div key={cat} className="flex items-center gap-3 text-xs">
-                              <span className="w-16 capitalize" style={{ color: "oklch(0.85 0.01 286)" }}>{cat}</span>
+                              <span className="w-16 capitalize" style={{ color: "oklch(0.85 0.01 60)" }}>{cat}</span>
                               <div className="flex gap-2 font-mono" style={{ color: MUTED }}>
                                 {d.added > 0 && <span style={{ color: GREEN }}>+{d.added}</span>}
                                 {d.changed > 0 && <span style={{ color: AMBER }}>~{d.changed}</span>}
@@ -99,7 +99,7 @@ export function SnapshotDetailPanel({
                           <div
                             key={i}
                             className="flex items-center gap-2 rounded border px-2 py-1.5 text-xs"
-                            style={{ borderColor: "oklch(0.25 0.02 286 / 30%)" }}
+                            style={{ borderColor: "oklch(0.25 0.02 60 / 30%)" }}
                           >
                             <span
                               className="shrink-0 rounded px-1 py-0.5 text-[10px] font-bold"
@@ -110,7 +110,7 @@ export function SnapshotDetailPanel({
                             >
                               {item.changeType === "added" ? "+" : item.changeType === "removed" ? "−" : "~"}
                             </span>
-                            <span className="font-mono truncate" style={{ color: "oklch(0.85 0.01 286)" }}>
+                            <span className="font-mono truncate" style={{ color: "oklch(0.85 0.01 60)" }}>
                               {item.name}
                             </span>
                             <span className="shrink-0 text-[10px]" style={{ color: MUTED }}>
@@ -128,7 +128,7 @@ export function SnapshotDetailPanel({
                   {/* Metadata */}
                   <div className="rounded-lg border p-3 text-xs" style={{ borderColor: BORDER }}>
                     <h4 className="font-semibold mb-1.5" style={{ color: MUTED }}>Metadata</h4>
-                    <div className="space-y-1 font-mono" style={{ color: "oklch(0.75 0.01 286)" }}>
+                    <div className="space-y-1 font-mono" style={{ color: "oklch(0.75 0.01 60)" }}>
                       <div>Snapshot ID: {snap.id}</div>
                       <div>Schedule ID: {snap.scheduleId}</div>
                       <div>Baseline ID: {snap.baselineId}</div>
@@ -147,7 +147,7 @@ export function SnapshotDetailPanel({
                     </summary>
                     <pre
                       className="mt-2 max-h-64 overflow-auto rounded-lg border p-3 font-mono text-[10px] leading-relaxed"
-                      style={{ background: "oklch(0.12 0.02 286)", borderColor: BORDER, color: "oklch(0.75 0.01 286)" }}
+                      style={{ background: "oklch(0.12 0.02 60)", borderColor: BORDER, color: "oklch(0.75 0.01 60)" }}
                     >
                       {JSON.stringify(snap, null, 2)}
                     </pre>

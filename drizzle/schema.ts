@@ -66,6 +66,8 @@ export const analystNotes = mysqlTable("analyst_notes", {
   tags: json("tags").$type<string[]>(),
   /** Whether the note has been resolved/closed */
   resolved: int("resolved").default(0).notNull(),
+  /** User who created this note — used for ownership enforcement */
+  createdBy: int("createdBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

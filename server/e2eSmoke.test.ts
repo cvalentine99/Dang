@@ -59,7 +59,7 @@ describe.skipIf(!HAS_DB)("alertQueue.list — shape verification", () => {
       expect(item).toHaveProperty("ruleLevel");
       expect(item).toHaveProperty("status");
       expect(item).toHaveProperty("queuedAt");
-      expect(["queued", "processing", "completed", "failed", "dismissed"]).toContain(item.status);
+      expect(["queued", "processing", "triaged", "completed", "failed", "dismissed"]).toContain(item.status);
       expect(typeof item.ruleLevel).toBe("number");
     }
   });

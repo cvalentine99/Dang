@@ -143,7 +143,7 @@ function ActionDetailCell({ value }: { value: unknown }) {
       {endpoints && endpoints.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {endpoints.map((ep, i) => (
-            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20 font-mono">
+            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono">
               {String(ep)}
             </span>
           ))}

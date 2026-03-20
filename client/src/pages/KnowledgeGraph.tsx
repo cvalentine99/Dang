@@ -889,7 +889,7 @@ export default function KnowledgeGraph(): React.JSX.Element {
           {isLoading ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+                <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
                 <p className="text-sm text-muted-foreground">Loading Knowledge Graph...</p>
               </div>
             </div>
@@ -948,7 +948,7 @@ export default function KnowledgeGraph(): React.JSX.Element {
           {/* Expansion hint */}
           {!selectedNode && !showRiskPaths && !multiSelectMode && filteredData.nodes.length > 0 && expandedNodes.size === 0 && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 glass-panel rounded-lg border border-white/10 px-3 py-1.5 z-10 flex items-center gap-2">
-              <MousePointerClick className="w-3.5 h-3.5 text-purple-400" />
+              <MousePointerClick className="w-3.5 h-3.5 text-amber-400" />
               <span className="text-[10px] text-muted-foreground">Double-click a resource or endpoint to expand its neighbors</span>
             </div>
           )}
@@ -1043,7 +1043,7 @@ export default function KnowledgeGraph(): React.JSX.Element {
                 <EyeOff className="w-3.5 h-3.5 text-orange-400" />
                 <span className="text-xs text-orange-300 font-mono">{hiddenNodes.size} hidden</span>
               </div>
-              <button onClick={handleShowAll} className="text-xs text-purple-300 hover:text-purple-200 transition-colors font-medium">
+              <button onClick={handleShowAll} className="text-xs text-amber-300 hover:text-amber-200 transition-colors font-medium">
                 Show All
               </button>
             </div>

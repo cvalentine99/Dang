@@ -27,6 +27,7 @@ import {
   Database, Globe, Package, Server, Loader2,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
+import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import {
   PieChart, Pie, ResponsiveContainer, Tooltip as ReTooltip,
@@ -36,12 +37,12 @@ import {
 
 // ── Theme tokens ─────────────────────────────────────────────────────────────
 const COLORS = {
-  purple: "oklch(0.541 0.281 293.009)",
-  cyan: "oklch(0.789 0.154 211.53)",
-  green: "oklch(0.765 0.177 163.223)",
-  yellow: "oklch(0.795 0.184 86.047)",
-  red: "oklch(0.637 0.237 25.331)",
-  orange: "oklch(0.705 0.191 22.216)",
+  gold: "oklch(0.795 0.184 85)",
+  cyan: "oklch(0.75 0.15 195)",
+  green: "oklch(0.723 0.219 149.579)",
+  yellow: "oklch(0.769 0.188 70.08)",
+  red: "oklch(0.628 0.258 29.234)",
+  orange: "oklch(0.705 0.213 47.604)",
 };
 const SEV_COLORS: Record<string, string> = {
   Critical: COLORS.red, High: COLORS.orange, Medium: COLORS.yellow, Low: COLORS.green, Untriaged: COLORS.cyan,
@@ -372,16 +373,36 @@ export default function Vulnerabilities() {
           />
         )}
 
-        {/* KPI Row */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {vulnSearchQ.isLoading ? <StatCardSkeleton count={5} /> : (<>
-          <StatCard label="Total CVEs" value={viewMode === "fleet" ? fleetTotal : agentTotal} icon={Bug} colorClass="text-primary" />
-          <StatCard label="Critical" value={criticalCount} icon={AlertTriangle} colorClass="text-threat-critical" />
-          <StatCard label="High" value={highCount} icon={Shield} colorClass="text-threat-high" />
-          <StatCard label="Medium" value={mediumCount} icon={TrendingDown} colorClass="text-threat-medium" />
-          <StatCard label="Avg CVSS" value={fleetAvgCvss} icon={Bug} colorClass="text-primary" />
-          </>)}
-        </div>
+        {/* KPI Row — stagger entrance */}
+        {vulnSearchQ.isLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <StatCardSkeleton count={5} />
+          </div>
+        ) : (
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-5 gap-4"
+            initial="hidden" animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+          >
+            {[
+              { label: "Total CVEs", value: viewMode === "fleet" ? fleetTotal : agentTotal, icon: Bug, colorClass: "text-primary" },
+              { label: "Critical", value: criticalCount, icon: AlertTriangle, colorClass: "text-threat-critical" },
+              { label: "High", value: highCount, icon: Shield, colorClass: "text-threat-high" },
+              { label: "Medium", value: mediumCount, icon: TrendingDown, colorClass: "text-threat-medium" },
+              { label: "Avg CVSS", value: fleetAvgCvss, icon: Bug, colorClass: "text-primary" },
+            ].map((card) => (
+              <motion.div
+                key={card.label}
+                variants={{
+                  hidden: { opacity: 0, y: 20, scale: 0.95 },
+                  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
+                }}
+              >
+                <StatCard label={card.label} value={card.value} icon={card.icon} colorClass={card.colorClass} />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
 
         {/* Fleet-Wide Dashboard (Indexer-powered) */}
         {viewMode === "fleet" && (
@@ -393,8 +414,13 @@ export default function Vulnerabilities() {
                 <ChartSkeleton variant="bar" height={220} title="Top CVEs Across Fleet" className="lg:col-span-8" />
               </div>
             ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <GlassPanel className="lg:col-span-4">
+            <motion.div
+              className="grid grid-cols-1 lg:grid-cols-12 gap-4"
+              initial="hidden" animate="visible"
+              variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.15 } } }}
+            >
+              <motion.div className="lg:col-span-4" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+              <GlassPanel>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Shield className="h-4 w-4 text-primary" /> Severity Distribution</h3>
                   <SourceBadge source={fleetSource} />
@@ -403,12 +429,14 @@ export default function Vulnerabilities() {
                   <PieChart>
                     <Pie data={fleetSevDist} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={3} dataKey="value" stroke="none" />
                     <ReTooltip content={<ChartTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.65 0.02 286)" }} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: "oklch(0.6 0.01 260)" }} />
                   </PieChart>
                 </ResponsiveContainer>
               </GlassPanel>
+              </motion.div>
 
-              <GlassPanel className="lg:col-span-8">
+              <motion.div className="lg:col-span-8" variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const } } }}>
+              <GlassPanel>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Bug className="h-4 w-4 text-primary" /> Top CVEs Across Fleet</h3>
                   <SourceBadge source={cveSource} />
@@ -440,7 +468,8 @@ export default function Vulnerabilities() {
                   </table>
                 </div>
               </GlassPanel>
-            </div>
+              </motion.div>
+            </motion.div>
             )}
 
             {/* Row 2: Top Vulnerable Agents + Top Packages Treemap */}
@@ -473,7 +502,7 @@ export default function Vulnerabilities() {
                           </div>
                         </div>
                         <div className="h-1.5 bg-secondary/30 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${COLORS.purple}, ${COLORS.orange})` }} />
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${COLORS.gold}, ${COLORS.orange})` }} />
                         </div>
                         {a.sevBreakdown.length > 0 && (
                           <div className="flex gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -499,15 +528,15 @@ export default function Vulnerabilities() {
                       data={treemapData}
                       dataKey="size"
                       nameKey="name"
-                      stroke="oklch(0.3 0.04 286 / 30%)"
-                      fill={COLORS.purple}
+                      stroke="oklch(0.3 0.01 260 / 30%)"
+                      fill={COLORS.gold}
                       content={(({ x, y, width, height, name, size }: { x: number; y: number; width: number; height: number; name?: string; size?: number }) => {
-                        if (width < 30 || height < 20) return <rect x={x} y={y} width={width} height={height} fill={COLORS.purple} stroke="oklch(0.3 0.04 286 / 30%)" />;
+                        if (width < 30 || height < 20) return <rect x={x} y={y} width={width} height={height} fill={COLORS.gold} stroke="oklch(0.3 0.01 260 / 30%)" />;
                         return (
                           <g>
-                            <rect x={x} y={y} width={width} height={height} fill={COLORS.purple} fillOpacity={0.6} stroke="oklch(0.3 0.04 286 / 30%)" rx={4} />
-                            <text x={x + width / 2} y={y + height / 2 - 6} textAnchor="middle" fill="oklch(0.9 0.02 286)" fontSize={width > 80 ? 10 : 8} fontFamily="Inter">{name}</text>
-                            <text x={x + width / 2} y={y + height / 2 + 8} textAnchor="middle" fill="oklch(0.65 0.02 286)" fontSize={8} fontFamily="JetBrains Mono">{size}</text>
+                            <rect x={x} y={y} width={width} height={height} fill={COLORS.gold} fillOpacity={0.6} stroke="oklch(0.3 0.01 260 / 30%)" rx={4} />
+                            <text x={x + width / 2} y={y + height / 2 - 6} textAnchor="middle" fill="oklch(0.9 0.02 60)" fontSize={width > 80 ? 10 : 8} fontFamily="Inter">{name}</text>
+                            <text x={x + width / 2} y={y + height / 2 + 8} textAnchor="middle" fill="oklch(0.6 0.01 260)" fontSize={8} fontFamily="JetBrains Mono">{size}</text>
                           </g>
                         );
                       }) as unknown as React.ReactElement}

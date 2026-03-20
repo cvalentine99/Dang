@@ -874,7 +874,7 @@ describe("BUG-06: resume validates referenced artifacts exist", () => {
         triageId, triageStatus: "completed",
         correlationId: corrId, correlationStatus: "completed",
         hypothesisStatus: "completed",
-        livingCaseId: 999999, // Non-existent
+        livingCaseId: null, // Non-existent (null to avoid FK violation)
         responseActionsStatus: "failed",
       });
 
@@ -882,7 +882,7 @@ describe("BUG-06: resume validates referenced artifacts exist", () => {
 
       await expect(
         executeResumePipeline({ runId, fromStage: "response_actions" }, { user: { id: 1 } }, "replay"),
-      ).rejects.toThrow(/no longer exists in living_case_state/i);
+      ).rejects.toThrow(/no living case ID from original run/i);
     },
   );
 

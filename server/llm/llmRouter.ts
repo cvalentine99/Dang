@@ -156,20 +156,18 @@ export const llmRouter = router({
 
       const now = new Date();
       let cutoff: Date;
-      let bucketFormat: string;
 
       if (input.range === "24h") {
         cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        bucketFormat = "%Y-%m-%d %H:00:00";
       } else if (input.range === "7d") {
         cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        bucketFormat = "%Y-%m-%d %H:00:00";
       } else {
         cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        bucketFormat = "%Y-%m-%d";
       }
 
-      const fmt = sql.raw(`'${bucketFormat}'`);
+      const FORMAT_24H = sql.raw("'%Y-%m-%d %H:00:00'");
+      const FORMAT_DAILY = sql.raw("'%Y-%m-%d'");
+      const fmt = input.range === "30d" ? FORMAT_DAILY : FORMAT_24H;
       const rows = await db
         .select({
           bucket: sql<string>`DATE_FORMAT(${llmUsage.createdAt}, ${fmt})`,

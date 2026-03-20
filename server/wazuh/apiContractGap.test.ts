@@ -25,6 +25,7 @@ import {
   SYSCOLLECTOR_NETIFACE_CONFIG,
   SYSCOLLECTOR_NETPROTO_CONFIG,
   ROOTCHECK_CONFIG,
+  SECURITY_RESOURCES_CONFIG,
   type EndpointParamConfig,
 } from "./paramBroker";
 
@@ -33,15 +34,19 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("C-1: /security/resources uses resource_list (not resource)", () => {
-  it("router should reference resource_list param name", async () => {
-    // Structural test: read the router source and verify the param name
+  it("router uses brokerParams(SECURITY_RESOURCES_CONFIG) for /security/resources", async () => {
+    // Structural test: read the router source and verify broker wiring
     const fs = await import("fs");
     const src = fs.readFileSync("server/wazuh/wazuhRouter.ts", "utf-8");
     // Find the securityResources endpoint
-    const match = src.match(/securityResources[\s\S]*?proxyGet\(["']\/security\/resources["'][\s\S]*?\)/);
+    const match = src.match(/securityResources[\s\S]*?brokerParams\(SECURITY_RESOURCES_CONFIG/);
     expect(match).toBeTruthy();
-    // Must contain resource_list, not just resource
-    expect(match![0]).toContain("resource_list");
+  });
+
+  it("SECURITY_RESOURCES_CONFIG forwards resource as resource_list to Wazuh", () => {
+    const result = brokerParams(SECURITY_RESOURCES_CONFIG, { resource: "agent:id" });
+    expect(result.unsupportedParams).toHaveLength(0);
+    expect(result.forwardedQuery).toHaveProperty("resource_list", "agent:id");
   });
 });
 

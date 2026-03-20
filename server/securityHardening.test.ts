@@ -125,10 +125,10 @@ describe("HybridRAG Router — Promoted endpoints require authentication", () =>
     mockDb.offset.mockResolvedValue([]);
   });
 
-  it("hybridrag router imports protectedProcedure only, not publicProcedure", async () => {
+  it("hybridrag router imports protectedProcedure (and optionally adminProcedure), not publicProcedure", async () => {
     const fs = await import("fs");
     const routerContent = fs.readFileSync("server/hybridrag/hybridragRouter.ts", "utf-8");
-    expect(routerContent).toContain('import { protectedProcedure, router }');
+    expect(routerContent).toMatch(/import\s*\{[^}]*protectedProcedure[^}]*\}\s*from/);
     expect(routerContent).not.toMatch(/publicProcedure/);
   });
 
