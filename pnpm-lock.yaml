@@ -248,8 +248,8 @@ importers:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@4.2.0)
       undici:
-        specifier: ^7.22.0
-        version: 7.22.0
+        specifier: ^7.24.0
+        version: 7.24.0
       vaul:
         specifier: ^1.1.2
         version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.1))(@types/react@19.2.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -4406,8 +4406,8 @@ packages:
   undici-types@7.14.0:
     resolution: {integrity: sha512-QQiYxHuyZ9gQUIrmPo3IA+hUl4KYk8uSA7cHrcKd/l3p1OTpZcM0Tbp9x7FAtXdAYhlasd60ncPpgu6ihG6TOA==}
 
-  undici@7.22.0:
-    resolution: {integrity: sha512-RqslV2Us5BrllB+JeiZnK4peryVTndy9Dnqq62S3yYRRTj0tFQCwEniUy2167skdGOy3vqRzEvl1Dm4sV2ReDg==}
+  undici@7.24.0:
+    resolution: {integrity: sha512-jxytwMHhsbdpBXxLAcuu0fzlQeXCNnWdDyRHpvWsUl8vd98UwYdl9YTyn8/HcpcJPC3pwUveefsa3zTxyD/ERg==}
     engines: {node: '>=20.18.1'}
 
   unified@11.0.5:
@@ -9341,7 +9341,7 @@ snapshots:
 
   undici-types@7.14.0: {}
 
-  undici@7.22.0: {}
+  undici@7.24.0: {}
 
   unified@11.0.5:
     dependencies:
