@@ -75,7 +75,7 @@
     "geoip-lite": "^1.4.10",
     "input-otp": "^1.4.2",
     "jose": "6.1.0",
-    "js-yaml": "^4.1.1",
+    "js-yaml": "^4.2.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.575.0",
     "mysql2": "^3.15.1",
