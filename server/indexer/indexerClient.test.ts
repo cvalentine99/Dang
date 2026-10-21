@@ -193,7 +193,7 @@ describe("indexerClient", () => {
     });
 
     it("has the expected vulnerability index pattern", () => {
-      expect(INDEX_PATTERNS.VULNERABILITIES).toBe("wazuh-states-vulnerabilities-*");
+      expect(INDEX_PATTERNS.VULNERABILITIES).toBe("wazuh-states-vulnerabilities*");
     });
 
     it("has the expected archives index pattern", () => {
@@ -208,8 +208,16 @@ describe("indexerClient", () => {
       expect(INDEX_PATTERNS.STATISTICS).toBe("wazuh-statistics-*");
     });
 
-    it("has exactly 5 index patterns", () => {
-      expect(Object.keys(INDEX_PATTERNS)).toHaveLength(5);
+    it("has the 5 event/vuln patterns plus 16 suffix-tolerant state patterns", () => {
+      const keys = Object.keys(INDEX_PATTERNS);
+      expect(keys).toHaveLength(21);
+      const states = keys.filter(k => k.startsWith("STATES_"));
+      expect(states).toHaveLength(16);
+      for (const k of states) {
+        const v = (INDEX_PATTERNS as Record<string, string>)[k];
+        expect(v).toMatch(/^wazuh-states-[a-z-]+\*$/);
+        expect(v.endsWith("-*")).toBe(false);
+      }
     });
   });
 

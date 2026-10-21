@@ -536,6 +536,7 @@ describe("brokerCoverage — registry ↔ router structural parity", () => {
     "brokerCoverage",   // Returns broker coverage analysis report
     "brokerPlayground", // Dev tool for testing broker param configs
     "brokerConfigList", // Returns list of broker configs for UI
+    "statesSource",     // Wazuh 5.0 de-risk diagnostics (states source + index probe)
 
     // ── Cache management procedures (internal plumbing, not Wazuh API) ──
     "cacheStats",       // Returns request cache statistics

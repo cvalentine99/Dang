@@ -103,6 +103,7 @@ import {
   GROUP_FILE_CONTENT_CONFIG,
 } from "./paramBroker";
 import { generateCoverageReport, BROKER_CONFIG_REGISTRY, getRuntimeWiredConfigs } from "./brokerCoverage";
+import { statesOrManager, syscheckKind, managerPath, getStatesSourceStatus } from "./statesSource";
 
 // ── Per-request user context for rate limiting ──────────────────────────────
 // AsyncLocalStorage carries the authenticated user's ID through the call stack
@@ -264,7 +265,7 @@ export const wazuhRouter = router({
       return { configured: false, data: null };
     }
     try {
-      const data = await proxyGet("/manager/info");
+      const data = await proxyGet(managerPath("/manager/info"));
       return { configured: true, data };
     } catch (err) {
       // M1: never relay the upstream body — generic message + correlation id
@@ -284,8 +285,8 @@ export const wazuhRouter = router({
   // ══════════════════════════════════════════════════════════════════════════════
   // MANAGER
   // ══════════════════════════════════════════════════════════════════════════════
-  managerInfo: wazuhProcedure.query(() => proxyGet("/manager/info")),
-  managerStatus: wazuhProcedure.query(() => proxyGet("/manager/status")),
+  managerInfo: wazuhProcedure.query(() => proxyGet(managerPath("/manager/info"))),
+  managerStatus: wazuhProcedure.query(() => proxyGet(managerPath("/manager/status"))),
   /**
    * GET /manager/configuration — Manager configuration (broker-wired)
    *
@@ -311,26 +312,26 @@ export const wazuhRouter = router({
           message: `Unsupported parameters for /manager/configuration: ${unsupportedParams.join(", ")}`,
         });
       }
-      return withBrokerWarnings(proxyGet("/manager/configuration", forwardedQuery), errors);
+      return withBrokerWarnings(proxyGet(managerPath("/manager/configuration"), forwardedQuery), errors);
     }),
-  managerConfigValidation: wazuhProcedure.query(() => proxyGet("/manager/configuration/validation")),
+  managerConfigValidation: wazuhProcedure.query(() => proxyGet(managerPath("/manager/configuration/validation"))),
 
   // ── Manager stats ─────────────────────────────────────────────────────────
   /** GET /manager/stats — Manager stats (manual: date param added) */
   managerStats: wazuhProcedure
     .input(z.object({ date: z.string().optional() }).optional())
     .query(({ input }) => {
-      if (!input) return proxyGet("/manager/stats");
+      if (!input) return proxyGet(managerPath("/manager/stats"));
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(MANAGER_STATS_CONFIG, input);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /manager/stats: ${unsupportedParams.join(", ")}` });
       }
-      return withBrokerWarnings(proxyGet("/manager/stats", forwardedQuery), errors);
+      return withBrokerWarnings(proxyGet(managerPath("/manager/stats"), forwardedQuery), errors);
     }),
-  statsHourly: wazuhProcedure.query(() => proxyGet("/manager/stats/hourly")),
-  statsWeekly: wazuhProcedure.query(() => proxyGet("/manager/stats/weekly")),
-  analysisd: wazuhProcedure.query(() => proxyGet("/manager/stats/analysisd")),
-  remoted: wazuhProcedure.query(() => proxyGet("/manager/stats/remoted")),
+  statsHourly: wazuhProcedure.query(() => proxyGet(managerPath("/manager/stats/hourly"))),
+  statsWeekly: wazuhProcedure.query(() => proxyGet(managerPath("/manager/stats/weekly"))),
+  analysisd: wazuhProcedure.query(() => proxyGet(managerPath("/manager/stats/analysisd"))),
+  remoted: wazuhProcedure.query(() => proxyGet(managerPath("/manager/stats/remoted"))),
 
   // ── Manager daemon stats (4.14+ enhanced) ─────────────────────────────────
   daemonStats: wazuhProcedure
@@ -338,12 +339,12 @@ export const wazuhRouter = router({
       daemons: z.union([z.string(), z.array(z.string())]).optional(),
     }).optional())
     .query(({ input }) => {
-      if (!input) return proxyGet("/manager/daemons/stats");
+      if (!input) return proxyGet(managerPath("/manager/daemons/stats"));
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(MANAGER_DAEMON_STATS_CONFIG, input);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /manager/daemons/stats: ${unsupportedParams.join(", ")}` });
       }
-      return withBrokerWarnings(proxyGet("/manager/daemons/stats", forwardedQuery), errors);
+      return withBrokerWarnings(proxyGet(managerPath("/manager/daemons/stats"), forwardedQuery), errors);
     }),
 
   // ── Manager logs ──────────────────────────────────────────────────────────
@@ -373,11 +374,11 @@ export const wazuhRouter = router({
           message: `Unsupported parameters for /manager/logs: ${unsupportedParams.join(", ")}`,
         });
       }
-      return withBrokerWarnings(proxyGet("/manager/logs", forwardedQuery, "alerts"), errors);
+      return withBrokerWarnings(proxyGet(managerPath("/manager/logs"), forwardedQuery, "alerts"), errors);
     }),
 
   managerLogsSummary: wazuhProcedure.query(() =>
-    proxyGet("/manager/logs/summary", {}, "alerts")
+    proxyGet(managerPath("/manager/logs/summary"), {}, "alerts")
   ),
 
   /**
@@ -389,12 +390,12 @@ export const wazuhRouter = router({
       force_query: z.boolean().optional(),
     }).optional())
     .query(({ input }) => {
-      if (!input) return proxyGet("/manager/version/check");
+      if (!input) return proxyGet(managerPath("/manager/version/check"));
       const { forwardedQuery, unsupportedParams, errors } = brokerParams(MANAGER_VERSION_CHECK_CONFIG, input);
       if (unsupportedParams.length > 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /manager/version/check: ${unsupportedParams.join(", ")}` });
       }
-      return withBrokerWarnings(proxyGet("/manager/version/check", forwardedQuery), errors);
+      return withBrokerWarnings(proxyGet(managerPath("/manager/version/check"), forwardedQuery), errors);
     }),
 
   /**
@@ -407,7 +408,7 @@ export const wazuhRouter = router({
       configuration: configurationSchema,
     }))
     .query(({ input }) =>
-      proxyGet(`/manager/configuration/${input.component}/${input.configuration}`)
+      proxyGet(managerPath(`/manager/configuration/${input.component}/${input.configuration}`))
     ),
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -466,7 +467,7 @@ export const wazuhRouter = router({
   clusterConfigValidation: wazuhProcedure.query(() => proxyGet("/cluster/configuration/validation")),
 
   /** GET /manager/api/config — Manager API configuration (C-5 gap fill) */
-  managerApiConfig: wazuhProcedure.query(() => proxyGet("/manager/api/config")),
+  managerApiConfig: wazuhProcedure.query(() => proxyGet(managerPath("/manager/api/config"))),
 
   clusterNodeInfo: wazuhProcedure
     .input(z.object({ nodeId: nodeIdSchema }))
@@ -822,7 +823,7 @@ export const wazuhRouter = router({
     .query(({ input }) => {
       const { agentId, ...params } = input;
       const { forwardedQuery, errors } = brokerParams(SYSCOLLECTOR_OS_CONFIG, params);
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/os`, forwardedQuery), errors);
+      return withBrokerWarnings(statesOrManager("os", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/os`, forwardedQuery), getCurrentUserId()), errors);
     }),
 
   agentHardware: wazuhProcedure
@@ -834,7 +835,7 @@ export const wazuhRouter = router({
     .query(({ input }) => {
       const { agentId, ...params } = input;
       const { forwardedQuery, errors } = brokerParams(SYSCOLLECTOR_HARDWARE_CONFIG, params);
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/hardware`, forwardedQuery), errors);
+      return withBrokerWarnings(statesOrManager("hardware", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/hardware`, forwardedQuery), getCurrentUserId()), errors);
     }),
 
   agentPackages: wazuhProcedure
@@ -863,7 +864,7 @@ export const wazuhRouter = router({
           message: `Unsupported parameters for /syscollector/{agent_id}/packages: ${unsupportedParams.join(", ")}`,
         });
       }
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/packages`, forwardedQuery), errors);
+      return withBrokerWarnings(statesOrManager("packages", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/packages`, forwardedQuery), getCurrentUserId()), errors);
     }),
 
   agentPorts: wazuhProcedure
@@ -895,7 +896,7 @@ export const wazuhRouter = router({
           message: `Unsupported parameters for /syscollector/{agent_id}/ports: ${unsupportedParams.join(", ")}`,
         });
       }
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/ports`, forwardedQuery), errors);
+      return withBrokerWarnings(statesOrManager("ports", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/ports`, forwardedQuery), getCurrentUserId()), errors);
     }),
 
   agentProcesses: wazuhProcedure
@@ -933,7 +934,7 @@ export const wazuhRouter = router({
           message: `Unsupported parameters for /syscollector/{agent_id}/processes: ${unsupportedParams.join(", ")}`,
         });
       }
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/processes`, forwardedQuery), errors);
+      return withBrokerWarnings(statesOrManager("processes", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/processes`, forwardedQuery), getCurrentUserId()), errors);
     }),
 
   agentNetaddr: wazuhProcedure
@@ -958,7 +959,7 @@ export const wazuhRouter = router({
       if (unsupportedParams.length > 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /syscollector/{agent_id}/netaddr: ${unsupportedParams.join(", ")}` });
       }
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/netaddr`, forwardedQuery), errors);
+      return withBrokerWarnings(statesOrManager("netaddr", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/netaddr`, forwardedQuery), getCurrentUserId()), errors);
     }),
 
   agentNetiface: wazuhProcedure
@@ -991,7 +992,7 @@ export const wazuhRouter = router({
       if (unsupportedParams.length > 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /syscollector/{agent_id}/netiface: ${unsupportedParams.join(", ")}` });
       }
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/netiface`, forwardedQuery), errors);
+      return withBrokerWarnings(statesOrManager("netiface", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/netiface`, forwardedQuery), getCurrentUserId()), errors);
     }),
 
   agentHotfixes: wazuhProcedure
@@ -1012,7 +1013,7 @@ export const wazuhRouter = router({
       if (unsupportedParams.length > 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /syscollector/{agent_id}/hotfixes: ${unsupportedParams.join(", ")}` });
       }
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/hotfixes`, forwardedQuery), errors);
+      return withBrokerWarnings(statesOrManager("hotfixes", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/hotfixes`, forwardedQuery), getCurrentUserId()), errors);
     }),
 
   groupFiles: wazuhProcedure
@@ -1058,7 +1059,7 @@ export const wazuhRouter = router({
       if (unsupportedParams.length > 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /syscollector/{agent_id}/browser_extensions: ${unsupportedParams.join(", ")}` });
       }
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/browser_extensions`, forwardedQuery), errors)
+      return withBrokerWarnings(statesOrManager("browser_extensions", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/browser_extensions`, forwardedQuery), getCurrentUserId()), errors)
         .catch((err: unknown) => {
           if (err instanceof TRPCError) throw err; // broker BAD_REQUEST / upstream 429 pass through
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/browser_extensions failed: ${err instanceof Error ? err.message : "unknown"}` });
@@ -1086,7 +1087,7 @@ export const wazuhRouter = router({
           message: `Unsupported parameters for /syscollector/{agent_id}/services: ${unsupportedParams.join(", ")}`,
         });
       }
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/services`, forwardedQuery), errors)
+      return withBrokerWarnings(statesOrManager("services", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/services`, forwardedQuery), getCurrentUserId()), errors)
         .catch((err: unknown) => {
           if (err instanceof TRPCError) throw err; // broker BAD_REQUEST / upstream 429 pass through
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/services failed: ${err instanceof Error ? err.message : "unknown"}` });
@@ -1110,7 +1111,7 @@ export const wazuhRouter = router({
       if (unsupportedParams.length > 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /syscollector/{agent_id}/users: ${unsupportedParams.join(", ")}` });
       }
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/users`, forwardedQuery), errors)
+      return withBrokerWarnings(statesOrManager("users", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/users`, forwardedQuery), getCurrentUserId()), errors)
         .catch((err: unknown) => {
           if (err instanceof TRPCError) throw err; // broker BAD_REQUEST / upstream 429 pass through
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/users failed: ${err instanceof Error ? err.message : "unknown"}` });
@@ -1134,7 +1135,7 @@ export const wazuhRouter = router({
       if (unsupportedParams.length > 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported params for /syscollector/{agent_id}/groups: ${unsupportedParams.join(", ")}` });
       }
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/groups`, forwardedQuery), errors)
+      return withBrokerWarnings(statesOrManager("groups", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/groups`, forwardedQuery), getCurrentUserId()), errors)
         .catch((err: unknown) => {
           if (err instanceof TRPCError) throw err; // broker BAD_REQUEST / upstream 429 pass through
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/groups failed: ${err instanceof Error ? err.message : "unknown"}` });
@@ -1163,7 +1164,7 @@ export const wazuhRouter = router({
       if (unsupportedParams.length > 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported parameters for /syscollector/{agent_id}/netproto: ${unsupportedParams.join(", ")}` });
       }
-      return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/netproto`, forwardedQuery), errors)
+      return withBrokerWarnings(statesOrManager("netproto", agentId, forwardedQuery, () => proxyGet(`/syscollector/${agentId}/netproto`, forwardedQuery), getCurrentUserId()), errors)
 .catch((err: unknown) => {
           if (err instanceof TRPCError) throw err; // broker BAD_REQUEST / upstream 429 pass through
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/netproto failed: ${err instanceof Error ? err.message : "unknown"}` });
@@ -1688,7 +1689,7 @@ export const wazuhRouter = router({
           message: `Unsupported parameters for /sca/{agent_id}: ${unsupportedParams.join(", ")}`,
         });
       }
-      return withBrokerWarnings(proxyGet(`/sca/${agentId}`, forwardedQuery), errors);
+      return withBrokerWarnings(statesOrManager("sca_policies", agentId, forwardedQuery, () => proxyGet(`/sca/${agentId}`, forwardedQuery), getCurrentUserId()), errors);
     }),
 
   /**
@@ -1732,7 +1733,7 @@ export const wazuhRouter = router({
           message: `Unsupported parameters for /sca/{agent_id}/checks/{policy_id}: ${unsupportedParams.join(", ")}`,
         });
       }
-      return withBrokerWarnings(proxyGet(`/sca/${agentId}/checks/${policyId}`, forwardedQuery), errors);
+      return withBrokerWarnings(statesOrManager("sca_checks", agentId, forwardedQuery, () => proxyGet(`/sca/${agentId}/checks/${policyId}`, forwardedQuery), getCurrentUserId(), { policyId }), errors);
     }),
 
   /**
@@ -1815,7 +1816,7 @@ export const wazuhRouter = router({
           message: `Unsupported parameters for /syscheck/{agent_id}: ${unsupportedParams.join(", ")}`,
         });
       }
-      return withBrokerWarnings(proxyGet(`/syscheck/${agentId}`, forwardedQuery, "syscheck"), errors);
+      return withBrokerWarnings(statesOrManager(syscheckKind(forwardedQuery), agentId, forwardedQuery, () => proxyGet(`/syscheck/${agentId}`, forwardedQuery, "syscheck"), getCurrentUserId()), errors);
     }),
 
   syscheckLastScan: wazuhProcedure
@@ -1825,7 +1826,8 @@ export const wazuhRouter = router({
     ),
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // ROOTCHECK
+  // ROOTCHECK — manager-only: no indexer state index in 4.14 or 5.0, and the
+  // endpoint is removed in 5.0 (see docs/architecture/wazuh-5-compat.md).
   // ══════════════════════════════════════════════════════════════════════════════
   /**
    * GET /rootcheck/{agent_id} — Rootcheck results (broker-wired)
@@ -1864,6 +1866,13 @@ export const wazuhRouter = router({
     .query(({ input }) =>
       proxyGet(`/rootcheck/${input.agentId}/last_scan`)
     ),
+
+  /**
+   * Wazuh 5.0 de-risk diagnostics: active states source (WAZUH_STATES_SOURCE),
+   * manager API style, and per kind whether the indexer state index exists.
+   * Admin-only (exposes index names and doc counts).
+   */
+  statesSource: adminProcedure.query(({ ctx }) => getStatesSourceStatus(ctx.user?.id)),
 
   // ══════════════════════════════════════════════════════════════════════════════
   // DECODERS

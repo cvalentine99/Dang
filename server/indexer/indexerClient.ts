@@ -39,6 +39,7 @@ const RATE_LIMITS: Record<string, number> = {
   "sse-alerts": 30,         // sse/alertStreamService poll loop
   "alert-queue-enqueue": 30, // alertQueue/alertQueueRouter single-alert lookup
   "index-status": 30,       // indexerIndexExists (5 HEADs per indexStatus call)
+  states: 60,               // statesClient — syscollector/FIM/SCA reads (Wazuh 5.0 de-risk)
 };
 /** Global (all users) ceiling = per-user limit × this factor. */
 const GLOBAL_LIMIT_FACTOR = 3;
@@ -196,7 +197,25 @@ export const INDEX_PATTERNS = {
   ARCHIVES: "wazuh-archives-*",
   MONITORING: "wazuh-monitoring-*",
   STATISTICS: "wazuh-statistics-*",
-  VULNERABILITIES: "wazuh-states-vulnerabilities-*",
+  // Suffix-tolerant: 4.x names state indices `<base>-<cluster>`, 5.0 drops the
+  // `-<cluster>` suffix. `<base>*` matches both (verified live on 4.14.9).
+  VULNERABILITIES: "wazuh-states-vulnerabilities*",
+  STATES_PACKAGES: "wazuh-states-inventory-packages*",
+  STATES_PORTS: "wazuh-states-inventory-ports*",
+  STATES_PROCESSES: "wazuh-states-inventory-processes*",
+  STATES_NETWORKS: "wazuh-states-inventory-networks*",
+  STATES_PROTOCOLS: "wazuh-states-inventory-protocols*",
+  STATES_INTERFACES: "wazuh-states-inventory-interfaces*",
+  STATES_HOTFIXES: "wazuh-states-inventory-hotfixes*",
+  STATES_SYSTEM: "wazuh-states-inventory-system*",
+  STATES_HARDWARE: "wazuh-states-inventory-hardware*",
+  STATES_USERS: "wazuh-states-inventory-users*",
+  STATES_GROUPS: "wazuh-states-inventory-groups*",
+  STATES_SERVICES: "wazuh-states-inventory-services*",
+  STATES_BROWSER_EXTENSIONS: "wazuh-states-inventory-browser-extensions*",
+  STATES_FIM_FILES: "wazuh-states-fim-files*",
+  STATES_FIM_REGISTRIES: "wazuh-states-fim-registries*",
+  STATES_SCA: "wazuh-states-sca*",
 } as const;
 
 // ── Elasticsearch/OpenSearch query types ─────────────────────────────────────
@@ -280,6 +299,31 @@ export async function indexerIndexExists(
     // network) is a failure, not "does not exist" — surface it sanitized.
     if (axios.isAxiosError(err) && err.response?.status === 404) return false;
     throw sanitizeUpstreamError("Indexer", err, `HEAD /${index}`);
+  }
+}
+
+// ── Index listing (_cat/indices) ─────────────────────────────────────────────
+/**
+ * List concrete indices matching `pattern` with their doc counts. A wildcard
+ * that matches nothing yields `[]` (not an error). Read-only GET.
+ */
+export async function indexerCatIndices(
+  config: IndexerConfig,
+  pattern: string,
+  userId?: string | number
+): Promise<Array<{ index: string; docsCount: number }>> {
+  if (!/^[a-z0-9*,._-]+$/.test(pattern)) throw new Error(`Invalid index pattern: ${pattern}`);
+  checkRateLimit("index-status", userId);
+  const instance = createInstance(config);
+  try {
+    const response = await instance.get(`/_cat/indices/${pattern}`, {
+      params: { format: "json", h: "index,docs.count", expand_wildcards: "open" },
+    });
+    const rows = Array.isArray(response.data) ? (response.data as Array<Record<string, unknown>>) : [];
+    return rows.map(r => ({ index: String(r.index ?? ""), docsCount: Number(r["docs.count"] ?? 0) || 0 }));
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.status === 404) return [];
+    throw sanitizeUpstreamError("Indexer", err, `GET /_cat/indices/${pattern}`);
   }
 }
 
