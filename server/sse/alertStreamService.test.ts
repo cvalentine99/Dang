@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Request, Response } from "express";
 
 // Mock the indexer client before importing the service
@@ -11,13 +11,26 @@ vi.mock("../indexer/indexerClient", () => ({
   INDEX_PATTERNS: { ALERTS: "wazuh-alerts-*" },
 }));
 
+// H-A2: heartbeat re-validation goes through sdk.isUserSessionStillValid
+const { isUserSessionStillValid } = vi.hoisted(() => ({
+  isUserSessionStillValid: vi.fn(async () => true),
+}));
+vi.mock("../_core/sdk", () => ({ sdk: { isUserSessionStillValid } }));
+
 import {
   handleSSEConnection,
   getStreamStats,
   getConnectedClientCount,
+  setSSEAuth,
+  MAX_STREAMS_PER_USER,
 } from "./alertStreamService";
 
-function createMockReqRes(query: Record<string, string> = {}) {
+let nextUserId = 1000;
+
+function createMockReqRes(
+  query: Record<string, string> = {},
+  opts: { auth?: boolean; userId?: number; expiresAtMs?: number } = {}
+) {
   const writtenChunks: string[] = [];
   const onHandlers: Record<string, (() => void)[]> = {};
   const req = {
@@ -32,7 +45,18 @@ function createMockReqRes(query: Record<string, string> = {}) {
     write: vi.fn((data: string) => { writtenChunks.push(data); return true; }),
     on: vi.fn(),
     flushHeaders: vi.fn(),
+    end: vi.fn(),
+    status: vi.fn(function (this: unknown) { return res; }),
+    json: vi.fn(),
   } as unknown as Response;
+  if (opts.auth !== false) {
+    setSSEAuth(req, {
+      userId: opts.userId ?? nextUserId++,
+      openId: "user-openid",
+      tokenVersion: 0,
+      expiresAtMs: opts.expiresAtMs ?? Date.now() + 60 * 60 * 1000,
+    });
+  }
   return { req, res, writtenChunks, onHandlers };
 }
 
@@ -137,5 +161,62 @@ describe("AlertStreamService", () => {
     const event = writtenChunks[0];
     // SSE format: event: <name>\ndata: <json>\n\n
     expect(event).toMatch(/^event: \w+\ndata: .+\n\n$/);
+  });
+
+  it("rejects a connection with no verified identity (fail closed)", () => {
+    const { req, res } = createMockReqRes({}, { auth: false });
+    handleSSEConnection(req, res);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.writeHead).not.toHaveBeenCalled();
+  });
+
+  it(`caps streams per user at ${MAX_STREAMS_PER_USER} by closing the oldest`, () => {
+    const userId = 424242;
+    const conns = Array.from({ length: MAX_STREAMS_PER_USER + 1 }, () =>
+      createMockReqRes({}, { userId })
+    );
+    conns.forEach(({ req, res }) => handleSSEConnection(req, res));
+    expect(conns[0].res.end).toHaveBeenCalledTimes(1);
+    expect(conns[0].writtenChunks.some((c) => c.includes("stream_limit"))).toBe(true);
+    for (const c of conns.slice(1)) expect(c.res.end).not.toHaveBeenCalled();
+    const stats = getStreamStats();
+    expect(stats.connectedClients).toBeGreaterThanOrEqual(MAX_STREAMS_PER_USER);
+  });
+
+  describe("heartbeat re-validation (H-A2)", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("keeps the stream open while the session is valid", async () => {
+      isUserSessionStillValid.mockResolvedValue(true);
+      const { req, res, writtenChunks } = createMockReqRes();
+      handleSSEConnection(req, res);
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(isUserSessionStillValid).toHaveBeenCalledWith("user-openid", 0);
+      expect(writtenChunks.some((c) => c.includes("event: heartbeat"))).toBe(true);
+      expect(res.end).not.toHaveBeenCalled();
+    });
+
+    it("ends the stream when the session was revoked / user disabled", async () => {
+      isUserSessionStillValid.mockResolvedValue(false);
+      const { req, res, writtenChunks } = createMockReqRes();
+      handleSSEConnection(req, res);
+      const before = getConnectedClientCount();
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(res.end).toHaveBeenCalledTimes(1);
+      expect(writtenChunks.some((c) => c.includes("session_revoked"))).toBe(true);
+      expect(writtenChunks.some((c) => c.includes("event: heartbeat"))).toBe(false);
+      expect(getConnectedClientCount()).toBe(before - 1);
+      isUserSessionStillValid.mockResolvedValue(true);
+    });
+
+    it("ends the stream once the JWT has expired, without a DB call", async () => {
+      const { req, res } = createMockReqRes({}, { expiresAtMs: Date.now() + 1_000 });
+      handleSSEConnection(req, res);
+      isUserSessionStillValid.mockClear();
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(res.end).toHaveBeenCalledTimes(1);
+      expect(isUserSessionStillValid).not.toHaveBeenCalled();
+    });
   });
 });

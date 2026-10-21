@@ -8,17 +8,18 @@ function isIpAddress(host: string) {
   return host.includes(":");
 }
 
+/**
+ * M7: `Secure` is forced in production and otherwise follows `req.secure`.
+ * `req.secure` is Express's `req.protocol === "https"`, which only honours
+ * X-Forwarded-Proto when the hop is trusted via the `trust proxy` setting —
+ * never read X-Forwarded-Proto directly (any client can send it).
+ * COOKIE_SECURE=false disables only the production forcing (plain-HTTP LAN
+ * deployments); HTTPS requests always get Secure.
+ */
 function isSecureRequest(req: Request) {
-  if (req.protocol === "https") return true;
-
-  const forwardedProto = req.headers["x-forwarded-proto"];
-  if (!forwardedProto) return false;
-
-  const protoList = Array.isArray(forwardedProto)
-    ? forwardedProto
-    : forwardedProto.split(",");
-
-  return protoList.some(proto => proto.trim().toLowerCase() === "https");
+  const forceInProd =
+    process.env.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "false";
+  return forceInProd || req.secure === true;
 }
 
 export function getSessionCookieOptions(

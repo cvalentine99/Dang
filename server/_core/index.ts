@@ -52,11 +52,38 @@ async function startServer() {
   const app = express();
 
   // Configure trust proxy from environment.
-  // Required when running behind nginx/caddy so req.ip reflects the real client.
-  // Values: "1" (one hop), "2", "loopback", "true" (all), or unset (direct exposure).
-  if (process.env.TRUST_PROXY) {
-    const tp = process.env.TRUST_PROXY;
-    app.set("trust proxy", tp === "true" ? true : /^\d+$/.test(tp) ? Number(tp) : tp);
+  // Required when running behind nginx/caddy so req.ip reflects the real client
+  // (the login/register rate limiter keys on req.ip; cookies use req.secure).
+  // Values: "1"/N (hop count), "true" (treated as 1 hop), a comma-separated
+  // list of CIDRs / proxy-addr keywords (loopback, linklocal, uniquelocal),
+  // or unset/"false"/"0" (direct exposure — X-Forwarded-* ignored).
+  // H-A3: "true" is NOT passed through as Express `true` (trust every hop),
+  // because then req.ip is the left-most X-Forwarded-For entry — client-chosen.
+  const trustProxyRaw = (process.env.TRUST_PROXY ?? "").trim();
+  if (trustProxyRaw && trustProxyRaw !== "false" && trustProxyRaw !== "0") {
+    let trustProxy: number | string[];
+    if (trustProxyRaw === "true") {
+      trustProxy = 1;
+      console.warn('[Startup] TRUST_PROXY="true" interpreted as 1 trusted hop (trusting all hops allows client IP spoofing). Set a hop count or CIDR list to silence this.');
+    } else if (/^\d+$/.test(trustProxyRaw)) {
+      trustProxy = Number(trustProxyRaw);
+    } else {
+      trustProxy = trustProxyRaw.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    app.set("trust proxy", trustProxy);
+    console.log(`[Startup] trust proxy = ${JSON.stringify(trustProxy)}`);
+  } else {
+    // Operator hint: X-Forwarded-For on a login attempt while TRUST_PROXY is unset
+    // means a proxy is in front but untrusted — every client shares the proxy's
+    // rate-limit bucket and cookies may lack Secure. Logged once.
+    let warnedUntrustedXff = false;
+    app.use("/api/trpc", (req, _res, next) => {
+      if (!warnedUntrustedXff && req.headers["x-forwarded-for"] && /localAuth\.(?:login|register)/.test(req.path)) {
+        warnedUntrustedXff = true;
+        console.warn("[Startup] X-Forwarded-For seen on a login request but TRUST_PROXY is unset — set TRUST_PROXY=1 (one proxy hop) so rate limiting sees real client IPs.");
+      }
+      next();
+    });
   }
 
   const server = createServer(app);
@@ -247,12 +274,20 @@ async function startServer() {
   });
 
   // SSE alert stream endpoint — authenticated
-  const { handleSSEConnection, getStreamStats } = await import("../sse/alertStreamService");
+  const { handleSSEConnection, getStreamStats, setSSEAuth } = await import("../sse/alertStreamService");
 
-  // SSE auth middleware: validates session cookie before allowing connection
+  // SSE auth middleware: validates session cookie before allowing connection.
+  // H-A2: stores the verified identity on the request so the stream can
+  // re-validate it on every heartbeat (logout / disable / role change / expiry).
   const sseAuthMiddleware: import("express").RequestHandler = async (req, res, next) => {
     try {
-      await sdk.authenticateRequest(req);
+      const { user, session } = await sdk.authenticateRequestWithSession(req);
+      setSSEAuth(req, {
+        userId: user.id,
+        openId: user.openId,
+        tokenVersion: user.tokenVersion,
+        expiresAtMs: session.exp * 1000,
+      });
       next();
     } catch {
       res.status(401).json({ error: "Authentication required for SSE stream" });

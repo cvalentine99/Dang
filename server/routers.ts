@@ -49,14 +49,21 @@ export const appRouter = router({
         createdAt: u.createdAt,
       };
     }),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      // S-2: Blocklist the token server-side before clearing the cookie
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+      // H-A8 / P2-10: Revoke server-side by bumping users.tokenVersion — but only
+      // if the cookie token VERIFIES (signature + current tv). Unverified input is
+      // never stored anywhere (the old in-memory blocklist was an unauth OOM).
+      // Revocation failure must not block clearing the cookie.
       const cookieHeader = ctx.req.headers.cookie;
       if (cookieHeader) {
         const parsed = parseCookie(cookieHeader);
         const token = parsed[COOKIE_NAME];
         if (token) {
-          sdk.blockToken(token);
+          try {
+            await sdk.revokeSessionToken(token);
+          } catch (err) {
+            console.warn("[Auth] logout: session revocation failed:", (err as Error).message);
+          }
         }
       }
       const cookieOptions = getSessionCookieOptions(ctx.req);
