@@ -126,7 +126,27 @@ const agentIdSchema = z.string().regex(/^\d{3,}$/, "Invalid agent ID format");
 const pathSegment = z.string().min(1).max(256).regex(
   /^[a-zA-Z0-9._-]+$/,
   "Invalid path segment: only alphanumeric, dots, hyphens, and underscores are allowed"
+).refine(
+  (s) => s !== "." && s !== ".." && !s.startsWith("."),
+  "Invalid path segment: dot-segments are not allowed"
 );
+
+/**
+ * Defense in depth for every upstream path: reject empty or dot segments (which
+ * WHATWG URL parsing in axios would collapse — `/agents/001/config/../key` becomes
+ * `/agents/001/key`, skipping that route's authorization and audit) and percent-encode
+ * each segment so no interpolated value can introduce `/`, `?` or `#`.
+ */
+function normalizeProxyPath(path: string): string {
+  if (!path.startsWith("/")) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid upstream path" });
+  const segments = path.slice(1).split("/");
+  for (const seg of segments) {
+    if (seg === "" || seg === "." || seg === "..") {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid upstream path segment" });
+    }
+  }
+  return "/" + segments.map(encodeURIComponent).join("/");
+}
 
 /** Wazuh component name (e.g. 'agent', 'analysis', 'auth') */
 const componentSchema = pathSegment;
@@ -147,10 +167,11 @@ const requirementSchema = pathSegment;
 
 // ── Helper: wrap with config check (uses DB override → env fallback) ─────────
 async function proxyGet(
-  path: string,
+  rawPath: string,
   params?: Record<string, string | number | boolean | undefined>,
   group?: string
 ) {
+  const path = normalizeProxyPath(rawPath);
   const config = await getEffectiveWazuhConfig();
   if (!config) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Wazuh is not configured. Set connection settings in Admin > Connection Settings or via environment variables." });
   const userId = getCurrentUserId();
@@ -1918,6 +1939,7 @@ export const wazuhRouter = router({
       node: z.string().optional(),
       module: z.string().optional(),
       status: z.string().optional(),
+      wait_for_complete: z.boolean().optional(),
       ...paginationSchema.shape,
       sort: z.string().optional(),
       search: z.string().optional(),
@@ -1932,7 +1954,7 @@ export const wazuhRouter = router({
       return withBrokerWarnings(proxyGet("/tasks/status", forwardedQuery), errors);
     }),
 
-  // NOTE: GET /active-response does not exist in Wazuh v4.14.3.
+  // NOTE: GET /active-response does not exist in Wazuh v4.14.4.
   // The spec only defines PUT /active-response (trigger action — write operation).
   // Removed activeResponseList per audit.
 
@@ -2063,14 +2085,6 @@ export const wazuhRouter = router({
       }
       return withBrokerWarnings(proxyGet("/security/users/me", forwardedQuery), errors);
     }),
-
-  /**
-   * GET /security/user/authenticate — Token introspection
-   * Returns info about the current JWT token. Spec v4.14.3 coverage gap fill.
-   */
-  securityTokenInfo: wazuhProcedure
-    .input(z.void())
-    .query(() => proxyGet("/security/user/authenticate")),
 
   /**
    * GET /security/rules — List RBAC security rules

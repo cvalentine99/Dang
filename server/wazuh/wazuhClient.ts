@@ -183,6 +183,12 @@ function checkRateLimit(group: string, userId?: string | number): void {
 
 // ── Sensitive fields to strip from all responses ──────────────────────────────
 const STRIP_FIELDS = new Set([
+  "apikey",
+  "api_token",
+  "hec_token",
+  "rbac_token",
+  "private_key",
+  "passphrase",
   "password",
   "token",
   "secret",

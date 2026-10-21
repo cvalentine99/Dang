@@ -65,15 +65,15 @@ export const responseActionsRouter = router({
       triageId: z.string().optional(),
       linkedAlertIds: z.array(z.string()).optional(),
       linkedAgentIds: z.array(z.string()).optional(),
-      /** If proposed by an agent, specify the agent name */
-      proposedByAgent: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       const actionId = `ra-${nanoid(12)}`;
-      const proposedBy = input.proposedByAgent ?? `user:${ctx.user.id}`;
+      // Attribution is derived from the session, never from input: agent-proposed
+      // actions are created by materializeResponseActions(), not this procedure.
+      const proposedBy = `user:${ctx.user.id}`;
 
       // Audit #48: Wrap INSERT + SELECT + audit INSERT in a single transaction
       // to prevent orphaned action rows without audit trails on partial failure.

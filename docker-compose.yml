@@ -8,12 +8,20 @@
 #   docker compose logs -f # Follow logs
 # ============================================================================
 
+# Log rotation for every service: the json-file driver is unbounded by default.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   # ── MySQL Database ─────────────────────────────────────────────────────────
   db:
     image: mysql:8.0
     container_name: dang-db
     restart: unless-stopped
+    logging: *default-logging
     command: --default-time-zone=+00:00 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required — generate with openssl rand -hex 16}
@@ -40,6 +48,7 @@ services:
       dockerfile: Dockerfile
     container_name: dang-app
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       db:
         condition: service_healthy

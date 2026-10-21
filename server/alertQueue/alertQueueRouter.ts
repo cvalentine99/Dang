@@ -19,12 +19,57 @@
 import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, adminProcedure } from "../_core/trpc";
 import { alertQueue, pipelineRuns } from "../../drizzle/schema";
 import { eq, desc, asc, sql, and, inArray, gte } from "drizzle-orm";
 import { runTriageAgent } from "../agenticPipeline/triageAgent";
+import { getEffectiveIndexerConfig, indexerSearch, INDEX_PATTERNS } from "../indexer/indexerClient";
 
 const MAX_QUEUE_DEPTH = 10;
+
+// ── Indexer confirmation for enqueue ─────────────────────────────────────────
+// Fetch the alert document by _id so severity and payload come from the source of
+// truth rather than the request body. Returns null when the indexer is not
+// configured, unreachable, or has no such document.
+async function lookupAlertInIndexer(alertId: string): Promise<{
+  ruleLevel: number;
+  ruleId: string;
+  ruleDescription?: string;
+  agentId?: string;
+  agentName?: string;
+  alertTimestamp?: string;
+  rawJson: Record<string, unknown>;
+} | null> {
+  try {
+    const config = await getEffectiveIndexerConfig();
+    if (!config) return null;
+    const res = await indexerSearch(
+      config,
+      INDEX_PATTERNS.ALERTS,
+      { size: 1, query: { ids: { values: [alertId] } } } as unknown as Parameters<typeof indexerSearch>[2],
+      "alert-queue-enqueue",
+    );
+    const hit = res?.hits?.hits?.[0];
+    const src = hit?._source as Record<string, unknown> | undefined;
+    if (!src) return null;
+    const rule = (src.rule ?? {}) as Record<string, unknown>;
+    const agent = (src.agent ?? {}) as Record<string, unknown>;
+    const level = Number(rule.level);
+    if (!Number.isInteger(level) || level < 0 || level > 15) return null;
+    return {
+      ruleLevel: level,
+      ruleId: String(rule.id ?? ""),
+      ruleDescription: typeof rule.description === "string" ? rule.description : undefined,
+      agentId: typeof agent.id === "string" ? agent.id : undefined,
+      agentName: typeof agent.name === "string" ? agent.name : undefined,
+      alertTimestamp: typeof src.timestamp === "string" ? src.timestamp : undefined,
+      rawJson: src,
+    };
+  } catch (err) {
+    console.warn("[AlertQueue] indexer lookup failed for", alertId, (err as Error).message);
+    return null;
+  }
+}
 
 export const alertQueueRouter = router({
   /**
@@ -85,7 +130,7 @@ export const alertQueueRouter = router({
       alertTimestamp: z.string().max(64).optional(),
       rawJson: z.record(z.string(), z.unknown()).optional(),
     }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input: clientInput, ctx }) => {
       const db = await requireDb();
 
       // Check for duplicate (same alertId already queued/processing)
@@ -94,7 +139,7 @@ export const alertQueueRouter = router({
         .from(alertQueue)
         .where(
           and(
-            eq(alertQueue.alertId, input.alertId),
+            eq(alertQueue.alertId, clientInput.alertId),
             inArray(alertQueue.status, ["queued", "processing"])
           )
         )
@@ -103,6 +148,16 @@ export const alertQueueRouter = router({
       if (existing) {
         return { success: false, message: "Alert already in queue", id: existing.id };
       }
+
+      // Server-authoritative alert facts. The client's ruleLevel/rawJson are hints only:
+      // a forged ruleLevel could evict every real alert, and rawJson feeds the triage
+      // prompt. When the indexer holds the alert, its document wins; when it cannot be
+      // confirmed, the hint is kept but may never evict another alert.
+      const confirmed = await lookupAlertInIndexer(clientInput.alertId);
+      const input = confirmed
+        ? { ...clientInput, ...confirmed }
+        : clientInput;
+      const severityConfirmed = confirmed !== null;
 
       // Check queue depth — evict oldest if at max
       const [countResult] = await db
@@ -123,7 +178,11 @@ export const alertQueueRouter = router({
           .limit(1);
 
         if (lowestPriority) {
-          // Only evict if the incoming alert is higher or equal severity
+          // Only evict if the incoming alert is higher or equal severity — and only when
+          // that severity came from the indexer, not from the caller.
+          if (!severityConfirmed) {
+            return { success: false, message: "Queue is full — alert severity could not be confirmed against the indexer, so nothing was evicted", id: null };
+          }
           if (input.ruleLevel >= lowestPriority.ruleLevel) {
             await db
               .update(alertQueue)
@@ -445,12 +504,25 @@ export const alertQueueRouter = router({
   /**
    * Clear all dismissed/completed/failed items from the queue.
    */
-  clearHistory: protectedProcedure.mutation(async () => {
+  clearHistory: adminProcedure.mutation(async () => {
     const db = await requireDb();
 
-    await db
-      .delete(alertQueue)
-      .where(inArray(alertQueue.status, ["completed", "failed", "dismissed"]));
+    try {
+      await db
+        .delete(alertQueue)
+        .where(inArray(alertQueue.status, ["completed", "failed", "dismissed"]));
+    } catch (err) {
+      // ticket_artifacts.queueItemId → alert_queue(id) is ON DELETE RESTRICT (0020):
+      // history that produced a Splunk ticket is part of the forensic record.
+      const msg = (err as Error).message ?? String(err);
+      if (/foreign key|ER_ROW_IS_REFERENCED/i.test(msg)) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Some history items are referenced by ticket artifacts and cannot be deleted.",
+        });
+      }
+      throw err;
+    }
 
     return { success: true };
   }),

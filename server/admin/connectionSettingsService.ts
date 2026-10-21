@@ -8,6 +8,7 @@
  */
 
 import { eq, and } from "drizzle-orm";
+import { asProtocol } from "../_core/protocol";
 import { getDb } from "../db";
 import { connectionSettings } from "../../drizzle/schema";
 import { encrypt, decrypt } from "./encryptionService";
@@ -240,7 +241,7 @@ export async function getEffectiveIndexerConfig(): Promise<IndexerConfig | null>
     port: parseInt(values.port ?? "9200", 10),
     user: values.user,
     pass: values.pass,
-    protocol: (values.protocol ?? "https") as "https" | "http",
+    protocol: asProtocol(values.protocol, "https"),
   };
 }
 

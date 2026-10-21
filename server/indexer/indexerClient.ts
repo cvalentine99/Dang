@@ -13,6 +13,7 @@
  */
 
 import axios, { AxiosInstance } from "axios";
+import { asProtocol } from "../_core/protocol";
 import { sharedHttpsAgent } from "../_core/tlsAgent";
 
 // ── Rate-limit state ─────────────────────────────────────────────────────────
@@ -43,6 +44,12 @@ function checkRateLimit(group: string): void {
 
 // ── Sensitive fields to strip ────────────────────────────────────────────────
 const STRIP_FIELDS = new Set([
+  "apikey",
+  "api_token",
+  "hec_token",
+  "rbac_token",
+  "private_key",
+  "passphrase",
   "password", "token", "secret", "api_key", "auth", "credential",
 ]);
 
@@ -74,7 +81,7 @@ export function getIndexerConfig(): IndexerConfig {
   const port = parseInt(process.env.WAZUH_INDEXER_PORT ?? "9200", 10);
   const user = process.env.WAZUH_INDEXER_USER;
   const pass = process.env.WAZUH_INDEXER_PASS;
-  const protocol = (process.env.WAZUH_INDEXER_PROTOCOL ?? "https") as "https" | "http";
+  const protocol = asProtocol(process.env.WAZUH_INDEXER_PROTOCOL, "https");
 
   if (!host || !user || !pass) {
     throw new Error(

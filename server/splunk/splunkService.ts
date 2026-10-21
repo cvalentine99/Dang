@@ -13,6 +13,7 @@
  */
 
 import { getDb } from "../db";
+import { asProtocol } from "../_core/protocol";
 import { connectionSettings } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { Agent } from "undici";
@@ -82,7 +83,7 @@ export async function getEffectiveSplunkConfig(): Promise<SplunkConfig> {
             if (row.settingValue) config.hecPort = row.settingValue;
             break;
           case "protocol":
-            if (row.settingValue) config.protocol = row.settingValue;
+            if (row.settingValue) config.protocol = asProtocol(row.settingValue, "https");
             break;
           case "enabled":
             config.enabled = row.settingValue === "true";
@@ -312,8 +313,17 @@ export async function testSplunkConnection(overrides?: {
     ...(overrides?.port && { port: overrides.port }),
     ...(overrides?.hecToken && { hecToken: overrides.hecToken }),
     ...(overrides?.hecPort && { hecPort: overrides.hecPort }),
-    ...(overrides?.protocol && { protocol: overrides.protocol }),
+    ...(overrides?.protocol && { protocol: asProtocol(overrides.protocol, "https") }),
   };
+
+  // Stored credentials are never sent to a host the caller supplied: testing a new
+  // host requires the caller to supply the token for that host as well.
+  if (overrides?.host && overrides.host !== saved.host && !overrides.hecToken) {
+    return {
+      success: false,
+      message: "Provide the HEC token when testing a new host — stored credentials are not sent to unsaved hosts.",
+    };
+  }
 
   // SSRF prevention: validate user-provided host overrides
   if (overrides?.host) {

@@ -29,6 +29,7 @@
  */
 
 import { z } from "zod";
+import { protocolSchema } from "../_core/protocol";
 import { router, protectedProcedure, adminProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import {
@@ -129,14 +130,17 @@ export const splunkRouter = router({
    */
   // Audit #29: Accept optional form overrides so the "Test Connection" button
   // tests the values currently in the form, not just the saved config.
-  testConnection: protectedProcedure
+  // Admin-only: this call can send the stored HEC token to the configured host, so it
+  // must never be reachable from a non-admin account (a form override of `host` or
+  // `protocol` would otherwise turn it into a credential-exfiltration primitive).
+  testConnection: adminProcedure
     .input(
       z.object({
-        host: z.string().optional(),
-        port: z.string().optional(),
-        hecToken: z.string().optional(),
-        hecPort: z.string().optional(),
-        protocol: z.string().optional(),
+        host: z.string().max(253).optional(),
+        port: z.string().max(5).optional(),
+        hecToken: z.string().max(256).optional(),
+        hecPort: z.string().max(5).optional(),
+        protocol: protocolSchema.optional(),
       }).optional()
     )
     .mutation(async ({ input }) => {

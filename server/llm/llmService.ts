@@ -14,6 +14,7 @@
  */
 
 import { getEffectiveSettings } from "../admin/connectionSettingsService";
+import { asProtocol } from "../_core/protocol";
 import { invokeLLM as invokeBuiltInLLM, type InvokeParams, type InvokeResult } from "../_core/llm";
 import { getDb } from "../db";
 import { llmUsage } from "../../drizzle/schema";
@@ -252,7 +253,7 @@ export async function getEffectiveLLMConfig(): Promise<LLMConfig> {
       model: values.model || ENV_DEFAULTS.model,
       apiKey: values.api_key || ENV_DEFAULTS.apiKey,
       enabled: values.enabled === "true" || (values.enabled === undefined && ENV_DEFAULTS.enabled),
-      protocol: values.protocol || ENV_DEFAULTS.protocol,
+      protocol: asProtocol(values.protocol, asProtocol(ENV_DEFAULTS.protocol, "http")),
     };
   } catch {
     // If DB is unavailable, fall back to env
@@ -569,7 +570,7 @@ export async function invokeLLMWithFallback(params: InvokeParams & { caller?: st
 export async function testLLMConnection(settings: Record<string, string>): Promise<LLMTestResult> {
   const host = settings.host;
   const port = settings.port || "30000";
-  const protocol = settings.protocol || "http";
+  const protocol = asProtocol(settings.protocol, "http");
   const apiKey = settings.api_key || "";
 
   if (!host) {

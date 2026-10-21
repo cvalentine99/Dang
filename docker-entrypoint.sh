@@ -46,13 +46,19 @@ if [ "$RUN_MIGRATIONS" = "true" ] && [ -n "$DATABASE_URL" ]; then
   # This handles the MySQL 8.0 limitation where CREATE INDEX (without IF NOT EXISTS)
   # fails on re-run if the previous attempt partially completed
   echo "[entrypoint] Running pre-migration repair..."
-  node scripts/docker-pre-migrate.mjs 2>&1 || echo "[entrypoint] WARNING: Pre-migration repair had issues, continuing..."
+  if ! node scripts/docker-pre-migrate.mjs 2>&1; then
+    echo "[entrypoint] FATAL: pre-migration repair failed — refusing to start with an unknown schema state."
+    exit 1
+  fi
 
   # Step 2: Backfill migration journal — ensures all previously-applied migrations
   # are recorded in __drizzle_migrations so drizzle-kit doesn't try to re-apply them.
   # This is idempotent: it only inserts entries that are missing.
   echo "[entrypoint] Checking migration journal integrity..."
-  node scripts/backfill-migrations.mjs 2>&1 || echo "[entrypoint] WARNING: Migration journal backfill had issues, continuing..."
+  if ! node scripts/backfill-migrations.mjs 2>&1; then
+    echo "[entrypoint] FATAL: migration journal backfill failed — refusing to start with an unknown schema state."
+    exit 1
+  fi
 
   # Step 3: Run drizzle-kit migrate — apply any genuinely new migrations
   echo "[entrypoint] Running database migrations..."
@@ -89,8 +95,17 @@ if [ "$RUN_MIGRATIONS" = "true" ] && [ -n "$DATABASE_URL" ]; then
 
   if [ "$KG_COUNT" = "0" ] || [ -z "$KG_COUNT" ]; then
     echo "[entrypoint] KG tables empty — running Knowledge Graph seeder..."
-    npx tsx seed-kg.mjs 2>&1 || echo "[entrypoint] WARNING: KG seeder failed, continuing..."
-    echo "[entrypoint] KG seeder complete."
+    # tsx is a runtime dependency (see package.json) so this never reaches out to the registry.
+    if node_modules/.bin/tsx seed-kg.mjs 2>&1; then
+      echo "[entrypoint] KG seeder complete."
+    else
+      echo "[entrypoint] ERROR: KG seeder failed."
+      if [ "$ALLOW_SEED_FAILURE" != "true" ]; then
+        echo "[entrypoint] Set ALLOW_SEED_FAILURE=true to start without a populated Knowledge Graph."
+        exit 1
+      fi
+      echo "[entrypoint] WARNING: ALLOW_SEED_FAILURE=true — starting with an empty Knowledge Graph."
+    fi
   else
     echo "[entrypoint] KG tables already populated ($KG_COUNT endpoints) — skipping seeder."
   fi

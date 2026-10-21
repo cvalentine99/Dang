@@ -81,7 +81,19 @@ async function startServer() {
     try {
       const { getDb } = await import("../db");
       const db = await getDb();
-      const dbOk = !!db;
+      // createPool() is lazy — a pool object exists even when MySQL is down — so a
+      // real round-trip is the only honest readiness signal. This endpoint drives the
+      // container HEALTHCHECK and the proxies' depends_on.
+      let dbOk = false;
+      if (db) {
+        try {
+          const { sql } = await import("drizzle-orm");
+          await db.execute(sql`SELECT 1`);
+          dbOk = true;
+        } catch {
+          dbOk = false;
+        }
+      }
       res.status(dbOk ? 200 : 503).json({
         status: dbOk ? "healthy" : "degraded",
         timestamp: new Date().toISOString(),

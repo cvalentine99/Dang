@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { asProtocol, isUpstreamProtocol } from "../_core/protocol";
 import { TRPCError } from "@trpc/server";
 import { adminProcedure, router } from "../_core/trpc";
 import {
@@ -77,6 +78,15 @@ export const connectionSettingsRouter = router({
           code: "BAD_REQUEST",
           message: "No settings provided",
         });
+      }
+
+      // Only two URL schemes are ever accepted — anything else could redirect
+      // upstream traffic (and credentials) to another origin.
+      for (const protoKey of ["protocol", "WAZUH_INDEXER_PROTOCOL"]) {
+        const v = filtered[protoKey];
+        if (v !== undefined && v !== "" && !isUpstreamProtocol(v.trim().toLowerCase())) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Invalid protocol "${v}": must be https or http` });
+        }
       }
 
       // Audit #7: Validate host fields before persisting to prevent SSRF via config
@@ -199,7 +209,7 @@ export const connectionSettingsRouter = router({
           }
         } else if (category === "wazuh_indexer") {
           // Test Wazuh Indexer: GET /_cluster/health
-          const protocol = merged.protocol || "https";
+          const protocol = asProtocol(merged.protocol, "https");
           const baseURL = `${protocol}://${connectHost}:${port || "9200"}`;
           const instance = axios.create({
             baseURL,
