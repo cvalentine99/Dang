@@ -22,7 +22,8 @@
 import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, and, desc, sql, count } from "drizzle-orm";
+import { eq, and, desc, sql, count, inArray } from "drizzle-orm";
+import { recordAnalystAction } from "../_core/analystAudit";
 import { nanoid } from "nanoid";
 import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -201,17 +202,44 @@ export const responseActionsRouter = router({
   // by another analyst. Per-action results are returned so the UI can show
   // exactly what succeeded and what conflicted.
   //
+  // P2-8/M12: a bulk approval is bound to ONE case — every actionId must belong to
+  // `caseId` (mismatches → BAD_REQUEST, nothing transitioned) and the batch is
+  // recorded as one analyst_action_audit row before any transition.
   bulkApprove: adminProcedure
     .input(z.object({
+      caseId: z.number().int(),
       actionIds: z.array(z.string().min(1)).min(1).max(50),
       reason: z.string().max(2000).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      const uniqueIds = Array.from(new Set(input.actionIds));
+      const owned = await db
+        .select({ actionId: responseActions.actionId, caseId: responseActions.caseId })
+        .from(responseActions)
+        .where(inArray(responseActions.actionId, uniqueIds));
+      const caseOf = new Map(owned.map((r) => [r.actionId, r.caseId]));
+      const mismatches = uniqueIds.filter((id) => caseOf.get(id) !== input.caseId);
+      if (mismatches.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Actions not found in case ${input.caseId}: ${mismatches.join(", ")}`,
+        });
+      }
+
+      await recordAnalystAction(db, {
+        userId: ctx.user.id,
+        action: "responseActions.bulkApprove",
+        targetType: "living_case",
+        targetId: input.caseId,
+        metadata: { actionIds: uniqueIds, reason: input.reason ?? null },
+      });
+
       const results: Array<{ actionId: string; success: boolean; error?: string }> = [];
       const affectedCaseIds = new Set<number>();
 
       // Transition each action but SKIP per-action case sync
-      for (const actionId of input.actionIds) {
+      for (const actionId of uniqueIds) {
         const result = await transitionActionState({
           actionId,
           targetState: "approved",

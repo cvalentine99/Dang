@@ -16,6 +16,8 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { autoQueueRules, alertQueue } from "../../drizzle/schema";
 import { eq, desc, and, inArray, sql } from "drizzle-orm";
+import { recordAnalystAction } from "../_core/analystAudit";
+import { getAlertTriageHistory, isTriageHistoryExhausted } from "./triageAttempts";
 import {
   getEffectiveIndexerConfig,
   indexerSearch,
@@ -261,6 +263,14 @@ async function pollAndEnqueue(): Promise<{ matched: number; queued: number; skip
           break; // Already queued, skip to next alert
         }
 
+        // M6: never re-enqueue an alert whose triage attempts are exhausted (poison
+        // loop every poll); otherwise the new row inherits the prior attempt count.
+        const history = await getAlertTriageHistory(db, alertId);
+        if (isTriageHistoryExhausted(history)) {
+          result.skipped++;
+          break;
+        }
+
         // Check rate limit
         const allowed = await checkRateLimit(rule.id);
         if (!allowed) {
@@ -282,6 +292,7 @@ async function pollAndEnqueue(): Promise<{ matched: number; queued: number; skip
             rawJson: src as unknown as Record<string, unknown>,
             status: "queued",
             // queuedBy omitted — defaults to NULL for auto-queued items (no user)
+            triageAttempts: history.maxAttempts,
           });
 
           result.queued++;
@@ -418,6 +429,15 @@ export const autoQueueRouter = router({
         createdBy: ctx.user?.id ?? null,
       });
 
+      // H-A5: detection-rule changes are attributed (the insert id is only known after the write).
+      await recordAnalystAction(db, {
+        userId: ctx.user.id,
+        action: "autoQueue.create",
+        targetType: "auto_queue_rule",
+        targetId: result.insertId,
+        metadata: { after: input },
+      });
+
       // Start polling if this is the first enabled rule
       await syncPollingState();
 
@@ -457,6 +477,21 @@ export const autoQueueRouter = router({
       if (updates.maxPerHour !== undefined) setValues.maxPerHour = updates.maxPerHour;
       if (updates.enabled !== undefined) setValues.enabled = updates.enabled ? 1 : 0;
 
+      const [before] = await db.select().from(autoQueueRules).where(eq(autoQueueRules.id, id)).limit(1);
+      if (!before) throw new TRPCError({ code: "NOT_FOUND", message: "Auto-queue rule not found" });
+      const beforeRec = before as unknown as Record<string, unknown>;
+      const diff: Record<string, { before: unknown; after: unknown }> = {};
+      for (const [k, v] of Object.entries(setValues)) {
+        if (beforeRec[k] !== v) diff[k] = { before: beforeRec[k] ?? null, after: v };
+      }
+      await recordAnalystAction(db, {
+        userId: ctx.user.id,
+        action: "autoQueue.update",
+        targetType: "auto_queue_rule",
+        targetId: id,
+        metadata: { name: before.name, diff },
+      });
+
       await db
         .update(autoQueueRules)
         .set(setValues)
@@ -480,6 +515,16 @@ export const autoQueueRouter = router({
 
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+      const [before] = await db.select().from(autoQueueRules).where(eq(autoQueueRules.id, input.id)).limit(1);
+      if (!before) throw new TRPCError({ code: "NOT_FOUND", message: "Auto-queue rule not found" });
+      await recordAnalystAction(db, {
+        userId: ctx.user.id,
+        action: "autoQueue.delete",
+        targetType: "auto_queue_rule",
+        targetId: input.id,
+        metadata: { before },
+      });
 
       await db.delete(autoQueueRules).where(eq(autoQueueRules.id, input.id));
 

@@ -24,6 +24,8 @@ import { alertQueue, pipelineRuns } from "../../drizzle/schema";
 import { eq, desc, asc, sql, and, inArray, gte } from "drizzle-orm";
 import { runTriageAgent } from "../agenticPipeline/triageAgent";
 import { getEffectiveIndexerConfig, indexerSearch, INDEX_PATTERNS } from "../indexer/indexerClient";
+import { recordAnalystAction, requireOwnerOrAdmin, isAdmin } from "../_core/analystAudit";
+import { getAlertTriageHistory, isTriageHistoryExhausted, MAX_TRIAGE_ATTEMPTS } from "./triageAttempts";
 
 const MAX_QUEUE_DEPTH = 10;
 
@@ -160,6 +162,29 @@ export const alertQueueRouter = router({
         return { success: false, message: "Alert already in queue", id: existing.id };
       }
 
+      // M6: lifecycle-aware dedup — a re-enqueued alert inherits its prior attempt
+      // count, and one that exhausted MAX_TRIAGE_ATTEMPTS is not re-queued (poison
+      // loop). An admin may deliberately re-queue it with a fresh budget (audited).
+      const history = await getAlertTriageHistory(db, clientInput.alertId);
+      let inheritedAttempts = history.maxAttempts;
+      if (isTriageHistoryExhausted(history)) {
+        if (!isAdmin(ctx)) {
+          return {
+            success: false,
+            message: `Alert exhausted its ${MAX_TRIAGE_ATTEMPTS} auto-triage attempts and was parked; an admin can re-queue it`,
+            id: null,
+          };
+        }
+        await recordAnalystAction(db, {
+          userId: ctx.user.id,
+          action: "alertQueue.requeueExhausted",
+          targetType: "alert",
+          targetId: clientInput.alertId,
+          metadata: { priorAttempts: history.maxAttempts, exhaustedRows: history.exhaustedRows },
+        });
+        inheritedAttempts = 0;
+      }
+
       // Server-authoritative alert facts. The client's ruleLevel/rawJson are hints only:
       // a forged ruleLevel could evict every real alert, and rawJson feeds the triage
       // prompt. When the indexer holds the alert, its document wins; when it cannot be
@@ -231,6 +256,7 @@ export const alertQueueRouter = router({
           rawJson: input.rawJson ?? null,
           status: "queued",
           queuedBy: ctx.user?.id ?? null,
+          triageAttempts: inheritedAttempts,
         });
 
         return { success: true, message: "Alert queued for structured triage", id: result.insertId };
@@ -254,8 +280,30 @@ export const alertQueueRouter = router({
    */
   remove: protectedProcedure
     .input(z.object({ id: z.number().int() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
+
+      // H-A5: dismissing an alert pre-triage is a shared-state mutation — only the
+      // analyst who queued it (or an admin) may do it, and it is always audited.
+      // Auto-queued items (queuedBy NULL) are team-owned; see below.
+      const [item] = await db
+        .select({ queuedBy: alertQueue.queuedBy, status: alertQueue.status, alertId: alertQueue.alertId })
+        .from(alertQueue)
+        .where(eq(alertQueue.id, input.id))
+        .limit(1);
+      if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "Queue item not found" });
+      // Team-global SOC model: items the poller queued (queuedBy NULL) belong to the team,
+      // so any analyst may dismiss them (always audited). Items a person queued are theirs
+      // or an admin's to dismiss.
+      if (item.queuedBy !== null) requireOwnerOrAdmin(ctx, item.queuedBy, "queued alert");
+
+      await recordAnalystAction(db, {
+        userId: ctx.user.id,
+        action: "alertQueue.remove",
+        targetType: "alert_queue",
+        targetId: input.id,
+        metadata: { priorStatus: item.status, alertId: item.alertId, queuedBy: item.queuedBy },
+      });
 
       await db
         .update(alertQueue)
@@ -435,6 +483,7 @@ export const alertQueueRouter = router({
               .set({
                 status: "failed",
                 autoTriageStatus: "failed",
+                triageAttempts: sql`${alertQueue.triageAttempts} + 1`,
                 triageResult: {
                   answer: `Triage failed: ${result.error ?? "Unknown error"}`,
                   reasoning: "Pipeline error during structured triage",
@@ -459,6 +508,7 @@ export const alertQueueRouter = router({
           .set({
             status: "failed",
             autoTriageStatus: "failed",
+            triageAttempts: sql`${alertQueue.triageAttempts} + 1`,
             triageResult: {
               answer: `Analysis failed: ${(err as Error).message}`,
               reasoning: "Pipeline error during structured triage",

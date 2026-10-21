@@ -500,6 +500,7 @@ describe("runHypothesisAgent (real function, mocked LLM)", () => {
       const { runHypothesisAgent } = await import("./hypothesisAgent");
       const result = await runHypothesisAgent({
         correlationId: testCorrelationId,
+        userId: 1,
       });
 
       // ── Verify structure ──────────────────────────────────────────────

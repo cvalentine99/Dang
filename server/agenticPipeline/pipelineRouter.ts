@@ -53,7 +53,9 @@ import {
   STALE_RUN_TTL_MS,
 } from "./resumePipelineHelper";
 import { getDb } from "../db";
-import { triageObjects, alertQueue, correlationBundles, livingCaseState, pipelineRuns, responseActions } from "../../drizzle/schema";
+import { triageObjects, alertQueue, correlationBundles, livingCaseState, pipelineRuns, responseActions, investigationSessions } from "../../drizzle/schema";
+import { recordAnalystAction, isAdmin } from "../_core/analystAudit";
+import { recordAutoTriageFailure } from "../alertQueue/triageAttempts";
 import { eq, desc, sql, and, lt, inArray } from "drizzle-orm";
 
 export const pipelineRouter = router({
@@ -163,6 +165,7 @@ export const pipelineRouter = router({
       try {
         const result = await runCorrelationAgent({
           triageId: input.triageId,
+          userId: ctx.user.id,
           lookbackHours: input.lookbackHours,
           includeThreatIntel: input.includeThreatIntel,
           maxAlertsPerSource: input.maxPerSource,
@@ -236,15 +239,30 @@ export const pipelineRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
-      // Find the triage object
+      // Find the triage object (with the current sign-off, for the override check + audit)
       const [row] = await db
-        .select({ id: triageObjects.id, triageId: triageObjects.triageId })
+        .select({
+          id: triageObjects.id,
+          triageId: triageObjects.triageId,
+          analystUserId: triageObjects.analystUserId,
+          analystConfirmed: triageObjects.analystConfirmed,
+          analystSeverityOverride: triageObjects.analystSeverityOverride,
+          analystRouteOverride: triageObjects.analystRouteOverride,
+        })
         .from(triageObjects)
         .where(eq(triageObjects.triageId, input.triageId))
         .limit(1);
 
       if (!row) {
         return { success: false as const, error: "Triage object not found" };
+      }
+
+      // H-A5: overwriting another analyst's sign-off requires admin.
+      if (row.analystUserId != null && row.analystUserId !== ctx.user.id && !isAdmin(ctx)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "This triage was already signed off by another analyst; only that analyst or an admin can change it.",
+        });
       }
 
       // Build the update
@@ -265,6 +283,27 @@ export const pipelineRouter = router({
       if (input.notes !== undefined) {
         updateData.analystNotes = input.notes;
       }
+
+      await recordAnalystAction(db, {
+        userId: ctx.user.id,
+        action: "pipeline.submitFeedback",
+        targetType: "triage_object",
+        targetId: input.triageId,
+        metadata: {
+          before: {
+            analystUserId: row.analystUserId,
+            confirmed: row.analystConfirmed,
+            severityOverride: row.analystSeverityOverride,
+            routeOverride: row.analystRouteOverride,
+          },
+          after: {
+            confirmed: updateData.analystConfirmed ?? row.analystConfirmed,
+            severityOverride: updateData.analystSeverityOverride ?? row.analystSeverityOverride,
+            routeOverride: updateData.analystRouteOverride ?? row.analystRouteOverride,
+          },
+          overrodeOtherAnalyst: row.analystUserId != null && row.analystUserId !== ctx.user.id,
+        },
+      });
 
       await db
         .update(triageObjects)
@@ -535,6 +574,7 @@ export const pipelineRouter = router({
               autoTriageStatus: "completed",
               status: "triaged",
               processedAt: new Date(),
+              triageAttempts: 0, // M6: success resets the poison counter
             })
             .where(and(eq(alertQueue.id, input.queueItemId), inArray(alertQueue.status, ["processing"])));
           if (getAffectedRows(doneRes) === 0) {
@@ -551,11 +591,11 @@ export const pipelineRouter = router({
         } else {
           // Release the claim back to 'queued' (pre-C14 behaviour: a failed auto-triage
           // leaves the item queued and retryable via Structured Triage / Full Pipeline).
-          const failRes = await db
-            .update(alertQueue)
-            .set({ autoTriageStatus: "failed", status: "queued" })
-            .where(and(eq(alertQueue.id, input.queueItemId), inArray(alertQueue.status, ["processing"])));
-          if (getAffectedRows(failRes) === 0) {
+          // M6: bounded retries — after MAX_TRIAGE_ATTEMPTS the item is parked as exhausted.
+          const fail = await recordAutoTriageFailure(db, input.queueItemId, {
+            actorUserId: ctx.user.id, source: "pipeline.autoTriageQueueItem", error: result.error,
+          });
+          if (!fail.released) {
             console.warn(`[Pipeline] autoTriageQueueItem: queue item ${input.queueItemId} left 'processing' — not releasing claim`);
           }
 
@@ -565,11 +605,10 @@ export const pipelineRouter = router({
           };
         }
       } catch (err) {
-        const failRes = await db
-          .update(alertQueue)
-          .set({ autoTriageStatus: "failed", status: "queued" })
-          .where(and(eq(alertQueue.id, input.queueItemId), inArray(alertQueue.status, ["processing"])));
-        if (getAffectedRows(failRes) === 0) {
+        const fail = await recordAutoTriageFailure(db, input.queueItemId, {
+          actorUserId: ctx.user.id, source: "pipeline.autoTriageQueueItem", error: (err as Error).message,
+        });
+        if (!fail.released) {
           console.warn(`[Pipeline] autoTriageQueueItem: queue item ${input.queueItemId} left 'processing' — not marking failed`);
         }
 
@@ -636,6 +675,22 @@ export const pipelineRouter = router({
       existingSessionId: z.number().int().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+      // C9: existingSessionId is client-supplied — only the session's owner may merge
+      // into it (investigation sessions are strictly per-analyst; admin read-only).
+      if (input.existingSessionId !== undefined) {
+        const db = await requireDb();
+        const [session] = await db
+          .select({ userId: investigationSessions.userId })
+          .from(investigationSessions)
+          .where(eq(investigationSessions.id, input.existingSessionId))
+          .limit(1);
+        if (!session || session.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You can only merge hypotheses into your own investigation sessions.",
+          });
+        }
+      }
       try {
         const result = await runHypothesisAgent({
           correlationId: input.correlationId,
@@ -747,6 +802,20 @@ export const pipelineRouter = router({
 
         caseData.lastUpdatedAt = new Date().toISOString();
         caseData.lastUpdatedBy = "analyst_manual";
+
+        // H-A5: team-global write, but every pivot is attributed (same tx as the write).
+        await recordAnalystAction(tx, {
+          userId: ctx.user.id,
+          action: "pipeline.recordPivot",
+          targetType: "living_case",
+          targetId: input.caseId,
+          metadata: {
+            sessionId: row.sessionId,
+            action: input.action.slice(0, 500),
+            impactedTheory: input.impactedTheory,
+            pivotIndex: caseData.completedPivots.length - 1,
+          },
+        });
 
         await tx
           .update(livingCaseState)
@@ -865,6 +934,7 @@ export const pipelineRouter = router({
                 autoTriageStatus: "completed",
                 status: "triaged",
                 processedAt: new Date(),
+                triageAttempts: 0, // M6: success resets the poison counter
               })
               .where(and(eq(alertQueue.id, item.id), inArray(alertQueue.status, ["processing"])));
             if (getAffectedRows(doneRes) === 0) {
@@ -874,11 +944,10 @@ export const pipelineRouter = router({
             triaged++;
             results.push({ queueItemId: item.id, alertId: item.alertId, triageId: result.triageId });
           } else {
-            const failRes = await db
-              .update(alertQueue)
-              .set({ autoTriageStatus: "failed", status: "queued" })
-              .where(and(eq(alertQueue.id, item.id), inArray(alertQueue.status, ["processing"])));
-            if (getAffectedRows(failRes) === 0) {
+            const fail = await recordAutoTriageFailure(db, item.id, {
+              actorUserId: ctx.user.id, source: "pipeline.autoTriageAllPending", error: result.error,
+            });
+            if (!fail.released) {
               console.warn(`[Pipeline] autoTriageAllPending: queue item ${item.id} left 'processing' — not releasing claim`);
             }
 
@@ -886,11 +955,13 @@ export const pipelineRouter = router({
             results.push({ queueItemId: item.id, alertId: item.alertId, error: result.error });
           }
         } catch (err) {
-          const failRes = await db
-            .update(alertQueue)
-            .set({ autoTriageStatus: "failed", status: "queued" })
-            .where(and(eq(alertQueue.id, item.id), inArray(alertQueue.status, ["processing"])));
-          if (getAffectedRows(failRes) === 0) {
+          const fail = await recordAutoTriageFailure(db, item.id, {
+            actorUserId: ctx.user.id, source: "pipeline.autoTriageAllPending", error: (err as Error).message,
+          }).catch((e: Error) => {
+            console.error(`[Pipeline] autoTriageAllPending: failure bookkeeping for ${item.id} failed:`, e.message);
+            return { released: false, exhausted: false, attempts: 0 };
+          });
+          if (!fail.released) {
             console.warn(`[Pipeline] autoTriageAllPending: queue item ${item.id} left 'processing' — not releasing claim`);
           }
 
@@ -939,6 +1010,19 @@ export const pipelineRouter = router({
         ? resolvedRawId
         : `hash-${createHash("sha256").update(JSON.stringify(input.rawAlert)).digest("hex").slice(0, 16)}`;
       const startTime = Date.now();
+
+      // H-A5: never bind an arbitrary rawAlert's provenance to someone else's queue row.
+      if (input.queueItemId) {
+        const [qi] = await db
+          .select({ alertId: alertQueue.alertId })
+          .from(alertQueue)
+          .where(eq(alertQueue.id, input.queueItemId))
+          .limit(1);
+        if (!qi) throw new TRPCError({ code: "NOT_FOUND", message: "Queue item not found" });
+        if (qi.alertId !== alertId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "rawAlert does not match the alert of the given queueItemId" });
+        }
+      }
 
       // ── Audit #83: Concurrent pipeline guard on same alert ──────────────────
       // Prevent multiple pipelines from processing the same alert simultaneously.
@@ -1106,6 +1190,7 @@ export const pipelineRouter = router({
 
         const corrResult = await runCorrelationAgent({
           triageId: result.stages.triage.triageId!,
+          userId: ctx.user.id,
         });
 
         result.stages.correlation = {

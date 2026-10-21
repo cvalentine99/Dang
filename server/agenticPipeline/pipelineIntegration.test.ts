@@ -282,6 +282,7 @@ describe("Pipeline Integration — triage → correlation → hypothesis", () =>
     const { runHypothesisAgent } = await import("./hypothesisAgent");
     const hypoResult = await runHypothesisAgent({
       correlationId: corrResult.correlationId,
+      userId: 1,
     });
 
     expect(hypoResult.caseId).toBeDefined();
@@ -375,9 +376,10 @@ describe("Pipeline Integration — triage → correlation → hypothesis", () =>
       userId: 1,
     });
     const corr = await runCorrelationAgent({ triageId: triage.triageId! });
-    const hypo = await runHypothesisAgent({ correlationId: corr.correlationId });
+    const hypo = await runHypothesisAgent({ correlationId: corr.correlationId, userId: 1 });
 
-    // The critical assertion: userId must be actual NULL, not empty string
+    // C9 (2026-10-21): system-created sessions are attributed to the triggering
+    // analyst — never NULL, and never the old "" serialization bug.
     const { getDb } = await import("../db");
     const { investigationSessions } = await import("../../drizzle/schema");
     const { eq } = await import("drizzle-orm");
@@ -389,8 +391,8 @@ describe("Pipeline Integration — triage → correlation → hypothesis", () =>
       .limit(1);
 
     expect(session).toBeDefined();
-    // This was the bug: userId was "" instead of null
-    expect(session.userId).toBeNull();
+    // Original bug: userId was "" instead of null. Now it must be the triggering user.
+    expect(session.userId).toBe(1);
     expect(session.title).toBeTruthy();
     expect(session.status).toBe("active");
   }, 30_000);

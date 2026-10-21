@@ -19,6 +19,7 @@ import { nanoid } from "nanoid";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { analystNotes, ragSessions } from "../../drizzle/schema";
+import { recordAnalystAction, requireOwnerOrAdmin, isAdmin } from "../_core/analystAudit";
 import { invokeLLMWithFallback, getEffectiveLLMConfig } from "../llm/llmService";
 import { isWazuhConfigured, wazuhGet, getWazuhConfig, getEffectiveWazuhConfig } from "../wazuh/wazuhClient";
 
@@ -77,20 +78,53 @@ async function buildWazuhContext(): Promise<string> {
     return "No Wazuh connection configured. Answering from general security knowledge only.";
   }
   const lines: string[] = ["## Live Wazuh Telemetry Context\n"];
+  // M8: live Wazuh JSON is attacker-influenced (agent names, etc.) — frame it as untrusted.
+  const { wrapUntrustedData } = await import("../enhancedLLM/enhancedLLMService");
 
   try {
     const summary = await wazuhGet(config, { path: "/agents/summary/status" }) as Record<string, unknown>;
     const data = (summary as { data?: Record<string, unknown> }).data ?? summary;
-    lines.push(`### Agent Summary\n${JSON.stringify(data, null, 2)}\n`);
+    lines.push(`### Agent Summary\n${wrapUntrustedData(data)}\n`);
   } catch { lines.push("Agent summary: unavailable\n"); }
 
   try {
     const analysisd = await wazuhGet(config, { path: "/manager/stats/analysisd" }) as Record<string, unknown>;
     const data = (analysisd as { data?: Record<string, unknown> }).data ?? analysisd;
-    lines.push(`### Analysis Engine Stats\n${JSON.stringify(data, null, 2)}\n`);
+    lines.push(`### Analysis Engine Stats\n${wrapUntrustedData(data)}\n`);
   } catch { lines.push("Analysisd stats: unavailable\n"); }
 
   return lines.join("\n");
+}
+
+// ── RAG session ownership (C8/H-A4) ───────────────────────────────────────────
+/**
+ * Chat sessions are strictly per-analyst. Returns normally when the caller may
+ * read/write `sessionId`; throws FORBIDDEN otherwise. A sessionId with no rows
+ * is a new session (caller becomes owner on first write). Legacy rows
+ * (userId NULL) are admin-only. Admin may access any session.
+ */
+type RagDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+export async function assertRagSessionAccess(
+  db: RagDb,
+  ctx: { user: { id: number; role?: string | null } },
+  sessionId: string,
+): Promise<void> {
+  if (isAdmin(ctx)) return;
+  const owners = await db
+    .selectDistinct({ userId: ragSessions.userId })
+    .from(ragSessions)
+    .where(eq(ragSessions.sessionId, sessionId))
+    .limit(5);
+  if (owners.some((o) => o.userId !== ctx.user.id)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "This chat session belongs to another analyst." });
+  }
+}
+
+/** Row predicate for a session's messages: admin sees all rows, analysts only their own. */
+function ragSessionScope(ctx: { user: { id: number; role?: string | null } }, sessionId: string) {
+  return isAdmin(ctx)
+    ? eq(ragSessions.sessionId, sessionId)
+    : and(eq(ragSessions.sessionId, sessionId), eq(ragSessions.userId, ctx.user.id));
 }
 
 // ── System prompt ─────────────────────────────────────────────────────────────
@@ -147,15 +181,19 @@ export const hybridragRouter = router({
         injectWazuhContext: z.boolean().default(true),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
 
-      // Load conversation history
+      // C8/H-A4: a sessionId owned by another analyst is FORBIDDEN (read AND write —
+      // injected turns would be replayed to the victim as trusted dialogue).
+      if (db) await assertRagSessionAccess(db, ctx, input.sessionId);
+
+      // Load conversation history (owner-scoped; admin sees the full session)
       const history = db
         ? await db
             .select()
             .from(ragSessions)
-            .where(eq(ragSessions.sessionId, input.sessionId))
+            .where(ragSessionScope(ctx, input.sessionId))
             .orderBy(ragSessions.createdAt)
             .limit(20)
         : [];
@@ -198,11 +236,13 @@ export const hybridragRouter = router({
             role: "user",
             content: input.message,
             contextSnapshot: input.pageContext,
+            userId: ctx.user.id,
           },
           {
             sessionId: input.sessionId,
             role: "assistant",
             content: response,
+            userId: ctx.user.id,
           },
         ]);
       }
@@ -217,20 +257,31 @@ export const hybridragRouter = router({
   // ── Session history ─────────────────────────────────────────────────────────
   sessionHistory: protectedProcedure
     .input(z.object({ sessionId: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await requireDb();
+      await assertRagSessionAccess(db, ctx, input.sessionId);
       return db
         .select()
         .from(ragSessions)
-        .where(eq(ragSessions.sessionId, input.sessionId))
+        .where(ragSessionScope(ctx, input.sessionId))
         .orderBy(ragSessions.createdAt);
     }),
 
   clearSession: protectedProcedure
     .input(z.object({ sessionId: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
-        await db.delete(ragSessions).where(eq(ragSessions.sessionId, input.sessionId));
+      await assertRagSessionAccess(db, ctx, input.sessionId);
+      if (isAdmin(ctx)) {
+        // Admin may clear any session (incl. legacy NULL-owner rows) — attributed.
+        await recordAnalystAction(db, {
+          userId: ctx.user.id,
+          action: "hybridrag.clearSession",
+          targetType: "rag_session",
+          targetId: input.sessionId,
+        });
+      }
+      await db.delete(ragSessions).where(ragSessionScope(ctx, input.sessionId));
       return { success: true };
     }),
 
@@ -245,12 +296,15 @@ export const hybridragRouter = router({
           resolved: z.boolean().optional(),
           limit: z.number().int().min(1).max(200).default(50),
           offset: z.number().int().min(0).default(0),
+          /** Team-global read is allowed, but the default view is the caller's own notes (H-A4). */
+          includeTeam: z.boolean().default(false),
         })
       )
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await requireDb();
 
         const conditions = [];
+        if (!input.includeTeam) conditions.push(eq(analystNotes.createdBy, ctx.user.id));
         if (input.agentId) conditions.push(eq(analystNotes.agentId, input.agentId));
         if (input.ruleId) conditions.push(eq(analystNotes.ruleId, input.ruleId));
         if (input.severity) conditions.push(eq(analystNotes.severity, input.severity));
@@ -258,16 +312,13 @@ export const hybridragRouter = router({
           conditions.push(eq(analystNotes.resolved, input.resolved ? 1 : 0));
         }
 
-        const query = db
+        const notes = await db
           .select()
           .from(analystNotes)
+          .where(conditions.length > 0 ? and(...conditions) : undefined)
           .orderBy(desc(analystNotes.createdAt))
           .limit(input.limit)
           .offset(input.offset);
-
-        const notes = conditions.length > 0
-          ? await db.select().from(analystNotes).where(and(...conditions)).orderBy(desc(analystNotes.createdAt)).limit(input.limit).offset(input.offset)
-          : await query;
 
         return { notes };
       }),
@@ -323,9 +374,8 @@ export const hybridragRouter = router({
         const [note] = await db.select({ createdBy: analystNotes.createdBy })
           .from(analystNotes).where(eq(analystNotes.id, input.id)).limit(1);
         if (!note) throw new TRPCError({ code: "NOT_FOUND", message: "Note not found" });
-        if (note.createdBy !== null && note.createdBy !== ctx.user.id && ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "You can only edit your own notes" });
-        }
+        // H-A4: no null-owner fail-open — a NULL owner (legacy note) is admin-only.
+        requireOwnerOrAdmin(ctx, note.createdBy, "note");
 
         const updates: Partial<typeof analystNotes.$inferInsert> = {};
         if (input.title !== undefined) updates.title = input.title;
@@ -334,6 +384,13 @@ export const hybridragRouter = router({
         if (input.resolved !== undefined) updates.resolved = input.resolved ? 1 : 0;
         if (input.tags !== undefined) updates.tags = input.tags;
 
+        await recordAnalystAction(db, {
+          userId: ctx.user.id,
+          action: "notes.update",
+          targetType: "analyst_note",
+          targetId: input.id,
+          metadata: { ownerUserId: note.createdBy, fields: Object.keys(updates) },
+        });
         await db.update(analystNotes).set(updates).where(eq(analystNotes.id, input.id));
         return { success: true };
       }),
@@ -348,10 +405,15 @@ export const hybridragRouter = router({
         const [note] = await db.select({ createdBy: analystNotes.createdBy })
           .from(analystNotes).where(eq(analystNotes.id, input.id)).limit(1);
         if (!note) throw new TRPCError({ code: "NOT_FOUND", message: "Note not found" });
-        if (note.createdBy !== null && note.createdBy !== ctx.user.id && ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "You can only delete your own notes" });
-        }
+        requireOwnerOrAdmin(ctx, note.createdBy, "note");
 
+        await recordAnalystAction(db, {
+          userId: ctx.user.id,
+          action: "notes.delete",
+          targetType: "analyst_note",
+          targetId: input.id,
+          metadata: { ownerUserId: note.createdBy },
+        });
         await db.delete(analystNotes).where(eq(analystNotes.id, input.id));
         return { success: true };
       }),

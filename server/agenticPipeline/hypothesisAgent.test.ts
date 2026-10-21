@@ -193,7 +193,7 @@ describe("runHypothesisAgent — full pipeline", () => {
       const { runHypothesisAgent } = await import("./hypothesisAgent");
       mockLLMResponse.mockResolvedValueOnce(makeHypothesisLLMResponse());
 
-      const result = await runHypothesisAgent({ correlationId: testCorrelationId });
+      const result = await runHypothesisAgent({ correlationId: testCorrelationId, userId: 1 });
 
       expect(result.caseId).toBeGreaterThan(0);
       expect(result.materializedActionIds.length).toBeGreaterThan(0);
@@ -245,6 +245,7 @@ describe("runHypothesisAgent — full pipeline", () => {
       const result = await runHypothesisAgent({
         correlationId: testCorrelationId,
         existingSessionId: testSessionId,
+        userId: 1, // C9: must be the session's owner (created above as user 1)
       });
 
       // Should reuse the same session and case state
@@ -388,7 +389,7 @@ describe("runHypothesisAgent — response action materialization", () => {
         ],
       }));
 
-      const result = await runHypothesisAgent({ correlationId });
+      const result = await runHypothesisAgent({ correlationId, userId: 1 });
 
       expect(result.materializedActionIds.length).toBe(2);
       // All materialized actions should start in "proposed" state
@@ -408,7 +409,7 @@ describe("runHypothesisAgent — response action materialization", () => {
         recommendedActions: [],
       }));
 
-      const result = await runHypothesisAgent({ correlationId });
+      const result = await runHypothesisAgent({ correlationId, userId: 1 });
 
       expect(result.caseId).toBeGreaterThan(0);
       // No new actions to materialize
@@ -459,7 +460,7 @@ describe("runHypothesisAgent — edge cases", () => {
         ],
       }));
 
-      const result = await runHypothesisAgent({ correlationId: corr.correlationId });
+      const result = await runHypothesisAgent({ correlationId: corr.correlationId, userId: 1 });
 
       expect(result.caseId).toBeGreaterThan(0);
       expect(result.materializedActionIds.length).toBe(0);

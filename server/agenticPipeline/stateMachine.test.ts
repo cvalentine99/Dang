@@ -354,7 +354,7 @@ describe("transitionActionState (real DB)", () => {
       usage: { prompt_tokens: 300, completion_tokens: 150 },
     });
 
-    const hypoResult = await runHypothesisAgent({ correlationId: corrResult.correlationId });
+    const hypoResult = await runHypothesisAgent({ correlationId: corrResult.correlationId, userId: 1 });
     testCaseId = hypoResult.caseId;
 
     // Get the first materialized action ID

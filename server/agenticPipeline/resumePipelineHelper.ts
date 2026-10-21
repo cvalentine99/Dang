@@ -27,6 +27,7 @@ import {
   livingCaseState,
 } from "../../drizzle/schema";
 import { runTriageAgent } from "./triageAgent";
+import { MAX_TRIAGE_ATTEMPTS, EXHAUSTED_STATUS } from "../alertQueue/triageAttempts";
 import { runCorrelationAgent } from "./correlationAgent";
 import { runHypothesisAgent, rematerializeResponseActions } from "./hypothesisAgent";
 
@@ -81,15 +82,21 @@ type PipelineDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 export async function sweepStaleAutoTriage(db: PipelineDb): Promise<number> {
   try {
     const cutoff = new Date(Date.now() - STALE_RUN_TTL_MS);
+    // A crashed attempt still counts as an attempt (M6): an alert that crashes the
+    // worker must not loop forever. Items at the cap are parked as exhausted.
     const res = await db.update(alertQueue)
-      .set({ autoTriageStatus: "pending", status: "queued" })
+      .set({
+        autoTriageStatus: sql`CASE WHEN ${alertQueue.triageAttempts} + 1 >= ${MAX_TRIAGE_ATTEMPTS} THEN ${EXHAUSTED_STATUS} ELSE 'pending' END`,
+        status: sql`CASE WHEN ${alertQueue.triageAttempts} + 1 >= ${MAX_TRIAGE_ATTEMPTS} THEN 'failed' ELSE 'queued' END`,
+        triageAttempts: sql`${alertQueue.triageAttempts} + 1`,
+      })
       .where(and(
         eq(alertQueue.autoTriageStatus, "running"),
         inArray(alertQueue.status, ["queued", "processing"]),
         sql`COALESCE(${alertQueue.processedAt}, ${alertQueue.queuedAt}) < ${cutoff}`,
       ));
     const n = getAffectedRows(res);
-    if (n > 0) console.warn(`[Pipeline] stale auto-triage sweep reset ${n} queue item(s) to pending/queued`);
+    if (n > 0) console.warn(`[Pipeline] stale auto-triage sweep released ${n} queue item(s) (attempt counted; exhausted ones parked as failed)`);
     return n;
   } catch (sweepErr) {
     console.error("[Pipeline] stale auto-triage sweep failed:", (sweepErr as Error).message);

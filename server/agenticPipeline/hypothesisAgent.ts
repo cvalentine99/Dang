@@ -28,6 +28,7 @@ import {
 import { eq, desc, and, sql } from "drizzle-orm";
 import { recomputeCaseSummary, syncCaseSummaryAfterTransition } from "./stateMachine";
 import { invokeLLMWithFallback } from "../llm/llmService";
+import { sanitizeForPrompt, sanitizeKey as sanitizeKeyLike, truncateForPrompt, wrapUntrustedData, UNTRUSTED_DATA_SYSTEM_INSTRUCTION } from "./sanitizeForPrompt";
 import type { InvokeResult } from "../_core/llm";
 import type { CorrelationBundleRow, TriageObjectRow } from "../../drizzle/schema";
 import type { LLMHypothesisRaw } from "./types/LLMHypothesisRaw";
@@ -47,8 +48,11 @@ export interface HypothesisAgentInput {
   correlationId: string;
   /** Optional: existing investigation session to merge into */
   existingSessionId?: number;
-  /** Optional: authenticated user ID to attribute the session to */
-  userId?: number;
+  /**
+   * Triggering analyst (ctx.user.id). Required (C9): an existingSessionId is only
+   * honoured when owned by this user, and new sessions are always attributed to it.
+   */
+  userId: number;
 }
 
 export interface HypothesisAgentResult {
@@ -125,18 +129,26 @@ async function assembleContext(correlationId: string): Promise<HypothesisContext
  */
 async function resolveSession(
   ctx: HypothesisContext,
-  existingSessionId?: number,
-  userId?: number
+  existingSessionId: number | undefined,
+  userId: number
 ): Promise<{ sessionId: number; isNew: boolean }> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  // C9: investigation sessions are strictly per-analyst — never create/merge unattributed.
+  if (!Number.isInteger(userId) || userId <= 0) {
+    throw new Error("Hypothesis agent requires the triggering analyst's user id");
+  }
 
-  // If merging into an existing session, verify it exists
+  // If merging into an existing session, verify it exists AND belongs to the
+  // triggering analyst (C9: existingSessionId is client-supplied).
   if (existingSessionId) {
     const [existing] = await db
       .select({ id: investigationSessions.id })
       .from(investigationSessions)
-      .where(eq(investigationSessions.id, existingSessionId))
+      .where(and(
+        eq(investigationSessions.id, existingSessionId),
+        eq(investigationSessions.userId, userId),
+      ))
       .limit(1);
 
     if (existing) {
@@ -157,6 +169,8 @@ async function resolveSession(
       .where(and(
         eq(investigationSessions.id, caseRec.mergeTargetId),
         eq(investigationSessions.status, "active"),
+        // C9 sibling: the model may only merge into the triggering analyst's own session
+        eq(investigationSessions.userId, userId),
       ))
       .limit(1);
 
@@ -185,10 +199,8 @@ async function resolveSession(
     title,
     description: ctx.triage.summary ?? `Investigation triggered by alert ${ctx.triage.alertId}`,
     status: "active",
-    // Use spread to conditionally include userId — avoids Drizzle null-serialization bug
-    // When userId is provided (e.g., from Continue Pipeline), attribute session to the analyst
-    // When omitted, column defaults to NULL for system-created sessions
-    ...(userId ? { userId } : {}),
+    // C9: always attributed to the triggering analyst — never NULL.
+    userId,
   }).$returningId();
 
   return { sessionId: result.id, isNew: true };
@@ -293,7 +305,9 @@ function buildSessionTitle(triage: TriageObject, bundle: CorrelationBundle): str
 
 // ── LLM Hypothesis Synthesis ────────────────────────────────────────────────
 
-const HYPOTHESIS_SYSTEM_PROMPT = `You are a senior SOC analyst performing hypothesis generation for a security investigation.
+const HYPOTHESIS_SYSTEM_PROMPT = `${UNTRUSTED_DATA_SYSTEM_INSTRUCTION}
+
+You are a senior SOC analyst performing hypothesis generation for a security investigation.
 
 You receive:
 1. A TriageObject (the alert that started this investigation)
@@ -349,9 +363,10 @@ Rules:
 function buildHypothesisPrompt(ctx: HypothesisContext, sessionId: number): string {
   const parts: string[] = [
     "## Source Triage Object",
-    "```json",
-    JSON.stringify(
-      {
+    // H-L2: sanitize keys+values and truncate per field BEFORE serialization,
+    // then frame with a nonce delimiter (no post-stringify .slice).
+    wrapUntrustedData(
+      truncateForPrompt(sanitizeForPrompt({
         triageId: ctx.triage.triageId,
         alertId: ctx.triage.alertId,
         ruleId: ctx.triage.ruleId,
@@ -372,16 +387,13 @@ function buildHypothesisPrompt(ctx: HypothesisContext, sessionId: number): strin
         keyEvidence: ctx.triage.keyEvidence?.slice(0, 5),
         uncertainties: ctx.triage.uncertainties,
         caseLink: ctx.triage.caseLink,
-      },
-      null,
-      2
-    ).slice(0, 4000),
-    "```",
+      }), 4000),
+      6000
+    ),
     "",
     "## Correlation Bundle",
-    "```json",
-    JSON.stringify(
-      {
+    wrapUntrustedData(
+      truncateForPrompt(sanitizeForPrompt({
         correlationId: ctx.bundle.correlationId,
         relatedAlerts: ctx.bundle.relatedAlerts?.slice(0, 15),
         discoveredEntities: ctx.bundle.discoveredEntities?.slice(0, 20),
@@ -395,17 +407,15 @@ function buildHypothesisPrompt(ctx: HypothesisContext, sessionId: number): strin
         synthesis: ctx.bundle.synthesis,
         synthesisConfidence: ctx.bundle.synthesis?.confidence,
         clusteredTechniques: ctx.bundle.campaignAssessment?.clusteredTechniques?.slice(0, 10),
-      },
-      null,
-      2
-    ).slice(0, 6000),
-    "```",
+      }), 6000),
+      9000
+    ),
     "",
     `## Investigation Context`,
     `- Case ID: ${sessionId}`,
     `- Blast Radius: ${ctx.bundle.blastRadius?.affectedHosts ?? 0} hosts, ${ctx.bundle.blastRadius?.affectedUsers ?? 0} users`,
     `- Synthesis Confidence: ${ctx.bundle.synthesis?.confidence ?? "N/A"}`,
-    `- Campaign: ${ctx.bundle.campaignAssessment?.likelyCampaign ? ctx.bundle.campaignAssessment.campaignLabel ?? "Unnamed" : "Not detected"}`,
+    `- Campaign: ${ctx.bundle.campaignAssessment?.likelyCampaign ? JSON.stringify(sanitizeKeyLike(ctx.bundle.campaignAssessment.campaignLabel ?? "Unnamed")) : "Not detected"}`,
     `- Related Alerts: ${ctx.bundle.relatedAlerts?.length ?? 0}`,
     `- Vulnerabilities: ${ctx.bundle.vulnerabilityContext?.length ?? 0}`,
     `- FIM Events: ${ctx.bundle.fimContext?.length ?? 0}`,
@@ -968,6 +978,7 @@ export async function runHypothesisAgent(
     ],
     response_format: HYPOTHESIS_JSON_SCHEMA,
     caller: "hypothesis_agent",
+    userId: input.userId,
   });
 
   // 4. Parse the structured response

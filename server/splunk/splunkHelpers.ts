@@ -81,11 +81,18 @@ export interface RecordArtifactParams {
  * IMPORTANT: Drizzle passes `undefined` as empty string to MySQL, which breaks
  * nullable int/varchar columns. All nullable fields are explicitly coerced to null.
  */
-export async function recordTicketArtifact(params: RecordArtifactParams): Promise<void> {
+type DbRoot = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type TxLike = Parameters<Parameters<DbRoot["transaction"]>[0]>[0];
+export type ArtifactDb = DbRoot | TxLike;
+
+export async function recordTicketArtifact(params: RecordArtifactParams, dbOrTx?: ArtifactDb): Promise<void> {
   // H-D7 FAIL-CLOSED — same contract as logSensitiveAccess (server/db.ts): the
   // audit row is a gate, not best-effort. If the DB is unavailable this THROWS
   // so callers surface an error instead of reporting an un-audited ticket.
-  const db = await getDb();
+  //
+  // `dbOrTx`: createTicket holds a FOR UPDATE lock on the parent alert_queue row;
+  // the FK child insert must run on that same connection or it waits on itself.
+  const db = dbOrTx ?? await getDb();
   if (!db) {
     throw new Error("Ticket artifact audit unavailable: database connection failed. Ticket creation was not recorded.");
   }

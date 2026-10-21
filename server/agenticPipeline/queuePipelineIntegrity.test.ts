@@ -100,9 +100,11 @@ describe("C14: claims advance status and guard on autoTriageStatus", () => {
 });
 
 describe("H-D2: stale autoTriageStatus='running' sweep", () => {
-  it("resets running items older than the TTL to pending/queued, measured from processedAt", () => {
+  it("releases running items older than the TTL, counting the attempt and parking exhausted ones, measured from processedAt", () => {
     const body = slice(resumeSrc, "export async function sweepStaleAutoTriage", "/** The stage names");
-    expect(body).toContain('.set({ autoTriageStatus: "pending", status: "queued" })');
+    expect(body).toContain("triageAttempts: sql`${alertQueue.triageAttempts} + 1`");
+    expect(body).toMatch(/CASE WHEN \$\{alertQueue\.triageAttempts\} \+ 1 >= \$\{MAX_TRIAGE_ATTEMPTS\} THEN \$\{EXHAUSTED_STATUS\} ELSE 'pending' END/);
+    expect(body).toMatch(/THEN 'failed' ELSE 'queued' END/);
     expect(body).toContain('eq(alertQueue.autoTriageStatus, "running")');
     expect(body).toContain('inArray(alertQueue.status, ["queued", "processing"])');
     expect(body).toContain("COALESCE(${alertQueue.processedAt}, ${alertQueue.queuedAt}) < ${cutoff}");
