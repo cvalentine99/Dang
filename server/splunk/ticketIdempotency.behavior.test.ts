@@ -15,6 +15,8 @@ vi.hoisted(() => {
   process.env.SPLUNK_HOST = "splunk.hec.test.invalid";
   process.env.SPLUNK_HEC_PORT = "8088";
   process.env.SPLUNK_HEC_TOKEN = "11111111-2222-3333-4444-555555555555";
+  // P2-9: credentials no longer imply enablement — the write integration must be opted into.
+  process.env.SPLUNK_ENABLED = "true";
 });
 
 import { eq } from "drizzle-orm";
