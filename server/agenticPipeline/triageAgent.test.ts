@@ -314,11 +314,43 @@ describe("runTriageAgent — MITRE mapping extraction", () => {
       expect(Array.isArray(triage.mitreMapping)).toBe(true);
     }
   );
+
+  it.skipIf(!HAS_DB)(
+    "M4: drops unknown LLM technique ids and malformed CVE entities, records them in metadata",
+    async () => {
+      const { runTriageAgent } = await import("./triageAgent");
+      mockLLMResponse.mockResolvedValueOnce(makeTriageLLMResponse({
+        alertFamily: "generic",
+        mitreMapping: [
+          { techniqueId: "T9999", techniqueName: "Made Up", tactic: "Impact", confidence: 0.9 },
+          { techniqueId: "T1059", techniqueName: "Command and Scripting Interpreter", tactic: "Execution", confidence: 0.6 },
+        ],
+        entities: [
+          { type: "cve", value: "CVE-2024-1234", confidence: 0.9 },
+          { type: "cve", value: "CVE-24-1", confidence: 0.9 },
+        ],
+      }));
+
+      const result = await runTriageAgent({ rawAlert: MINIMAL_ALERT, userId: 1 });
+      expect(result.success).toBe(true);
+      const triage = result.triageObject!;
+      const ids = triage.mitreMapping.map(m => m.techniqueId);
+      expect(ids).toContain("T1059");
+      expect(ids).not.toContain("T9999");
+      expect(triage.metadata?.mitreUnknown).toContain("T9999");
+      // The wazuhClient mock returns no catalog → bundled fallback list
+      expect(triage.metadata?.mitreValidated).toBe(false);
+      const cves = triage.entities.filter(e => e.type === "cve").map(e => e.value);
+      expect(cves).toEqual(["CVE-2024-1234"]);
+      expect(triage.metadata?.cveDropped).toEqual(["CVE-24-1"]);
+      expect(triage.metadata?.cveValidated).toBe(true);
+    }
+  );
 });
 
 describe("runTriageAgent — validation and normalization", () => {
   it.skipIf(!HAS_DB)(
-    "normalizes invalid severity to 'info'",
+    "falls back to max(medium, rule.level severity) for an invalid severity and flags it (M3)",
     async () => {
       const { runTriageAgent } = await import("./triageAgent");
       mockLLMResponse.mockResolvedValueOnce(makeTriageLLMResponse({
@@ -331,7 +363,31 @@ describe("runTriageAgent — validation and normalization", () => {
 
       const validSeverities: AgenticSeverity[] = ["critical", "high", "medium", "low", "info"];
       expect(validSeverities).toContain(result.triageObject!.severity);
-      expect(result.triageObject!.severity).toBe("info"); // fallback
+      // M3: an unrecognized value must never silently become "info" (hides the
+      // alert). rule.level 10 → "high", which outranks the "medium" floor.
+      expect(result.triageObject!.severity).toBe("high");
+      expect((result.triageObject as any).metadata).toMatchObject({
+        severityFallback: true,
+        severityFallbackRaw: "SUPER_CRITICAL",
+      });
+    }
+  );
+
+  it.skipIf(!HAS_DB)(
+    "invalid severity on a low rule.level falls back to the 'medium' floor (M3)",
+    async () => {
+      const { runTriageAgent } = await import("./triageAgent");
+      mockLLMResponse.mockResolvedValueOnce(makeTriageLLMResponse({ severity: "bogus" }));
+
+      const lowLevelAlert = {
+        ...SSH_BRUTE_FORCE_ALERT,
+        id: "triage-test-ssh-lowlevel-1",
+        rule: { ...SSH_BRUTE_FORCE_ALERT.rule, level: 3 },
+      };
+      const result = await runTriageAgent({ rawAlert: lowLevelAlert, userId: 1 });
+      expect(result.success).toBe(true);
+      expect(result.triageObject!.severity).toBe("medium");
+      expect((result.triageObject as any).metadata?.severityFallback).toBe(true);
     }
   );
 

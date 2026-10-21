@@ -321,7 +321,10 @@ describe("runTriageAgent (real function, mocked LLM)", () => {
       const triage = result.triageObject!;
 
       // The real validation code should normalize these
-      expect(triage.severity).toBe("info"); // fallback for invalid severity
+      // M3: invalid severity falls back to max("medium", rule.level severity);
+      // rule.level 10 → "high". Never "info" (that would hide the alert).
+      expect(triage.severity).toBe("high");
+      expect((triage as any).metadata?.severityFallback).toBe(true);
       expect(triage.route).toBe("B_LOW_CONFIDENCE"); // fallback for invalid route
       expect(triage.severityConfidence).toBeLessThanOrEqual(1); // clamped
     }
