@@ -18,9 +18,12 @@ import { asProtocol } from "../_core/protocol";
 import {
   invokeLLM as invokeBuiltInLLM,
   STRUCTURED_OUTPUT_INFERENCE_PARAMS,
+  getBuiltInEndpoint,
+  resolveMaxTokens,
   type InvokeParams,
   type InvokeResult,
 } from "../_core/llm";
+import { dispatchLLM } from "./llmDispatcher";
 import { getDb } from "../db";
 import { llmUsage } from "../../drizzle/schema";
 
@@ -313,12 +316,8 @@ async function invokeCustomLLM(params: InvokeParams, config: LLMConfig): Promise
     })),
   };
 
-  // Add optional parameters
-  if (params.maxTokens || params.max_tokens) {
-    payload.max_tokens = params.maxTokens || params.max_tokens;
-  } else {
-    payload.max_tokens = 32768;
-  }
+  // M9: honor the caller's max tokens, capped by LLM_MAX_OUTPUT_TOKENS (default 32768).
+  payload.max_tokens = resolveMaxTokens(params);
 
   if (hasTools) {
     payload.tools = params.tools;
@@ -499,8 +498,8 @@ async function logUsage(entry: {
 /**
  * Extract token usage from an LLM response.
  */
-function extractUsage(result: InvokeResult): { promptTokens: number; completionTokens: number; totalTokens: number } {
-  const usage = (result as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } }).usage;
+function extractUsage(result: InvokeResult | null | undefined): { promptTokens: number; completionTokens: number; totalTokens: number } {
+  const usage = ((result ?? {}) as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } }).usage;
   return {
     promptTokens: usage?.prompt_tokens ?? 0,
     completionTokens: usage?.completion_tokens ?? 0,
@@ -509,12 +508,48 @@ function extractUsage(result: InvokeResult): { promptTokens: number; completionT
 }
 
 /**
+ * M10: a result is only a success if it actually carries a usable answer
+ * (non-empty content or tool calls). Never log success:true unseen.
+ */
+export function inspectLLMResult(result: InvokeResult | null | undefined): { ok: boolean; reason?: string } {
+  const choice = result?.choices?.[0];
+  if (!choice?.message) return { ok: false, reason: "response has no choices[0].message" };
+  const { content, tool_calls } = choice.message;
+  const hasContent = typeof content === "string" ? content.trim().length > 0 : Array.isArray(content) && content.length > 0;
+  const hasTools = Array.isArray(tool_calls) && tool_calls.length > 0;
+  if (!hasContent && !hasTools) return { ok: false, reason: `empty response (finish_reason: ${choice.finish_reason ?? "none"})` };
+  return { ok: true };
+}
+
+function normalizeHost(h: string): string {
+  const x = h.trim().toLowerCase().replace(/^\[|\]$/g, "");
+  return x === "localhost" || x === "::1" ? "127.0.0.1" : x;
+}
+
+/** M10: true when the built-in "fallback" client points at the same server as the primary. */
+export function isFallbackSameAsPrimary(config: Pick<LLMConfig, "host" | "port">): boolean {
+  const fb = getBuiltInEndpoint();
+  return normalizeHost(fb.host) === normalizeHost(config.host) && String(fb.port).trim() === String(config.port).trim();
+}
+
+/**
  * Invoke LLM — routes to custom endpoint if configured, otherwise falls back to built-in.
  * Logs token usage for every call.
+ *
+ * H-L5: every call runs under the process-wide dispatcher (concurrency,
+ * per-user fairness, daily token budget, prompt-size budget).
  *
  * This is the primary entry point that should be used instead of the raw invokeLLM.
  */
 export async function invokeLLMWithFallback(params: InvokeParams & { caller?: string }): Promise<InvokeResult> {
+  return dispatchLLM(
+    { stage: params.caller, userId: params.userId, messages: params.messages },
+    () => invokeLLMUndispatched(params),
+    r => extractUsage(r).totalTokens,
+  );
+}
+
+async function invokeLLMUndispatched(params: InvokeParams & { caller?: string }): Promise<InvokeResult> {
   const config = await getEffectiveLLMConfig();
   const startTime = Date.now();
 
@@ -524,15 +559,16 @@ export async function invokeLLMWithFallback(params: InvokeParams & { caller?: st
       const result = await invokeCustomLLM(params, config);
       const latencyMs = Date.now() - startTime;
       const usage = extractUsage(result);
+      const inspected = inspectLLMResult(result);
 
-      // Log successful custom call
       logUsage({
         model: config.model,
         source: "custom",
         ...usage,
         latencyMs,
         caller: params.caller,
-        success: true,
+        success: inspected.ok,
+        errorMessage: inspected.reason,
       });
 
       return result;
@@ -554,20 +590,47 @@ export async function invokeLLMWithFallback(params: InvokeParams & { caller?: st
         errorMessage: (err as Error).message,
       });
 
+      // M10: a "fallback" to the same server is just a retry against the
+      // endpoint that just failed — skip it and surface the primary error.
+      if (isFallbackSameAsPrimary(config)) {
+        console.warn(`[LLM] Fallback endpoint is the same server as the primary (${config.host}:${config.port}) — not retrying; surfacing primary error`);
+        throw err;
+      }
+
       // Fall back to built-in
       const fallbackStart = Date.now();
-      const result = await invokeBuiltInLLM(params);
+      let result: InvokeResult;
+      try {
+        result = await invokeBuiltInLLM(params);
+      } catch (fallbackErr) {
+        logUsage({
+          model: "builtin",
+          source: "fallback",
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+          latencyMs: Date.now() - fallbackStart,
+          caller: params.caller,
+          success: false,
+          errorMessage: (fallbackErr as Error).message,
+        });
+        throw new Error(
+          `LLM primary failed (${(err as Error).message}); fallback failed (${(fallbackErr as Error).message})`
+        );
+      }
       const fallbackLatency = Date.now() - fallbackStart;
       const usage = extractUsage(result);
+      const inspected = inspectLLMResult(result);
 
-      // Log fallback call
+      // Log fallback call — success only if the result was actually usable
       logUsage({
-        model: result.model ?? "builtin",
+        model: result?.model ?? "builtin",
         source: "fallback",
         ...usage,
         latencyMs: fallbackLatency,
         caller: params.caller,
-        success: true,
+        success: inspected.ok,
+        errorMessage: inspected.reason,
       });
 
       return result;
@@ -578,14 +641,16 @@ export async function invokeLLMWithFallback(params: InvokeParams & { caller?: st
   const result = await invokeBuiltInLLM(params);
   const latencyMs = Date.now() - startTime;
   const usage = extractUsage(result);
+  const inspected = inspectLLMResult(result);
 
   logUsage({
-    model: result.model ?? "builtin",
+    model: result?.model ?? "builtin",
     source: "builtin",
     ...usage,
     latencyMs,
     caller: params.caller,
-    success: true,
+    success: inspected.ok,
+    errorMessage: inspected.reason,
   });
 
   return result;

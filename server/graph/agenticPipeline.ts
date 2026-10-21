@@ -19,6 +19,7 @@
 
 import { z } from "zod";
 import { invokeLLMWithFallback as invokeLLM } from "../llm/llmService";
+import { wrapUntrustedData } from "../agenticPipeline/sanitizeForPrompt";
 import { searchGraph, getGraphStats, getRiskAnalysis, getEndpoints, getResourceOverview, getUseCases, getErrorPatterns, recordProvenance } from "./graphQueryService";
 import {
   getEffectiveIndexerConfig,
@@ -872,9 +873,9 @@ async function synthesizeResponse(
   const sourceContext = sources
     .filter(s => s.relevance !== "error")
     .map((s, i) => {
-      const dataStr = typeof s.data === "string" ? s.data : JSON.stringify(s.data, null, 1);
-      const truncated = dataStr.length > 3000 ? dataStr.slice(0, 3000) + "\n... [truncated]" : dataStr;
-      return `[Source ${i + 1}: ${s.label}]\n${truncated}`;
+      // Retrieved content (alerts, cases, KG rows) is attacker-influenceable: delimit it
+      // as data with a per-call nonce and truncate per field, never by slicing JSON.
+      return `[Source ${i + 1}: ${s.label}]\n${wrapUntrustedData(s.data, 3000)}`;
     })
     .join("\n\n");
 

@@ -6,6 +6,8 @@
  * - usageStats: Aggregated token usage statistics (today, 7d, 30d)
  * - usageHistory: Time-series token usage data for charts
  * - recentCalls: Paginated list of recent LLM invocations
+ * - usageStats.dispatcher (admin only): live dispatcher stats — in flight,
+ *   queued, today's tokens vs LLM_DAILY_TOKEN_BUDGET (H-L5)
  */
 
 import { requireDb } from "../dbGuard";
@@ -15,6 +17,17 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { llmUsage } from "../../drizzle/schema";
 import { getEffectiveLLMConfig } from "./llmService";
+import { getDispatcherStats, type DispatcherStats } from "./llmDispatcher";
+
+/** H-L5: dispatcher stats are surfaced to admins only (null for other roles). */
+async function dispatcherStatsFor(user: { role?: string } | null | undefined): Promise<DispatcherStats | null> {
+  if (user?.role !== "admin") return null;
+  try {
+    return await getDispatcherStats();
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Ping the custom LLM endpoint's /v1/models to check health.
@@ -88,10 +101,12 @@ export const llmRouter = router({
         range: z.enum(["today", "7d", "30d", "all"]).default("today"),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      const dispatcher = await dispatcherStatsFor(ctx.user);
       const db = await getDb();
       if (!db) {
         return {
+          dispatcher,
           totalRequests: 0,
           totalPromptTokens: 0,
           totalCompletionTokens: 0,
@@ -130,7 +145,8 @@ export const llmRouter = router({
         .from(llmUsage)
         .where(conditions.length > 0 ? and(...conditions) : undefined);
 
-      return result[0] ?? {
+      return result[0] ? { ...result[0], dispatcher } : {
+        dispatcher,
         totalRequests: 0,
         totalPromptTokens: 0,
         totalCompletionTokens: 0,

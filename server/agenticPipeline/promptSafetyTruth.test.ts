@@ -277,10 +277,13 @@ describe("sanitizeForPrompt — prompt injection defense", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("wrapUntrustedData — delimiter and anti-obedience contract", () => {
-  it("wraps data with <<<UNTRUSTED_DATA_BEGIN>>> / <<<UNTRUSTED_DATA_END>>> delimiters", () => {
+  it("wraps data with nonce-tagged <<<UNTRUSTED_DATA_BEGIN id=…>>> / <<<UNTRUSTED_DATA_END id=…>>> delimiters", () => {
     const result = wrapUntrustedData({ test: "value" });
-    expect(result).toContain("<<<UNTRUSTED_DATA_BEGIN>>>");
-    expect(result).toContain("<<<UNTRUSTED_DATA_END>>>");
+    const begin = result.match(/<<<UNTRUSTED_DATA_BEGIN id=([0-9a-f]{16})>>>/);
+    const end = result.match(/<<<UNTRUSTED_DATA_END id=([0-9a-f]{16})>>>/);
+    expect(begin).not.toBeNull();
+    expect(end).not.toBeNull();
+    expect(begin![1]).toBe(end![1]);
   });
 
   it("includes anti-obedience instruction", () => {
@@ -299,8 +302,8 @@ describe("wrapUntrustedData — delimiter and anti-obedience contract", () => {
 
   it("handles null/undefined gracefully", () => {
     const result = wrapUntrustedData(null);
-    expect(result).toContain("<<<UNTRUSTED_DATA_BEGIN>>>");
-    expect(result).toContain("<<<UNTRUSTED_DATA_END>>>");
+    expect(result).toMatch(/<<<UNTRUSTED_DATA_BEGIN id=[0-9a-f]+>>>/);
+    expect(result).toMatch(/<<<UNTRUSTED_DATA_END id=[0-9a-f]+>>>/);
   });
 
   it("serializes objects into JSON within delimiters", () => {

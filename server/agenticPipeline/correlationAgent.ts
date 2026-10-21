@@ -25,6 +25,7 @@ import {
 } from "../indexer/indexerClient";
 import { getEffectiveWazuhConfig, type WazuhConfig } from "../wazuh/wazuhClient";
 import { wazuhGet } from "../wazuh/wazuhClient";
+import { sanitizeUpstreamError } from "../wazuh/upstreamError";
 import { otxGet, isOtxConfigured } from "../otx/otxClient";
 import type {
   TriageObject,
@@ -48,6 +49,8 @@ export interface CorrelationAgentInput {
   maxAlertsPerSource?: number;
   /** Whether to include OTX threat intel lookups */
   includeThreatIntel?: boolean;
+  /** H-L5: triggering user, for per-user LLM fairness in the dispatcher (optional) */
+  userId?: number;
 }
 
 export interface CorrelationAgentResult {
@@ -102,6 +105,17 @@ interface PriorInvestigation {
   [key: string]: unknown;
 }
 
+/**
+ * M2: an evidence source that was queried but FAILED. An empty array in the
+ * pack means "searched, nothing found" only when the source is NOT listed here;
+ * a listed source means the evidence is MISSING, not absent.
+ */
+export interface DegradedEvidenceSource {
+  source: "sameHostAlerts" | "sameUserAlerts" | "sameIocAlerts" | "vulnerabilities" | "fimEvents";
+  /** Sanitized message with correlation id (full detail is in the server log) */
+  error: string;
+}
+
 interface EvidencePack {
   sameHostAlerts: IndexerAlertHit[];
   sameUserAlerts: IndexerAlertHit[];
@@ -111,6 +125,20 @@ interface EvidencePack {
   threatIntel: ThreatIntelResult[];
   priorInvestigations: PriorInvestigation[];
   totalItems: number;
+  /** M2: sources whose retrieval failed (added field; empty when all succeeded) */
+  degradedSources: DegradedEvidenceSource[];
+}
+
+/** Record a failed evidence retrieval instead of silently returning `[]`. */
+function recordDegraded(
+  sink: DegradedEvidenceSource[] | undefined,
+  source: DegradedEvidenceSource["source"],
+  err: unknown
+): void {
+  const upstream = source === "fimEvents" ? "Wazuh" : "Indexer";
+  const error = sanitizeUpstreamError(upstream, err, `correlation evidence ${source}`).message;
+  console.warn(`[CorrelationAgent] evidence source ${source} unavailable: ${error}`);
+  sink?.push({ source, error });
 }
 
 /**
@@ -122,7 +150,8 @@ async function fetchSameHostAlerts(
   agentName: string | undefined,
   alertId: string,
   lookbackHours: number,
-  limit: number
+  limit: number,
+  degraded?: DegradedEvidenceSource[]
 ): Promise<IndexerAlertHit[]> {
   if (!agentId && !agentName) return [];
   try {
@@ -156,7 +185,9 @@ async function fetchSameHostAlerts(
     };
     const result = await indexerSearch(config, INDEX_PATTERNS.ALERTS, body, "correlation");
     return result.hits.hits.map((h) => ({ _id: h._id, ...h._source } as IndexerAlertHit));
-  } catch {
+  } catch (err) {
+    // M2: missing ≠ empty — report the failure so the bundle can say so
+    recordDegraded(degraded, "sameHostAlerts", err);
     return [];
   }
 }
@@ -170,7 +201,8 @@ async function fetchSameUserAlerts(
   agentId: string | undefined,
   alertId: string,
   lookbackHours: number,
-  limit: number
+  limit: number,
+  degraded?: DegradedEvidenceSource[]
 ): Promise<IndexerAlertHit[]> {
   if (users.length === 0) return [];
   try {
@@ -201,7 +233,9 @@ async function fetchSameUserAlerts(
     };
     const result = await indexerSearch(config, INDEX_PATTERNS.ALERTS, body, "correlation");
     return result.hits.hits.map((h) => ({ _id: h._id, ...h._source } as IndexerAlertHit));
-  } catch {
+  } catch (err) {
+    // M2: missing ≠ empty — report the failure so the bundle can say so
+    recordDegraded(degraded, "sameUserAlerts", err);
     return [];
   }
 }
@@ -214,7 +248,8 @@ async function fetchSameIocAlerts(
   iocs: { ips: string[]; hashes: string[]; domains: string[] },
   alertId: string,
   lookbackHours: number,
-  limit: number
+  limit: number,
+  degraded?: DegradedEvidenceSource[]
 ): Promise<IndexerAlertHit[]> {
   const allIocs = [...iocs.ips, ...iocs.hashes, ...iocs.domains];
   if (allIocs.length === 0) return [];
@@ -249,7 +284,9 @@ async function fetchSameIocAlerts(
     };
     const result = await indexerSearch(config, INDEX_PATTERNS.ALERTS, body, "correlation");
     return result.hits.hits.map((h) => ({ _id: h._id, ...h._source } as IndexerAlertHit));
-  } catch {
+  } catch (err) {
+    // M2: missing ≠ empty — report the failure so the bundle can say so
+    recordDegraded(degraded, "sameIocAlerts", err);
     return [];
   }
 }
@@ -260,7 +297,8 @@ async function fetchSameIocAlerts(
 async function fetchVulnerabilities(
   config: IndexerConfig,
   agentId: string | undefined,
-  limit: number
+  limit: number,
+  degraded?: DegradedEvidenceSource[]
 ): Promise<IndexerVulnHit[]> {
   if (!agentId) return [];
   try {
@@ -280,7 +318,9 @@ async function fetchVulnerabilities(
     };
     const result = await indexerSearch(config, INDEX_PATTERNS.VULNERABILITIES, body, "correlation");
     return result.hits.hits.map((h) => h._source as IndexerVulnHit);
-  } catch {
+  } catch (err) {
+    // M2: missing ≠ empty — report the failure so the bundle can say so
+    recordDegraded(degraded, "vulnerabilities", err);
     return [];
   }
 }
@@ -291,7 +331,8 @@ async function fetchVulnerabilities(
 async function fetchFimEvents(
   wazuhConfig: WazuhConfig,
   agentId: string | undefined,
-  limit: number
+  limit: number,
+  degraded?: DegradedEvidenceSource[]
 ): Promise<FimEvent[]> {
   if (!agentId || !wazuhConfig) return [];
   try {
@@ -301,7 +342,9 @@ async function fetchFimEvents(
       rateLimitGroup: "correlation",
     }) as { data?: { affected_items?: FimEvent[] } };
     return result?.data?.affected_items ?? [];
-  } catch {
+  } catch (err) {
+    // M2: missing ≠ empty — report the failure so the bundle can say so
+    recordDegraded(degraded, "fimEvents", err);
     return [];
   }
 }
@@ -489,23 +532,26 @@ async function assembleEvidencePack(
   const hashes = entities.filter((e) => e.type === "hash").map((e) => e.value);
   const domains = entities.filter((e) => e.type === "domain").map((e) => e.value);
   
+  // M2: collectors push failures here instead of masking them as empty results
+  const degradedSources: DegradedEvidenceSource[] = [];
+
   // Run all retrievals in parallel
   const [sameHostAlerts, sameUserAlerts, sameIocAlerts, vulnerabilities, fimEvents, threatIntel, priorInvestigations] =
     await Promise.all([
       indexerConfig
-        ? fetchSameHostAlerts(indexerConfig, triage.agent?.id, triage.agent?.name, triage.alertId, lookbackHours, maxPerSource)
+        ? fetchSameHostAlerts(indexerConfig, triage.agent?.id, triage.agent?.name, triage.alertId, lookbackHours, maxPerSource, degradedSources)
         : Promise.resolve([]),
       indexerConfig
-        ? fetchSameUserAlerts(indexerConfig, users, triage.agent?.id, triage.alertId, lookbackHours, maxPerSource)
+        ? fetchSameUserAlerts(indexerConfig, users, triage.agent?.id, triage.alertId, lookbackHours, maxPerSource, degradedSources)
         : Promise.resolve([]),
       indexerConfig
-        ? fetchSameIocAlerts(indexerConfig, { ips, hashes, domains }, triage.alertId, lookbackHours, maxPerSource)
+        ? fetchSameIocAlerts(indexerConfig, { ips, hashes, domains }, triage.alertId, lookbackHours, maxPerSource, degradedSources)
         : Promise.resolve([]),
       indexerConfig
-        ? fetchVulnerabilities(indexerConfig, triage.agent?.id, maxPerSource)
+        ? fetchVulnerabilities(indexerConfig, triage.agent?.id, maxPerSource, degradedSources)
         : Promise.resolve([]),
       wazuhConfig
-        ? fetchFimEvents(wazuhConfig, triage.agent?.id, maxPerSource)
+        ? fetchFimEvents(wazuhConfig, triage.agent?.id, maxPerSource, degradedSources)
         : Promise.resolve([]),
       includeThreatIntel ? fetchThreatIntel(entities) : Promise.resolve([]),
       fetchPriorInvestigations(entities, triage.agent?.id),
@@ -523,12 +569,15 @@ async function assembleEvidencePack(
     threatIntel,
     priorInvestigations,
     totalItems,
+    degradedSources,
   };
 }
 
 // ── LLM Correlation Synthesis ────────────────────────────────────────────────
 
-const CORRELATION_SYSTEM_PROMPT = `You are a senior SOC analyst performing evidence correlation.
+const CORRELATION_SYSTEM_PROMPT = `${UNTRUSTED_DATA_SYSTEM_INSTRUCTION}
+
+You are a senior SOC analyst performing evidence correlation.
 You receive a triage object (the alert that triggered this analysis) and an evidence pack
 (related alerts, vulnerabilities, FIM events, threat intel, and prior investigations).
 
@@ -550,12 +599,14 @@ Rules:
 // Re-export from shared module for backward compatibility — the canonical
 // implementation now lives in sanitizeForPrompt.ts (Ticket 2 / Ticket 3).
 import { sanitizeForPrompt } from "./sanitizeForPrompt";
+import { truncateForPrompt, wrapUntrustedData, UNTRUSTED_DATA_SYSTEM_INSTRUCTION } from "./sanitizeForPrompt";
 
 function buildCorrelationPrompt(triage: TriageObject, pack: EvidencePack): string {
   const parts: string[] = [
     "## Triggering Triage Object",
-    "```json",
-    JSON.stringify(sanitizeForPrompt({
+    // H-L2: sanitize keys+values, truncate per field BEFORE stringify, frame
+    // with a nonce delimiter. No post-stringify .slice (malformed JSON).
+    wrapUntrustedData(truncateForPrompt(sanitizeForPrompt({
       triageId: triage.triageId,
       alertId: triage.alertId,
       ruleId: triage.ruleId,
@@ -569,8 +620,7 @@ function buildCorrelationPrompt(triage: TriageObject, pack: EvidencePack): strin
       entities: triage.entities,
       mitreMapping: triage.mitreMapping,
       summary: triage.summary,
-    }), null, 2).slice(0, 3000),
-    "```",
+    }), 3000), 4500),
     "",
     "## Evidence Pack",
     "",
@@ -578,57 +628,43 @@ function buildCorrelationPrompt(triage: TriageObject, pack: EvidencePack): strin
   
   if (pack.sameHostAlerts.length > 0) {
     parts.push(`### Same-Host Alerts (${pack.sameHostAlerts.length} found)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.sameHostAlerts.slice(0, 15)), null, 2).slice(0, 3000));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.sameHostAlerts.slice(0, 15)), 3000), 4500));
     parts.push("");
   }
   
   if (pack.sameUserAlerts.length > 0) {
     parts.push(`### Cross-Host Same-User Alerts (${pack.sameUserAlerts.length} found)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.sameUserAlerts.slice(0, 10)), null, 2).slice(0, 2000));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.sameUserAlerts.slice(0, 10)), 2000), 3000));
     parts.push("");
   }
   
   if (pack.sameIocAlerts.length > 0) {
     parts.push(`### Same-IOC Alerts (${pack.sameIocAlerts.length} found)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.sameIocAlerts.slice(0, 10)), null, 2).slice(0, 2000));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.sameIocAlerts.slice(0, 10)), 2000), 3000));
     parts.push("");
   }
   
   if (pack.vulnerabilities.length > 0) {
     parts.push(`### Agent Vulnerabilities (${pack.vulnerabilities.length} found)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.vulnerabilities.slice(0, 10)), null, 2).slice(0, 2000));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.vulnerabilities.slice(0, 10)), 2000), 3000));
     parts.push("");
   }
   
   if (pack.fimEvents.length > 0) {
     parts.push(`### FIM Events (${pack.fimEvents.length} found)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.fimEvents.slice(0, 10)), null, 2).slice(0, 2000));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.fimEvents.slice(0, 10)), 2000), 3000));
     parts.push("");
   }
   
   if (pack.threatIntel.length > 0) {
     parts.push(`### Threat Intelligence (${pack.threatIntel.length} lookups)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.threatIntel), null, 2).slice(0, 2000));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.threatIntel), 2000), 3000));
     parts.push("");
   }
   
   if (pack.priorInvestigations.length > 0) {
     parts.push(`### Prior Investigations (${pack.priorInvestigations.length} related)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.priorInvestigations), null, 2).slice(0, 1500));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.priorInvestigations), 1500), 2250));
     parts.push("");
   }
   
@@ -655,7 +691,17 @@ function buildCorrelationPrompt(triage: TriageObject, pack: EvidencePack): strin
   parts.push("- uncertainties: array of { description, impact, suggestedAction }");
   parts.push("- confidence: number 0.0-1.0 — overall correlation confidence");
   parts.push("- mitreMapping: array of { techniqueId, techniqueName, tactic, confidence } — aggregated across all evidence");
-  
+
+  // M2: missing evidence is not the same as no evidence. Tell the model which
+  // sources failed so it lowers confidence and records an uncertainty, instead of
+  // reading an empty section as "nothing happened".
+  if (pack.degradedSources.length > 0) {
+    parts.push("");
+    parts.push("## Evidence Sources UNAVAILABLE (query failed — treat as unknown, not as absent)");
+    for (const d of pack.degradedSources) parts.push(`- ${d.source}: unavailable`);
+    parts.push("Lower your confidence accordingly and add an uncertainty entry for each unavailable source.");
+  }
+
   return parts.join("\n");
 }
 
@@ -940,6 +986,7 @@ export async function runCorrelationAgent(
       ],
       response_format: CORRELATION_JSON_SCHEMA,
       caller: "correlation_agent",
+      userId: input.userId,
     });
     
     // 5. Parse and validate the structured LLM response via Zod schema

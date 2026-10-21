@@ -71,6 +71,8 @@ export type ToolChoice =
 
 export type InvokeParams = {
   messages: Message[];
+  /** H-L5: triggering user for per-user fairness in the LLM dispatcher (not sent upstream). */
+  userId?: number | string;
   tools?: Tool[];
   toolChoice?: ToolChoice;
   tool_choice?: ToolChoice;
@@ -223,10 +225,33 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
+/** Host/port of the built-in (fallback) client. Used by llmService (M10) to
+ *  refuse a "fallback" that is the same server as the primary. */
+export const getBuiltInEndpoint = (): { host: string; port: string } => ({
+  host: process.env.LLM_HOST ?? "192.168.50.110",
+  port: process.env.LLM_PORT ?? "30000",
+});
+
 const resolveApiUrl = () => {
-  const host = process.env.LLM_HOST ?? "192.168.50.110";
-  const port = process.env.LLM_PORT ?? "30000";
+  const { host, port } = getBuiltInEndpoint();
   return `http://${host}:${port}/v1/chat/completions`;
+};
+
+/** M9: default/ceiling for max_tokens (LLM_MAX_OUTPUT_TOKENS, default 32768). */
+export const getMaxOutputTokensCap = (): number => {
+  const n = parseInt(process.env.LLM_MAX_OUTPUT_TOKENS ?? "", 10);
+  return Number.isFinite(n) && n > 0 ? n : 32768;
+};
+
+/**
+ * M9: honor the caller's requested max tokens (maxTokens / max_tokens),
+ * capped by LLM_MAX_OUTPUT_TOKENS; the cap is also the default.
+ */
+export const resolveMaxTokens = (params: { maxTokens?: number; max_tokens?: number }): number => {
+  const cap = getMaxOutputTokensCap();
+  const requested = params.maxTokens ?? params.max_tokens;
+  if (typeof requested !== "number" || !Number.isFinite(requested) || requested <= 0) return cap;
+  return Math.min(Math.floor(requested), cap);
 };
 
 const assertApiKey = () => {
@@ -309,7 +334,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768;
+  payload.max_tokens = resolveMaxTokens(params);
 
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
