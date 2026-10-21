@@ -312,8 +312,20 @@ export default function ResponseActions() {
               variant="outline"
               className="border-amber-500/30 text-amber-300 hover:bg-amber-500/15"
               onClick={() => {
-                const ids = pendingActions.map(a => a.actionId);
-                bulkApproveMut.mutate({ actionIds: ids });
+                // P2-8/M12: server binds each bulk approval to ONE case
+                // (≤50 ids) — batch per case.
+                const byCase = new Map<number, string[]>();
+                for (const a of pendingActions) {
+                  if (a.caseId == null) continue;
+                  const list = byCase.get(a.caseId) ?? [];
+                  list.push(a.actionId);
+                  byCase.set(a.caseId, list);
+                }
+                byCase.forEach((ids, caseId) => {
+                  for (let i = 0; i < ids.length; i += 50) {
+                    bulkApproveMut.mutate({ caseId, actionIds: ids.slice(i, i + 50) });
+                  }
+                });
               }}
               disabled={bulkApproveMut.isPending}
             >

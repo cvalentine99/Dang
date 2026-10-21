@@ -299,7 +299,7 @@ function computeRemediationQueue(endpoints: Array<{
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function BrokerCoverage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const { data, isLoading, refetch } = trpc.wazuh.brokerCoverage.useQuery(undefined, { enabled: isAdmin });
   const [, navigate] = useLocation();
@@ -332,16 +332,7 @@ export default function BrokerCoverage() {
     return computeRemediationQueue(data.endpoints);
   }, [data]);
 
-  if (!authLoading && !isAdmin) {
-    return (
-      <div className="p-6 space-y-6 max-w-[2400px] mx-auto">
-        <PageHeader title="Broker Coverage" subtitle="Admin access required" />
-        <GlassPanel className="p-8 text-center text-muted-foreground">
-          This page is restricted to administrators.
-        </GlassPanel>
-      </div>
-    );
-  }
+  // Non-admin state is rendered by RoleGuard (routeRegistry `requiresRole`).
 
   if (isLoading || !data) {
     return (

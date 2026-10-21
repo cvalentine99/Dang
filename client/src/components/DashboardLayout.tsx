@@ -201,13 +201,13 @@ export const menuItems = [
   { icon: Server, label: "Cluster Health", path: "/cluster", group: "System" },
   { icon: HeartPulse, label: "System Status", path: "/status", group: "System" },
   { icon: Lock, label: "Security Explorer", path: "/security", group: "System" },
-  { icon: FolderOpen, label: "Group Management", path: "/groups", group: "System" },
+  { icon: FolderOpen, label: "Group Management", path: "/groups", group: "System", adminOnly: true },
   { icon: Brain, label: "Security Analyst", path: "/analyst", group: "Intelligence", hasQueueBadge: true },
   { icon: Network, label: "Knowledge Graph", path: "/graph", group: "Intelligence" },
   { icon: FolderSearch, label: "Investigations", path: "/investigations", group: "Intelligence" },
   { icon: Database, label: "Data Pipeline", path: "/pipeline", group: "Intelligence" },
   { icon: Inbox, label: "Alert Queue", path: "/alert-queue", group: "Intelligence" },
-  { icon: Zap, label: "Auto-Queue Rules", path: "/auto-queue-rules", group: "Intelligence" },
+  { icon: Zap, label: "Auto-Queue Rules", path: "/auto-queue-rules", group: "Intelligence", adminOnly: true },
   { icon: Workflow, label: "Triage Pipeline", path: "/triage", group: "Intelligence" },
   { icon: Lightbulb, label: "Living Cases", path: "/living-cases", group: "Intelligence" },
   { icon: ShieldAlert, label: "Response Actions", path: "/response-actions", group: "Intelligence" },
@@ -309,8 +309,11 @@ export default function DashboardLayout({
     return <DashboardLayoutSkeleton />;
   }
 
-  // Auth gate removed — always show the dashboard so the site is visible
-  // without requiring login. Auth-dependent features degrade gracefully.
+  // Auth gate: no session → sign-in panel instead of the full chrome (which
+  // would otherwise fire a burst of doomed protected queries).
+  if (!user) {
+    return <UnauthenticatedView />;
+  }
 
   return (
     <SidebarProvider

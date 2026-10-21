@@ -134,22 +134,7 @@ export default function AdminUsers(): React.JSX.Element {
     onError: (err) => toast.error(err.message),
   });
 
-  // Access check
-  if (currentUser?.role !== "admin") {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <GlassPanel className="p-8 max-w-md text-center">
-          <Shield className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-xl font-display font-semibold text-foreground mb-2">
-            Access Denied
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            You need administrator privileges to access user management.
-          </p>
-        </GlassPanel>
-      </div>
-    );
-  }
+  // Access check: enforced by RoleGuard (routeRegistry `requiresRole: "admin"`).
 
   const usersList = (usersQuery.data?.users ?? []) as UserRow[];
   const totalPages = usersQuery.data?.totalPages ?? 1;

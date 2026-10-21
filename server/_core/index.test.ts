@@ -334,6 +334,26 @@ describe("CSP_DIRECTIVES production value", () => {
     expect(directives).toContain("object-src 'none'");
     expect(directives).toContain("base-uri 'self'");
   });
+
+  it("img-src does not allow arbitrary https: origins (H-L8 beacon)", async () => {
+    const mod = await import("../securityHeaders");
+    const imgSrc = mod.CSP_DIRECTIVES.split(";").map((d) => d.trim()).find((d) => d.startsWith("img-src"));
+    expect(imgSrc).toBe("img-src 'self' data: blob:");
+  });
+
+  it("fails closed: any NODE_ENV other than 'development' gets the production policy", async () => {
+    // Vitest runs with NODE_ENV=test — previously that selected the dev policy.
+    expect(process.env.NODE_ENV).not.toBe("development");
+    const mod = await import("../securityHeaders");
+    const csp = mod.CSP_DIRECTIVES;
+    const scriptSrc = csp.split(";").map((d) => d.trim()).find((d) => d.startsWith("script-src"));
+    expect(scriptSrc).toBe("script-src 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    const res = mockRes();
+    mod.securityHeaders(mockReq(), res, vi.fn());
+    expect(res._headers["strict-transport-security"]).toContain("max-age=");
+    expect(res._headers["x-frame-options"]).toBe("DENY");
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

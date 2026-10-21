@@ -40,6 +40,10 @@ export default function AlertQueue() {
       utils.alertQueue.list.invalidate();
       utils.alertQueue.count.invalidate();
     },
+    // Server returns FORBIDDEN for non-owners — surface its message verbatim.
+    onError: (err) => {
+      toast.error("Could not dismiss alert", { description: err.message });
+    },
   });
 
   const clearHistoryMutation = trpc.alertQueue.clearHistory.useMutation({

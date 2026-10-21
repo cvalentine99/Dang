@@ -21,11 +21,13 @@ const queryClient = new QueryClient({
  * No Manus OAuth. No external auth providers.
  */
 const redirectToLoginIfUnauthorized = (error: unknown) => {
-  if (
-    error instanceof TRPCClientError &&
-    error.message === UNAUTHED_ERR_MSG &&
-    !window.location.pathname.startsWith("/login")
-  ) {
+  if (!(error instanceof TRPCClientError)) return;
+  // Key on the structured tRPC code; the legacy message match is a fallback
+  // for any procedure still throwing a bare Error(UNAUTHED_ERR_MSG).
+  const isUnauthorized =
+    error.data?.code === "UNAUTHORIZED" || error.message === UNAUTHED_ERR_MSG;
+  const path = window.location.pathname;
+  if (isUnauthorized && !path.startsWith("/login") && !path.startsWith("/register")) {
     window.location.href = "/login";
   }
 };
@@ -51,7 +53,9 @@ queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
     redirectToLoginIfUnauthorized(error);
-    toastIfForbidden(error);
+    // Mutations with their own onError surface the server's message
+    // (e.g. alertQueue.remove FORBIDDEN for non-owners); avoid a second toast.
+    if (!event.mutation.options.onError) toastIfForbidden(error);
     console.error("[API Mutation Error]", error);
   }
 });

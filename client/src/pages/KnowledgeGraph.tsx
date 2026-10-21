@@ -194,6 +194,12 @@ export default function KnowledgeGraph(): React.JSX.Element {
 
   // ── Search-to-Focus Handler ─────────────────────────────────────────────
 
+  // H-C8: focus-pulse reset timer is cancelled on re-focus and unmount.
+  const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+  }, []);
+
   const handleSearchSelect = useCallback((searchNode: any) => {
     setSelectedNode(searchNode);
     setSearchQuery("");
@@ -216,7 +222,11 @@ export default function KnowledgeGraph(): React.JSX.Element {
       );
 
       setFocusNodeId(searchNode.id);
-      setTimeout(() => setFocusNodeId(null), 2500);
+      if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+      focusTimerRef.current = setTimeout(() => {
+        focusTimerRef.current = null;
+        setFocusNodeId(null);
+      }, 2500);
     }
   }, []);
 
@@ -555,7 +565,7 @@ export default function KnowledgeGraph(): React.JSX.Element {
     });
 
     // Initial zoom to fit
-    setTimeout(() => {
+    const fitTimer = setTimeout(() => {
       const bounds = (g.node() as SVGGElement)?.getBBox();
       if (bounds) {
         const dx = bounds.width + 100;
@@ -571,7 +581,12 @@ export default function KnowledgeGraph(): React.JSX.Element {
       }
     }, 1000);
 
-    return () => { simulation.stop(); };
+    // H-C8: cancel pending fit-zoom and single-click timers on re-render/unmount.
+    return () => {
+      simulation.stop();
+      clearTimeout(fitTimer);
+      if (clickTimer) clearTimeout(clickTimer);
+    };
   }, [filteredData, viewMode, expandedNodes, handleExpand, multiSelectMode]);
 
   // ── Focus pulse effect ────────────────────────────────────────────────

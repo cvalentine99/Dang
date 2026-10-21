@@ -41,6 +41,7 @@ import {
   Ticket,
   ExternalLink,
 } from "lucide-react";
+import { toastIfSuperseded } from "@/lib/pipelineResult";
 
 // ── Stage Config ───────────────────────────────────────────────────────────
 
@@ -465,13 +466,15 @@ function PipelineContinuationButton({ runId, runStatus }: { runId: string; runSt
   //   partial runs → continuePipelineRun ("Continue Pipeline")
   //   failed runs  → resumePipelineRun  ("Replay Pipeline")
   const continueMutation = trpc.pipeline.continuePipelineRun.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
+      toastIfSuperseded(result);
       utils.pipeline.listPipelineRuns.invalidate();
       utils.pipeline.pipelineRunStats.invalidate();
     },
   });
   const resumeMutation = trpc.pipeline.resumePipelineRun.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
+      toastIfSuperseded(result);
       utils.pipeline.listPipelineRuns.invalidate();
       utils.pipeline.pipelineRunStats.invalidate();
     },

@@ -23,7 +23,7 @@ interface WazuhGuardProps {
  * Always renders children — pages handle their own empty states.
  */
 export function WazuhGuard({ children, indexer }: WazuhGuardProps) {
-  const { data, isLoading } = trpc.wazuh.status.useQuery(undefined, {
+  const { data, isLoading, isError, error } = trpc.wazuh.status.useQuery(undefined, {
     retry: 1,
     staleTime: 60_000,
   });
@@ -64,7 +64,9 @@ export function WazuhGuard({ children, indexer }: WazuhGuardProps) {
               <WifiOff className="h-3.5 w-3.5" />
               <span>Wazuh API Not Connected</span>
               <span className="text-muted-foreground ml-1">
-                {!isConfigured
+                {isError
+                  ? `— Status check failed: ${error?.message ?? "unknown error"}`
+                  : !isConfigured
                   ? "— Set WAZUH_HOST, WAZUH_USER, WAZUH_PASS in Secrets"
                   : `— ${errorDetail ?? "Connection failed (no detail available)"}`}
               </span>
@@ -84,13 +86,15 @@ export function WazuhGuard({ children, indexer }: WazuhGuardProps) {
  * Returns structured errorDetail instead of generic messages.
  */
 export function useWazuhStatus() {
-  const { data, isLoading } = trpc.wazuh.status.useQuery(undefined, {
+  const { data, isLoading, isError, error } = trpc.wazuh.status.useQuery(undefined, {
     retry: 1,
     staleTime: 60_000,
   });
   const isConfigured = data?.configured === true;
   const hasData = data?.data != null;
-  const errorDetail = (data as Record<string, unknown>)?.error as string | undefined;
+  const errorDetail = isError
+    ? `Status check failed: ${error?.message ?? "unknown error"}`
+    : ((data as Record<string, unknown>)?.error as string | undefined);
   return {
     isLoading,
     isConfigured,

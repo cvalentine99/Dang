@@ -8,7 +8,7 @@ import {
   ShieldOff, Terminal, Zap, Activity, Clock, CheckCircle2, XCircle, Eye,
   Volume2, VolumeX, RotateCcw,
 } from "lucide-react";
-import { Streamdown } from "streamdown";
+import { SafeMarkdown } from "@/components/SafeMarkdown";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -440,7 +440,7 @@ function ChatMessageBubble({
             <p className="text-sm text-foreground whitespace-pre-wrap">{message.content}</p>
           ) : (
             <div className="text-sm text-foreground prose prose-invert prose-sm max-w-none prose-headings:text-amber-200 prose-strong:text-foreground prose-code:text-cyan-300 prose-code:bg-black/30 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-black/40 prose-pre:border prose-pre:border-white/5">
-              <Streamdown>{message.content}</Streamdown>
+              <SafeMarkdown>{message.content}</SafeMarkdown>
             </div>
           )}
         </div>
@@ -913,33 +913,55 @@ export default function AnalystChat(): React.JSX.Element {
     return () => clearInterval(interval);
   }, [isAnalyzing]);
 
+  // H-C8: replay timers live in refs so unmount can cancel the whole chain.
+  const replayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const replayTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const clearReplayTimers = useCallback(() => {
+    if (replayIntervalRef.current) {
+      clearInterval(replayIntervalRef.current);
+      replayIntervalRef.current = null;
+    }
+    replayTimeoutsRef.current.forEach(clearTimeout);
+    replayTimeoutsRef.current.clear();
+  }, []);
+  useEffect(() => clearReplayTimers, [clearReplayTimers]);
+
   // Replay handler: re-animate steps one by one with timing
   const handleReplay = useCallback((messageId: string, steps: AgentStep[]) => {
     if (replayingId) return; // Already replaying
+    clearReplayTimers();
     setReplayingId(messageId);
     setReplaySteps([]);
 
+    const later = (fn: () => void, ms: number) => {
+      const t = setTimeout(() => {
+        replayTimeoutsRef.current.delete(t);
+        fn();
+      }, ms);
+      replayTimeoutsRef.current.add(t);
+    };
+
     let i = 0;
-    const timer = setInterval(() => {
+    replayIntervalRef.current = setInterval(() => {
       if (i < steps.length) {
-        setReplaySteps(prev => [...prev, steps[i]]);
+        const step = steps[i];
+        setReplaySteps(prev => [...prev, step]);
         i++;
       } else {
-        clearInterval(timer);
+        if (replayIntervalRef.current) clearInterval(replayIntervalRef.current);
+        replayIntervalRef.current = null;
         // Play analysis done chime at end of replay
-        setTimeout(() => {
+        later(() => {
           SoundEngine.analysisDone();
           // Clear replay state after a brief pause
-          setTimeout(() => {
+          later(() => {
             setReplayingId(null);
             setReplaySteps([]);
           }, 800);
         }, 300);
       }
     }, 600); // Slightly faster than original for replay
-
-    return () => clearInterval(timer);
-  }, [replayingId]);
+  }, [replayingId, clearReplayTimers]);
 
   const handleSend = useCallback(async (overrideText?: string) => {
     const text = overrideText ?? input.trim();

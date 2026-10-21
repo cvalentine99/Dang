@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { Bot, Send, Trash2, Cpu, Loader2, AlertCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Streamdown } from "streamdown";
+import { SafeMarkdown } from "@/components/SafeMarkdown";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 
@@ -141,7 +141,7 @@ export default function Assistant() {
               >
                 {msg.role === "assistant" ? (
                   <div className="text-sm prose prose-invert prose-sm max-w-none">
-                    <Streamdown>{msg.content}</Streamdown>
+                    <SafeMarkdown>{msg.content}</SafeMarkdown>
                   </div>
                 ) : (
                   <p className="text-sm">{msg.content}</p>

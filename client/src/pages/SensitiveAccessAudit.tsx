@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { GlassPanel } from "@/components/shared/GlassPanel";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,8 @@ import {
 } from "lucide-react";
 
 export default function SensitiveAccessAudit() {
-  const { user } = useAuth();
+  // Admin gate: enforced by RoleGuard via routeRegistry `requiresRole: "admin"`
+  // (the previous in-page early return also violated the rules of hooks).
   const [page, setPage] = useState(1);
   const [limit] = useState(25);
   const [resourceType, setResourceType] = useState<string | undefined>();
@@ -40,20 +40,6 @@ export default function SensitiveAccessAudit() {
   const [resourceId, setResourceId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-
-  // Admin gate — non-admins see a locked panel
-  if (user?.role !== "admin") {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <ShieldAlert className="w-16 h-16 text-red-400/60" />
-        <h2 className="text-xl font-semibold text-foreground/80 font-heading">Access Denied</h2>
-        <p className="text-sm text-muted-foreground max-w-md text-center">
-          The Sensitive Access Audit log is restricted to administrators. Contact your security team
-          if you believe you need access to this data.
-        </p>
-      </div>
-    );
-  }
 
   const listInput = useMemo(() => ({
     page,

@@ -24,7 +24,25 @@ function flattenObject(obj: Record<string, unknown>, prefix = ""): Record<string
 }
 
 /** Escape a CSV cell value (handles commas, quotes, newlines) */
-function escapeCSV(value: string): string {
+/** Cells starting with these are evaluated as formulas by Excel/Sheets/LibreOffice. */
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+/** Plain numbers (e.g. "-5", "+1.5e3") are data, not formulas — leave them intact. */
+const PLAIN_NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
+/**
+ * CSV/formula-injection guard (OWASP): alert fields are attacker-influenced
+ * (hostnames, user agents, log lines), so neutralise leading formula
+ * characters with a single quote before quoting.
+ */
+export function neutralizeFormula(value: string): string {
+  if (FORMULA_TRIGGER.test(value) && !PLAIN_NUMBER.test(value)) {
+    return `'${value}`;
+  }
+  return value;
+}
+
+function escapeCSV(raw: string): string {
+  const value = neutralizeFormula(String(raw));
   if (value.includes(",") || value.includes('"') || value.includes("\n") || value.includes("\r")) {
     return `"${value.replace(/"/g, '""')}"`;
   }

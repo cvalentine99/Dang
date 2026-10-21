@@ -10,9 +10,16 @@
  *   - script-src 'self': Scripts from same origin only (no unsafe-inline in production)
  *   - style-src 'self' 'unsafe-inline' fonts.googleapis.com: Allow inline styles + Google Fonts CSS
  *   - font-src 'self' fonts.gstatic.com: Allow Google Fonts files
- *   - img-src 'self' data: blob:: Allow inline images and blob URLs (for charts)
- *   - connect-src 'self' wss: https:: Allow WebSocket (HMR) and HTTPS API calls
+ *   - img-src 'self' data: blob:: Same-origin, inline and blob images only (charts).
+ *     No `https:` — that would let LLM-authored markdown images beacon data
+ *     to arbitrary hosts (review H-L8).
+ *   - connect-src: dev 'self' wss: ws: https: (HMR); prod 'self' wss: + Google Fonts
  *   - frame-ancestors 'none': Prevent embedding in iframes (clickjacking protection)
+ *     (dev only: `*`, for the preview iframe)
+ *
+ * Mode selection FAILS CLOSED: only NODE_ENV === "development" gets the relaxed
+ * dev policy. Unset, "test", "staging", "production", or anything else gets
+ * the production policy (no unsafe-inline/eval, frame-ancestors 'none', HSTS, XFO).
  *   - base-uri 'self': Prevent base tag hijacking
  *   - form-action 'self': Restrict form submissions to same origin
  *
@@ -24,7 +31,8 @@
 
 import type { Request, Response, NextFunction } from "express";
 
-const isDev = process.env.NODE_ENV !== "production";
+// M2: fail closed — matches the server's own `=== "development"` serving switch.
+const isDev = process.env.NODE_ENV === "development";
 
 // In development, Vite HMR needs 'unsafe-inline' and 'unsafe-eval' for hot module replacement.
 // In production, no inline scripts exist because:
@@ -45,7 +53,7 @@ export const CSP_DIRECTIVES = [
   `script-src ${scriptSrc}`,
   `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
   `font-src 'self' https://fonts.gstatic.com`,
-  `img-src 'self' data: blob: https:`,
+  `img-src 'self' data: blob:`,
   `connect-src ${connectSrc}`,
   isDev ? `frame-ancestors *` : `frame-ancestors 'none'`,
   `base-uri 'self'`,
