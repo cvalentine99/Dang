@@ -82,14 +82,52 @@ function getPromisePool(db: any): any | null {
   return null;
 }
 
+/** Minimal mysql2 PromisePoolConnection surface used for transactions. */
+interface PromisePoolConnectionLike {
+  execute: (...args: unknown[]) => unknown;
+  beginTransaction: () => Promise<unknown>;
+  commit: () => Promise<unknown>;
+  rollback: () => Promise<unknown>;
+  release: () => void;
+}
+
+function executeOn(target: { execute: (...args: unknown[]) => unknown }, query: string, params?: unknown[]): Promise<unknown> {
+  if (params && params.length > 0) {
+    return target.execute(query, params) as Promise<unknown>;
+  }
+  return target.execute(query) as Promise<unknown>;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mysql2 PromisePool is untyped at this layer
-function makeSqlExecutor(promisePool: { execute: (...args: unknown[]) => unknown }): SqlExecutor {
+function makeSqlExecutor(promisePool: {
+  execute: (...args: unknown[]) => unknown;
+  getConnection?: () => Promise<PromisePoolConnectionLike>;
+}): SqlExecutor {
   return {
     async execute(query: string, params?: unknown[]): Promise<unknown> {
-      if (params && params.length > 0) {
-        return promisePool.execute(query, params);
+      return executeOn(promisePool, query, params);
+    },
+    // H-D1: pin one pooled connection for the whole layer reload so
+    // DELETE + INSERT commit (or roll back) atomically.
+    async transaction<T>(fn: (tx: SqlExecutor) => Promise<T>): Promise<T> {
+      if (typeof promisePool.getConnection !== "function") {
+        throw new Error("mysql2 pool does not expose getConnection() — cannot run KG load transactionally");
       }
-      return promisePool.execute(query);
+      const conn = await promisePool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const tx: SqlExecutor = {
+          execute: (query: string, params?: unknown[]) => executeOn(conn, query, params),
+        };
+        const result = await fn(tx);
+        await conn.commit();
+        return result;
+      } catch (err) {
+        try { await conn.rollback(); } catch { /* surface the original error */ }
+        throw err;
+      } finally {
+        conn.release();
+      }
     },
   };
 }

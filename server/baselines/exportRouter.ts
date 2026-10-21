@@ -11,6 +11,7 @@
  */
 
 import { requireDb } from "../dbGuard";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { eq, desc, and, gte } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -337,15 +338,12 @@ export const exportRouter = router({
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) {
-        return {
-          generatedAt: new Date().toISOString(),
-          period: `${input.days} days`,
-          summary: { snapshots: 0, anomalies: 0, notifications: 0, schedules: 0 },
-          driftTrend: [],
-          anomalies: [],
-          agentVolatility: [],
-          notifications: [],
-        };
+        // H-D9: never emit a zero-count report stamped with a real
+        // generatedAt — it is indistinguishable from "no drift occurred".
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Database unavailable — cannot generate drift report.",
+        });
       }
 
       const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);

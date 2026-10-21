@@ -585,14 +585,82 @@ docker compose up -d
 
 ## Backup & Restore
 
-### Database Backup
+### Automatic Pre-Migration Backup
+
+When `RUN_MIGRATIONS=true`, `docker-entrypoint.sh` boots in this order:
+
+1. `node scripts/docker-pre-migrate.mjs --has-pending` — read-only probe of
+   `__drizzle_migrations` against `drizzle/meta/_journal.json`.
+2. **If any migration is pending**, a consistent dump is taken with
+   `mysqldump --single-transaction --quick --routines --triggers --no-tablespaces`
+   to:
+
+   ```
+   /app/backups/pre-migrate-<UTC timestamp>.sql.gz     e.g. pre-migrate-20261021T140512Z.sql.gz
+   ```
+
+   If the dump fails (client missing, directory not writable, connection or
+   privilege error, truncated output) **the container refuses to boot** — no
+   migration runs without a backup. When nothing is pending, no dump is taken.
+3. `scripts/backfill-migrations.mjs` — journal-only repair.
+4. `node scripts/docker-pre-migrate.mjs` — read-only conflict check. It never
+   modifies the schema. If a pending migration contains a statement that would
+   collide with the live schema (index/column/foreign key already present, or a
+   `DROP` target missing) it lists every such statement and exits non-zero;
+   reconcile by hand using the dump from step 2.
+5. `drizzle-kit migrate`.
+
+Details:
+
+| Item | Value |
+|------|-------|
+| Location (in container) | `/app/backups` (override with `BACKUP_DIR`) — mount the `dang-backups` volume here |
+| File name | `pre-migrate-<YYYYMMDDTHHMMSSZ>.sql.gz` (mode 0600) |
+| Retention | Dumps older than **14 days** are deleted at the next pre-migration backup (override with `BACKUP_RETENTION_DAYS`). Only `pre-migrate-*.sql.gz` files are pruned. |
+| Credentials | Parsed from `DATABASE_URL` into a temporary 0600 option file; the password is never echoed or passed on a command line |
+| Privileges | The app DB user needs `SELECT`, `SHOW VIEW`, `TRIGGER`, `LOCK TABLES` (and `EVENT`/routine access if used) on the database |
+
+The directory must be writable by the container user (`dang`). Retention is
+age-based only — copy dumps you want to keep long-term off the volume.
+
+List / copy the automatic dumps:
 
 ```bash
-# Backup
-docker compose exec db mysqldump -u root -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE} > backup_$(date +%Y%m%d).sql
+docker compose exec app ls -lh /app/backups
+docker compose cp app:/app/backups/pre-migrate-20261021T140512Z.sql.gz ./
+```
 
-# Restore
-docker compose exec -T db mysql -u root -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE} < backup_20260222.sql
+### Manual Database Backup
+
+Run the dump inside the `db` container so the password comes from the
+container's own environment (not your shell history or the host process list):
+
+```bash
+# Backup (consistent InnoDB snapshot, no table locks)
+docker compose exec -T db sh -c \
+  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysqldump -uroot \
+     --single-transaction --quick --routines --triggers --no-tablespaces \
+     "$MYSQL_DATABASE"' | gzip > backup_$(date -u +%Y%m%dT%H%M%SZ).sql.gz
+
+# Verify the dump finished (last line must read "-- Dump completed ...")
+gunzip -c backup_20261021T140512Z.sql.gz | tail -n 1
+```
+
+Always take a manual backup before upgrading with `RUN_MIGRATIONS=false`, before
+running `drizzle-kit migrate` by hand, or before reconciling a migration conflict
+reported by `[pre-migrate-check]`.
+
+### Restore
+
+```bash
+# Stop the app so nothing writes during the restore
+docker compose stop app
+
+# Restore a manual or automatic dump
+gunzip -c backup_20261021T140512Z.sql.gz | docker compose exec -T db sh -c \
+  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot "$MYSQL_DATABASE"'
+
+docker compose start app
 ```
 
 ### Volume Backup

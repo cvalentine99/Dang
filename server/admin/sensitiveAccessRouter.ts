@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 import { adminProcedure, router } from "../_core/trpc";
-import { getDb } from "../db";
+import { requireDb } from "../dbGuard";
 import { sensitiveAccessAudit } from "../../drizzle/schema";
 import { desc, eq, and, gte, lte, sql } from "drizzle-orm";
 
@@ -29,8 +29,9 @@ export const sensitiveAccessRouter = router({
       })
     )
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { rows: [], total: 0, page: input.page, limit: input.limit };
+      // H-D6: fail closed like the writer (logSensitiveAccess). An empty audit
+      // trail on DB outage would read as "no sensitive access occurred".
+      const db = await requireDb();
 
       const conditions = [];
 
@@ -82,8 +83,8 @@ export const sensitiveAccessRouter = router({
    * Admin-only.
    */
   stats: adminProcedure.query(async () => {
-    const db = await getDb();
-    if (!db) return { totalRecords: 0, uniqueUsers: 0, resourceTypes: [] };
+    // H-D6: fail closed — never report zero accesses because the DB is down.
+    const db = await requireDb();
 
     const [totalResult, uniqueUsersResult, resourceTypesResult] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(sensitiveAccessAudit),

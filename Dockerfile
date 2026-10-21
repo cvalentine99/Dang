@@ -38,9 +38,11 @@ FROM node:22-slim AS production
 
 RUN npm install -g pnpm@10.34.7
 
-# Install curl for health checks and tini for proper signal handling
+# Install curl for health checks, tini for proper signal handling, and
+# default-mysql-client for the pre-migration mysqldump in docker-entrypoint.sh
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    default-mysql-client \
     tini \
     && rm -rf /var/lib/apt/lists/*
 
@@ -85,6 +87,8 @@ RUN chmod +x docker-entrypoint.sh
 
 # Non-root user for security
 RUN groupadd -r dang && useradd -r -g dang -d /app dang
+# Pre-migration dump target (named volume mounted here; must pre-exist and be owned by dang)
+RUN mkdir -p /app/backups
 RUN chown -R dang:dang /app
 USER dang
 

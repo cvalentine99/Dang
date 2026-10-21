@@ -35,6 +35,54 @@ type SqlResult = any;
 
 export interface SqlExecutor {
   execute(sql: string, params?: unknown[]): Promise<SqlResult>;
+  /**
+   * Run `fn` inside ONE database transaction on ONE connection: commit when it
+   * resolves, roll back when it throws. Pool-backed executors must implement
+   * this (a pool spreads statements across connections, so BEGIN/COMMIT via
+   * execute() would be meaningless). See etlService.makeSqlExecutor.
+   */
+  transaction?<T>(fn: (tx: SqlExecutor) => Promise<T>): Promise<T>;
+}
+
+/** mysql2 single Connection shape (seed-kg.mjs passes one of these). */
+interface TransactionalConnection extends SqlExecutor {
+  beginTransaction(): Promise<unknown>;
+  commit(): Promise<unknown>;
+  rollback(): Promise<unknown>;
+}
+
+function isTransactionalConnection(exec: SqlExecutor): exec is TransactionalConnection {
+  const c = exec as Partial<TransactionalConnection>;
+  return typeof c.beginTransaction === "function"
+    && typeof c.commit === "function"
+    && typeof c.rollback === "function";
+}
+
+/**
+ * H-D1: run a layer reload atomically. Readers keep seeing the previous
+ * committed layer until COMMIT, and a mid-layer failure rolls back to it.
+ * Fails closed if the executor cannot provide a transaction — a partially
+ * loaded layer is worse than a failed sync.
+ */
+export async function withTransaction<T>(
+  exec: SqlExecutor,
+  fn: (tx: SqlExecutor) => Promise<T>,
+): Promise<T> {
+  if (typeof exec.transaction === "function") {
+    return exec.transaction(fn);
+  }
+  if (isTransactionalConnection(exec)) {
+    await exec.beginTransaction();
+    try {
+      const result = await fn(exec);
+      await exec.commit();
+      return result;
+    } catch (err) {
+      try { await exec.rollback(); } catch { /* surface the original error */ }
+      throw err;
+    }
+  }
+  throw new Error("SqlExecutor does not support transactions — refusing a non-atomic KG layer load");
 }
 
 // ── Layer definitions ───────────────────────────────────────────────────────
@@ -42,6 +90,12 @@ export interface SqlExecutor {
 interface LayerDef {
   name: KgLayerName;
   tables: string[];
+  /**
+   * Tables in `tables` that are NOT wiped on reload because the layer's
+   * loadFn upserts them and prunes stale rows itself (kg_endpoints — rows are
+   * referenced by kg_trust_history, which must survive a sync).
+   */
+  upsertedTables?: string[];
   loadFn: (data: KgExtractionResult, exec: SqlExecutor) => Promise<number>;
 }
 
@@ -71,21 +125,58 @@ async function batchInsert(
   return inserted;
 }
 
+function extractInsertId(result: SqlResult): number | null {
+  // mysql2: result[0].insertId  |  Drizzle: result.insertId or result[0]?.insertId
+  const insertId = Array.isArray(result)
+    ? result[0]?.insertId
+    : result?.insertId ?? result?.[0]?.insertId;
+  return insertId ? Number(insertId) : null;
+}
+
+function extractRows(result: SqlResult): Array<Record<string, unknown>> {
+  if (Array.isArray(result)) {
+    return Array.isArray(result[0]) ? result[0] : result;
+  }
+  return result?.rows ?? [];
+}
+
 /**
- * Insert endpoints one-by-one and return a map of string endpoint_id → auto-increment id.
- * This is needed because kg_parameters and kg_responses reference the auto-increment id,
- * not the string endpoint_id.
+ * Columns refreshed from the spec on every sync. Deliberately excludes the
+ * runtime-owned columns `trust_score`, `broker_validated` and
+ * `last_verified_at` so an existing endpoint keeps its trust state (and its
+ * kg_trust_history rows keep pointing at the same id).
  */
-async function insertEndpointsWithIdMap(
+const ENDPOINT_SPEC_UPDATE_COLUMNS = [
+  "endpoint_id", "summary", "description", "tags", "operation_id", "resource",
+  "operation_type", "risk_level", "allowed_for_llm", "auth_method", "deprecated",
+] as const;
+
+/**
+ * Upsert endpoints one-by-one keyed on (path, method) and return a map of
+ * string endpoint_id → kg_endpoints.id. kg_parameters / kg_responses reference
+ * the auto-increment id, not the string endpoint_id.
+ *
+ * Relies on the UNIQUE index `kg_endpoints_path_method_uniq` on (path, method)
+ * (added by the orchestrator's schema migration). `id = LAST_INSERT_ID(id)`
+ * makes the driver report the EXISTING row's id on the update path, so ids are
+ * stable across syncs. Before that index exists ON DUPLICATE KEY never fires
+ * and every row is a fresh insert; the stale-row prune below then removes the
+ * old rows, i.e. the pre-index behaviour (full replace) is preserved.
+ */
+async function upsertEndpointsWithIdMap(
   data: KgExtractionResult,
   exec: SqlExecutor,
 ): Promise<{ count: number; idMap: Map<string, number> }> {
   const idMap = new Map<string, number>();
   let count = 0;
+  const updateClause = [
+    "`id` = LAST_INSERT_ID(`id`)",
+    ...ENDPOINT_SPEC_UPDATE_COLUMNS.map(c => `\`${c}\` = VALUES(\`${c}\`)`),
+  ].join(", ");
 
   for (const ep of data.endpoints) {
     const result = await exec.execute(
-      `INSERT INTO \`kg_endpoints\` (\`endpoint_id\`, \`path\`, \`method\`, \`summary\`, \`description\`, \`tags\`, \`operation_id\`, \`resource\`, \`operation_type\`, \`risk_level\`, \`allowed_for_llm\`, \`auth_method\`, \`trust_score\`, \`deprecated\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO \`kg_endpoints\` (\`endpoint_id\`, \`path\`, \`method\`, \`summary\`, \`description\`, \`tags\`, \`operation_id\`, \`resource\`, \`operation_type\`, \`risk_level\`, \`allowed_for_llm\`, \`auth_method\`, \`trust_score\`, \`deprecated\`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE ${updateClause}`,
       [
         ep.endpoint_id, ep.path, ep.method, ep.summary, ep.description,
         ep.tags, // already JSON-stringified string — MySQL json column accepts this
@@ -94,14 +185,19 @@ async function insertEndpointsWithIdMap(
       ],
     );
 
-    // Extract auto-increment id from result
-    // mysql2: result[0].insertId  |  Drizzle: result.insertId or result[0]?.insertId
-    const insertId = Array.isArray(result)
-      ? result[0]?.insertId
-      : result?.insertId ?? result?.[0]?.insertId;
+    let id = extractInsertId(result);
+    if (!id) {
+      // Defensive: some drivers/proxies drop insertId on the duplicate path.
+      const sel = await exec.execute(
+        "SELECT `id` FROM `kg_endpoints` WHERE `path` = ? AND `method` = ? LIMIT 1",
+        [ep.path, ep.method],
+      );
+      const row = extractRows(sel)[0];
+      id = row?.id != null ? Number(row.id) : null;
+    }
 
-    if (insertId) {
-      idMap.set(ep.endpoint_id, Number(insertId));
+    if (id) {
+      idMap.set(ep.endpoint_id, id);
     }
     count++;
   }
@@ -109,13 +205,37 @@ async function insertEndpointsWithIdMap(
   return { count, idMap };
 }
 
+/**
+ * Delete kg_endpoints rows that are no longer in the spec (ids not upserted
+ * in this sync).
+ *
+ * NOTE (H-D1): the orchestrator is changing fk_kgth_endpointId
+ * (kg_trust_history → kg_endpoints) from ON DELETE CASCADE to RESTRICT. If an
+ * endpoint that disappeared from the spec still has trust history, this DELETE
+ * fails with ER_ROW_IS_REFERENCED_2, the whole api_ontology transaction rolls
+ * back (previous layer stays intact) and the layer is reported as "error".
+ * That is intentional: trust history is never silently destroyed.
+ */
+async function deleteStaleEndpoints(exec: SqlExecutor, keepIds: number[]): Promise<void> {
+  if (keepIds.length === 0) {
+    await exec.execute("DELETE FROM `kg_endpoints`");
+    return;
+  }
+  await exec.execute(
+    `DELETE FROM \`kg_endpoints\` WHERE \`id\` NOT IN (${keepIds.map(() => "?").join(", ")})`,
+    keepIds,
+  );
+}
+
 // ── Layer 1: API Ontology ───────────────────────────────────────────────────
 
 async function loadApiOntology(data: KgExtractionResult, exec: SqlExecutor): Promise<number> {
   let count = 0;
 
-  // Endpoints — insert one-by-one to capture auto-increment IDs
-  const { count: epCount, idMap } = await insertEndpointsWithIdMap(data, exec);
+  // Endpoints — upsert one-by-one on (path, method) to capture stable ids.
+  // (kg_parameters/kg_responses/kg_auth_methods/kg_resources were already
+  // cleared by truncateLayer; kg_endpoints is not — see upsertedTables.)
+  const { count: epCount, idMap } = await upsertEndpointsWithIdMap(data, exec);
   count += epCount;
 
   // Parameters — map string endpoint_id to auto-increment int id
@@ -153,6 +273,9 @@ async function loadApiOntology(data: KgExtractionResult, exec: SqlExecutor): Pro
   count += await batchInsert(exec, "kg_resources", [
     "name", "endpoint_count",
   ], resRows);
+
+  // Finally prune endpoints that left the spec (children were re-pointed above).
+  await deleteStaleEndpoints(exec, Array.from(new Set(idMap.values())));
 
   return count;
 }
@@ -228,6 +351,7 @@ const LAYERS: LayerDef[] = [
   {
     name: "api_ontology",
     tables: ["kg_endpoints", "kg_parameters", "kg_responses", "kg_auth_methods", "kg_resources"],
+    upsertedTables: ["kg_endpoints"],
     loadFn: loadApiOntology,
   },
   {
@@ -261,9 +385,13 @@ export function getLayerTables(layerName: KgLayerName): string[] {
 // ── Truncate helpers ────────────────────────────────────────────────────────
 
 async function truncateLayer(exec: SqlExecutor, layerName: KgLayerName): Promise<void> {
-  const tables = getLayerTables(layerName);
-  // Reverse order to handle FK constraints (children first)
+  const layer = LAYERS.find(l => l.name === layerName);
+  const tables = layer ? layer.tables : [];
+  const preserved = new Set(layer?.upsertedTables ?? []);
+  // Reverse order to handle FK constraints (children first). DELETE (not
+  // TRUNCATE) so it participates in the surrounding transaction.
   for (const table of [...tables].reverse()) {
+    if (preserved.has(table)) continue;
     await exec.execute(`DELETE FROM \`${table}\``);
   }
 }
@@ -300,7 +428,13 @@ async function updateSyncStatus(
 
 /**
  * Load a single layer from extraction data into the database.
- * Truncates the layer's tables first, then inserts fresh data.
+ *
+ * H-D1: the clear-and-reload runs inside ONE transaction (withTransaction), so
+ * readers never observe a half-loaded layer and any failure rolls back to the
+ * previous layer contents. Non-upserted tables are cleared and re-inserted;
+ * kg_endpoints is upserted on (path, method) and only endpoints no longer in
+ * the spec are deleted. The "syncing"/final kg_sync_status writes happen
+ * outside the transaction so the status is visible while the load runs.
  */
 export async function loadLayer(
   exec: SqlExecutor,
@@ -328,8 +462,10 @@ export async function loadLayer(
       durationMs: null,
     }, data.specVersion);
 
-    await truncateLayer(exec, layerName);
-    const entityCount = await layer.loadFn(data, exec);
+    const entityCount = await withTransaction(exec, async (tx) => {
+      await truncateLayer(tx, layerName);
+      return layer.loadFn(data, tx);
+    });
     const durationMs = Date.now() - start;
 
     const result: KgSyncLayerResult = {
@@ -356,7 +492,7 @@ export async function loadLayer(
 }
 
 /**
- * Full rebuild: truncate all KG tables and reload from extraction data.
+ * Full rebuild: reload every layer (one transaction per layer — see loadLayer).
  * Returns a KgLoadResult with per-layer results and overall stats.
  */
 export async function loadAll(

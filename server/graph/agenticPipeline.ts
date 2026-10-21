@@ -667,11 +667,14 @@ async function retrievePipelineContext(
   try {
     const db = await getDb();
     if (!db) {
+      // H-D9: never report a DB outage as "complete". AgentStep.status has no
+      // "skipped" (the union is mirrored in client/src/pages/AnalystChat.tsx),
+      // so use the existing failure state.
       steps[steps.length - 1] = {
         ...steps[steps.length - 1],
-        status: "complete",
+        status: "error",
         durationMs: Date.now() - stepStart,
-        detail: "Database unavailable — skipping pipeline context",
+        detail: "Database unavailable — pipeline context NOT retrieved",
       };
       return [];
     }

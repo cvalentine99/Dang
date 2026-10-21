@@ -82,8 +82,13 @@ export interface RecordArtifactParams {
  * nullable int/varchar columns. All nullable fields are explicitly coerced to null.
  */
 export async function recordTicketArtifact(params: RecordArtifactParams): Promise<void> {
+  // H-D7 FAIL-CLOSED — same contract as logSensitiveAccess (server/db.ts): the
+  // audit row is a gate, not best-effort. If the DB is unavailable this THROWS
+  // so callers surface an error instead of reporting an un-audited ticket.
   const db = await getDb();
-  if (!db) return;
+  if (!db) {
+    throw new Error("Ticket artifact audit unavailable: database connection failed. Ticket creation was not recorded.");
+  }
 
   await db.insert(ticketArtifacts).values({
     ticketId: params.ticketId,
