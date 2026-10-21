@@ -97,6 +97,86 @@ async function safeSearch(
 // ═══════════════════════════════════════════════════════════════════════════════
 // INDEXER ROUTER
 // ═══════════════════════════════════════════════════════════════════════════════
+/** Aggregation response shape consumed by {@link buildGeoEnrichedCountries}. */
+export interface GeoEnrichedAggs {
+  geo_countries?: {
+    buckets?: Array<{
+      key: string;
+      doc_count: number;
+      avg_level?: { value: number | null };
+      centroid?: { location?: { lat: number; lon: number }; count?: number };
+      avg_lat?: { value: number | null };
+      avg_lon?: { value: number | null };
+      cities?: { buckets?: Array<{ key: string; doc_count: number }> };
+      top_ips?: { buckets?: Array<{ key: string; doc_count: number }> };
+    }>;
+  };
+  ungeolocated?: {
+    doc_count: number;
+    avg_level?: { value: number | null };
+    top_ips?: { buckets?: Array<{ key: string; doc_count: number }> };
+  };
+}
+
+export interface GeoEnrichedCountry {
+  country: string;
+  count: number;
+  avgLevel: number;
+  lat: number | null;
+  lng: number | null;
+  cities: string[];
+  topIps: string[];
+  /** "wazuh-geo": from the alert's GeoLocation; "unknown": source IP had no GeoLocation. */
+  source: "wazuh-geo" | "unknown";
+}
+
+export const UNKNOWN_GEO_COUNTRY = "Unknown";
+
+/**
+ * Turn the alertsGeoEnriched aggregation into the per-country rows the
+ * ThreatMap consumes. Known countries are sorted by count and capped at topN;
+ * the "Unknown" bucket (if any) is appended last with null coordinates.
+ */
+export function buildGeoEnrichedCountries(
+  aggs: GeoEnrichedAggs | undefined,
+  topN: number
+): GeoEnrichedCountry[] {
+  const round1 = (v: number | null | undefined) => Math.round((v ?? 0) * 10) / 10;
+  const countries: GeoEnrichedCountry[] = (aggs?.geo_countries?.buckets ?? []).map((bucket) => {
+    const c = bucket.centroid?.location;
+    const hasCentroid = c != null && Number.isFinite(c.lat) && Number.isFinite(c.lon) && (bucket.centroid?.count ?? 1) > 0;
+    const lat = hasCentroid ? c!.lat : (bucket.avg_lat?.value ?? null);
+    const lng = hasCentroid ? c!.lon : (bucket.avg_lon?.value ?? null);
+    return {
+      country: bucket.key,
+      count: bucket.doc_count,
+      avgLevel: round1(bucket.avg_level?.value),
+      lat: lat != null && lng != null ? lat : null,
+      lng: lat != null && lng != null ? lng : null,
+      cities: bucket.cities?.buckets?.map((x) => x.key) ?? [],
+      topIps: bucket.top_ips?.buckets?.map((x) => x.key) ?? [],
+      source: "wazuh-geo",
+    };
+  });
+  countries.sort((a, b) => b.count - a.count);
+  const out = countries.slice(0, topN);
+
+  const unk = aggs?.ungeolocated;
+  if (unk && unk.doc_count > 0) {
+    out.push({
+      country: UNKNOWN_GEO_COUNTRY,
+      count: unk.doc_count,
+      avgLevel: round1(unk.avg_level?.value),
+      lat: null,
+      lng: null,
+      cities: [],
+      topIps: unk.top_ips?.buckets?.map((x) => x.key) ?? [],
+      source: "unknown",
+    });
+  }
+  return out;
+}
+
 export const indexerRouter = router({
   // ── Status ─────────────────────────────────────────────────────────────────
   status: indexerProcedure.query(async () => {
@@ -343,11 +423,16 @@ export const indexerRouter = router({
       );
     }),
 
-  /** GeoIP-enriched geographic distribution — resolves source IPs to coordinates */
+  /**
+   * Geographic distribution from Wazuh's own GeoLocation enrichment.
+   * Coordinates come from a geo_centroid over GeoLocation.location (avg of
+   * GeoLocation.latitude/longitude as a fallback). Alerts that carry a
+   * data.srcip but no GeoLocation are reported in one "Unknown" bucket with
+   * null coordinates — we no longer guess with a bundled offline IP database.
+   */
   alertsGeoEnriched: indexerProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(100).default(30) }))
     .query(async ({ input }) => {
-      // First, get alerts with source IPs
       const result = await safeSearch(
         INDEX_PATTERNS.ALERTS,
         {
@@ -358,22 +443,28 @@ export const indexerRouter = router({
           }),
           size: 0,
           aggs: {
-            // Try GeoLocation first (Wazuh-enriched)
             geo_countries: {
               ...termsAgg("GeoLocation.country_name", input.topN),
               aggs: {
                 avg_level: { avg: { field: "rule.level" } },
+                centroid: { geo_centroid: { field: "GeoLocation.location" } },
                 avg_lat: { avg: { field: "GeoLocation.latitude" } },
                 avg_lon: { avg: { field: "GeoLocation.longitude" } },
                 cities: termsAgg("GeoLocation.city_name", 5),
                 top_ips: termsAgg("data.srcip", 10),
               },
             },
-            // Also aggregate by source IP for GeoIP fallback
-            source_ips: {
-              ...termsAgg("data.srcip", 200),
+            // Alerts with a source IP that Wazuh could not geolocate.
+            ungeolocated: {
+              filter: {
+                bool: {
+                  filter: [{ exists: { field: "data.srcip" } }],
+                  must_not: [{ exists: { field: "GeoLocation.country_name" } }],
+                },
+              },
               aggs: {
                 avg_level: { avg: { field: "rule.level" } },
+                top_ips: termsAgg("data.srcip", 10),
               },
             },
           },
@@ -383,91 +474,10 @@ export const indexerRouter = router({
 
       if (!result.data) return result;
 
-      // Extract aggregation data
-      const aggs = (result.data as unknown as Record<string, unknown>)?.aggregations as Record<string, unknown> | undefined;
-      const geoCountries = aggs?.geo_countries as { buckets?: Array<{ key: string; doc_count: number; avg_level: { value: number }; avg_lat: { value: number | null }; avg_lon: { value: number | null }; cities: { buckets: Array<{ key: string; doc_count: number }> }; top_ips: { buckets: Array<{ key: string; doc_count: number }> } }> } | undefined;
-      const sourceIps = aggs?.source_ips as { buckets?: Array<{ key: string; doc_count: number; avg_level: { value: number } }> } | undefined;
-
-      // Build enriched results
-      const enrichedCountries: Array<{
-        country: string;
-        count: number;
-        avgLevel: number;
-        lat: number | null;
-        lng: number | null;
-        cities: string[];
-        topIps: string[];
-        source: "wazuh-geo" | "geoip-lite";
-      }> = [];
-
-      // Use Wazuh GeoLocation data if available
-      if (geoCountries?.buckets && geoCountries.buckets.length > 0) {
-        for (const bucket of geoCountries.buckets) {
-          enrichedCountries.push({
-            country: bucket.key,
-            count: bucket.doc_count,
-            avgLevel: Math.round((bucket.avg_level?.value ?? 0) * 10) / 10,
-            lat: bucket.avg_lat?.value ?? null,
-            lng: bucket.avg_lon?.value ?? null,
-            cities: bucket.cities?.buckets?.map(c => c.key) ?? [],
-            topIps: bucket.top_ips?.buckets?.map(ip => ip.key) ?? [],
-            source: "wazuh-geo",
-          });
-        }
-      }
-
-      // Enrich remaining source IPs via geoip-lite for IPs not covered by Wazuh GeoLocation
-      const coveredIps = new Set(enrichedCountries.flatMap(c => c.topIps));
-      const uncoveredIps = sourceIps?.buckets
-        ?.filter(b => !coveredIps.has(b.key))
-        ?.slice(0, 100) ?? [];
-
-      if (uncoveredIps.length > 0) {
-        const { batchLookupIPs, aggregateByCountry } = await import("../geoip/geoipService");
-        const lookups = batchLookupIPs(uncoveredIps.map(b => b.key));
-        const geoResults = Array.from(lookups.values()).filter(r => r.country !== null);
-        const countryAggs = aggregateByCountry(geoResults);
-
-        // Merge with existing or add new
-        for (const ca of countryAggs) {
-          const existing = enrichedCountries.find(e => e.country === ca.country);
-          if (existing) {
-            // Merge counts
-            const matchingIps = uncoveredIps.filter(b => {
-              const lookup = lookups.get(b.key);
-              return lookup?.country === ca.country;
-            });
-            const additionalCount = matchingIps.reduce((sum, b) => sum + b.doc_count, 0);
-            existing.count += additionalCount;
-          } else {
-            // Calculate count from matching IPs
-            const matchingIps = uncoveredIps.filter(b => {
-              const lookup = lookups.get(b.key);
-              return lookup?.country === ca.country;
-            });
-            const totalCount = matchingIps.reduce((sum, b) => sum + b.doc_count, 0);
-            const totalWeightedLevel = matchingIps.reduce((sum, b) => sum + (b.avg_level?.value ?? 0) * b.doc_count, 0);
-            const avgLevel = totalCount > 0 ? totalWeightedLevel / totalCount : 0;
-            enrichedCountries.push({
-              country: ca.country,
-              count: totalCount,
-              avgLevel: Math.round(avgLevel * 10) / 10,
-              lat: ca.lat,
-              lng: ca.lng,
-              cities: ca.cities,
-              topIps: ca.ips.slice(0, 10),
-              source: "geoip-lite",
-            });
-          }
-        }
-      }
-
-      // Sort by count descending and limit
-      enrichedCountries.sort((a, b) => b.count - a.count);
-
+      const aggs = (result.data as unknown as Record<string, unknown>)?.aggregations as GeoEnrichedAggs | undefined;
       return {
         configured: true,
-        data: enrichedCountries.slice(0, input.topN),
+        data: buildGeoEnrichedCountries(aggs, input.topN),
       };
     }),
 

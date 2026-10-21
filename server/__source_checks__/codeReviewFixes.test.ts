@@ -36,9 +36,13 @@ describe("Bug #3: Weighted average for threat severity", () => {
     const src = await import("fs").then(fs =>
       fs.readFileSync("server/indexer/indexerRouter.ts", "utf-8")
     );
-    // Should have weighted calculation: totalWeightedLevel / totalCount
-    expect(src).toMatch(/totalWeightedLevel/);
-    expect(src).toMatch(/totalCount\s*>\s*0\s*\?\s*totalWeightedLevel\s*\/\s*totalCount/);
+    // Phase 3: the client-side geoip-lite merge (and its hand-rolled weighted
+    // average) is gone. Per-country and "Unknown" severities are now a single
+    // OpenSearch avg over rule.level per bucket — inherently per-alert weighted,
+    // never an average of averages.
+    expect(src).not.toMatch(/totalWeightedLevel/);
+    expect(src).toMatch(/geo_countries:[\s\S]*?avg_level:\s*\{\s*avg:\s*\{\s*field:\s*"rule\.level"/);
+    expect(src).toMatch(/ungeolocated:[\s\S]*?avg_level:\s*\{\s*avg:\s*\{\s*field:\s*"rule\.level"/);
   });
 });
 
@@ -55,15 +59,17 @@ describe("Bug #4: ThreatMap lat/lng falsy check", () => {
   });
 });
 
-// ── Bug #5: geoipService returns null instead of (0,0) ──
-describe("Bug #5: geoipService null coords", () => {
+// ── Bug #5: geo enrichment returns null instead of (0,0) ──
+// Phase 3 removed geoip-lite; coordinates now come from Wazuh's GeoLocation
+// fields via buildGeoEnrichedCountries in indexerRouter.ts.
+describe("Bug #5: geo enrichment null coords", () => {
   it("should return null for missing coordinates, not (0,0)", async () => {
     const src = await import("fs").then(fs =>
-      fs.readFileSync("server/geoip/geoipService.ts", "utf-8")
+      fs.readFileSync("server/indexer/indexerRouter.ts", "utf-8")
     );
-    // Should have nullable lat/lng in CountryAggregation
     expect(src).toMatch(/lat:\s*number\s*\|\s*null/);
     expect(src).toMatch(/lng:\s*number\s*\|\s*null/);
+    expect(src).not.toMatch(/geoip\/geoipService/);
   });
 });
 

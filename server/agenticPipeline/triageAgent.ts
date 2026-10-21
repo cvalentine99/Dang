@@ -430,6 +430,21 @@ ${activeInvestigationsCtx.length > 0 ? wrapUntrustedData(activeInvestigationsCtx
     // M3: unrecognized severity is escalated (never silently "info") and flagged.
     const severityResult = resolveSeverity(parsed.severity, ruleLevel);
 
+    // M4: model-supplied ATT&CK ids are checked against the Wazuh manager's
+    // technique catalog (bundled allowlist if unreachable); unknown ids are
+    // dropped and recorded. CVE entities must match CVE-YYYY-NNNN+.
+    const { ensureMitreCatalog, filterMitreMappings, isKnownTechnique, normalizeCveId } = await import("./mitreCatalog");
+    await ensureMitreCatalog();
+    const mitreCheck = filterMitreMappings((parsed.mitreMapping || []).map((m) => ({
+      techniqueId: m.techniqueId,
+      techniqueName: m.techniqueName,
+      tactic: m.tactic,
+      confidence: clampConfidence(m.confidence),
+      source: "llm_inference" as const,
+    })));
+    const mitreUnknown: string[] = [...mitreCheck.unknown];
+    const cveDropped: string[] = [];
+
     // Build the full TriageObject with provenance
     const triageObject: TriageObject = {
       schemaVersion: "1.0",
@@ -448,10 +463,19 @@ ${activeInvestigationsCtx.length > 0 ? wrapUntrustedData(activeInvestigationsCtx
       severityReasoning: parsed.severityReasoning || "",
       entities: (parsed.entities || []).reduce<ExtractedEntity[]>((acc, e) => {
         const validType = validateEntityType(e.type);
+        let value = e.value;
+        if (validType === "cve") {
+          const cve = normalizeCveId(e.value);
+          if (!cve) { cveDropped.push(String(e.value).slice(0, 64)); return acc; }
+          value = cve;
+        } else if (validType === "mitre_technique") {
+          if (!isKnownTechnique(e.value)) { mitreUnknown.push(String(e.value).slice(0, 64)); return acc; }
+          value = String(e.value).trim().toUpperCase();
+        }
         if (validType) {
           acc.push({
             type: validType,
-            value: e.value,
+            value,
             source: "llm_inference" as const,
             confidence: clampConfidence(e.confidence),
           });
@@ -460,13 +484,7 @@ ${activeInvestigationsCtx.length > 0 ? wrapUntrustedData(activeInvestigationsCtx
         }
         return acc;
       }, []),
-      mitreMapping: (parsed.mitreMapping || []).map((m) => ({
-        techniqueId: m.techniqueId,
-        techniqueName: m.techniqueName,
-        tactic: m.tactic,
-        confidence: clampConfidence(m.confidence),
-        source: "llm_inference" as const,
-      })),
+      mitreMapping: mitreCheck.kept,
       dedup: {
         isDuplicate: !!parsed.dedup?.isDuplicate,
         similarityScore: clampConfidence(parsed.dedup?.similarityScore ?? 0),
@@ -492,13 +510,29 @@ ${activeInvestigationsCtx.length > 0 ? wrapUntrustedData(activeInvestigationsCtx
       rawAlert: input.rawAlert,
     };
 
-    // M3: flag severity fallback so the UI can mark it. TriageObject has no
-    // typed metadata field yet, so attach it as an additive optional property.
+    // M4: validation annotations. mitreValidated is true only when ids were
+    // checked against the manager's catalog (false = bundled fallback list).
+    const metadata: NonNullable<TriageObject["metadata"]> = {
+      mitreValidated: mitreCheck.validated,
+      cveValidated: true,
+    };
+    if (mitreUnknown.length > 0) {
+      metadata.mitreUnknown = Array.from(new Set(mitreUnknown)).slice(0, 50);
+      console.warn(`[TriageAgent] M4: dropped ${mitreUnknown.length} unknown MITRE id(s) (catalog: ${mitreCheck.source}): ${metadata.mitreUnknown.slice(0, 10).join(", ")}`);
+    }
+    if (mitreCheck.parentMatched.length > 0) metadata.mitreParentMatched = mitreCheck.parentMatched;
+    if (cveDropped.length > 0) {
+      metadata.cveDropped = Array.from(new Set(cveDropped)).slice(0, 50);
+      console.warn(`[TriageAgent] M4: dropped ${cveDropped.length} malformed CVE id(s): ${metadata.cveDropped.slice(0, 10).join(", ")}`);
+    }
+    triageObject.metadata = metadata;
+
+    // M3: flag severity fallback so the UI can mark it.
     if (severityResult.fallback) {
-      (triageObject as TriageObject & { metadata?: Record<string, unknown> }).metadata = {
+      Object.assign(metadata, {
         severityFallback: true,
         severityFallbackRaw: typeof parsed.severity === "string" ? parsed.severity.slice(0, 64) : String(parsed.severity),
-      };
+      });
       console.warn(`[TriageAgent] M3: unrecognized severity '${String(parsed.severity).slice(0, 64)}' — fell back to '${severityResult.severity}' (ruleLevel ${ruleLevel})`);
     }
 
