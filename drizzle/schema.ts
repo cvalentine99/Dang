@@ -82,7 +82,7 @@ export const analystNotes = mysqlTable("analyst_notes", {
   /** Whether the note has been resolved/closed */
   resolved: int("resolved").default(0).notNull(),
   /** User who created this note — used for ownership enforcement */
-  createdBy: int("createdBy"),
+  createdBy: int("createdBy").notNull(),  // owner (team-global read, owner/admin write)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => ([
@@ -106,9 +106,12 @@ export const ragSessions = mysqlTable("rag_sessions", {
   /** Optional context snapshot injected for this message */
   contextSnapshot: json("contextSnapshot").$type<Record<string, unknown>>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  /** Owner — chat sessions are strictly per-analyst (C8/H-A4). */
+  userId: int("userId").notNull(),
 }, (table) => ([
   index("rs_sessionId_idx").on(table.sessionId),
   index("rs_createdAt_idx").on(table.createdAt),
+  index("rs_userId_idx").on(table.userId),
 ]));
 
 export type RagSession = typeof ragSessions.$inferSelect;
@@ -713,7 +716,7 @@ export type KgSyncStatus = typeof kgSyncStatus.$inferSelect;
 export const investigationSessions = mysqlTable("investigation_sessions", {
   id: int("id").autoincrement().primaryKey(),
   /** Nullable: system-created sessions (e.g. hypothesis agent) use null */
-  userId: int("userId"),
+  userId: int("userId").notNull(), // per-analyst; system-created sessions carry the triggering user
   title: varchar("title", { length: 512 }).notNull(),
   description: text("description"),
   status: mysqlEnum("status", ["active", "closed", "archived"]).default("active").notNull(),
@@ -737,7 +740,7 @@ export const investigationSessions = mysqlTable("investigation_sessions", {
 }, (table) => ([
   index("is_userId_idx").on(table.userId),
   index("is_status_idx").on(table.status),
-  foreignKey({ name: "fk_is_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("set null"),
+  foreignKey({ name: "fk_is_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("restrict"), // owner column is NOT NULL; never orphan or cascade-delete investigations
 ]));
 
 export type InvestigationSession = typeof investigationSessions.$inferSelect;
@@ -872,6 +875,8 @@ export const alertQueue = mysqlTable("alert_queue", {
   pipelineTriageId: varchar("pipelineTriageId", { length: 64 }),
   /** Auto-triage pipeline status */
   autoTriageStatus: varchar("autoTriageStatus", { length: 20 }).default("pending"),
+  /** Auto-triage attempts; after MAX_TRIAGE_ATTEMPTS the item is parked as failed (no poison loop, M6). */
+  triageAttempts: int("triageAttempts").default(0).notNull(),
 }, (table) => ([
   index("aq_status_idx").on(table.status),
   index("aq_alertId_idx").on(table.alertId),
@@ -1615,3 +1620,26 @@ export type InsertThreatIntelCacheRow = typeof threatIntelCache.$inferInsert;
 
 // ── Saved Broker Queries ────────────────────────────────────────────────────
 
+/**
+ * Analyst action audit — team-global SOC model (CODE_REVIEW_2026-10-21.md C8/H-A5).
+ * Any analyst may read shared pipeline data; every mutation that changes shared state
+ * (dismiss alert, override triage sign-off, pivot a case, change detection rules, ...)
+ * is attributed here. Append-only; no FK to users so the trail survives account removal.
+ */
+export const analystActionAudit = mysqlTable("analyst_action_audit", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  /** Procedure-style action name, e.g. "alertQueue.remove", "pipeline.submitFeedback" */
+  action: varchar("action", { length: 64 }).notNull(),
+  targetType: varchar("targetType", { length: 64 }).notNull(),
+  targetId: varchar("targetId", { length: 128 }).notNull(),
+  /** Before/after or reason payload — never secrets */
+  metadata: json("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ([
+  index("aaa_userId_createdAt_idx").on(table.userId, table.createdAt),
+  index("aaa_target_idx").on(table.targetType, table.targetId),
+  index("aaa_action_createdAt_idx").on(table.action, table.createdAt),
+]));
+export type AnalystActionAuditRow = typeof analystActionAudit.$inferSelect;
+export type InsertAnalystActionAudit = typeof analystActionAudit.$inferInsert;
