@@ -1,16 +1,21 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
+import { projects } from "./vitest.workspace";
 
 const templateRoot = path.resolve(import.meta.dirname);
 
 /**
- * Shared base for the server-side vitest projects. The projects themselves
- * ("unit", "source-checks", "client") are declared in vitest.workspace.ts;
- * `pnpm test` runs unit + client, `pnpm test:source-checks` the quarantined
- * source-inspection suites, `pnpm test:db` the unit project against a test DB.
+ * Root vitest config. The projects ("unit", "source-checks", "client") and the
+ * DB_KNOWN_FAILING / TEST_DB / DB_KNOWN_FAILING=only selection logic live in
+ * vitest.workspace.ts (vitest >= 4 replaced workspace files with
+ * `test.projects`). `pnpm test` runs unit + client, `pnpm test:source-checks`
+ * the quarantined source-inspection suites, `pnpm test:db` the unit project
+ * against a test DB.
  *
- * Do not add `include` here: project configs extend this file and vitest's
- * mergeConfig concatenates arrays.
+ * The settings below are the shared base that the unit and source-checks
+ * projects inherit via `extends: true`; the client project is self-contained
+ * in vitest.config.client.ts. Do not add `include` here: projects that extend
+ * the root inherit and merge it.
  */
 export default defineConfig({
   root: templateRoot,
@@ -27,5 +32,6 @@ export default defineConfig({
     setupFiles: ["./server/testHelpers/loadTestEnv.ts"],
     testTimeout: 15_000,
     fileParallelism: false, // DB-dependent tests must not race (ETL integration truncates tables)
+    projects,
   },
 });

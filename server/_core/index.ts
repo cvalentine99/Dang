@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 import { createServer } from "http";
 import net from "net";
+import fs from "fs";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -31,7 +32,25 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+/**
+ * Docker secrets support: when NAME is unset and NAME_FILE points at a file
+ * (e.g. /run/secrets/encryption_key), load NAME from it (trailing newline
+ * trimmed). Only for the two secrets the app derives keys from.
+ */
+function loadSecretFiles() {
+  for (const name of ["JWT_SECRET", "ENCRYPTION_KEY"]) {
+    const file = process.env[`${name}_FILE`];
+    if (!file || (process.env[name] ?? "").trim() !== "") continue;
+    try {
+      process.env[name] = fs.readFileSync(file, "utf8").trim();
+    } catch (e) {
+      console.error(`[Startup] ${name}_FILE=${file} could not be read: ${(e as Error).message}`);
+    }
+  }
+}
+
 async function startServer() {
+  loadSecretFiles();
   // Validate environment variables before anything else
   const { validateEnvironment } = await import("./envValidation");
   const { errors: envErrors } = validateEnvironment();
@@ -47,6 +66,19 @@ async function startServer() {
   } catch (e) {
     // Non-fatal: seeding may fail if DB isn't ready yet
     console.warn("[Startup] Admin seeding skipped:", (e as Error).message);
+  }
+
+  // L3/M3: rewrite legacy v1 credential ciphertexts (JWT_SECRET-derived key,
+  // no AAD) as v2 (ENCRYPTION_KEY, AAD-bound). Idempotent; non-fatal — v1 rows
+  // still decrypt on the read path, so a DB that is not ready yet only defers it.
+  try {
+    const { reencryptLegacySettings } = await import("../admin/connectionSettingsService");
+    const { failed } = await reencryptLegacySettings();
+    if (failed > 0) {
+      console.warn(`[Startup] ${failed} stored credential(s) could not be decrypted (JWT_SECRET changed?) — re-enter them in Admin → Connection Settings`);
+    }
+  } catch (e) {
+    console.warn("[Startup] Credential re-encryption skipped:", (e as Error).message);
   }
 
   const app = express();

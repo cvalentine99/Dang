@@ -43,7 +43,8 @@ vi.mock("../wazuh/wazuhClient", () => ({
 }));
 
 // Mock indexerClient
-vi.mock("../indexer/indexerClient", () => ({
+vi.mock("../indexer/indexerClient", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   isIndexerConfigured: vi.fn(() => false),
   getIndexerConfig: vi.fn(() => null),
   indexerHealth: vi.fn(async () => ({})),

@@ -4,7 +4,7 @@ import path from "path";
 const root = path.resolve(import.meta.dirname);
 
 /**
- * "client" vitest project (referenced from vitest.workspace.ts).
+ * "client" vitest project (listed in `projects` in vitest.workspace.ts).
  *
  * Environment is `node`: jsdom/happy-dom are not installed, so only pure
  * client modules (no DOM) can be tested here. Add jsdom as a devDependency

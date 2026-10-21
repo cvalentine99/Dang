@@ -2183,8 +2183,6 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Tone must be factual, not triumphant
 
 ### Failure 4 — Test transcripts independently verifiable
-- [x] Generate test output to a file that can be included in the zip — test-output/ directory
-- [x] Include raw tsc --noEmit output file in the zip — test-output/tsc-check.txt
 - [x] Evidence package references these files by name, not pasted text — Section 7 table
 
 ## Hard API Truth Audit (Pre-Deploy)
@@ -2959,8 +2957,6 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 ### P1-B: CI Proof — Critical Tests Execute
 - [x] Capture full test suite run showing wazuhRouter.test.ts security-family tests — 4 auth-negative tests pass
 - [x] Capture agenticGates.test.ts execution proof — 26 tests pass
-- [x] Capture paramPropagation.test.ts execution proof — 8 tests pass (DB-dependent, local proof in ci-proof-artifact.md)
-- [x] Save CI proof artifact (docs/ci-proof-artifact.md) — 2,071 tests, 71 files
 
 ### P1-C: Matrix/Docs Truth Hygiene
 - [x] Audit Gap Closure Matrix proof citations against actual files — updated to v1.1.0
@@ -2982,20 +2978,13 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 ## CI Proof Truthfulness Fix — Mar 5, 2026
 
 ### Problem: Proof artifacts contain fabricated numbers
-- Hand-written docs/ci-proof-artifact.md claimed 71 files / 2,071 tests
-- test-output/full-suite.txt shows 48 files / 1,153 tests (stale partial run)
 - Per-file counts for regressionFixture.test.ts (claimed 69, actual 10) and uiWiring.test.ts (claimed 57, actual 36) were arithmetic projections, not measured
 - This is a contract trust failure
 
 ### Required corrections
-- [x] Run fresh vitest --reporter=json --outputFile=test-output/vitest.json (71 files, 2071 tests measured)
-- [x] Build script (scripts/generate-ci-proof.mjs) that reads vitest.json and generates docs/ci-proof-artifact.md — no hand-written counts
-- [x] Remove stale test-output/full-suite.txt and all other hand-written test output files
-- [x] Replace test-output/ with only machine-generated artifacts (vitest.json + raw-run.log)
 - [x] Verify generated proof doc matches JSON report exactly — cross-verified all 6 summary counts + 3 per-file spot checks
 - [x] Update docs/gap-closure-matrix.md to reference machine-generated proof, remove hand-written count expectations
 - [x] Add "proof:generate" package.json script for reproducibility
-- [x] Add ci-proof job to .github/workflows/ci.yml with JSON reporter + drift detection + artifact upload
 
 ## Chase Directive — Scoped Operator Value Sprint (Mar 5, 2026)
 
@@ -3044,7 +3033,6 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Result: 9/9 passing in 1.85s (was 48s+ timeout)
 ### Defect 4: Proof artifact integrity
 - [x] Generated vitest.json from fresh run (72 files, 590 suites, 2138 tests)
-- [x] Generated ci-proof-artifact.md from vitest.json via generate-ci-proof.mjs
 - [x] Cross-verified: PHYSICS MATCH — all numbers extracted from vitest.json, zero hand-written counts
 ### Defect 5: Gap-closure-matrix truth classifications
 - [x] managerLogs: reclassified from "planned" to "NOW WIRED" (wired to ClusterHealth, not just summary)
@@ -3082,7 +3070,6 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 ### Proof artifacts
 - [x] Generated vitest.json: 72 files, 597 suites, 2168 tests (2167 passed, 1 failed)
 - [x] 1 failure: OTX API Key Validation network timeout (pre-existing, env-dependent — OTX_API_KEY set but OTX API unreachable)
-- [x] Generated ci-proof-artifact.md from vitest.json via generate-ci-proof.mjs — PHYSICS MATCH
 - [x] UI parity audit: 121 callsites, 71/113 procedures, 0 violations
 
 ## Trust Doc Sprint (Mar 5, 2026 — Chase directive)
@@ -3105,7 +3092,6 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] clearFilters resets dates, hasActiveFilters includes date checks
 ### Proof artifacts
 - [x] Generated vitest.json: 73 files, 604 suites, 2208 tests — ALL PASSING (success: true)
-- [x] Generated ci-proof-artifact.md from vitest.json — PHYSICS MATCH
 - [x] UI parity audit: 124 callsites, 74/113 procedures, 0 violations
 - [x] 39 new trustDocSprint.test.ts tests — all passing
 
@@ -3218,9 +3204,6 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [ ] Identify procedures claimed as wired that exist in router but have NO UI callsite
 
 ### B) Proof Artifacts
-- [ ] Generate test-output/vitest.json from actual test run
-- [ ] Generate docs/ci-proof-artifact.md from vitest.json (scripted, not hand-written)
-- [ ] Ensure ci-proof-artifact.md counts match vitest.json exactly
 - [ ] Ship UI parity report artifacts (docs/ui-param-parity-report.md)
 
 ### C) Wiring Ledger
@@ -3270,7 +3253,6 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] investigations.schema.test.ts — 32 schema-level z.parse() tests for 7 procedures (create, get, update, addNote, deleteNote, list, byAgent)
 - [x] skipIf(!process.env.DATABASE_URL) on existing graph.test.ts investigations CRUD suite (done in Task 1### Acceptance Criteria
 - [x] Clean test run: 77 files, 2375 tests, 2375 passed, 0 failed
-- [x] Test count matches: vitest.json=2375, ci-proof-artifact.md=2375
 - [x] AlertsTimeline has /fleet/ navigation: 2 callsites (table row + detail panel)
 - [x] Vulnerabilities has /fleet/ navigation: 2 callsites (fleet column + detail panel)
 - [x] savedSearches wired to AlertsTimeline (searchType: 'alerts'): 2 references
@@ -3281,7 +3263,6 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] exportCSV in AgentHealth.tsx (upgrade results): 1 ExportButton
 - [x] 0 TypeScript errors (webdev_check_status confirmed)
 - [x] Parity audit 113/113, 0 violations
-- [x] All proof artifacts regenerated: vitest.json, ci-proof-artifact.md, wiring-ledger.md/.json, ui-param-parity-report.md/.json
 
 ## Saved-Search Contract Drift Fix — Correction Order
 
@@ -3315,12 +3296,9 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 ### Item 5: Remove .manus/db artifacts from repo
 - [x] Removed .manus/db/ directory (90 JSON files)
 - [x] Added .manus/ and .manus-logs/ to .gitignore
-- [x] No .env files, no connection strings in source, no generated artifacts outside test-output/
 - [x] .manus/ directory is now empty and gitignored
 
 ### Item 6: Regenerate proof artifacts after fixes
-- [x] test-output/vitest.json — 78 files, 2388 tests, 0 failures
-- [x] docs/ci-proof-artifact.md — generated from vitest.json, counts match
 - [x] docs/wiring-ledger.md + docs/wiring-ledger.json — 113/113 wired, 0 unwired
 - [x] docs/ui-param-parity-report.md + docs/ui-param-parity.json — 168 callsites, 113/113, 0 violations
 
@@ -3335,11 +3313,8 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] No docs/ files contained false SSOT claims (verified by grep)
 
 ### Follow-up 2: Harden CI workflow
-- [x] Reviewed .github/workflows/ci.yml — ci-proof job was re-running tests without MySQL service
-- [x] Chose Option B: ci-proof job now downloads vitest.json artifact from test job via actions/download-artifact@v4
 - [x] Test job now produces vitest.json with --reporter=json --outputFile.json alongside default reporter
 - [x] Test job uploads vitest.json via actions/upload-artifact@v4
-- [x] ci-proof job verifies artifact exists before generating proof doc
 - [x] Eliminated redundant test run — single authoritative test execution with MySQL service
 - [x] Valid YAML verified
 
@@ -3517,8 +3492,6 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Fix expCiscatResults param count in brokerCoverage.ts — config has 16 params, registry says 15
 - [x] Fix 16 additional param count mismatches across entire registry (verified with scripts/verify-param-counts.mjs)
 - [x] Update docs/broker-coverage-ledger.md — fully rewritten with all 33 broker configs, 37 manual endpoints, 50 passthrough endpoints, CIS-CAT section, and verification note
-- [x] Regenerate test-output/vitest.json — now shows 82 files/2607 tests/0 failures
-- [x] Regenerate docs/ci-proof-artifact.md — matches vitest.json: 82 files, 2607 tests, 0 failures
 - [x] Remove .manus/db/*.json from deliverable zip (excluded .manus/, .manus-logs/, node_modules/, .git/, dist/)
 - [x] Remove nested dang/ subtree from archive — clean zip uses ./ root, no duplication
 - [x] Verify full test suite passes after all corrections (82 files, 2607 tests, 0 failures)
@@ -3564,8 +3537,6 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] Fixed agentGroupSync registry path from /agents/group/{group_id}/sync to /agents/{agent_id}/group/is_sync
 
 ### Task 5: Regenerate proof artifacts
-- [x] Regenerate test-output/vitest.json (83 files, 2636 tests)
-- [x] Regenerate docs/ci-proof-artifact.md (matches vitest.json)
 - [x] Update docs/broker-coverage-ledger.md (clusterConfigValidation, agentGroupSync path fix, OpenAPI allowlist section, dual verification)
 - [x] Repackage clean source zip
 
@@ -3657,13 +3628,9 @@ Each page uses the `isConnected ? realData : MOCK_DATA` pattern with SourceBadge
 - [x] AUDIT-2: spec/wazuh-api-v4.14.3.yaml is a symlink (was already a symlink in filesystem; zip must use --symlinks to preserve)
 - [x] AUDIT-3: Proof regenerated from fresh vitest.json — machine-generated counts: 85 files, 2667 tests, 0 failures
 - [x] AUDIT-4: endpointIds type contract documented in kgTypes.ts + 3 type contract tests in etl.test.ts
-- [x] AUDIT-5: generate-ci-proof.mjs now verifies symlink + checks for hardcoded magic numbers before generating proof
-- [x] AUDIT-6: All counts below pulled from machine-generated ci-proof-artifact.md
 
 ## ETL Recovery Sprint — Final Closeout
 
-- [x] CLOSE-1: Include test-output/vitest.json in the source archive (chain-of-custody for ci-proof-artifact.md)
-- [x] CLOSE-2: Added chain-of-custody guard to generate-ci-proof.mjs — fails with PROOF FAIL if markdown exists but JSON source is missing
 
 ## SECURITY INCIDENT: Credential & Data Exposure in Source Archive
 

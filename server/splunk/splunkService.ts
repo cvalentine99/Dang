@@ -18,7 +18,7 @@ import { connectionSettings } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { Agent } from "undici";
 import { SKIP_TLS_VERIFY } from "../_core/tlsAgent";
-import { decrypt } from "../admin/encryptionService";
+import { decrypt, settingAad } from "../admin/encryptionService";
 import { newCorrelationId } from "../wazuh/upstreamError";
 
 // Audit #28: Use centralized TLS policy for Splunk connections.
@@ -103,7 +103,7 @@ export async function getEffectiveSplunkConfig(): Promise<SplunkConfig> {
             if (row.settingValue) config.port = row.settingValue;
             break;
           case "hec_token":
-            if (row.settingValue) config.hecToken = row.isEncrypted ? decrypt(row.settingValue) : row.settingValue;
+            if (row.settingValue) config.hecToken = row.isEncrypted ? decrypt(row.settingValue, settingAad("splunk", row.settingKey)) : row.settingValue;
             break;
           case "hec_port":
             if (row.settingValue) config.hecPort = row.settingValue;

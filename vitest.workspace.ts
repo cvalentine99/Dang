@@ -1,4 +1,4 @@
-import { configDefaults, defineWorkspace } from "vitest/config";
+import { configDefaults, type TestProjectConfiguration } from "vitest/config";
 // Load .env.test (never .env) here too, so TEST_DB / DATABASE_URL from it
 // select DB mode below exactly as they do in the workers and globalSetup.
 import { loadTestEnv } from "./server/testHelpers/loadTestEnv";
@@ -6,7 +6,11 @@ import { loadTestEnv } from "./server/testHelpers/loadTestEnv";
 loadTestEnv();
 
 /**
- * Vitest projects (vitest 2 workspace).
+ * Vitest project definitions.
+ *
+ * Vitest >= 4 no longer reads workspace files: this module is now imported by
+ * vitest.config.ts, which passes `projects` to `test.projects`. The file keeps
+ * its name so DB_KNOWN_FAILING stays where the CI workflow and docs point.
  *
  *   unit           server/**  behavioral tests. DB-gated suites skip unless
  *                  DATABASE_URL is set; when it is, testDb.ts migrates the test
@@ -29,16 +33,10 @@ loadTestEnv();
  * non-DB tests still run in `pnpm test`. Remove a file from this list once it
  * passes under `pnpm test:db:known-failing`.
  */
-export const DB_KNOWN_FAILING = [
-  "server/agenticPipeline/auditBugRegression.test.ts",
-  "server/agenticPipeline/correlationAgent.test.ts",
-  "server/agenticPipeline/hypothesisAgent.test.ts",
-  "server/agenticPipeline/liveFireValidation.test.ts",
-  "server/agenticPipeline/pipelineIntegration.test.ts",
-  "server/agenticPipeline/resumePipelineHelper.test.ts",
-  "server/agenticPipeline/stageOutput.test.ts",
-  "server/agenticPipeline/stateMachine.test.ts",
-  "server/agenticPipeline/triageAgent.test.ts",
+export const DB_KNOWN_FAILING: string[] = [
+  // Empty since the Phase 3 burn-down (2026-10-21): all nine agenticPipeline
+  // suites pass against a freshly migrated test DB. Tests blocked by a genuine
+  // application bug are it.todo in their suite, not listed here.
 ];
 
 const dbMode = process.env.TEST_DB === "1";
@@ -52,9 +50,11 @@ const unitExclude = [
   ...(dbMode && knownFailingMode !== "only" ? DB_KNOWN_FAILING : []),
 ];
 
-export default defineWorkspace([
+export const projects: TestProjectConfiguration[] = [
   {
-    extends: "./vitest.config.ts",
+    // `extends: true` inherits the shared base in vitest.config.ts (aliases,
+    // node env, setupFiles, timeout, fileParallelism: false).
+    extends: true,
     test: {
       name: "unit",
       include: unitInclude,
@@ -63,11 +63,11 @@ export default defineWorkspace([
     },
   },
   {
-    extends: "./vitest.config.ts",
+    extends: true,
     test: {
       name: "source-checks",
       include: ["server/__source_checks__/**/*.test.ts"],
     },
   },
   "./vitest.config.client.ts",
-]);
+];

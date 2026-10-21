@@ -1,7 +1,7 @@
 {
-  "generated": "2026-10-21T19:43:12.374Z",
+  "generated": "2026-10-21T21:40:42.820Z",
   "callsiteCount": 182,
-  "procedureCount": 129,
+  "procedureCount": 130,
   "consumedProcedures": [
     "agentBrowserExtensions",
     "agentById",
@@ -4429,6 +4429,10 @@
           "default": null
         }
       }
+    },
+    "statesSource": {
+      "inputType": "void",
+      "keys": {}
     },
     "decoders": {
       "inputType": "object",

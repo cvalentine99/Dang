@@ -47,7 +47,7 @@ An analyst-grade security operations platform that visualizes, correlates, and i
 ```
                                     ┌─────────────────────────────────────────────┐
                                     │              Dang! SIEM Server               │
-Browser ──► Caddy/Nginx TLS ──►    │  Express 4 + tRPC 11                        │
+Browser ──► Caddy/Nginx TLS ──►    │  Express 5 + tRPC 11                        │
                                     │    ├── Wazuh Proxy (130 procedures)          │
                                     │    ├── Indexer Proxy (OpenSearch)             │
                                     │    ├── Agentic Pipeline (Triage → Hypothesis)│
@@ -214,17 +214,17 @@ Alert Queue ──► Triage Agent ──► Correlation Agent ──► Hypothe
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 19, TypeScript, Tailwind CSS 4, Recharts, shadcn/ui, Framer Motion |
-| Backend | Express 4, tRPC 11, Drizzle ORM, SuperJSON |
+| Frontend | React 19, TypeScript 7, Vite 8, Tailwind CSS 4, Recharts, shadcn/ui, Framer Motion |
+| Backend | Express 5, tRPC 11, Drizzle ORM, SuperJSON |
 | Database | MySQL 8 (TiDB compatible) — 40 tables |
 | Auth | Local JWT (self-hosted) or Manus OAuth (cloud) |
 | LLM | Any OpenAI-compatible API — Nemotron 3 Nano default, configurable |
 | Threat Intel | AlienVault OTX v2 API |
 | SIEM Forward | Splunk HEC (optional) |
 | Container | Docker multi-stage, Node 22 slim, tini init |
-| CI/CD | GitHub Actions, GHCR, Dependabot |
+| CI/CD | GitHub Actions, Dependabot (no published image — build locally) |
 | Proxy | Caddy (auto TLS) or Nginx (manual TLS) |
-| Testing | Vitest — 111 test files |
+| Testing | Vitest 5 — `unit` / `client` / `source-checks` projects |
 
 ---
 
@@ -239,12 +239,6 @@ cp env.docker.template .env
 ./deploy.sh                    # HTTP on port 3000
 ./deploy.sh --proxy caddy      # HTTPS with auto Let's Encrypt
 ./deploy.sh --proxy nginx      # HTTPS with your own certs
-```
-
-Or pull the pre-built image:
-
-```bash
-docker pull ghcr.io/cvalentine99/dang-siem:latest
 ```
 
 ### With GPU (for local LLM inference)
@@ -285,6 +279,7 @@ See **[DOCKER.md](DOCKER.md)** for full deployment documentation including envir
 | Variable | Description |
 |---|---|
 | `JWT_SECRET` | Session signing key — generate with `openssl rand -hex 32` |
+| `ENCRYPTION_KEY` | **Required in production** (≥ 32 chars, distinct from `JWT_SECRET`) — encrypts saved connection credentials. Generate with `openssl rand -hex 32`; keep it stable. Credentials saved by older versions are re-encrypted under it at first boot. |
 | `DATABASE_URL` | MySQL connection string (auto-configured in Docker) |
 
 ### Authentication
@@ -355,13 +350,7 @@ The application uses 40 MySQL tables managed by Drizzle ORM with migration files
 
 ## Testing
 
-The test suite uses **Vitest** with 111 test files covering backend procedures, parameter broker validation, UI wiring parity, security auth, agentic pipeline stages, KG ETL integration, and broker coverage.
-
-```bash
-pnpm test                      # Run full suite
-p## Testing
-
-Tests use **Vitest 2** with three projects, declared in `vitest.workspace.ts`:
+Tests use **Vitest 5** with three projects, defined in `vitest.workspace.ts` (which also holds `DB_KNOWN_FAILING`) and registered as `test.projects` by `vitest.config.ts` — Vitest 4+ no longer reads workspace files on its own:
 
 | Project | Files | What it is |
 |---|---|---|

@@ -25,6 +25,13 @@ const ENV_CHECKS: EnvCheck[] = [
     category: "core",
   },
 
+  {
+    key: "ENCRYPTION_KEY",
+    required: false, // production requirement enforced by checkEncryptionKey()
+    description: "Credential-encryption key, >= 32 chars (REQUIRED in production)",
+    category: "core",
+  },
+
   // Wazuh Manager API
   {
     key: "WAZUH_HOST",
@@ -124,6 +131,28 @@ export function maskEnvValue(key: string, value: string): string {
   if (SECRET_KEY_PATTERN.test(key)) return `******** (set, ${lengthBucket(value.length)})`;
   const scrubbed = value.replace(URL_CREDENTIAL_PATTERN, "//$1:***@");
   return scrubbed.length > 60 ? `${scrubbed.substring(0, 57)}...` : scrubbed;
+}
+
+export const MIN_ENCRYPTION_KEY_LENGTH = 32;
+
+/** ENCRYPTION_KEY policy (exported for tests). */
+export function checkEncryptionKey(env: NodeJS.ProcessEnv = process.env): { errors: string[]; warnings: string[] } {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const key = env.ENCRYPTION_KEY ?? "";
+  const isProd = env.NODE_ENV === "production";
+  const gen = "Generate with: openssl rand -hex 32";
+  if (key.trim() === "") {
+    if (isProd) errors.push(`ENCRYPTION_KEY is required in production (>= ${MIN_ENCRYPTION_KEY_LENGTH} chars) — it encrypts stored connection credentials. ${gen}`);
+    else warnings.push(`ENCRYPTION_KEY not set — credential encryption falls back to a JWT_SECRET-derived key (development only). ${gen}`);
+  } else if (key.length < MIN_ENCRYPTION_KEY_LENGTH) {
+    if (isProd) errors.push(`ENCRYPTION_KEY is shorter than ${MIN_ENCRYPTION_KEY_LENGTH} characters. ${gen}`);
+    else warnings.push(`ENCRYPTION_KEY is shorter than ${MIN_ENCRYPTION_KEY_LENGTH} characters and is IGNORED — falling back to a JWT_SECRET-derived key (development only). ${gen}`);
+  } else if (env.JWT_SECRET && key === env.JWT_SECRET) {
+    if (isProd) errors.push("ENCRYPTION_KEY must differ from JWT_SECRET");
+    else warnings.push("ENCRYPTION_KEY equals JWT_SECRET — use an independent secret");
+  }
+  return { errors, warnings };
 }
 
 export function validateEnvironment(): {
@@ -236,6 +265,19 @@ export function validateEnvironment(): {
     console.log(
       "  ⚠️  JWT_SECRET is short (< 32 chars) — consider `openssl rand -hex 32` for a stronger secret"
     );
+  }
+
+  // L3/M3: ENCRYPTION_KEY encrypts stored connection credentials (v2, AAD-bound).
+  // Required in production; elsewhere encryptionService falls back to a key
+  // derived from JWT_SECRET with a loud warning.
+  const encErrors = checkEncryptionKey();
+  for (const e of encErrors.errors) {
+    errors.push(e);
+    console.error(`  ❌  ${e}`);
+  }
+  for (const w of encErrors.warnings) {
+    warnings.push(w);
+    console.log(`  ⚠️  ${w}`);
   }
 
   // Summary

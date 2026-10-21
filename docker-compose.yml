@@ -80,9 +80,16 @@ services:
       # Auth — generate with: openssl rand -hex 32
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — generate with openssl rand -hex 32}
 
-      # Encryption — separate key for AES-256-GCM credential encryption (optional)
-      # If not set, a key is derived from JWT_SECRET via HKDF (safe but separation is best practice)
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      # Encryption — AES-256-GCM key for stored connection credentials. REQUIRED
+      # (>= 32 chars); the app refuses to start in production without it.
+      # Generate with: openssl rand -hex 32. Changing it later makes saved
+      # credentials undecryptable (re-enter them in Admin → Connection Settings).
+      # Credentials saved before this key existed (legacy v1, JWT_SECRET-derived)
+      # still decrypt and are re-encrypted under it automatically at boot.
+      # To use a Docker secret instead, replace this line with
+      #   ENCRYPTION_KEY_FILE: /run/secrets/encryption_key
+      # and uncomment the `secrets:` blocks below (JWT_SECRET_FILE works the same way).
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required — generate with openssl rand -hex 32}
 
       # Local auth — first registered user becomes admin if these are not set
       LOCAL_ADMIN_USER: ${LOCAL_ADMIN_USER:-}
@@ -132,6 +139,17 @@ services:
       VITE_APP_LOGO: ${VITE_APP_LOGO:-}
     networks:
       - dang-net
+    # Optional Docker secrets (keeps the keys out of `docker inspect`). The app
+    # reads <NAME>_FILE for JWT_SECRET and ENCRYPTION_KEY when <NAME> is unset.
+    # secrets:
+    #   - jwt_secret
+    #   - encryption_key
+
+# secrets:
+#   jwt_secret:
+#     file: ./secrets/jwt_secret        # openssl rand -hex 32 > secrets/jwt_secret
+#   encryption_key:
+#     file: ./secrets/encryption_key    # openssl rand -hex 32 > secrets/encryption_key
 
 volumes:
   dang-db-data:

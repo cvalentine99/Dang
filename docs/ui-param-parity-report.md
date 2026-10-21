@@ -3,7 +3,7 @@
 **Generated:** 2026-10-21  
 **Script:** `scripts/audit-ui-param-parity.mjs`  
 **Callsites audited:** 182  
-**Unique procedures consumed:** 128 of 129 total  
+**Unique procedures consumed:** 128 of 130 total  
 
 ---
 
@@ -14,7 +14,7 @@
 |--------|-------|
 | Total callsites | 182 |
 | Unique procedures consumed | 128 |
-| Router procedures available | 129 |
+| Router procedures available | 130 |
 | Parameters surfaced in UI | 99 |
 | Parameters hardcoded/constant | 130 |
 | Parameters not supported (classified) | 912 |
@@ -27,6 +27,7 @@
 | Procedure | Input Keys | Disposition |
 |-----------|-----------|-------------|
 | `remoted` | (void) | Backend-only / Not yet wired to UI |
+| `statesSource` | (void) | Backend-only / Not yet wired to UI |
 
 ## client/src/components/DriftComparison.tsx
 
@@ -2072,6 +2073,7 @@ Input: void (no parameters) — **OK**
 | `status` | Optional | No | Passed | **Constant** (hardcoded: `"active"`) |
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+
 
 
 

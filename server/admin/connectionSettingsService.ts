@@ -11,7 +11,7 @@ import { eq, and } from "drizzle-orm";
 import { asProtocol } from "../_core/protocol";
 import { getDb } from "../db";
 import { connectionSettings } from "../../drizzle/schema";
-import { encrypt, decrypt } from "./encryptionService";
+import { encrypt, decrypt, isLegacyCiphertext, settingAad } from "./encryptionService";
 import type { WazuhConfig } from "../wazuh/wazuhClient";
 import type { IndexerConfig } from "../indexer/indexerClient";
 
@@ -102,7 +102,9 @@ async function getDbSettings(category: string): Promise<Record<string, string>> 
   const result: Record<string, string> = {};
   for (const row of rows) {
     try {
-      result[row.settingKey] = row.isEncrypted ? decrypt(row.settingValue) : row.settingValue;
+      result[row.settingKey] = row.isEncrypted
+        ? decrypt(row.settingValue, settingAad(category, row.settingKey))
+        : row.settingValue;
     } catch {
       // If decryption fails (e.g. key changed), skip this value
       console.error(`[ConnectionSettings] Failed to decrypt ${category}.${row.settingKey}`);
@@ -208,7 +210,7 @@ export async function saveSettings(
     if (value === undefined || value === "") continue;
 
     const isSensitive = SENSITIVE_KEYS.has(key);
-    const storedValue = isSensitive ? encrypt(value) : value;
+    const storedValue = isSensitive ? encrypt(value, settingAad(category, key)) : value;
 
     // Atomic upsert: INSERT ... ON DUPLICATE KEY UPDATE
     // Requires unique index on (category, settingKey)
@@ -299,4 +301,51 @@ export async function isWazuhEffectivelyConfigured(): Promise<boolean> {
 export async function isIndexerEffectivelyConfigured(): Promise<boolean> {
   const config = await getEffectiveIndexerConfig();
   return config !== null;
+}
+
+/**
+ * ENCRYPTION_KEY migration (review L3/M3): rewrite every legacy v1 ciphertext
+ * (16-byte IV, no AAD, key derived from JWT_SECRET) as v2 (12-byte IV, AAD =
+ * "<category>:<settingKey>", key derived from ENCRYPTION_KEY).
+ *
+ * Called once at boot from server/_core/index.ts. Idempotent: v2 rows are
+ * skipped, so later boots are a single SELECT. The UPDATE is compare-and-swap
+ * on the old ciphertext, so an admin save that lands mid-migration wins.
+ * Rows that fail to decrypt are left untouched (and logged) — getDbSettings()
+ * already skips those values. The read path still decrypts v1, so a boot where
+ * the DB is not reachable yet just defers the rewrite to the next boot.
+ */
+export async function reencryptLegacySettings(): Promise<{ migrated: number; failed: number }> {
+  const db = await getDb();
+  if (!db) return { migrated: 0, failed: 0 };
+
+  const rows = await db
+    .select()
+    .from(connectionSettings)
+    .where(eq(connectionSettings.isEncrypted, 1));
+
+  let migrated = 0;
+  let failed = 0;
+  for (const row of rows) {
+    if (!isLegacyCiphertext(row.settingValue)) continue;
+    const aad = settingAad(row.category, row.settingKey);
+    let plaintext: string;
+    try {
+      plaintext = decrypt(row.settingValue, aad);
+    } catch {
+      failed++;
+      console.error(`[ConnectionSettings] Legacy value ${row.category}.${row.settingKey} could not be decrypted — left as-is`);
+      continue;
+    }
+    await db
+      .update(connectionSettings)
+      .set({ settingValue: encrypt(plaintext, aad) })
+      .where(and(eq(connectionSettings.id, row.id), eq(connectionSettings.settingValue, row.settingValue)));
+    migrated++;
+  }
+  if (migrated > 0) {
+    invalidateCache();
+    console.log(`[ConnectionSettings] Re-encrypted ${migrated} legacy credential(s) as v2`);
+  }
+  return { migrated, failed };
 }
