@@ -18,7 +18,8 @@ x-logging: &default-logging
 services:
   # ── MySQL Database ─────────────────────────────────────────────────────────
   db:
-    image: mysql:8.0
+    # 8.4 is the current LTS (8.0 reached EOL 2026-04-30; its tag stopped receiving rebuilds).
+    image: mysql:8.4
     container_name: dang-db
     restart: unless-stopped
     logging: *default-logging
@@ -52,8 +53,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Bound to loopback by default: the UI is served over cleartext HTTP, so direct
+    # LAN exposure is opt-in via APP_BIND (or use the caddy/nginx overlays for TLS).
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    volumes:
+      # Extra CA material for upstream TLS (Wazuh root CA). Node honors NODE_EXTRA_CA_CERTS
+      # process-wide, so axios, undici fetch and https.Agent all trust it.
+      - ./certs:/app/certs:ro
+      # Automatic pre-migration mysqldump target (see docker-entrypoint.sh)
+      - dang-backups:/app/backups
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -78,9 +87,16 @@ services:
       # Local auth — first registered user becomes admin if these are not set
       LOCAL_ADMIN_USER: ${LOCAL_ADMIN_USER:-}
       LOCAL_ADMIN_PASS: ${LOCAL_ADMIN_PASS:-}
+      # Registration is closed once a user exists; set "true" temporarily to onboard someone.
+      REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-}
+      # Session cookie `Secure` flag is on in production. Browsers accept it on http://localhost;
+      # only set COOKIE_SECURE=false if you must log in over plain HTTP from another host.
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
 
       # TLS — Wazuh/Indexer typically use self-signed certs
       SKIP_TLS_VERIFY: ${SKIP_TLS_VERIFY:-false}
+      # Trust the Wazuh root CA instead of disabling verification. Copy it to ./certs/.
+      NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-/app/certs/wazuh-root-ca.pem}
 
       # Wazuh Manager API (optional — leave blank to start without Wazuh)
       WAZUH_HOST: ${WAZUH_HOST:-}
@@ -119,6 +135,8 @@ services:
 
 volumes:
   dang-db-data:
+    driver: local
+  dang-backups:
     driver: local
 
 networks:

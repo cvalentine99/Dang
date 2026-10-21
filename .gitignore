@@ -115,3 +115,6 @@ temp/
 __manus__/
 client/public/__manus__/
 .github/workflows/ci.yml
+
+# Local TLS trust material (mounted into the container, never committed)
+certs/

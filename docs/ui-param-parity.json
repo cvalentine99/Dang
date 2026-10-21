@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-21T17:20:53.542Z",
+  "generated": "2026-10-21T18:46:57.275Z",
   "callsiteCount": 182,
   "procedureCount": 129,
   "consumedProcedures": [
@@ -1054,42 +1054,42 @@
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 240,
+      "line": 241,
       "procedure": "status",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 243,
+      "line": 244,
       "procedure": "agentSummaryStatus",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 244,
+      "line": 245,
       "procedure": "analysisd",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 245,
+      "line": 246,
       "procedure": "statsHourly",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 246,
+      "line": 247,
       "procedure": "managerStatus",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 247,
+      "line": 248,
       "procedure": "rules",
       "passedKeys": {
         "limit": "10",
@@ -1099,7 +1099,7 @@
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 248,
+      "line": 249,
       "procedure": "agents",
       "passedKeys": {
         "limit": "8",
@@ -1109,28 +1109,28 @@
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 249,
+      "line": 250,
       "procedure": "mitreTactics",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 250,
+      "line": 251,
       "procedure": "managerLogsSummary",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 251,
+      "line": 252,
       "procedure": "agentOverview",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 252,
+      "line": 253,
       "procedure": "agentsSummary",
       "passedKeys": {},
       "isVoid": true
@@ -1749,14 +1749,14 @@
     },
     {
       "file": "client/src/components/shared/WazuhGuard.tsx",
-      "line": 21,
+      "line": 26,
       "procedure": "status",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/components/shared/WazuhGuard.tsx",
-      "line": 72,
+      "line": 87,
       "procedure": "status",
       "passedKeys": {},
       "isVoid": true

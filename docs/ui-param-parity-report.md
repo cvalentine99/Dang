@@ -102,11 +102,11 @@
 
 ## client/src/components/shared/WazuhGuard.tsx
 
-### Line 21: `wazuh.status`
+### Line 26: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 72: `wazuh.status`
+### Line 87: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
@@ -1195,27 +1195,27 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/Home.tsx
 
-### Line 240: `wazuh.status`
+### Line 241: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
-### Line 243: `wazuh.agentSummaryStatus`
+### Line 244: `wazuh.agentSummaryStatus`
 
 Input: void (no parameters) — **OK**
 
-### Line 244: `wazuh.analysisd`
+### Line 245: `wazuh.analysisd`
 
 Input: void (no parameters) — **OK**
 
-### Line 245: `wazuh.statsHourly`
+### Line 246: `wazuh.statsHourly`
 
 Input: void (no parameters) — **OK**
 
-### Line 246: `wazuh.managerStatus`
+### Line 247: `wazuh.managerStatus`
 
 Input: void (no parameters) — **OK**
 
-### Line 247: `wazuh.rules`
+### Line 248: `wazuh.rules`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1240,7 +1240,7 @@ Input: void (no parameters) — **OK**
 | `tsc` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 248: `wazuh.agents`
+### Line 249: `wazuh.agents`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1265,7 +1265,7 @@ Input: void (no parameters) — **OK**
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 249: `wazuh.mitreTactics`
+### Line 250: `wazuh.mitreTactics`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
@@ -1279,15 +1279,15 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 250: `wazuh.managerLogsSummary`
+### Line 251: `wazuh.managerLogsSummary`
 
 Input: void (no parameters) — **OK**
 
-### Line 251: `wazuh.agentOverview`
+### Line 252: `wazuh.agentOverview`
 
 Input: void (no parameters) — **OK**
 
-### Line 252: `wazuh.agentsSummary`
+### Line 253: `wazuh.agentsSummary`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|

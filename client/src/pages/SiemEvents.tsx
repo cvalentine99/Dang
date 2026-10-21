@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { GlassPanel, StatCard, ThreatBadge, RawJsonViewer, RefreshControl, IndexerLoadingState, IndexerErrorState, StatCardSkeleton } from "@/components/shared";
 import { threatLevelFromNumber } from "@/components/shared/ThreatBadge";
 import { ChartSkeleton } from "@/components/shared/ChartSkeleton";
@@ -154,28 +154,36 @@ export default function SiemEvents() {
     const map: Record<string, number> = { "15m": 900000, "1h": 3600000, "6h": 21600000, "24h": 86400000, "7d": 604800000 };
     return map[timeRange] ?? 86400000;
   }, [timeRange]);
+  // H-C1: the window must advance. `now` ticks every 30 s (and on manual refresh),
+  // so the query key is stable within a tick but a long-lived tab keeps seeing new events.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
   const timeWindow = useMemo(() => ({
-    from: new Date(Date.now() - timeRangeMs).toISOString(),
-    to: new Date().toISOString(),
-  }), [timeRange]); // eslint-disable-line react-hooks/exhaustive-deps
+    from: new Date(now - timeRangeMs).toISOString(),
+    to: new Date(now).toISOString(),
+  }), [now, timeRangeMs]);
   const alertsSearchQ = trpc.indexer.alertsSearch.useQuery(
     { from: timeWindow.from, to: timeWindow.to, size: 500, offset: 0, query: searchQuery || undefined, sortField: "timestamp", sortOrder: "desc" },
-    { retry: 1, staleTime: 15_000, enabled: indexerHealthy }
+    { retry: 1, staleTime: 15_000, enabled: indexerHealthy, placeholderData: (prev) => prev }
   );
 
   // ─── Data ────────────────────────────────────────────────────────────────
   const events: SiemEvent[] = useMemo(() => {
     if (!alertsSearchQ.data) return [];
     const safeData = (alertsSearchQ.data as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-    const hits = (safeData?.hits as Record<string, unknown>)?.hits as Array<{ _source: Record<string, unknown> }> ?? [];
-    return hits.map((h) => {
+    const hits = (safeData?.hits as Record<string, unknown>)?.hits as Array<{ _id?: string; _index?: string; _source: Record<string, unknown> }> ?? [];
+    return hits.map((h, i) => {
       const s = h._source;
       const agent = (s.agent ?? {}) as Record<string, unknown>;
       const rule = (s.rule ?? {}) as Record<string, unknown>;
       const mitre = (rule.mitre ?? {}) as Record<string, unknown>;
       const decoder = (s.decoder ?? {}) as Record<string, unknown>;
       return {
-        id: String(s.id ?? h._source._id ?? Math.random()),
+        // H-C6: OpenSearch _id lives on the hit, not _source. Deterministic fallback only — never random.
+        id: h._id ? String(h._id) : `${h._index ?? "unknown-index"}:${String(s.id ?? i)}`,
         timestamp: String(s.timestamp ?? ""),
         agent: { id: String(agent.id ?? ""), name: String(agent.name ?? ""), ip: String(agent.ip ?? "") },
         rule: {
@@ -458,6 +466,7 @@ export default function SiemEvents() {
 
           <RefreshControl
             onRefresh={() => {
+              setNow(Date.now());
               rulesQ.refetch();
               agentsQ.refetch();
               savedSearchesQ.refetch();

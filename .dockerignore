@@ -58,3 +58,4 @@ spec/openapi-allowlist.json
 
 # Proxy config (mounted separately via compose)
 proxy
+certs/

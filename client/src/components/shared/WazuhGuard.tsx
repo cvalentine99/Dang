@@ -1,9 +1,14 @@
 import { trpc } from "@/lib/trpc";
-import { Wifi, WifiOff } from "lucide-react";
+import { Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { ReactNode } from "react";
 
 interface WazuhGuardProps {
   children: ReactNode;
+  /**
+   * Optional indexer health. When supplied, the green "Live data active" banner
+   * requires BOTH manager and indexer; manager-only shows an amber degraded state.
+   */
+  indexer?: { connected: boolean; loading?: boolean };
 }
 
 /**
@@ -17,7 +22,7 @@ interface WazuhGuardProps {
  *
  * Always renders children — pages handle their own empty states.
  */
-export function WazuhGuard({ children }: WazuhGuardProps) {
+export function WazuhGuard({ children, indexer }: WazuhGuardProps) {
   const { data, isLoading } = trpc.wazuh.status.useQuery(undefined, {
     retry: 1,
     staleTime: 60_000,
@@ -28,17 +33,27 @@ export function WazuhGuard({ children }: WazuhGuardProps) {
   const hasData = data?.data != null;
   const isConnected = isConfigured && hasData;
   const errorDetail = (data as Record<string, unknown>)?.error as string | undefined;
+  const indexerDegraded = isConnected && indexer !== undefined && !indexer.loading && !indexer.connected;
+  const fullyLive = isConnected && (indexer === undefined || indexer.connected);
 
   return (
     <div className="space-y-4">
       {/* Connection status banner */}
-      {!isLoading && (
+      {!isLoading && !(isConnected && indexer?.loading) && (
         <div className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border text-xs font-medium ${
-          isConnected
+          fullyLive
             ? "bg-threat-low/5 border-threat-low/20 text-threat-low"
-            : "bg-threat-high/5 border-threat-high/20 text-threat-high"
+            : indexerDegraded
+              ? "bg-amber-500/5 border-amber-500/20 text-amber-400"
+              : "bg-threat-high/5 border-threat-high/20 text-threat-high"
         }`}>
-          {isConnected ? (
+          {indexerDegraded ? (
+            <>
+              <AlertTriangle className="h-3.5 w-3.5" />
+              <span>Manager connected — Indexer unavailable</span>
+              <span className="text-muted-foreground ml-1">— alert analytics are not live</span>
+            </>
+          ) : fullyLive ? (
             <>
               <Wifi className="h-3.5 w-3.5" />
               <span>Wazuh API Connected</span>

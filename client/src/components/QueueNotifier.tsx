@@ -341,7 +341,9 @@ export function QueueNotifier() {
   const panelRef = useRef<HTMLDivElement>(null);
 
   const notifiedIdsRef = useRef<Set<string>>(new Set());
-  const [sinceValue] = useState(() => new Date().toISOString());
+  // H-C2: `since` advances to the newest queuedAt seen, so each poll only returns
+  // genuinely new rows (server returns newest-first, up to 50, queuedAt >= since).
+  const [sinceValue, setSinceValue] = useState(() => new Date().toISOString());
 
   const recentAlerts = trpc.alertQueue.recentAlerts.useQuery(
     { since: sinceValue },
@@ -361,10 +363,12 @@ export function QueueNotifier() {
 
     for (const alert of alerts) {
       if (notifiedIdsRef.current.has(alert.alertId)) continue;
-      notifiedIdsRef.current.add(alert.alertId);
 
       const tier = getSeverityTier(alert.ruleLevel);
+      // H-C2: only burn the id once it has actually passed the preference gate,
+      // so muted-tier alerts are not silently consumed.
       if (!prefs[tier]) continue;
+      notifiedIdsRef.current.add(alert.alertId);
 
       // Add to history
       const historyItem: NotifHistoryItem = {
@@ -405,7 +409,15 @@ export function QueueNotifier() {
       const arr = Array.from(notifiedIdsRef.current);
       notifiedIdsRef.current = new Set(arr.slice(-50));
     }
-  }, [recentAlerts.data, prefs, navigate]);
+
+    // Advance the polling cursor to the newest queuedAt seen (never backwards).
+    let newestMs = Date.parse(sinceValue);
+    for (const alert of alerts) {
+      const t = alert.queuedAt ? new Date(alert.queuedAt).getTime() : NaN;
+      if (Number.isFinite(t) && t > newestMs) newestMs = t;
+    }
+    if (newestMs > Date.parse(sinceValue)) setSinceValue(new Date(newestMs).toISOString());
+  }, [recentAlerts.data, prefs, navigate, sinceValue]);
 
   // Close panel on outside click
   useEffect(() => {

@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/select";
 import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePersistFn } from "@/hooks/usePersistFn";
 
 interface RefreshControlProps {
   onRefresh: () => void;
@@ -25,6 +26,9 @@ const INTERVALS = [
 
 export function RefreshControl({ onRefresh, isLoading, className }: RefreshControlProps) {
   const [interval, setInterval_] = useState("0");
+  // H-C5: callers pass inline arrows; a stable wrapper keeps the interval from
+  // being torn down and restarted on every parent render.
+  const refresh = usePersistFn(() => onRefresh());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearTimer = useCallback(() => {
@@ -38,10 +42,10 @@ export function RefreshControl({ onRefresh, isLoading, className }: RefreshContr
     clearTimer();
     const seconds = parseInt(interval, 10);
     if (seconds > 0) {
-      timerRef.current = setInterval(onRefresh, seconds * 1000);
+      timerRef.current = setInterval(refresh, seconds * 1000);
     }
     return clearTimer;
-  }, [interval, onRefresh, clearTimer]);
+  }, [interval, refresh, clearTimer]);
 
   return (
     <div className={`flex items-center gap-2 ${className ?? ""}`}>

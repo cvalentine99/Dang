@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
+import { useDebounced } from "@/hooks/useDebounced";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -93,16 +94,11 @@ export default function AdminUsers(): React.JSX.Element {
   const [newPassword, setNewPassword] = useState("");
 
   // Stabilize search input for query
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const searchTimeout = useMemo(() => {
-    return (value: string) => {
-      const id = setTimeout(() => {
-        setDebouncedSearch(value);
-        setPage(1);
-      }, 300);
-      return () => clearTimeout(id);
-    };
-  }, []);
+  // H-C8: real debounce (one timer, cancelled on change/unmount).
+  const debouncedSearch = useDebounced(searchQuery, 300);
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   // Data fetching
   const usersQuery = trpc.adminUsers.list.useQuery(
@@ -174,7 +170,6 @@ export default function AdminUsers(): React.JSX.Element {
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              searchTimeout(e.target.value);
             }}
             className="pl-9 w-64 bg-secondary/50 border-border/50 text-sm"
           />
