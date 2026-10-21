@@ -131,119 +131,98 @@ function buildIndexerQuery(
 }
 
 // ── Wazuh API search helpers ────────────────────────────────────────────────
-async function searchWazuhAgents(query: string, iocType: string) {
-  const config = await getEffectiveWazuhConfig();
-  if (!config) return [];
-  try {
-    const params: Record<string, string | number> = { limit: 100, offset: 0 };
-    if (iocType === "ip") params.search = query;
-    else if (iocType === "username") params.search = query;
-    else params.search = query;
-    const res = await wazuhGet(config, { path: "/agents", params, rateLimitGroup: "agents" });
-    return ((res as Record<string, unknown>)?.data as Record<string, unknown>)?.affected_items ?? [];
-  } catch {
-    return [];
-  }
+// M2: helpers no longer swallow failures into `[]`. They return `null` when the
+// source is not configured (not searched), resolve with the hits when the
+// search ran, and THROW (sanitized — see wazuh/upstreamError) when it failed,
+// so execute() can report the source as errored instead of "0 hits".
+
+type UserId = string | number | undefined;
+
+function affectedItems(res: unknown): unknown[] {
+  const items = ((res as Record<string, unknown>)?.data as Record<string, unknown>)?.affected_items;
+  return Array.isArray(items) ? items : [];
 }
 
-async function searchWazuhRules(query: string, iocType: string) {
+async function searchWazuhAgents(query: string, iocType: string, userId?: UserId): Promise<unknown[] | null> {
   const config = await getEffectiveWazuhConfig();
-  if (!config) return [];
-  try {
-    const params: Record<string, string | number> = { limit: 100, offset: 0 };
-    if (iocType === "rule_id") params.rule_ids = query;
-    else params.search = query;
-    const res = await wazuhGet(config, { path: "/rules", params, rateLimitGroup: "rules" });
-    return ((res as Record<string, unknown>)?.data as Record<string, unknown>)?.affected_items ?? [];
-  } catch {
-    return [];
-  }
+  if (!config) return null;
+  const params: Record<string, string | number> = { limit: 100, offset: 0 };
+  if (iocType === "ip") params.search = query;
+  else if (iocType === "username") params.search = query;
+  else params.search = query;
+  return affectedItems(await wazuhGet(config, { path: "/agents", params, rateLimitGroup: "agents", userId }));
 }
 
-async function searchWazuhVulns(query: string, iocType: string, agentIds: string[]) {
+async function searchWazuhRules(query: string, iocType: string, userId?: UserId): Promise<unknown[] | null> {
   const config = await getEffectiveWazuhConfig();
-  if (!config || agentIds.length === 0) return [];
-  try {
-    const allHits: unknown[] = [];
-    // Search vulns per agent (max 10 agents)
-    for (const agentId of agentIds.slice(0, 10)) {
-      try {
-        const params: Record<string, string | number> = { limit: 50, offset: 0 };
-        if (iocType === "cve") params.search = query;
-        else params.search = query;
-        const res = await wazuhGet(config, {
-          path: `/vulnerability/${agentId}`,
-          params,
-          rateLimitGroup: "vulnerabilities",
-        });
-        const items = ((res as Record<string, unknown>)?.data as Record<string, unknown>)?.affected_items;
-        if (Array.isArray(items)) {
-          allHits.push(...items.map((item) => ({ ...(item as Record<string, unknown>), _agentId: agentId })));
-        }
-      } catch {
-        // Skip agents that fail
-      }
+  if (!config) return null;
+  const params: Record<string, string | number> = { limit: 100, offset: 0 };
+  if (iocType === "rule_id") params.rule_ids = query;
+  else params.search = query;
+  return affectedItems(await wazuhGet(config, { path: "/rules", params, rateLimitGroup: "rules", userId }));
+}
+
+/** Per-agent search result: hits from the agents that answered + the agents that failed. */
+interface PerAgentResult {
+  hits: unknown[];
+  failures: Array<{ agentId: string; message: string }>;
+}
+
+async function searchPerAgent(
+  agentIds: string[],
+  fetchOne: (agentId: string) => Promise<unknown>
+): Promise<PerAgentResult> {
+  const hits: unknown[] = [];
+  const failures: PerAgentResult["failures"] = [];
+  // Max 10 agents per hunt
+  for (const agentId of agentIds.slice(0, 10)) {
+    try {
+      const items = affectedItems(await fetchOne(agentId));
+      hits.push(...items.map((item) => ({ ...(item as Record<string, unknown>), _agentId: agentId })));
+    } catch (err) {
+      failures.push({ agentId, message: (err as Error)?.message ?? "unknown error" });
     }
-    return allHits;
-  } catch {
-    return [];
   }
+  return { hits, failures };
 }
 
-async function searchWazuhSyscheck(query: string, iocType: string, agentIds: string[]) {
+async function searchWazuhVulns(query: string, iocType: string, agentIds: string[], userId?: UserId): Promise<PerAgentResult | null> {
   const config = await getEffectiveWazuhConfig();
-  if (!config || agentIds.length === 0) return [];
-  try {
-    const allHits: unknown[] = [];
-    for (const agentId of agentIds.slice(0, 10)) {
-      try {
-        const params: Record<string, string | number> = { limit: 50, offset: 0 };
-        if (iocType === "hash") params.hash = query;
-        else if (iocType === "filename") params.search = query;
-        else params.search = query;
-        const res = await wazuhGet(config, {
-          path: `/syscheck/${agentId}`,
-          params,
-          rateLimitGroup: "syscheck",
-        });
-        const items = ((res as Record<string, unknown>)?.data as Record<string, unknown>)?.affected_items;
-        if (Array.isArray(items)) {
-          allHits.push(...items.map((item) => ({ ...(item as Record<string, unknown>), _agentId: agentId })));
-        }
-      } catch {
-        // Skip agents that fail
-      }
-    }
-    return allHits;
-  } catch {
-    return [];
-  }
-}
-
-async function searchWazuhMitre(query: string, iocType: string) {
-  const config = await getEffectiveWazuhConfig();
-  if (!config) return [];
-  try {
-    const params: Record<string, string | number> = { limit: 100, offset: 0 };
-    if (iocType === "mitre_id") params.search = query;
+  if (!config || agentIds.length === 0) return null;
+  return searchPerAgent(agentIds, (agentId) => {
+    const params: Record<string, string | number> = { limit: 50, offset: 0 };
+    if (iocType === "cve") params.search = query;
     else params.search = query;
-    const res = await wazuhGet(config, { path: "/mitre/techniques", params, rateLimitGroup: "mitre" });
-    return ((res as Record<string, unknown>)?.data as Record<string, unknown>)?.affected_items ?? [];
-  } catch {
-    return [];
-  }
+    return wazuhGet(config, { path: `/vulnerability/${agentId}`, params, rateLimitGroup: "vulnerabilities", userId });
+  });
 }
 
-async function searchWazuhLogs(query: string) {
+async function searchWazuhSyscheck(query: string, iocType: string, agentIds: string[], userId?: UserId): Promise<PerAgentResult | null> {
   const config = await getEffectiveWazuhConfig();
-  if (!config) return [];
-  try {
-    const params: Record<string, string | number> = { limit: 100, offset: 0, search: query };
-    const res = await wazuhGet(config, { path: "/manager/logs", params, rateLimitGroup: "logs" });
-    return ((res as Record<string, unknown>)?.data as Record<string, unknown>)?.affected_items ?? [];
-  } catch {
-    return [];
-  }
+  if (!config || agentIds.length === 0) return null;
+  return searchPerAgent(agentIds, (agentId) => {
+    const params: Record<string, string | number> = { limit: 50, offset: 0 };
+    if (iocType === "hash") params.hash = query;
+    else if (iocType === "filename") params.search = query;
+    else params.search = query;
+    return wazuhGet(config, { path: `/syscheck/${agentId}`, params, rateLimitGroup: "syscheck", userId });
+  });
+}
+
+async function searchWazuhMitre(query: string, iocType: string, userId?: UserId): Promise<unknown[] | null> {
+  const config = await getEffectiveWazuhConfig();
+  if (!config) return null;
+  const params: Record<string, string | number> = { limit: 100, offset: 0 };
+  if (iocType === "mitre_id") params.search = query;
+  else params.search = query;
+  return affectedItems(await wazuhGet(config, { path: "/mitre/techniques", params, rateLimitGroup: "mitre", userId }));
+}
+
+async function searchWazuhLogs(query: string, userId?: UserId): Promise<unknown[] | null> {
+  const config = await getEffectiveWazuhConfig();
+  if (!config) return null;
+  const params: Record<string, string | number> = { limit: 100, offset: 0, search: query };
+  return affectedItems(await wazuhGet(config, { path: "/manager/logs", params, rateLimitGroup: "logs", userId }));
 }
 
 // ── Router ──────────────────────────────────────────────────────────────────
@@ -407,8 +386,9 @@ export const huntRouter = router({
 
   execute: protectedProcedure
     .input(huntInputSchema)
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const startTime = Date.now();
+      const userId = ctx.user?.id;
       const sources: Array<{
         source: string;
         sourceLabel: string;
@@ -416,6 +396,10 @@ export const huntRouter = router({
         count: number;
         searchTimeMs: number;
       }> = [];
+      // M2: every failure is reported. A hunt against a down Indexer must read
+      // "Indexer: Alerts — error", never "0 hits".
+      const errors: Array<{ source: string; message: string }> = [];
+      const errMsg = (err: unknown) => (err as Error)?.message || "unknown error";
 
       // ── Determine agent IDs for per-agent searches ─────────────────────
       let agentIds = input.agentIds ?? [];
@@ -428,18 +412,46 @@ export const huntRouter = router({
               path: "/agents",
               params: { limit: 5, offset: 0, status: "active" },
               rateLimitGroup: "agents",
+              userId,
             });
-            const items = ((res as Record<string, unknown>)?.data as Record<string, unknown>)?.affected_items;
-            if (Array.isArray(items)) {
-              agentIds = items
-                .map((a) => String((a as Record<string, unknown>).id ?? ""))
-                .filter((id) => id && id !== "000");
-            }
-          } catch {
-            // No agents available
+            agentIds = affectedItems(res)
+              .map((a) => String((a as Record<string, unknown>).id ?? ""))
+              .filter((id) => id && id !== "000");
+          } catch (err) {
+            errors.push({ source: "agent_discovery", message: errMsg(err) });
           }
         }
       }
+
+      /** Normalized task outcome. `searched: false` = source not configured / not applicable. */
+      type TaskResult = { searched: boolean; hits: unknown[]; time: number; total?: number; failures?: PerAgentResult["failures"] };
+      const timed = async (fn: () => Promise<unknown[] | null>): Promise<TaskResult> => {
+        const t = Date.now();
+        const hits = await fn();
+        return hits === null
+          ? { searched: false, hits: [], time: 0 }
+          : { searched: true, hits, time: Date.now() - t };
+      };
+      const timedPerAgent = async (fn: () => Promise<PerAgentResult | null>): Promise<TaskResult> => {
+        const t = Date.now();
+        const r = await fn();
+        return r === null
+          ? { searched: false, hits: [], time: 0 }
+          : { searched: true, hits: r.hits, failures: r.failures, time: Date.now() - t };
+      };
+      const indexerTask = async (index: string, size: number, group: string): Promise<TaskResult> => {
+        const t = Date.now();
+        const config = await getEffectiveIndexerConfig();
+        if (!config) return { searched: false, hits: [], time: 0 };
+        const body = buildIndexerQuery(input.query, input.iocType, input.timeFrom, input.timeTo, size);
+        const res = await indexerSearch(config, index, body, group, userId);
+        return {
+          searched: true,
+          hits: res.hits.hits.map((h) => h._source),
+          time: Date.now() - t,
+          total: typeof res.hits.total === "number" ? res.hits.total : res.hits.total.value,
+        };
+      };
 
       // ── Run all searches in parallel ───────────────────────────────────
       const [
@@ -453,82 +465,49 @@ export const huntRouter = router({
         wazuhLogs,
       ] = await Promise.allSettled([
         // 1. Indexer: alerts
-        (async () => {
-          const t = Date.now();
-          const config = await getEffectiveIndexerConfig();
-          if (!config) return { hits: [], time: 0 };
-          const body = buildIndexerQuery(input.query, input.iocType, input.timeFrom, input.timeTo, input.maxResults);
-          const res = await indexerSearch(config, INDEX_PATTERNS.ALERTS, body, "alerts");
-          return {
-            hits: res.hits.hits.map((h) => h._source),
-            time: Date.now() - t,
-            total: typeof res.hits.total === "number" ? res.hits.total : res.hits.total.value,
-          };
-        })(),
+        indexerTask(INDEX_PATTERNS.ALERTS, input.maxResults, "alerts"),
         // 2. Indexer: archives
-        (async () => {
-          const t = Date.now();
-          const config = await getEffectiveIndexerConfig();
-          if (!config) return { hits: [], time: 0 };
-          const body = buildIndexerQuery(input.query, input.iocType, input.timeFrom, input.timeTo, Math.min(input.maxResults, 25));
-          const res = await indexerSearch(config, INDEX_PATTERNS.ARCHIVES, body, "archives");
-          return {
-            hits: res.hits.hits.map((h) => h._source),
-            time: Date.now() - t,
-            total: typeof res.hits.total === "number" ? res.hits.total : res.hits.total.value,
-          };
-        })(),
+        indexerTask(INDEX_PATTERNS.ARCHIVES, Math.min(input.maxResults, 25), "archives"),
         // 3. Wazuh API: agents
-        (async () => {
-          const t = Date.now();
-          const hits = await searchWazuhAgents(input.query, input.iocType);
-          return { hits: Array.isArray(hits) ? hits : [], time: Date.now() - t };
-        })(),
+        timed(() => searchWazuhAgents(input.query, input.iocType, userId)),
         // 4. Wazuh API: rules
-        (async () => {
-          const t = Date.now();
-          const hits = await searchWazuhRules(input.query, input.iocType);
-          return { hits: Array.isArray(hits) ? hits : [], time: Date.now() - t };
-        })(),
+        timed(() => searchWazuhRules(input.query, input.iocType, userId)),
         // 5. Wazuh API: vulnerabilities (per-agent)
-        (async () => {
-          const t = Date.now();
-          const hits = await searchWazuhVulns(input.query, input.iocType, agentIds);
-          return { hits: Array.isArray(hits) ? hits : [], time: Date.now() - t };
-        })(),
+        timedPerAgent(() => searchWazuhVulns(input.query, input.iocType, agentIds, userId)),
         // 6. Wazuh API: syscheck (per-agent)
-        (async () => {
-          const t = Date.now();
-          const hits = await searchWazuhSyscheck(input.query, input.iocType, agentIds);
-          return { hits: Array.isArray(hits) ? hits : [], time: Date.now() - t };
-        })(),
+        timedPerAgent(() => searchWazuhSyscheck(input.query, input.iocType, agentIds, userId)),
         // 7. Wazuh API: MITRE techniques
-        (async () => {
-          const t = Date.now();
-          const hits = await searchWazuhMitre(input.query, input.iocType);
-          return { hits: Array.isArray(hits) ? hits : [], time: Date.now() - t };
-        })(),
+        timed(() => searchWazuhMitre(input.query, input.iocType, userId)),
         // 8. Wazuh API: manager logs
-        (async () => {
-          const t = Date.now();
-          const hits = await searchWazuhLogs(input.query);
-          return { hits: Array.isArray(hits) ? hits : [], time: Date.now() - t };
-        })(),
+        timed(() => searchWazuhLogs(input.query, userId)),
       ]);
 
       // ── Collect results ────────────────────────────────────────────────
+      let sourcesSearched = 0;
       const collect = (
-        result: PromiseSettledResult<{ hits: unknown[]; time: number; total?: number }>,
+        result: PromiseSettledResult<TaskResult>,
         source: string,
         sourceLabel: string
       ) => {
-        if (result.status === "fulfilled" && result.value.hits.length > 0) {
+        if (result.status === "rejected") {
+          // The source was attempted and failed — count it and report it
+          sourcesSearched++;
+          errors.push({ source, message: errMsg(result.reason) });
+          return;
+        }
+        const v = result.value;
+        if (!v.searched) return;
+        sourcesSearched++;
+        for (const f of v.failures ?? []) {
+          errors.push({ source: `${source}:${f.agentId}`, message: f.message });
+        }
+        if (v.hits.length > 0) {
           sources.push({
             source,
             sourceLabel,
-            matches: result.value.hits,
-            count: result.value.total ?? result.value.hits.length,
-            searchTimeMs: result.value.time,
+            matches: v.hits,
+            count: v.total ?? v.hits.length,
+            searchTimeMs: v.time,
           });
         }
       };
@@ -551,10 +530,15 @@ export const huntRouter = router({
         timeRange: { from: input.timeFrom, to: input.timeTo },
         totalHits,
         totalTimeMs,
-        sourcesSearched: 8,
+        /** Sources actually attempted (configured and applicable), including failed ones. */
+        sourcesSearched,
         sourcesWithHits: sources.length,
         agentsSearched: agentIds,
         sources,
+        /** M2: per-source failures (sanitized messages with correlation ids). */
+        errors,
+        /** M2: true when any source or per-agent sub-search failed — results are incomplete. */
+        degraded: errors.length > 0,
       };
     }),
 });

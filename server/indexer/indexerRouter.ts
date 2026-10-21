@@ -6,7 +6,10 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { protectedProcedure, router } from "../_core/trpc";
+import { publicUpstreamMessage } from "../wazuh/upstreamError";
 import {
   isIndexerConfigured,
   getIndexerConfig,
@@ -31,8 +34,45 @@ const timeRangeSchema = z.object({
 
 const paginationSchema = z.object({
   size: z.number().int().min(0).max(500).default(20),
-  offset: z.number().int().min(0).default(0),
+  // L2: OpenSearch's default index.max_result_window is 10 000 (from + size)
+  offset: z.number().int().min(0).max(10_000).default(0),
 });
+
+/**
+ * L2: fixed set of date-histogram buckets. A free string allowed `1ms` over a
+ * year (~3·10¹⁰ buckets). The client uses 1m/5m/15m/1h.
+ */
+const intervalSchema = z.enum(["1m", "5m", "10m", "15m", "30m", "1h", "3h", "6h", "12h", "1d", "7d"]);
+
+/** L2: free-text search inputs are bounded. */
+const freeTextQuery = z.string().max(500);
+
+// ── Per-request user context for per-user rate limiting (M6) ────────────────
+// Same pattern as wazuhRouter: the middleware runs the handler inside
+// AsyncLocalStorage so safeSearch() can key the Indexer bucket on the user
+// without threading ctx through every procedure.
+const indexerUserStore = new AsyncLocalStorage<{ userId: number }>();
+function getCurrentUserId(): number | undefined {
+  return indexerUserStore.getStore()?.userId;
+}
+const indexerProcedure = protectedProcedure.use(async (opts) => {
+  const { ctx, next } = opts;
+  if (!ctx.user) return next({ ctx });
+  return new Promise<Awaited<ReturnType<typeof next>>>((resolve, reject) => {
+    indexerUserStore.run({ userId: ctx.user!.id }, async () => {
+      try {
+        resolve(await next({ ctx }));
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+});
+
+/** Rate-limit violations propagate as 429 instead of being folded into `{ error }`. */
+function rethrowIfRateLimited(err: unknown): void {
+  if (err instanceof TRPCError && err.code === "TOO_MANY_REQUESTS") throw err;
+}
 
 // ── Helper: safe search with fallback (uses DB override → env fallback) ─────
 async function safeSearch(
@@ -45,10 +85,12 @@ async function safeSearch(
     return { configured: false, data: null };
   }
   try {
-    const data = await indexerSearch(config, index, body, rateLimitGroup);
+    const data = await indexerSearch(config, index, body, rateLimitGroup, getCurrentUserId());
     return { configured: true, data };
   } catch (err) {
-    return { configured: true, data: null, error: (err as Error).message };
+    rethrowIfRateLimited(err);
+    // M1: generic message + correlation id; the upstream body is in the server log only
+    return { configured: true, data: null, error: publicUpstreamMessage("Indexer", err, `search ${index}`) };
   }
 }
 
@@ -57,34 +99,39 @@ async function safeSearch(
 // ═══════════════════════════════════════════════════════════════════════════════
 export const indexerRouter = router({
   // ── Status ─────────────────────────────────────────────────────────────────
-  status: protectedProcedure.query(async () => {
+  status: indexerProcedure.query(async () => {
     const config = await getEffectiveIndexerConfig();
     if (!config) {
       return { configured: false, healthy: false, data: null };
     }
     try {
-      const health = await indexerHealth(config);
+      const health = await indexerHealth(config, getCurrentUserId());
       return { configured: true, healthy: true, data: health };
     } catch (err) {
-      return { configured: true, healthy: false, data: null, error: (err as Error).message };
+      rethrowIfRateLimited(err);
+      return { configured: true, healthy: false, data: null, error: publicUpstreamMessage("Indexer", err, "health") };
     }
   }),
 
   /** Check which index patterns exist */
-  indexStatus: protectedProcedure.query(async () => {
+  indexStatus: indexerProcedure.query(async () => {
     const config = await getEffectiveIndexerConfig();
     if (!config) {
       return { configured: false, indices: {} };
     }
     const indices: Record<string, boolean> = {};
+    // M2-style envelope: a failed probe is reported, not silently shown as "absent"
+    const errors: Array<{ index: string; message: string }> = [];
     for (const [name, pattern] of Object.entries(INDEX_PATTERNS)) {
       try {
-        indices[name] = await indexerIndexExists(config, pattern);
-      } catch {
+        indices[name] = await indexerIndexExists(config, pattern, getCurrentUserId());
+      } catch (err) {
+        rethrowIfRateLimited(err);
         indices[name] = false;
+        errors.push({ index: name, message: publicUpstreamMessage("Indexer", err, `exists ${pattern}`) });
       }
     }
-    return { configured: true, indices };
+    return { configured: true, indices, errors, degraded: errors.length > 0 };
   }),
 
   // ═════════════════════════════════════════════════════════════════════════════
@@ -92,12 +139,12 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Full-text alert search with filters */
-  alertsSearch: protectedProcedure
+  alertsSearch: indexerProcedure
     .input(
       z.object({
         ...timeRangeSchema.shape,
         ...paginationSchema.shape,
-        query: z.string().optional(),
+        query: freeTextQuery.optional(),
         agentId: z.string().optional(),
         ruleLevel: z.number().int().min(0).max(16).optional(),
         ruleLevelMin: z.number().int().min(0).max(16).optional(),
@@ -148,8 +195,8 @@ export const indexerRouter = router({
     }),
 
   /** Alert severity distribution over time (date_histogram + terms on rule.level) */
-  alertsAggByLevel: protectedProcedure
-    .input(timeRangeSchema.extend({ interval: z.string().default("1h") }))
+  alertsAggByLevel: indexerProcedure
+    .input(timeRangeSchema.extend({ interval: intervalSchema.default("1h") }))
     .query(async ({ input }) => {
       return safeSearch(
         INDEX_PATTERNS.ALERTS,
@@ -171,7 +218,7 @@ export const indexerRouter = router({
     }),
 
   /** Top agents by alert count (top talkers) */
-  alertsAggByAgent: protectedProcedure
+  alertsAggByAgent: indexerProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(50).default(10) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -194,8 +241,8 @@ export const indexerRouter = router({
     }),
 
   /** MITRE ATT&CK tactic/technique distribution */
-  alertsAggByMitre: protectedProcedure
-    .input(timeRangeSchema.extend({ interval: z.string().default("1d") }))
+  alertsAggByMitre: indexerProcedure
+    .input(timeRangeSchema.extend({ interval: intervalSchema.default("1d") }))
     .query(async ({ input }) => {
       return safeSearch(
         INDEX_PATTERNS.ALERTS,
@@ -229,7 +276,7 @@ export const indexerRouter = router({
     }),
 
   /** Top triggered rules */
-  alertsAggByRule: protectedProcedure
+  alertsAggByRule: indexerProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(50).default(15) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -252,8 +299,8 @@ export const indexerRouter = router({
     }),
 
   /** Alert count timeline (date_histogram) */
-  alertsTimeline: protectedProcedure
-    .input(timeRangeSchema.extend({ interval: z.string().default("1h") }))
+  alertsTimeline: indexerProcedure
+    .input(timeRangeSchema.extend({ interval: intervalSchema.default("1h") }))
     .query(async ({ input }) => {
       return safeSearch(
         INDEX_PATTERNS.ALERTS,
@@ -269,7 +316,7 @@ export const indexerRouter = router({
     }),
 
   /** Geographic distribution by GeoLocation.country_name */
-  alertsGeoAgg: protectedProcedure
+  alertsGeoAgg: indexerProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(50).default(20) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -297,7 +344,7 @@ export const indexerRouter = router({
     }),
 
   /** GeoIP-enriched geographic distribution — resolves source IPs to coordinates */
-  alertsGeoEnriched: protectedProcedure
+  alertsGeoEnriched: indexerProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(100).default(30) }))
     .query(async ({ input }) => {
       // First, get alerts with source IPs
@@ -425,7 +472,7 @@ export const indexerRouter = router({
     }),
 
   /** Compliance framework alert aggregation (PCI DSS, HIPAA, NIST, GDPR) */
-  alertsComplianceAgg: protectedProcedure
+  alertsComplianceAgg: indexerProcedure
     .input(
       timeRangeSchema.extend({
         framework: z.enum(["pci_dss", "hipaa", "nist_800_53", "gdpr", "tsc"]),
@@ -469,12 +516,12 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Global vulnerability search across all agents */
-  vulnSearch: protectedProcedure
+  vulnSearch: indexerProcedure
     .input(
       z.object({
         ...timeRangeSchema.shape,
         ...paginationSchema.shape,
-        query: z.string().optional(),
+        query: freeTextQuery.optional(),
         severity: z.enum(["Critical", "High", "Medium", "Low"]).optional(),
         agentId: z.string().optional(),
         cve: z.string().optional(),
@@ -513,7 +560,7 @@ export const indexerRouter = router({
     }),
 
   /** Vulnerability severity distribution */
-  vulnAggBySeverity: protectedProcedure.query(async () => {
+  vulnAggBySeverity: indexerProcedure.query(async () => {
     return safeSearch(
       INDEX_PATTERNS.VULNERABILITIES,
       {
@@ -540,7 +587,7 @@ export const indexerRouter = router({
   }),
 
   /** Top vulnerable agents */
-  vulnAggByAgent: protectedProcedure
+  vulnAggByAgent: indexerProcedure
     .input(z.object({ topN: z.number().int().min(1).max(50).default(10) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -564,7 +611,7 @@ export const indexerRouter = router({
     }),
 
   /** Most exploited packages */
-  vulnAggByPackage: protectedProcedure
+  vulnAggByPackage: indexerProcedure
     .input(z.object({ topN: z.number().int().min(1).max(50).default(15) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -588,7 +635,7 @@ export const indexerRouter = router({
     }),
 
   /** Top CVEs across fleet */
-  vulnAggByCVE: protectedProcedure
+  vulnAggByCVE: indexerProcedure
     .input(z.object({ topN: z.number().int().min(1).max(50).default(20) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -617,11 +664,11 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Agent connection state history */
-  monitoringAgentHistory: protectedProcedure
+  monitoringAgentHistory: indexerProcedure
     .input(
       timeRangeSchema.extend({
         agentId: z.string().optional(),
-        interval: z.string().default("1h"),
+        interval: intervalSchema.default("1h"),
       })
     )
     .query(async ({ input }) => {
@@ -666,10 +713,10 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Manager performance metrics over time */
-  statisticsPerformance: protectedProcedure
+  statisticsPerformance: indexerProcedure
     .input(
       timeRangeSchema.extend({
-        interval: z.string().default("1h"),
+        interval: intervalSchema.default("1h"),
       })
     )
     .query(async ({ input }) => {
@@ -699,12 +746,12 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Raw event search for forensic investigation */
-  archivesSearch: protectedProcedure
+  archivesSearch: indexerProcedure
     .input(
       z.object({
         ...timeRangeSchema.shape,
         ...paginationSchema.shape,
-        query: z.string().optional(),
+        query: freeTextQuery.optional(),
         agentId: z.string().optional(),
       })
     )

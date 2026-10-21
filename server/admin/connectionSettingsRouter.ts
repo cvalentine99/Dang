@@ -23,6 +23,9 @@ import { createTlsAgent } from "../_core/tlsAgent";
 import { testLLMConnection } from "../llm/llmService";
 import { testSplunkConnection } from "../splunk/splunkService";
 import { validateHost } from "./hostValidation";
+import { UPSTREAM_AXIOS_LIMITS } from "../wazuh/upstreamError";
+import { invalidateWazuhToken } from "../wazuh/wazuhClient";
+import { invalidatePrefix } from "../wazuh/requestCache";
 
 const categorySchema = z.enum(["wazuh_manager", "wazuh_indexer", "llm", "splunk"]);
 
@@ -102,6 +105,9 @@ export const connectionSettingsRouter = router({
       }
 
       await saveSettings(input.category, filtered, ctx.user.id);
+      // A changed upstream config must never be served from the old config's cache or token.
+      invalidateWazuhToken();
+      invalidatePrefix("");
 
       return { success: true, message: `${input.category} settings updated` };
     }),
@@ -134,9 +140,19 @@ export const connectionSettingsRouter = router({
         return testLLMConnection(merged);
       }
 
-      // Splunk HEC has its own test logic
+      // Splunk HEC has its own test logic.
+      // L6: pass the FORM values (not the merged set) so the admin tests what
+      // they typed. testSplunkConnection merges them over the saved config and
+      // refuses to send a stored token to a host that differs from the saved one.
       if (category === "splunk") {
-        const splunkResult = await testSplunkConnection();
+        const form = (k: string) => (settings[k] ? settings[k] : undefined);
+        const splunkResult = await testSplunkConnection({
+          host: form("host"),
+          port: form("port"),
+          hecToken: form("hec_token"),
+          hecPort: form("hec_port"),
+          protocol: form("protocol"),
+        });
         return {
           success: splunkResult.success,
           message: splunkResult.message,
@@ -181,6 +197,7 @@ export const connectionSettingsRouter = router({
             baseURL,
             timeout: 10_000,
             httpsAgent: createTlsAgent(),
+            ...UPSTREAM_AXIOS_LIMITS, // M5: response cap, no redirects (would replay Basic auth)
           });
 
           // CRITICAL: Wazuh /security/user/authenticate requires NO request body.
@@ -216,6 +233,7 @@ export const connectionSettingsRouter = router({
             timeout: 10_000,
             httpsAgent: createTlsAgent(),
             auth: { username: user, password: pass },
+            ...UPSTREAM_AXIOS_LIMITS, // M5: response cap, no redirects (would replay Basic auth)
           });
 
           const response = await instance.get("/_cluster/health");
@@ -255,6 +273,8 @@ export const connectionSettingsRouter = router({
     .input(z.object({ category: categorySchema }))
     .mutation(async ({ input }) => {
       await resetSettings(input.category);
+      invalidateWazuhToken();
+      invalidatePrefix("");
       return {
         success: true,
         message: `${input.category} settings reset to environment variables`,

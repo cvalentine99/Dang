@@ -34,6 +34,7 @@ vi.mock("./connectionSettingsService", () => ({
 
 // Mock wazuhClient
 vi.mock("../wazuh/wazuhClient", () => ({
+  invalidateWazuhToken: vi.fn(),
   isWazuhConfigured: vi.fn(() => false),
   getWazuhConfig: vi.fn(() => null),
   wazuhGet: vi.fn(async () => ({})),

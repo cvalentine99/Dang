@@ -1,74 +1,63 @@
 /**
- * Cross-check every broker-wired endpoint's paramCount in the registry
- * against the actual param count in the broker config.
+ * Broker audit (H-P3) — `npm run audit:broker`.
+ *
+ * Replaces the old regex count-matcher (which compared one hand-typed number
+ * against another). This loads the real TypeScript modules through tsx and:
+ *
+ *   1. Every broker-wired ENDPOINT_REGISTRY entry must reference a config that
+ *      exists in BROKER_CONFIG_REGISTRY and must NOT carry a hand-typed
+ *      paramCount (counts are derived at report time).
+ *   2. Every BROKER_CONFIG_REGISTRY config is compared, parameter name by
+ *      parameter name, against the bundled Wazuh OpenAPI spec
+ *      (shared/specPath.ts): phantom params, missing params, and enumValues
+ *      that differ from the spec's own enum are all mismatches.
+ *
+ * Exit code 1 on any mismatch.
  */
-import { readFileSync } from "fs";
+import { tsImport } from "tsx/esm/api";
 
-const brokerSrc = readFileSync("server/wazuh/paramBroker.ts", "utf8");
-const coverageSrc = readFileSync("server/wazuh/brokerCoverage.ts", "utf8");
+const coverage = await tsImport("../server/wazuh/brokerCoverage.ts", import.meta.url);
+const audit = await tsImport("../server/wazuh/specParamAudit.ts", import.meta.url);
 
-// Extract all config names and their param counts from paramBroker.ts
-const configParamCounts = new Map();
-const configRegex = /export const (\w+_CONFIG):\s*EndpointParamConfig\s*=\s*\{[^}]*params:\s*\{/g;
-let match;
+const { ENDPOINT_REGISTRY, BROKER_CONFIG_REGISTRY, deriveParamCount } = coverage;
+const { diffConfigAgainstSpec, isSpecMismatch, SPEC_ABSENT_ALLOWED } = audit;
 
-// Parse each config by finding its params block
-const configBlocks = brokerSrc.split(/export const (\w+_CONFIG):\s*EndpointParamConfig/);
-for (let i = 1; i < configBlocks.length; i += 2) {
-  const configName = configBlocks[i];
-  const block = configBlocks[i + 1];
-  
-  // Find the params: { ... } block
-  const paramsMatch = block.match(/params:\s*\{/);
-  if (!paramsMatch) continue;
-  
-  const paramsStart = block.indexOf(paramsMatch[0]) + paramsMatch[0].length;
-  let depth = 1;
-  let pos = paramsStart;
-  while (depth > 0 && pos < block.length) {
-    if (block[pos] === '{') depth++;
-    if (block[pos] === '}') depth--;
-    pos++;
+let mismatches = 0;
+const configNames = new Set(BROKER_CONFIG_REGISTRY.map((c) => c.name));
+
+console.log("=== Registry wiring ===\n");
+for (const e of ENDPOINT_REGISTRY) {
+  if (e.wiringLevel !== "broker") continue;
+  if (!e.brokerConfig || !configNames.has(e.brokerConfig)) {
+    mismatches++;
+    console.log(`✗ ${e.procedure}: broker config ${e.brokerConfig ?? "(none)"} NOT FOUND in BROKER_CONFIG_REGISTRY`);
+  } else if (e.paramCount !== undefined) {
+    mismatches++;
+    console.log(`✗ ${e.procedure}: hand-typed paramCount ${e.paramCount} on a broker entry (derived count is ${deriveParamCount(e)})`);
   }
-  const paramsBlock = block.substring(paramsStart, pos - 1);
-  
-  // Count top-level param keys (4-space indented keys, including quoted dotted keys)
-  const paramKeys = paramsBlock.match(/^\s{4}(?:"[^"]+"|\w+):/gm) || [];
-  configParamCounts.set(configName, paramKeys.length);
 }
 
-// Extract registry entries with brokerConfig
-const registryRegex = /procedure:\s*"(\w+)".*?brokerConfig:\s*"(\w+)".*?paramCount:\s*(\d+)/g;
-let regMatch;
-let mismatches = 0;
-
-console.log("=== Broker Config Param Count Verification ===\n");
-console.log("Config Name".padEnd(45) + "Registry".padEnd(10) + "Actual".padEnd(10) + "Status");
+console.log("\n=== Broker configs vs spec ===\n");
+console.log("Config Name".padEnd(45) + "Params".padEnd(8) + "Status");
 console.log("-".repeat(75));
-
-while ((regMatch = registryRegex.exec(coverageSrc)) !== null) {
-  const [, procedure, configName, registryCount] = regMatch;
-  const actualCount = configParamCounts.get(configName);
-  const regCount = parseInt(registryCount);
-  
-  const status = actualCount === undefined ? "NOT FOUND" :
-                 actualCount === regCount ? "OK" : "MISMATCH";
-  
-  if (status !== "OK") mismatches++;
-  
-  const marker = status === "OK" ? "✓" : "✗";
-  console.log(
-    `${marker} ${configName}`.padEnd(45) +
-    `${regCount}`.padEnd(10) +
-    `${actualCount ?? "?"}`.padEnd(10) +
-    status +
-    (status === "MISMATCH" ? ` (${procedure}: registry=${regCount}, actual=${actualCount})` : "")
-  );
+for (const { name, config } of BROKER_CONFIG_REGISTRY) {
+  const d = diffConfigAgainstSpec(config);
+  const bad = isSpecMismatch(name, d);
+  if (bad) mismatches++;
+  const count = Object.keys(config.params).length;
+  let detail = "OK";
+  if (d.notInSpec) detail = bad ? `NOT IN SPEC (${config.endpoint})` : `allowed off-spec: ${SPEC_ABSENT_ALLOWED[name]}`;
+  else if (bad) {
+    const parts = [];
+    if (d.extra.length) parts.push(`phantom: ${d.extra.join(",")}`);
+    if (d.missing.length) parts.push(`missing: ${d.missing.join(",")}`);
+    if (d.enumDrift.length) parts.push(`enum drift: ${d.enumDrift.join(",")}`);
+    detail = `MISMATCH (${parts.join("; ")})`;
+  }
+  console.log(`${bad ? "✗" : "✓"} ${name}`.padEnd(45) + String(count).padEnd(8) + detail);
 }
 
 console.log("\n" + "=".repeat(75));
 console.log(`Total mismatches: ${mismatches}`);
-if (mismatches > 0) {
-  process.exit(1);
-}
-console.log("All param counts are correct.");
+if (mismatches > 0) process.exit(1);
+console.log("All broker configs match the spec.");

@@ -112,7 +112,38 @@ async function getDbSettings(category: string): Promise<Record<string, string>> 
 }
 
 /**
- * Get the effective settings for a category (DB override → env fallback → defaults).
+ * L4 — credentials resolve ATOMICALLY per source.
+ *
+ * Per-key DB→env merging used to pair an env password with a DB host (or a
+ * DB api_key with an env host), sending a credential to a destination it was
+ * never configured for. Rule:
+ *
+ *   If the DB supplies ANY `identity` key of a category (the destination host
+ *   or a credential), then EVERY key in that category's credential set comes
+ *   from the DB or the built-in default — never from env. Otherwise the whole
+ *   set comes from env (→ default) as before.
+ *
+ * Keys outside the credential set (llm.model, *.enabled, …) still merge per key.
+ * Consequence: an admin who changes only the host in the UI must also enter
+ * the user/password (or token) for that host; until then the source reports
+ * "not configured" rather than reusing the env secret.
+ */
+const CREDENTIAL_SETS: Record<string, { identity: string[]; set: string[] }> = {
+  wazuh_manager: { identity: ["host", "user", "pass"], set: ["host", "port", "user", "pass"] },
+  wazuh_indexer: { identity: ["host", "user", "pass"], set: ["host", "port", "user", "pass", "protocol"] },
+  llm: { identity: ["host", "api_key"], set: ["host", "port", "api_key", "protocol"] },
+  splunk: { identity: ["host", "hec_token"], set: ["host", "port", "hec_token", "hec_port", "protocol"] },
+};
+
+/** True when the DB owns the credential set for `category` (see CREDENTIAL_SETS). */
+export function dbOwnsCredentialSet(category: string, dbSettings: Record<string, string>): boolean {
+  const spec = CREDENTIAL_SETS[category];
+  return !!spec && spec.identity.some(k => dbSettings[k] !== undefined && dbSettings[k] !== "");
+}
+
+/**
+ * Get the effective settings for a category (DB override → env fallback → defaults),
+ * with the credential set resolved atomically per source (L4, see CREDENTIAL_SETS).
  */
 export async function getEffectiveSettings(
   category: string
@@ -137,10 +168,19 @@ export async function getEffectiveSettings(
     ...Object.keys(defaults),
   ]));
 
+  const credentialSet = new Set(CREDENTIAL_SETS[category]?.set ?? []);
+  const dbOwnsCreds = dbOwnsCredentialSet(category, dbSettings);
+
   for (const key of allKeys) {
     if (dbSettings[key] !== undefined && dbSettings[key] !== "") {
       values[key] = dbSettings[key];
       sources[key] = "database";
+    } else if (dbOwnsCreds && credentialSet.has(key)) {
+      // L4: DB owns this credential set — env must not fill the gap
+      if (defaults[key]) {
+        values[key] = defaults[key];
+        sources[key] = "default";
+      }
     } else if (envMap[key] && process.env[envMap[key]]) {
       values[key] = process.env[envMap[key]]!;
       sources[key] = "env";

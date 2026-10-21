@@ -784,9 +784,13 @@ describe("Batch 1 — brokerParams forwarding contract", () => {
   });
 
   it("CLUSTER_NODE_DAEMON_STATS_CONFIG forwards daemons_list as csv", () => {
-    const result = brokerParams(CLUSTER_NODE_DAEMON_STATS_CONFIG, { daemons_list: ["wazuh-modulesd", "wazuh-analysisd"] });
+    const result = brokerParams(CLUSTER_NODE_DAEMON_STATS_CONFIG, { daemons_list: ["wazuh-db", "wazuh-analysisd"] });
     expect(result.unsupportedParams).toHaveLength(0);
-    expect(result.forwardedQuery.daemons_list).toBe("wazuh-modulesd,wazuh-analysisd");
+    expect(result.forwardedQuery.daemons_list).toBe("wazuh-db,wazuh-analysisd");
+    // H-P3: daemons outside the spec enum are rejected, not forwarded
+    const bad = brokerParams(CLUSTER_NODE_DAEMON_STATS_CONFIG, { daemons_list: ["wazuh-modulesd"] });
+    expect(bad.rejectedParams).toEqual(["daemons_list"]);
+    expect(bad.forwardedQuery.daemons_list).toBeUndefined();
   });
 
   it("AGENTS_SUMMARY_CONFIG forwards agents_list as csv", () => {
@@ -796,9 +800,9 @@ describe("Batch 1 — brokerParams forwarding contract", () => {
   });
 
   it("AGENT_DAEMON_STATS_CONFIG forwards daemons_list as csv", () => {
-    const result = brokerParams(AGENT_DAEMON_STATS_CONFIG, { daemons_list: "wazuh-modulesd" });
+    const result = brokerParams(AGENT_DAEMON_STATS_CONFIG, { daemons_list: "wazuh-remoted" });
     expect(result.unsupportedParams).toHaveLength(0);
-    expect(result.forwardedQuery.daemons_list).toBe("wazuh-modulesd");
+    expect(result.forwardedQuery.daemons_list).toBe("wazuh-remoted");
   });
 
   it("RULE_GROUPS_CONFIG forwards pagination and sort/search", () => {

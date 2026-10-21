@@ -1505,7 +1505,7 @@ describe("KG wiring: SYSCHECK_CONFIG", () => {
       type: "file",
       hash: "abc123",
       file: "/etc/passwd",
-      arch: "x64",
+      arch: "[x64]",
       "value.name": "Start",
       "value.type": "REG_DWORD",
       summary: true,
@@ -1516,7 +1516,7 @@ describe("KG wiring: SYSCHECK_CONFIG", () => {
     expect(result.forwardedQuery.type).toBe("file");
     expect(result.forwardedQuery.hash).toBe("abc123");
     expect(result.forwardedQuery.file).toBe("/etc/passwd");
-    expect(result.forwardedQuery.arch).toBe("x64");
+    expect(result.forwardedQuery.arch).toBe("[x64]");
     expect(result.forwardedQuery["value.name"]).toBe("Start");
     expect(result.forwardedQuery["value.type"]).toBe("REG_DWORD");
     expect(result.forwardedQuery.summary).toBe("true");
@@ -1542,8 +1542,12 @@ describe("KG wiring: SYSCHECK_CONFIG", () => {
   });
 
   it("maps architecture alias to arch", () => {
-    const result = brokerParams(SYSCHECK_CONFIG, { architecture: "x86" });
-    expect(result.forwardedQuery.arch).toBe("x86");
+    // spec v4.14.x enum is the literal "[x32]" / "[x64]"
+    const result = brokerParams(SYSCHECK_CONFIG, { architecture: "[x32]" });
+    expect(result.forwardedQuery.arch).toBe("[x32]");
+    const bad = brokerParams(SYSCHECK_CONFIG, { architecture: "x86" });
+    expect(bad.rejectedParams).toEqual(["architecture"]);
+    expect(bad.errors[0]).toMatch(/architecture: rejected — .*allowed: \[x32\], \[x64\]/);
   });
 
   it("includes all universal params", () => {
@@ -1711,11 +1715,12 @@ describe("KG wiring: CISCAT_CONFIG", () => {
     expect(result.unsupportedParams).toHaveLength(0);
   });
 
-  it("includes all universal params", () => {
-    const universalKeys = Object.keys(UNIVERSAL_PARAMS);
+  it("includes all universal params except distinct (not in spec v4.14.x for this endpoint)", () => {
+    const universalKeys = Object.keys(UNIVERSAL_PARAMS).filter(k => k !== "distinct");
     for (const key of universalKeys) {
       expect(CISCAT_CONFIG.params).toHaveProperty(key);
     }
+    expect(CISCAT_CONFIG.params).not.toHaveProperty("distinct");
   });
 
   it("rejects foreign params", () => {
@@ -1747,8 +1752,11 @@ describe("KG wiring: universal params in all new configs", () => {
 
   const universalKeys = Object.keys(UNIVERSAL_PARAMS);
 
+  // Spec v4.14.x: GET /ciscat/{agent_id}/results has no `distinct`
+  const specExclusions: Record<string, string[]> = { "/ciscat/{agent_id}/results": ["distinct"] };
+
   for (const { name, config } of newConfigs) {
-    for (const key of universalKeys) {
+    for (const key of universalKeys.filter(k => !(specExclusions[name] ?? []).includes(k))) {
       it(`${name} includes universal param "${key}"`, () => {
         expect(config.params).toHaveProperty(key);
         expect(config.params[key].wazuhName).toBe(

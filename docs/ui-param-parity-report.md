@@ -106,7 +106,7 @@
 
 Input: void (no parameters) — **OK**
 
-### Line 87: `wazuh.status`
+### Line 89: `wazuh.status`
 
 Input: void (no parameters) — **OK**
 
@@ -1956,44 +1956,44 @@ Input: void (no parameters) — **OK**
 
 ## client/src/pages/Status.tsx
 
-### Line 541: `wazuh.apiInfo`
+### Line 560: `wazuh.apiInfo`
 
 Input: void (no parameters) — **OK**
 
-### Line 546: `wazuh.managerVersionCheck`
+### Line 565: `wazuh.managerVersionCheck`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `force_query` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 551: `wazuh.securityConfig`
+### Line 570: `wazuh.securityConfig`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 566: `wazuh.managerStats`
+### Line 585: `wazuh.managerStats`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `date` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
-### Line 571: `wazuh.isConfigured`
+### Line 590: `wazuh.isConfigured`
 
 Input: void (no parameters) — **OK**
 
-### Line 580: `wazuh.managerComponentConfig`
+### Line 599: `wazuh.managerComponentConfig`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|
 | `component` | Required | Yes | Passed | **Surfaced** (required) |
 | `configuration` | Required | Yes | Passed | **Surfaced** (required) |
 
-### Line 585: `wazuh.agentsUninstallPermission`
+### Line 604: `wazuh.agentsUninstallPermission`
 
 Input: void (no parameters) — **OK**
 
-### Line 590: `wazuh.taskStatus`
+### Line 609: `wazuh.taskStatus`
 
 | Parameter | Router | Required | UI Status | Classification |
 |-----------|--------|----------|-----------|----------------|

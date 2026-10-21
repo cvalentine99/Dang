@@ -236,9 +236,11 @@ describe("H-10: GROUP_FILES_CONFIG", () => {
   it("forwards sort, search, select, q, distinct, hash", () => {
     const result = brokerParams(GROUP_FILES_CONFIG, {
       limit: 10, offset: 0, sort: "+filename", search: "agent",
-      select: "filename,hash", q: "filename~agent", distinct: true, hash: "abc123",
+      select: "filename,hash", q: "filename~agent", distinct: true, hash: "sha256",
     });
-    expect(result.forwardedQuery.hash).toBe("abc123");
+    // `hash` here selects the checksum ALGORITHM (spec enum) — H-P3 enforces it
+    expect(result.forwardedQuery.hash).toBe("sha256");
+    expect(brokerParams(GROUP_FILES_CONFIG, { hash: "abc123" }).rejectedParams).toEqual(["hash"]);
     expect(result.unsupportedParams).toHaveLength(0);
   });
 });

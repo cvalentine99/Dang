@@ -105,17 +105,18 @@ describe("Broker → Warnings end-to-end flow", () => {
   });
 
   it("CISCAT_CONFIG: invalid boolean produces coercion warning", async () => {
-    // "yes" is not a valid boolean — broker should produce an error
+    // "yes" is not a valid boolean — broker should produce an error.
+    // (CISCAT has no `distinct` per spec v4.14.x; wait_for_complete is its boolean.)
     const { errors, forwardedQuery } = brokerParams(CISCAT_CONFIG, {
       limit: 50,
-      distinct: "yes" as unknown as boolean,
+      wait_for_complete: "yes" as unknown as boolean,
     });
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0]).toContain("could not coerce");
     expect(errors[0]).toContain("boolean");
 
-    // distinct should NOT be in forwardedQuery (coercion failed)
-    expect(forwardedQuery.distinct).toBeUndefined();
+    // wait_for_complete should NOT be in forwardedQuery (coercion failed)
+    expect(forwardedQuery.wait_for_complete).toBeUndefined();
 
     // Warnings should be attached to the response
     const result = await withBrokerWarnings(

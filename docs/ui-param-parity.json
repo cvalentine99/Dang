@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-21T18:46:57.275Z",
+  "generated": "2026-10-21T19:43:12.374Z",
   "callsiteCount": 182,
   "procedureCount": 129,
   "consumedProcedures": [
@@ -1609,42 +1609,42 @@
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 541,
+      "line": 560,
       "procedure": "apiInfo",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 546,
+      "line": 565,
       "procedure": "managerVersionCheck",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 551,
+      "line": 570,
       "procedure": "securityConfig",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 566,
+      "line": 585,
       "procedure": "managerStats",
       "passedKeys": {},
       "isVoid": false
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 571,
+      "line": 590,
       "procedure": "isConfigured",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 580,
+      "line": 599,
       "procedure": "managerComponentConfig",
       "passedKeys": {
         "component": "compConfigComponent",
@@ -1654,14 +1654,14 @@
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 585,
+      "line": 604,
       "procedure": "agentsUninstallPermission",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 590,
+      "line": 609,
       "procedure": "taskStatus",
       "passedKeys": {
         "offset": "taskPage * taskPageSize",
@@ -1756,7 +1756,7 @@
     },
     {
       "file": "client/src/components/shared/WazuhGuard.tsx",
-      "line": 87,
+      "line": 89,
       "procedure": "status",
       "passedKeys": {},
       "isVoid": true

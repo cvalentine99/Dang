@@ -7,7 +7,11 @@
  * between pages that share common data.
  *
  * Design principles:
- * - Cache key = endpoint path + sorted query params (deterministic)
+ * - Cache key = scope + endpoint path + sorted query params (deterministic).
+ *   M4: the scope is `<config fingerprint>|u:<userId>` so a response fetched
+ *   with one connection config (host:port:user) is never served after a
+ *   settings change, and one user's response is never served to another.
+ * - Secret-bearing paths (`/agents/{id}/key`) are never stored (noStore).
  * - TTL is short (5-10s) to keep data fresh for SOC analysts
  * - In-flight deduplication: concurrent requests for the same key share
  *   a single upstream call (promise coalescing)
@@ -15,6 +19,8 @@
  * - No stale-while-revalidate — SOC data must be current
  * - Cache can be bypassed per-request via options
  */
+
+import { createHash } from "node:crypto";
 
 /** Single cache entry with expiration tracking */
 interface CacheEntry {
@@ -78,11 +84,37 @@ let stats = { hits: 0, misses: 0, coalesced: 0 };
  * Params are sorted alphabetically and undefined values are excluded
  * to ensure identical requests always produce the same key.
  */
+/**
+ * Connection identity: `${host}:${port}:${user}` plus a 12-hex SHA-256
+ * fingerprint of the password (so a password rotation is also a new identity).
+ * Shared by the request cache and the Wazuh JWT cache.
+ */
+export function connectionFingerprint(config: { host: string; port: number | string; user: string; pass?: string }): string {
+  const passFp = createHash("sha256").update(config.pass ?? "").digest("hex").slice(0, 12);
+  return `${config.host}:${config.port}:${config.user}#${passFp}`;
+}
+
+export interface CacheScope {
+  /** Connection identity, e.g. wazuhConfigFingerprint(config) (`host:port:user#…`) */
+  configFingerprint: string;
+  /** Requesting user; undefined for system/background callers */
+  userId?: string | number;
+}
+
+/** Prefix shared by every key for one connection config. */
+export function scopePrefix(configFingerprint: string): string {
+  return `${configFingerprint}|`;
+}
+
 export function makeCacheKey(
   path: string,
-  params?: Record<string, string | number | boolean | undefined>
+  params?: Record<string, string | number | boolean | undefined>,
+  scope?: CacheScope
 ): string {
-  if (!params || Object.keys(params).length === 0) return path;
+  const prefix = scope
+    ? `${scopePrefix(scope.configFingerprint)}u:${scope.userId ?? "system"}|`
+    : "";
+  if (!params || Object.keys(params).length === 0) return `${prefix}${path}`;
 
   const sorted = Object.entries(params)
     .filter(([, v]) => v !== undefined)
@@ -90,7 +122,35 @@ export function makeCacheKey(
     .map(([k, v]) => `${k}=${v}`)
     .join("&");
 
-  return sorted ? `${path}?${sorted}` : path;
+  return sorted ? `${prefix}${path}?${sorted}` : `${prefix}${path}`;
+}
+
+/**
+ * M4: paths whose responses carry secrets and must never sit in the cache.
+ * `/agents/{id}/key` returns the agent enrollment key.
+ */
+const NEVER_CACHE_PATTERNS: RegExp[] = [/^\/agents\/[^/]+\/key$/];
+
+export function isNeverCachePath(path: string): boolean {
+  const bare = path.split("?")[0];
+  return NEVER_CACHE_PATTERNS.some(re => re.test(bare));
+}
+
+// ── Config-change invalidation ───────────────────────────────────────────────
+
+let activeConfigFingerprint: string | null = null;
+
+/**
+ * Record the connection config in use. When it differs from the last one
+ * seen (connection settings were changed), every entry cached under the old
+ * fingerprint is dropped via invalidatePrefix(). Keys are already scoped so
+ * stale entries could never be SERVED; this frees them immediately.
+ */
+export function noteConfigFingerprint(configFingerprint: string): void {
+  if (activeConfigFingerprint !== null && activeConfigFingerprint !== configFingerprint) {
+    invalidatePrefix(scopePrefix(activeConfigFingerprint));
+  }
+  activeConfigFingerprint = configFingerprint;
 }
 
 // ── Core Cache Operations ────────────────────────────────────────────────────
@@ -157,14 +217,25 @@ function evictOldest(): void {
  *
  * @param key - Deterministic cache key (use makeCacheKey())
  * @param fetchFn - The upstream function to call on cache miss
- * @param bypass - If true, skip cache lookup (but still cache the result)
+ * @param options - `true` (legacy) or `{ bypass }`: skip cache lookup but still
+ *   cache the result. `{ noStore: true }`: go straight upstream, never join an
+ *   in-flight request, never store the result, and purge any entry under
+ *   this key (secret-bearing responses).
  * @returns The upstream response data
  */
 export async function cachedFetch(
   key: string,
   fetchFn: () => Promise<unknown>,
-  bypass = false
+  options: boolean | { bypass?: boolean; noStore?: boolean } = false
 ): Promise<unknown> {
+  const { bypass = false, noStore = false } =
+    typeof options === "boolean" ? { bypass: options } : options;
+
+  if (noStore) {
+    invalidateKey(key);
+    return fetchFn();
+  }
+
   // 1. Check cache (unless bypassed)
   if (!bypass) {
     const cached = getCached(key);
@@ -229,6 +300,7 @@ export function getCacheStats(): CacheStats {
 export function clearCache(): void {
   cache.clear();
   inflight.clear();
+  activeConfigFingerprint = null;
   stats = { hits: 0, misses: 0, coalesced: 0 };
 }
 
@@ -253,7 +325,8 @@ export function setCacheEnabled(value: boolean): void {
 }
 
 /**
- * Invalidate a specific cache key (e.g., after a write operation).
+ * Invalidate a specific cache key. Used by cachedFetch({ noStore }) to purge
+ * anything ever stored under a secret-bearing key.
  */
 export function invalidateKey(key: string): void {
   cache.delete(key);
@@ -261,7 +334,8 @@ export function invalidateKey(key: string): void {
 
 /**
  * Invalidate all cache entries whose keys start with the given prefix.
- * Useful for invalidating all entries for a specific endpoint group.
+ * Used by noteConfigFingerprint() to drop every entry for a replaced
+ * connection config (key prefix = scopePrefix(fingerprint)).
  */
 export function invalidatePrefix(prefix: string): void {
   const keys = Array.from(cache.keys());

@@ -29,8 +29,25 @@ export interface ParamDef {
   type: ParamType;
   /** Alternative public names that map to this parameter */
   aliases?: string[];
-  /** Known valid values from the Wazuh OpenAPI spec (for dropdown rendering in Playground) */
+  /**
+   * Known valid values from the Wazuh OpenAPI spec. ENFORCED by brokerParams()
+   * for `string` and `csv` params (every csv element must be listed); also
+   * rendered as a dropdown in the Playground. Must match the spec's own `enum`
+   * — `specParamAudit.ts` / `npm run audit:broker` fail on drift.
+   */
   enumValues?: string[];
+  /** Inclusive lower bound for `number` params (enforced). */
+  min?: number;
+  /** Inclusive upper bound for `number` params (enforced). */
+  max?: number;
+  /** Maximum serialized length for `string`/`csv` params (enforced). */
+  maxLength?: number;
+  /**
+   * For `sort`/`select`-style params: the field names the endpoint accepts.
+   * When declared, every comma-separated field (after stripping a leading
+   * `+`/`-` sort direction) must be in this list or the param is rejected.
+   */
+  allowedFields?: string[];
   /**
    * Optional coercion/serializer. Receives the raw input value and returns
    * a CoerceResult with the serialized string (or null to omit) and any error.
@@ -52,8 +69,60 @@ export interface BrokerResult {
   recognizedParams: string[];
   /** Parameters that were provided but are not in the endpoint config */
   unsupportedParams: string[];
-  /** Validation/coercion errors */
+  /** Validation/coercion errors (coercion warnings AND value rejections) */
   errors: string[];
+  /**
+   * Params whose value violated a declared constraint (enumValues, min/max,
+   * maxLength, allowedFields). They are NOT forwarded, and each has a
+   * matching brokerError in `errors` naming the param and what is allowed.
+   * Callers must treat a non-empty list as a BAD_REQUEST.
+   */
+  rejectedParams: string[];
+}
+
+/** Marker embedded in every value-rejection message (see isBrokerRejection). */
+const REJECTION_MARKER = "rejected —";
+
+/** Format a value-rejection message. Format: `<param>: rejected — <reason>`. */
+export function brokerError(param: string, reason: string): string {
+  return `${param}: ${REJECTION_MARKER} ${reason}`;
+}
+
+/** True when a broker error string is a value rejection (not a soft coercion warning). */
+export function isBrokerRejection(message: string): boolean {
+  return message.includes(`: ${REJECTION_MARKER} `);
+}
+
+/**
+ * Check a coerced value against the ParamDef's declared constraints.
+ * Returns a human-readable reason on violation, or null when the value is OK.
+ */
+function checkConstraints(def: ParamDef, serialized: string): string | null {
+  if (def.type === "number") {
+    const n = Number(serialized);
+    if (def.min !== undefined && n < def.min) return `must be >= ${def.min} (got ${n})`;
+    if (def.max !== undefined && n > def.max) return `must be <= ${def.max} (got ${n})`;
+    return null;
+  }
+  if (def.type === "boolean") return null; // strict coercion already applied
+  if (def.maxLength !== undefined && serialized.length > def.maxLength) {
+    return `exceeds max length ${def.maxLength} (got ${serialized.length})`;
+  }
+  const items = def.type === "csv" ? serialized.split(",").map(v => v.trim()) : [serialized];
+  if (def.enumValues && def.enumValues.length > 0) {
+    const bad = items.filter(v => !def.enumValues!.includes(v));
+    if (bad.length > 0) {
+      return `invalid value ${bad.map(v => JSON.stringify(v)).join(", ")}; allowed: ${def.enumValues.join(", ")}`;
+    }
+  }
+  if (def.allowedFields && def.allowedFields.length > 0) {
+    const fields = serialized.split(",").map(f => f.trim().replace(/^[+-]/, "")).filter(Boolean);
+    const bad = fields.filter(f => !def.allowedFields!.includes(f));
+    if (bad.length > 0) {
+      return `unknown field ${bad.map(f => JSON.stringify(f)).join(", ")}; allowed: ${def.allowedFields.join(", ")}`;
+    }
+  }
+  return null;
 }
 
 // ── Coercer result type ──────────────────────────────────────────────────────
@@ -153,6 +222,7 @@ export function brokerParams(
   const recognizedParams: string[] = [];
   const unsupportedParams: string[] = [];
   const errors: string[] = [];
+  const rejectedParams: string[] = [];
 
   for (const [inputKey, inputValue] of Object.entries(input)) {
     // Skip undefined/null values — they were not provided
@@ -187,12 +257,22 @@ export function brokerParams(
       continue;
     }
 
+    // H-P3: enforce declared value constraints. A violating value is never
+    // forwarded — the broker is the backstop behind each procedure's zod schema.
+    const violation = checkConstraints(def, result.value);
+    if (violation) {
+      errors.push(brokerError(inputKey, violation));
+      rejectedParams.push(inputKey);
+      recognizedParams.push(inputKey);
+      continue;
+    }
+
     // Use the Wazuh spec parameter name for the outbound query
     forwardedQuery[def.wazuhName] = result.value;
     recognizedParams.push(inputKey);
   }
 
-  return { forwardedQuery, recognizedParams, unsupportedParams, errors };
+  return { forwardedQuery, recognizedParams, unsupportedParams, errors, rejectedParams };
 }
 
 // ── Universal parameter family ───────────────────────────────────────────────
@@ -204,31 +284,40 @@ export const UNIVERSAL_PARAMS = {
     wazuhName: "offset",
     description: "First element to return in the collection",
     type: "number" as ParamType,
+    min: 0,
   },
   limit: {
     wazuhName: "limit",
     description: "Maximum number of elements to return",
     type: "number" as ParamType,
+    // Backstop behind the router's zod `.min(1).max(500)`; Wazuh's own cap is
+    // higher but nothing in the app needs more than 500 per page.
+    min: 1,
+    max: 500,
   },
   sort: {
     wazuhName: "sort",
     description: "Sort the collection by a field or fields (use +/- prefix for asc/desc)",
     type: "string" as ParamType,
+    maxLength: 512,
   },
   search: {
     wazuhName: "search",
     description: "Look for elements containing the specified string. Prefix with '-' for complementary search",
     type: "string" as ParamType,
+    maxLength: 1024,
   },
   select: {
     wazuhName: "select",
     description: "Select which fields to return (comma-separated)",
     type: "csv" as ParamType,
+    maxLength: 2048,
   },
   q: {
     wazuhName: "q",
     description: "Query to filter results by. For example q=\"status=active\"",
     type: "string" as ParamType,
+    maxLength: 4096,
   },
   distinct: {
     wazuhName: "distinct",
@@ -381,8 +470,6 @@ export const RULES_CONFIG: EndpointParamConfig = {
       wazuhName: "level",
       description: "Filter by rule level. Can be a single level (4) or an interval (2-4)",
       type: "string",
-
-      enumValues: ["critical", "debug", "debug2", "error", "info", "warning"],
       /**
        * Custom serializer: the Wazuh spec accepts level as a string ("4" or "2-4"),
        * but the Zod schema also allows numeric input (z.number().int()). This
@@ -585,7 +672,7 @@ export const MANAGER_CONFIG: EndpointParamConfig = {
       description: "Indicates the wazuh configuration section (e.g. global, alerts, syscheck, ruleset, etc.)",
       type: "string",
 
-      enumValues: ["active-response", "agentless", "alerts", "auth", "client", "client_buffer", "cluster", "command", "database_output", "email_alerts", "global", "integration", "labels", "localfile", "logging", "remote", "reports", "rootcheck", "ruleset", "sca", "socket", "syscheck", "syslog_output", "vulnerability-detection", "indexer"],
+      enumValues: ["active-response", "agentless", "alerts", "auth", "client", "client_buffer", "cluster", "command", "database_output", "email_alerts", "global", "integration", "labels", "localfile", "logging", "remote", "reports", "rootcheck", "ruleset", "sca", "socket", "syscheck", "syslog_output", "vulnerability-detection", "indexer", "aws-s3", "azure-logs", "cis-cat", "docker-listener", "open-scap", "osquery", "syscollector"],
     },
     field: {
       wazuhName: "field",
@@ -765,8 +852,6 @@ export const SYSCOLLECTOR_PORTS_CONFIG: EndpointParamConfig = {
       wazuhName: "pid",
       description: "Filter by PID",
       type: "string",
-
-      enumValues: ["true", "false"],
     },
     protocol: {
       wazuhName: "protocol",
@@ -843,8 +928,6 @@ export const SYSCOLLECTOR_PROCESSES_CONFIG: EndpointParamConfig = {
       wazuhName: "pid",
       description: "Filter by process PID",
       type: "string",
-
-      enumValues: ["true", "false"],
       aliases: ["process_pid"],
     },
     state: {
@@ -1043,8 +1126,6 @@ export const SYSCHECK_CONFIG: EndpointParamConfig = {
       wazuhName: "hash",
       description: "Filter by any hash (MD5, SHA1, or SHA256)",
       type: "string",
-
-      enumValues: ["md5", "sha1", "sha224", "sha256", "sha384", "sha512", "blake2b", "blake2s", "sha3_224", "sha3_256", "sha3_384", "sha3_512"],
     },
     file: {
       wazuhName: "file",
@@ -1124,8 +1205,6 @@ export const MITRE_TECHNIQUES_CONFIG: EndpointParamConfig = {
       wazuhName: "technique_ids",
       description: "Filter by MITRE technique IDs (comma-separated list, e.g. T1059,T1078)",
       type: "csv",
-
-      enumValues: ["true", "false"],
       aliases: ["techniqueIds"],
     },
     wait_for_complete: {
@@ -1160,8 +1239,6 @@ export const DECODERS_CONFIG: EndpointParamConfig = {
       wazuhName: "decoder_names",
       description: "Filter by decoder names (comma-separated list)",
       type: "csv",
-
-      enumValues: ["true", "false"],
       aliases: ["decoderNames"],
     },
     filename: {
@@ -1214,8 +1291,6 @@ export const ROOTCHECK_CONFIG: EndpointParamConfig = {
       wazuhName: "status",
       description: "Filter by rootcheck status",
       type: "string",
-
-      enumValues: ["active", "pending", "never_connected", "disconnected"],
     },
     // Restored: pci_dss and cis ARE in the Wazuh v4.14.3 spec for GET /rootcheck/{agent_id}
     pci_dss: {
@@ -1259,8 +1334,6 @@ export const RULES_FILES_CONFIG: EndpointParamConfig = {
       wazuhName: "filename",
       description: "Filter by rule filename",
       type: "string",
-
-      enumValues: ["true", "false"],
     },
     relative_dirname: {
       wazuhName: "relative_dirname",
@@ -1301,8 +1374,6 @@ export const DECODERS_FILES_CONFIG: EndpointParamConfig = {
       wazuhName: "filename",
       description: "Filter by decoder filename",
       type: "string",
-
-      enumValues: ["true", "false"],
     },
     relative_dirname: {
       wazuhName: "relative_dirname",
@@ -1343,8 +1414,6 @@ export const LISTS_CONFIG: EndpointParamConfig = {
       wazuhName: "filename",
       description: "Filter by CDB list filename",
       type: "string",
-
-      enumValues: ["true", "false"],
     },
     relative_dirname: {
       wazuhName: "relative_dirname",
@@ -1375,8 +1444,6 @@ export const LISTS_FILES_CONFIG: EndpointParamConfig = {
       wazuhName: "filename",
       description: "Filter by CDB list filename",
       type: "string",
-
-      enumValues: ["true", "false"],
     },
     relative_dirname: {
       wazuhName: "relative_dirname",
@@ -1410,8 +1477,6 @@ export const MITRE_TACTICS_CONFIG: EndpointParamConfig = {
       wazuhName: "tactic_ids",
       description: "Filter by MITRE tactic IDs (comma-separated)",
       type: "csv",
-
-      enumValues: ["true", "false"],
       aliases: ["tacticIds", "tactic_ids"],
     },
     wait_for_complete: {
@@ -1440,8 +1505,6 @@ export const MITRE_GROUPS_CONFIG: EndpointParamConfig = {
       wazuhName: "group_ids",
       description: "Filter by MITRE group IDs (comma-separated)",
       type: "csv",
-
-      enumValues: ["true", "false"],
       aliases: ["groupIds", "group_ids"],
     },
     wait_for_complete: {
@@ -1470,8 +1533,6 @@ export const MITRE_MITIGATIONS_CONFIG: EndpointParamConfig = {
       wazuhName: "mitigation_ids",
       description: "Filter by MITRE mitigation IDs (comma-separated)",
       type: "csv",
-
-      enumValues: ["true", "false"],
       aliases: ["mitigationIds", "mitigation_ids"],
     },
     wait_for_complete: {
@@ -1500,8 +1561,6 @@ export const MITRE_SOFTWARE_CONFIG: EndpointParamConfig = {
       wazuhName: "software_ids",
       description: "Filter by MITRE software IDs (comma-separated)",
       type: "csv",
-
-      enumValues: ["true", "false"],
       aliases: ["softwareIds", "software_ids"],
     },
     wait_for_complete: {
@@ -1529,8 +1588,6 @@ export const MITRE_REFERENCES_CONFIG: EndpointParamConfig = {
       wazuhName: "reference_ids",
       description: "Filter by MITRE reference IDs (comma-separated)",
       type: "csv",
-
-      enumValues: ["true", "false"],
       aliases: ["referenceIds", "reference_ids"],
     },
     wait_for_complete: {
@@ -1588,8 +1645,6 @@ export const SYSCOLLECTOR_NETIFACE_CONFIG: EndpointParamConfig = {
       wazuhName: "name",
       description: "Filter by interface name",
       type: "string",
-
-      enumValues: ["true", "false"],
     },
     adapter: {
       wazuhName: "adapter",
@@ -1600,8 +1655,6 @@ export const SYSCOLLECTOR_NETIFACE_CONFIG: EndpointParamConfig = {
       wazuhName: "type",
       description: "Filter by interface type (e.g. ethernet, wireless)",
       type: "string",
-
-      enumValues: ["file", "registry_key", "registry_value"],
     },
     state: {
       wazuhName: "state",
@@ -1687,8 +1740,6 @@ export const SYSCOLLECTOR_NETADDR_CONFIG: EndpointParamConfig = {
       wazuhName: "iface",
       description: "Filter by interface name",
       type: "string",
-
-      enumValues: ["true", "false"],
     },
     proto: {
       wazuhName: "proto",
@@ -1736,8 +1787,6 @@ export const SYSCOLLECTOR_HOTFIXES_CONFIG: EndpointParamConfig = {
       wazuhName: "hotfix",
       description: "Filter by hotfix ID (e.g. KB5000802)",
       type: "string",
-
-      enumValues: ["true", "false"],
     },
     wait_for_complete: {
       type: "boolean" as const,
@@ -1765,15 +1814,11 @@ export const SYSCOLLECTOR_NETPROTO_CONFIG: EndpointParamConfig = {
       wazuhName: "iface",
       description: "Filter by interface name",
       type: "string",
-
-      enumValues: ["true", "false"],
     },
     type: {
       wazuhName: "type",
       description: "Filter by protocol type",
       type: "string",
-
-      enumValues: ["file", "registry_key", "registry_value"],
     },
     gateway: {
       wazuhName: "gateway",
@@ -1810,15 +1855,13 @@ export const CISCAT_CONFIG: EndpointParamConfig = {
     search: UNIVERSAL_PARAMS.search,
     select: UNIVERSAL_PARAMS.select,
     q: UNIVERSAL_PARAMS.q,
-    distinct: UNIVERSAL_PARAMS.distinct,
+    // `distinct` removed: not a GET /ciscat/{agent_id}/results param in spec v4.14.x
 
     // Endpoint-specific field filters
     benchmark: {
       wazuhName: "benchmark",
       description: "Filter by CIS-CAT benchmark name",
       type: "string",
-
-      enumValues: ["true", "false"],
     },
     profile: {
       wazuhName: "profile",
@@ -1886,8 +1929,6 @@ export const EXPERIMENTAL_CISCAT_RESULTS_CONFIG: EndpointParamConfig = {
       wazuhName: "agents_list",
       description: "Comma-separated list of agent IDs to filter results",
       type: "csv",
-
-      enumValues: ["true", "false"],
       aliases: ["agentsList"],
     },
 
@@ -1945,11 +1986,14 @@ export const EXPERIMENTAL_CISCAT_RESULTS_CONFIG: EndpointParamConfig = {
  */
 function deriveExpConfig(
   stdConfig: EndpointParamConfig,
-  expEndpoint: string
+  expEndpoint: string,
+  /** Extra per-agent params the experimental (cross-agent) spec does not define */
+  exclude: string[] = []
 ): EndpointParamConfig {
   const params: Record<string, ParamDef> = {};
   for (const [key, def] of Object.entries(stdConfig.params)) {
     if (key === "q" || key === "distinct" || key === "wait_for_complete") continue;
+    if (exclude.includes(key)) continue;
     params[key] = def;
   }
   params.agents_list = {
@@ -2003,8 +2047,6 @@ export const SECURITY_ROLES_CONFIG: EndpointParamConfig = {
       wazuhName: "role_ids",
       description: "List of role IDs to filter (comma-separated)",
       type: "csv",
-
-      enumValues: ["true", "false"],
     },
   },
 };
@@ -2066,7 +2108,7 @@ export const CLUSTER_NODE_CONFIGURATION_CONFIG: EndpointParamConfig = {
       description: "Return the configuration of the specified section",
       type: "string",
 
-      enumValues: ["active-response", "agentless", "alerts", "auth", "client", "client_buffer", "cluster", "command", "database_output", "email_alerts", "global", "integration", "labels", "localfile", "logging", "remote", "reports", "rootcheck", "ruleset", "sca", "socket", "syscheck", "syslog_output", "vulnerability-detection", "indexer"],
+      enumValues: ["active-response", "agentless", "alerts", "auth", "client", "client_buffer", "cluster", "command", "database_output", "email_alerts", "global", "integration", "labels", "localfile", "logging", "remote", "reports", "rootcheck", "ruleset", "sca", "socket", "syscheck", "syslog_output", "vulnerability-detection", "indexer", "aws-s3", "azure-logs", "cis-cat", "docker-listener", "open-scap", "osquery", "syscollector"],
     },
     field: {
       wazuhName: "field",
@@ -2092,7 +2134,9 @@ export const CLUSTER_NODE_LOGS_CONFIG: EndpointParamConfig = {
     limit: UNIVERSAL_PARAMS.limit,
     sort: UNIVERSAL_PARAMS.sort,
     search: UNIVERSAL_PARAMS.search,
+    select: UNIVERSAL_PARAMS.select,
     q: UNIVERSAL_PARAMS.q,
+    distinct: UNIVERSAL_PARAMS.distinct,
     tag: {
       wazuhName: "tag",
       description: "Filter by daemon tag (e.g. wazuh-modulesd)",
@@ -2198,7 +2242,7 @@ export const DECODER_PARENTS_CONFIG: EndpointParamConfig = {
     sort: UNIVERSAL_PARAMS.sort,
     search: UNIVERSAL_PARAMS.search,
     select: UNIVERSAL_PARAMS.select,
-    q: UNIVERSAL_PARAMS.q,
+    // `q` removed: not a GET /decoders/parents param in spec v4.14.x
     wait_for_complete: {
       type: "boolean" as const,
       wazuhName: "wait_for_complete",
@@ -2287,8 +2331,6 @@ export const AGENTS_STATS_DISTINCT_CONFIG: EndpointParamConfig = {
       wazuhName: "fields",
       description: "List of fields to return distinct values for (comma-separated)",
       type: "csv",
-
-      enumValues: ["true", "false"],
     },
   },
 };
@@ -2351,7 +2393,8 @@ export const EXP_SYSCOLLECTOR_NETIFACE_CONFIG = deriveExpConfig(
 
 export const EXP_SYSCOLLECTOR_NETADDR_CONFIG = deriveExpConfig(
   SYSCOLLECTOR_NETADDR_CONFIG,
-  "/experimental/syscollector/netaddr"
+  "/experimental/syscollector/netaddr",
+  ["iface"] // spec v4.14.x: GET /experimental/syscollector/netaddr has no `iface`
 );
 
 export const EXP_SYSCOLLECTOR_NETPROTO_CONFIG = deriveExpConfig(
@@ -2430,8 +2473,6 @@ export const EXP_SYSCOLLECTOR_HARDWARE_CONFIG: EndpointParamConfig = {
       wazuhName: "agents_list",
       description: "List of agent IDs (comma-separated)",
       type: "csv",
-
-      enumValues: ["true", "false"],
     },
     // Endpoint-specific field filters (spec v4.14.3)
     board_serial: {
@@ -2556,8 +2597,6 @@ export const SECURITY_ACTIONS_CONFIG: EndpointParamConfig = {
   params: {
     endpoint: {
       type: "string",
-
-      enumValues: ["true", "false"],
       wazuhName: "endpoint",
       description: "Filter actions by API endpoint path",
     },
@@ -2595,10 +2634,9 @@ export const MANAGER_DAEMON_STATS_CONFIG: EndpointParamConfig = {
   params: {
     daemons_list: {
       type: "csv",
-
-      enumValues: ["true", "false"],
       wazuhName: "daemons_list",
       description: "List of daemon names (comma-separated)",
+      enumValues: ["wazuh-analysisd", "wazuh-remoted", "wazuh-db"],
       aliases: ["daemons"],
     },
     wait_for_complete: {
@@ -2644,8 +2682,6 @@ export const CLUSTER_CONFIG_VALIDATION_CONFIG: EndpointParamConfig = {
   params: {
     nodes_list: {
       type: "csv",
-
-      enumValues: ["true", "false"],
       wazuhName: "nodes_list",
       description: "List of node IDs (comma-separated)",
     },
@@ -2663,8 +2699,6 @@ export const CLUSTER_HEALTHCHECK_CONFIG: EndpointParamConfig = {
   params: {
     nodes_list: {
       type: "csv",
-
-      enumValues: ["true", "false"],
       wazuhName: "nodes_list",
       description: "List of node IDs (comma-separated)",
     },
@@ -2682,8 +2716,6 @@ export const CLUSTER_RULESET_SYNC_CONFIG: EndpointParamConfig = {
   params: {
     nodes_list: {
       type: "csv",
-
-      enumValues: ["true", "false"],
       wazuhName: "nodes_list",
       description: "List of node IDs (comma-separated)",
     },
@@ -2701,8 +2733,6 @@ export const CLUSTER_API_CONFIG_CONFIG: EndpointParamConfig = {
   params: {
     nodes_list: {
       type: "csv",
-
-      enumValues: ["true", "false"],
       wazuhName: "nodes_list",
       description: "List of node IDs (comma-separated)",
     },
@@ -2733,8 +2763,6 @@ export const CLUSTER_NODE_STATS_CONFIG: EndpointParamConfig = {
   params: {
     date: {
       type: "string",
-
-      enumValues: ["true", "false"],
       wazuhName: "date",
       description: "Date to obtain statistical information from. Format YYYY-MM-DD",
     },
@@ -2791,10 +2819,9 @@ export const CLUSTER_NODE_DAEMON_STATS_CONFIG: EndpointParamConfig = {
   params: {
     daemons_list: {
       type: "csv",
-
-      enumValues: ["true", "false"],
       wazuhName: "daemons_list",
       description: "List of daemon names (comma-separated)",
+      enumValues: ["wazuh-analysisd", "wazuh-remoted", "wazuh-db"],
     },
     wait_for_complete: {
       type: "boolean",
@@ -2865,8 +2892,6 @@ export const AGENTS_SUMMARY_CONFIG: EndpointParamConfig = {
   params: {
     agents_list: {
       type: "csv",
-
-      enumValues: ["true", "false"],
       wazuhName: "agents_list",
       description: "List of agent IDs (comma-separated)",
     },
@@ -2898,10 +2923,9 @@ export const AGENT_DAEMON_STATS_CONFIG: EndpointParamConfig = {
   params: {
     daemons_list: {
       type: "csv",
-
-      enumValues: ["true", "false"],
       wazuhName: "daemons_list",
       description: "List of daemon names (comma-separated)",
+      enumValues: ["wazuh-analysisd", "wazuh-remoted"],
     },
     wait_for_complete: {
       type: "boolean",
@@ -2944,8 +2968,6 @@ export const AGENTS_UPGRADE_RESULT_CONFIG: EndpointParamConfig = {
   params: {
     agents_list: {
       type: "csv",
-
-      enumValues: ["true", "false"],
       wazuhName: "agents_list",
       description: "List of agent IDs (comma-separated)",
     },

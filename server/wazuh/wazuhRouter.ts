@@ -11,10 +11,12 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import { getWazuhConfig, isWazuhConfigured, wazuhGet, getEffectiveWazuhConfig, isWazuhEffectivelyConfigured } from "./wazuhClient";
-import { makeCacheKey, cachedFetch, getCacheStats, clearCache, setTtl, setCacheEnabled, type CacheStats } from "./requestCache";
+import { makeCacheKey, cachedFetch, getCacheStats, clearCache, setTtl, setCacheEnabled, isNeverCachePath, noteConfigFingerprint, connectionFingerprint, type CacheStats } from "./requestCache";
+import { publicUpstreamMessage } from "./upstreamError";
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
   brokerParams,
+  isBrokerRejection,
   MANAGER_CONFIG,
   MANAGER_LOGS_CONFIG,
   AGENTS_CONFIG,
@@ -179,9 +181,16 @@ async function proxyGet(
   // Request deduplication: identical GET requests within the TTL window
   // share a single upstream call. This protects Wazuh from redundant
   // requests when multiple dashboard panels refresh simultaneously.
-  const cacheKey = makeCacheKey(path, params);
-  return cachedFetch(cacheKey, () =>
-    wazuhGet(config, { path, params, rateLimitGroup: group, userId })
+  // M4: the key is scoped to the connection config and the requesting user;
+  // a config change drops the old config's entries; secret-bearing paths
+  // (agent enrollment key) are never stored or shared.
+  const configFingerprint = connectionFingerprint(config);
+  noteConfigFingerprint(configFingerprint);
+  const cacheKey = makeCacheKey(path, params, { configFingerprint, userId });
+  return cachedFetch(
+    cacheKey,
+    () => wazuhGet(config, { path, params, rateLimitGroup: group, userId }),
+    { noStore: isNeverCachePath(path) }
   );
 }
 
@@ -197,6 +206,15 @@ async function withBrokerWarnings(
   responsePromise: Promise<unknown>,
   brokerErrors: string[]
 ): Promise<unknown> {
+  // H-P3: a value that violated a declared constraint (enumValues, min/max,
+  // maxLength, allowedFields) is a hard BAD_REQUEST, not a warning. The broker
+  // has already dropped it from the forwarded query, so the in-flight upstream
+  // call never carried it; swallow that call's outcome and fail the request.
+  const rejections = brokerErrors.filter(isBrokerRejection);
+  if (rejections.length > 0) {
+    responsePromise.catch(() => { /* superseded by the BAD_REQUEST below */ });
+    throw new TRPCError({ code: "BAD_REQUEST", message: `Invalid parameter value — ${rejections.join("; ")}` });
+  }
   const data = await responsePromise;
   if (brokerErrors.length === 0) return data;
   // Attach warnings to the response envelope
@@ -249,8 +267,8 @@ export const wazuhRouter = router({
       const data = await proxyGet("/manager/info");
       return { configured: true, data };
     } catch (err) {
-      const { extractWazuhErrorDetail } = await import("./wazuhClient");
-      return { configured: true, data: null, error: extractWazuhErrorDetail(err) };
+      // M1: never relay the upstream body — generic message + correlation id
+      return { configured: true, data: null, error: publicUpstreamMessage("Wazuh", err, "status") };
     }
   }),
 
@@ -598,6 +616,8 @@ export const wazuhRouter = router({
           message: "Audit logging unavailable; cannot reveal key.",
         });
       }
+      // M4: proxyGet never caches this path (isNeverCachePath) — each reveal
+      // is a fresh, audited upstream call that no other request can join.
       return proxyGet(`/agents/${input.agentId}/key`);
     }),
 
@@ -1040,6 +1060,7 @@ export const wazuhRouter = router({
       }
       return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/browser_extensions`, forwardedQuery), errors)
         .catch((err: unknown) => {
+          if (err instanceof TRPCError) throw err; // broker BAD_REQUEST / upstream 429 pass through
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/browser_extensions failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
     }),
@@ -1067,6 +1088,7 @@ export const wazuhRouter = router({
       }
       return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/services`, forwardedQuery), errors)
         .catch((err: unknown) => {
+          if (err instanceof TRPCError) throw err; // broker BAD_REQUEST / upstream 429 pass through
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/services failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
     }),
@@ -1090,6 +1112,7 @@ export const wazuhRouter = router({
       }
       return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/users`, forwardedQuery), errors)
         .catch((err: unknown) => {
+          if (err instanceof TRPCError) throw err; // broker BAD_REQUEST / upstream 429 pass through
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/users failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
     }),
@@ -1113,6 +1136,7 @@ export const wazuhRouter = router({
       }
       return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/groups`, forwardedQuery), errors)
         .catch((err: unknown) => {
+          if (err instanceof TRPCError) throw err; // broker BAD_REQUEST / upstream 429 pass through
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/groups failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
     }),
@@ -1141,6 +1165,7 @@ export const wazuhRouter = router({
       }
       return withBrokerWarnings(proxyGet(`/syscollector/${agentId}/netproto`, forwardedQuery), errors)
 .catch((err: unknown) => {
+          if (err instanceof TRPCError) throw err; // broker BAD_REQUEST / upstream 429 pass through
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Wazuh syscollector/netproto failed: ${err instanceof Error ? err.message : "unknown"}` });
         });
     }),

@@ -19,14 +19,29 @@ import { eq, and } from "drizzle-orm";
 import { Agent } from "undici";
 import { SKIP_TLS_VERIFY } from "../_core/tlsAgent";
 import { decrypt } from "../admin/encryptionService";
+import { newCorrelationId } from "../wazuh/upstreamError";
 
-// Audit #28: Use centralized TLS policy for Splunk connections
+// Audit #28: Use centralized TLS policy for Splunk connections.
+// M5: bound header/body waits so a stalled HEC endpoint cannot pin a socket
+// beyond the request's own AbortController timeout.
 function getSplunkDispatcher() {
   return new Agent({
     connect: {
       rejectUnauthorized: !SKIP_TLS_VERIFY,
     },
+    headersTimeout: 15_000,
+    bodyTimeout: 15_000,
   });
+}
+
+/**
+ * M1: log the full Splunk failure (response body / exception text) server-side
+ * under a correlation id and return only a generic, client-safe message.
+ */
+function splunkFailure(what: string, detail: string, status?: number): string {
+  const id = newCorrelationId();
+  console.error(`[Splunk] upstream error [${id}] ${what}: status=${status ?? "-"} ${detail.slice(0, 2000)}`);
+  return `${what}${status !== undefined ? ` (HTTP ${status})` : ""} [${id}]`;
 }
 
 // ── Environment defaults ──────────────────────────────────────────────────
@@ -68,6 +83,17 @@ export async function getEffectiveSplunkConfig(): Promise<SplunkConfig> {
         .from(connectionSettings)
         .where(eq(connectionSettings.category, "splunk"));
 
+      // L4 (same rule as connectionSettingsService CREDENTIAL_SETS): if the DB
+      // supplies the host or the HEC token, the whole destination+credential
+      // set (host, port, hec_token, hec_port) comes from the DB or built-in
+      // defaults — never the env token sent to a DB host, or vice versa.
+      const dbOwnsCreds = rows.some(r => (r.settingKey === "host" || r.settingKey === "hec_token") && !!r.settingValue);
+      if (dbOwnsCreds) {
+        config.host = "";
+        config.hecToken = "";
+        config.port = "8000";
+        config.hecPort = "8088";
+      }
       for (const row of rows) {
         switch (row.settingKey) {
           case "host":
@@ -225,7 +251,7 @@ export async function sendHECEvent(event: SplunkHECEvent): Promise<{
     } else {
       return {
         success: false,
-        message: `Splunk HEC error (${response.status}): ${body}`,
+        message: splunkFailure("Splunk HEC error", body, response.status),
         statusCode: response.status,
       };
     }
@@ -234,7 +260,7 @@ export async function sendHECEvent(event: SplunkHECEvent): Promise<{
     if (msg.includes("abort")) {
       return { success: false, message: "Splunk HEC request timed out (15s)" };
     }
-    return { success: false, message: `Splunk HEC connection error: ${msg}` };
+    return { success: false, message: splunkFailure("Splunk HEC connection error", msg) };
   }
 }
 
@@ -373,7 +399,7 @@ export async function testSplunkConnection(overrides?: {
     const latencyMs = Date.now() - start;
     return {
       success: false,
-      message: `Cannot reach Splunk HEC: ${(err as Error).message}`,
+      message: splunkFailure("Cannot reach Splunk HEC", (err as Error)?.message ?? String(err)),
       latencyMs,
     };
   }

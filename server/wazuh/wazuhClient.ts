@@ -40,11 +40,20 @@
  */
 
 import axios, { AxiosInstance, AxiosError } from "axios";
+import { TRPCError } from "@trpc/server";
+import { connectionFingerprint } from "./requestCache";
 import { sharedHttpsAgent } from "../_core/tlsAgent";
+import { sanitizeUpstreamError, UPSTREAM_AXIOS_LIMITS } from "./upstreamError";
+
 
 /**
  * Extract meaningful error detail from Axios errors instead of losing
  * the actual failure reason (ECONNREFUSED, ETIMEDOUT, 401, 403, TLS, etc.).
+ *
+ * M1: this string can contain up to 200 chars of the upstream body — it is for
+ * SERVER-SIDE diagnostics only. Client-facing paths use sanitizeUpstreamError()
+ * (see ./upstreamError), which logs the detail under a correlation id and
+ * returns only `Wazuh upstream error (HTTP n) [id]`.
  */
 export function extractWazuhErrorDetail(err: unknown): string {
   // S-10: Sanitize error messages — log full detail server-side, return safe summary to client.
@@ -82,7 +91,44 @@ interface CachedToken {
   expiresAt: number; // Date.now()-based epoch ms
 }
 
-let cachedToken: CachedToken | null = null;
+/**
+ * M3: JWTs are cached per connection identity, never globally — after a
+ * settings change a token minted by host A must never be sent to host B.
+ * Key = `${host}:${port}:${user}` plus a short SHA-256 fingerprint of the
+ * password, so a password rotation also misses the old entry automatically.
+ */
+const tokenCache = new Map<string, CachedToken>();
+
+/**
+ * M3: in-flight authentication per key. N concurrent cache misses (e.g. the
+ * ~8 parallel queries the /agents page fires) share ONE POST /authenticate.
+ */
+const inflightAuth = new Map<string, Promise<string>>();
+
+/** Bumped by invalidateWazuhToken(); an auth that started before the bump never repopulates the cache. */
+let tokenGeneration = 0;
+
+/** Cache key for a Wazuh connection identity (see connectionFingerprint). */
+export function wazuhConnectionKey(config: Pick<WazuhConfig, "host" | "port" | "user" | "pass">): string {
+  return connectionFingerprint(config);
+}
+
+/**
+ * Drop every cached JWT and in-flight authentication.
+ *
+ * Call site: the Wazuh connection-settings save/reset path
+ * (server/admin/connectionSettingsRouter.ts `updateSettings` / `resetSettings`
+ * for category "wazuh"). That file is outside this change set, so the call is
+ * NOT yet wired there; correctness does not depend on it because the cache
+ * key includes host, port, user and a password fingerprint — a changed
+ * setting simply misses. Calling it additionally frees the stale entries.
+ */
+export function invalidateWazuhToken(): void {
+  tokenGeneration++;
+  tokenCache.clear();
+  inflightAuth.clear();
+  console.log("[Wazuh Auth] All cached tokens invalidated");
+}
 
 // ── Rate-limit state ────────────────────────────────────────────────────────
 
@@ -98,6 +144,21 @@ const globalRateLimitState: Record<string, RateBucket> = {};
 const perUserRateLimitState: Record<string, RateBucket> = {};
 
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+
+/**
+ * M6: drop expired buckets so per-user state cannot grow without bound
+ * (one entry per user×group ever seen). Runs at most once per window.
+ */
+let lastRateLimitPruneAt = 0;
+function pruneRateLimitState(now: number): void {
+  if (now - lastRateLimitPruneAt < RATE_LIMIT_WINDOW_MS) return;
+  lastRateLimitPruneAt = now;
+  for (const state of [perUserRateLimitState, globalRateLimitState]) {
+    for (const key of Object.keys(state)) {
+      if (now > state[key].resetAt) delete state[key];
+    }
+  }
+}
 
 // Global limits per endpoint group (hard ceiling — protects Wazuh)
 const GLOBAL_RATE_LIMITS: Record<string, number> = {
@@ -158,26 +219,28 @@ function checkPerUserRateLimit(userId: string | number, group: string): { retryA
  * before the global ceiling is hit.
  */
 function checkRateLimit(group: string, userId?: string | number): void {
+  pruneRateLimitState(Date.now());
   // Per-user check (if userId is provided — it will be for all protectedProcedure calls)
   if (userId !== undefined) {
     const perUserResult = checkPerUserRateLimit(userId, group);
     if (perUserResult) {
-      throw new Error(
+      // M6: 429, not a generic 500
+      throw new TRPCError({ code: "TOO_MANY_REQUESTS", message:
         `Per-user rate limit exceeded for endpoint group '${group}'. ` +
         `Retry-After: ${perUserResult.retryAfterSeconds}s. ` +
-        `Your individual limit is ${PER_USER_RATE_LIMITS[group] ?? PER_USER_RATE_LIMITS.default} requests per minute.`
-      );
+        `Your individual limit is ${PER_USER_RATE_LIMITS[group] ?? PER_USER_RATE_LIMITS.default} requests per minute.`,
+      });
     }
   }
 
   // Global check (always enforced)
   const globalResult = checkGlobalRateLimit(group);
   if (globalResult) {
-    throw new Error(
+    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message:
       `Global rate limit exceeded for endpoint group '${group}'. ` +
       `Retry-After: ${globalResult.retryAfterSeconds}s. ` +
-      `The system-wide limit is ${GLOBAL_RATE_LIMITS[group] ?? GLOBAL_RATE_LIMITS.default} requests per minute.`
-    );
+      `The system-wide limit is ${GLOBAL_RATE_LIMITS[group] ?? GLOBAL_RATE_LIMITS.default} requests per minute.`,
+    });
   }
 }
 
@@ -197,12 +260,33 @@ const STRIP_FIELDS = new Set([
   "credential",
 ]);
 
+/**
+ * L5: any key CONTAINING one of these (case-insensitive) is stripped, so
+ * variants like `authToken`, `client_secret`, `PasswordHash` are caught
+ * without enumerating them. Bare `key` is deliberately NOT here: the admin
+ * agentKey endpoint returns its payload under `key`.
+ */
+const STRIP_SUBSTRINGS = ["token", "secret", "password"];
+
+/**
+ * Non-secret fields that happen to contain a STRIP_SUBSTRINGS word (Wazuh
+ * `/security/config` returns token lifetimes the Security page shows).
+ */
+const STRIP_SUBSTRING_EXCEPTIONS = new Set(["auth_token_exp_timeout", "rbac_mode"]);
+
+export function isSensitiveFieldName(key: string): boolean {
+  const k = key.toLowerCase();
+  if (STRIP_FIELDS.has(k)) return true;
+  if (STRIP_SUBSTRING_EXCEPTIONS.has(k)) return false;
+  return STRIP_SUBSTRINGS.some(sub => k.includes(sub));
+}
+
 function stripSensitiveFields(obj: unknown): unknown {
   if (Array.isArray(obj)) return obj.map(stripSensitiveFields);
   if (obj && typeof obj === "object") {
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-      if (!STRIP_FIELDS.has(k.toLowerCase())) {
+      if (!isSensitiveFieldName(k)) {
         result[k] = stripSensitiveFields(v);
       }
     }
@@ -217,6 +301,7 @@ function createAxiosInstance(baseURL: string): AxiosInstance {
     baseURL,
     timeout: 8_000,
     httpsAgent: sharedHttpsAgent,
+    ...UPSTREAM_AXIOS_LIMITS,
     // NOTE: Do NOT set a default Content-Type here. The /security/user/authenticate
     // endpoint must receive NO body and NO Content-Type. GET requests also don't
     // need one. Axios sets Content-Type automatically when a body is present.
@@ -225,22 +310,8 @@ function createAxiosInstance(baseURL: string): AxiosInstance {
 
 // ── Token management ──────────────────────────────────────────────────────────
 
-/**
- * Returns a valid JWT, re-authenticating only when the cached token is missing
- * or expired. Logs all authentication lifecycle events.
- */
-async function getToken(baseURL: string, user: string, pass: string): Promise<string> {
-  // Return cached token if it hasn't expired (with buffer)
-  if (cachedToken && Date.now() < cachedToken.expiresAt - TOKEN_EXPIRY_BUFFER_MS) {
-    console.log("[Wazuh Auth] Reusing cached JWT (expires in %ds)",
-      Math.round((cachedToken.expiresAt - Date.now()) / 1000));
-    return cachedToken.jwt;
-  }
-
-  const wasExpired = cachedToken !== null;
-  console.log("[Wazuh Auth] %s — calling POST /security/user/authenticate",
-    wasExpired ? "Token expired, re-authenticating" : "Initial authentication");
-
+/** Perform POST /security/user/authenticate (no body — Basic auth header only). */
+async function authenticate(baseURL: string, user: string, pass: string): Promise<CachedToken> {
   const instance = createAxiosInstance(baseURL);
 
   // CRITICAL: The Wazuh /security/user/authenticate endpoint accepts
@@ -262,18 +333,61 @@ async function getToken(baseURL: string, user: string, pass: string): Promise<st
     ? expEpochSeconds * 1000 // Convert seconds → ms
     : Date.now() + 840_000; // Fallback: 840s
 
-  cachedToken = { jwt: token, expiresAt };
-
   console.log("[Wazuh Auth] JWT obtained successfully (expires in %ds)",
     Math.round((expiresAt - Date.now()) / 1000));
-
-  return token;
+  return { jwt: token, expiresAt };
 }
 
-/** Clear cached token so the next getToken() call re-authenticates. */
-function invalidateToken(): void {
-  cachedToken = null;
-  console.log("[Wazuh Auth] Token invalidated (will re-authenticate on next request)");
+/** Remove expired tokens so the per-key map stays bounded. */
+function pruneExpiredTokens(now: number): void {
+  for (const [k, t] of Array.from(tokenCache.entries())) {
+    if (now >= t.expiresAt - TOKEN_EXPIRY_BUFFER_MS) tokenCache.delete(k);
+  }
+}
+
+/**
+ * Returns a valid JWT for this connection identity, re-authenticating only
+ * when the cached token is missing or expired. Concurrent misses for the same
+ * key share one in-flight authentication.
+ */
+async function getToken(baseURL: string, key: string, user: string, pass: string): Promise<string> {
+  const cached = tokenCache.get(key);
+  if (cached && Date.now() < cached.expiresAt - TOKEN_EXPIRY_BUFFER_MS) return cached.jwt;
+
+  const pending = inflightAuth.get(key);
+  if (pending) return pending;
+
+  console.log("[Wazuh Auth] %s — calling POST /security/user/authenticate",
+    cached ? "Token expired, re-authenticating" : "Initial authentication");
+
+  const generation = tokenGeneration;
+  const promise = authenticate(baseURL, user, pass)
+    .then((tok) => {
+      if (generation === tokenGeneration) {
+        pruneExpiredTokens(Date.now());
+        tokenCache.set(key, tok);
+      }
+      return tok.jwt;
+    })
+    .finally(() => {
+      if (inflightAuth.get(key) === promise) inflightAuth.delete(key);
+    });
+  inflightAuth.set(key, promise);
+  return promise;
+}
+
+/**
+ * After a 401 with `staleJwt`: drop that token (only if it is still the cached
+ * one — a concurrent request may already have refreshed it) and obtain a fresh
+ * one. Concurrent 401s therefore collapse onto a single re-authentication.
+ */
+async function reauthenticateAfter401(baseURL: string, key: string, user: string, pass: string, staleJwt: string): Promise<string> {
+  const current = tokenCache.get(key);
+  if (current && current.jwt === staleJwt) {
+    tokenCache.delete(key);
+    console.log("[Wazuh Auth] Token invalidated after 401 (will re-authenticate)");
+  }
+  return getToken(baseURL, key, user, pass);
 }
 
 // ── Core GET proxy ─────────────────────────────────────────────────────────────
@@ -301,12 +415,15 @@ export async function wazuhGet(
   checkRateLimit(rateLimitGroup, userId);
 
   const baseURL = `https://${config.host}:${config.port}`;
+  const key = wazuhConnectionKey(config);
   let token: string;
 
   try {
-    token = await getToken(baseURL, config.user, config.pass);
+    token = await getToken(baseURL, key, config.user, config.pass);
   } catch (err) {
-    throw new Error(`Wazuh auth error: ${extractWazuhErrorDetail(err)}`);
+    // M1: full detail (extractWazuhErrorDetail + body) goes to the server log
+    // under a correlation id; the caller only sees "Wazuh upstream error … [id]".
+    throw sanitizeUpstreamError("Wazuh", err, `auth (${extractWazuhErrorDetail(err)})`);
   }
 
   const instance = createAxiosInstance(baseURL);
@@ -327,17 +444,20 @@ export async function wazuhGet(
     return stripSensitiveFields(response.data);
   } catch (err: unknown) {
     if (axios.isAxiosError(err) && err.response?.status === 401) {
-      // Token expired or revoked — invalidate, re-authenticate, retry once
+      // Token expired or revoked — invalidate, re-authenticate (deduped), retry once
       console.log("[Wazuh Auth] 401 on %s — re-authenticating and retrying", path);
-      invalidateToken();
-      const freshToken = await getToken(baseURL, config.user, config.pass);
-      const retryResponse = await instance.get(path, {
-        params: cleanParams,
-        headers: { Authorization: `Bearer ${freshToken}` },
-      });
-      return stripSensitiveFields(retryResponse.data);
+      try {
+        const freshToken = await reauthenticateAfter401(baseURL, key, config.user, config.pass, token);
+        const retryResponse = await instance.get(path, {
+          params: cleanParams,
+          headers: { Authorization: `Bearer ${freshToken}` },
+        });
+        return stripSensitiveFields(retryResponse.data);
+      } catch (retryErr) {
+        throw sanitizeUpstreamError("Wazuh", retryErr, `GET ${path} (after 401 retry)`);
+      }
     }
-    throw err;
+    throw sanitizeUpstreamError("Wazuh", err, `GET ${path}`);
   }
 }
 
@@ -401,5 +521,10 @@ export const _testing = {
   resetRateLimits() {
     for (const key of Object.keys(globalRateLimitState)) delete globalRateLimitState[key];
     for (const key of Object.keys(perUserRateLimitState)) delete perUserRateLimitState[key];
+    lastRateLimitPruneAt = 0;
   },
+  pruneRateLimitState,
+  tokenCache,
+  inflightAuth,
+  isSensitiveFieldName,
 };
