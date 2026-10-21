@@ -309,7 +309,7 @@ describe("Shared Continuation Helper Extraction", () => {
     const fs = await import("fs");
     const src = fs.readFileSync("server/agenticPipeline/pipelineRouter.ts", "utf-8");
 
-    expect(src).toContain('import { executeResumePipeline } from "./resumePipelineHelper"');
+    expect(src).toMatch(/import \{[^}]*\bexecuteResumePipeline\b[^}]*\} from "\.\/resumePipelineHelper"/s);
   });
 
   it("resumePipelineRun delegates to executeResumePipeline", async () => {

@@ -59,59 +59,41 @@ describe("Audit #26: Dedup guard in resumePipelineHelper", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // #53: Auto-queue atomic increment
 // ═══════════════════════════════════════════════════════════════════════════════
-describe("Audit #53: Auto-queue atomic increment", () => {
+describe("Audit #53 / C13: Auto-queue rate limit is one conditional UPDATE", () => {
   const source = readSource("server/alertQueue/autoQueueRouter.ts");
+  const fnBody = (() => {
+    const idx = source.indexOf("async function checkRateLimit");
+    return idx === -1 ? "" : source.slice(idx, idx + 1500);
+  })();
 
-  it("uses SQL expression for atomic increment instead of read-then-write", () => {
-    // Should use SQL template literal for increment: currentHourCount + 1
-    // instead of the old pattern: rule.currentHourCount + 1
-    const checkRateLimitIdx = source.indexOf("async function checkRateLimit");
-    expect(checkRateLimitIdx).toBeGreaterThan(-1);
-    const fnBody = source.slice(checkRateLimitIdx, checkRateLimitIdx + 1500);
-
-    // Should NOT have the old read-then-write pattern
-    expect(fnBody).not.toContain("rule.currentHourCount + 1");
-
-    // Should have SQL-level atomic increment
-    expect(fnBody).toContain("autoQueueRules.currentHourCount");
-    expect(fnBody).toContain("+ 1");
+  it("takes only the rule id — never the stale in-memory rule object", () => {
+    expect(fnBody).toContain("async function checkRateLimit(ruleId: number)");
+    expect(fnBody).not.toContain("rule.currentHourStart");
+    expect(fnBody).not.toContain("rule.currentHourCount");
+    expect(source).toContain("checkRateLimit(rule.id)");
   });
 
-  it("uses WHERE guard to enforce rate limit atomically", () => {
-    const checkRateLimitIdx = source.indexOf("async function checkRateLimit");
-    const fnBody = source.slice(checkRateLimitIdx, checkRateLimitIdx + 1500);
-
-    // Should have a WHERE clause that checks count < maxPerHour
-    expect(fnBody).toContain("autoQueueRules.currentHourCount");
-    expect(fnBody).toContain("autoQueueRules.maxPerHour");
+  it("does not short-circuit an expired window with an unconditional `return true` (C13)", () => {
+    expect(fnBody).not.toContain("return true");
+    expect(fnBody).not.toContain("3600_000");
   });
 
-  it("checks affectedRows to determine if increment succeeded", () => {
-    const checkRateLimitIdx = source.indexOf("async function checkRateLimit");
-    const fnBody = source.slice(checkRateLimitIdx, checkRateLimitIdx + 1500);
+  it("resets or increments in SQL via CASE on the window age", () => {
+    expect(fnBody).toMatch(/SET currentHourCount = CASE/);
+    expect(fnBody).toContain("THEN 1");
+    expect(fnBody).toContain("ELSE currentHourCount + 1 END");
+    expect(fnBody).toContain("THEN NOW()");
+    expect(fnBody).toContain("currentHourStart < NOW() - INTERVAL 1 HOUR");
+  });
 
-    // Should check affectedRows to know if the atomic UPDATE succeeded
+  it("enforces maxPerHour in the WHERE clause of the same statement", () => {
+    expect(fnBody).toMatch(/WHERE id = \$\{ruleId\}/);
+    expect(fnBody).toContain("OR currentHourCount < maxPerHour");
+  });
+
+  it("is allowed iff exactly one row was affected", () => {
     expect(fnBody).toContain("affectedRows");
-  });
-
-  it("still resets counter when hour window expires", () => {
-    const checkRateLimitIdx = source.indexOf("async function checkRateLimit");
-    const fnBody = source.slice(checkRateLimitIdx, checkRateLimitIdx + 1500);
-
-    // Should still have the hour window expiration check
-    expect(fnBody).toContain("3600_000");
-    expect(fnBody).toContain("currentHourCount: 1");
-    expect(fnBody).toContain("currentHourStart: now");
-  });
-
-  it("returns boolean indicating whether rate limit allows queueing", () => {
-    const checkRateLimitIdx = source.indexOf("async function checkRateLimit");
-    const fnBody = source.slice(checkRateLimitIdx, checkRateLimitIdx + 1500);
-
-    // Function should return true/false based on affectedRows
-    expect(fnBody).toContain("return true");
-    // The affectedRows check returns the boolean result
-    expect(fnBody).toMatch(/return.*affectedRows/);
+    expect(fnBody).toMatch(/return \(header\?\.affectedRows \?\? 0\) === 1/);
   });
 });
 

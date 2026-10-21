@@ -13,6 +13,7 @@
 import { getDb } from "../db";
 import { triageObjects, correlationBundles, investigationSessions } from "../../drizzle/schema";
 import { eq, desc, and, inArray, sql, gte } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { invokeLLMWithFallback } from "../llm/llmService";
 import type { InvokeResult } from "../_core/llm";
 import {
@@ -779,6 +780,105 @@ const CORRELATION_JSON_SCHEMA = {
   },
 };
 
+// ── Bundle idempotency (H-L7) ───────────────────────────────────────────────
+
+/** A 'processing' bundle younger than this is presumed live; older is a crashed run. */
+const BUNDLE_PROCESSING_STALE_MS = 15 * 60 * 1000;
+
+type CorrelationBundleRow = typeof correlationBundles.$inferSelect;
+type CorrelationDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type BundleClaim =
+  | { kind: "reuse"; row: CorrelationBundleRow }
+  | { kind: "claimed"; correlationId: string };
+
+function affectedRowsOf(res: unknown): number {
+  const header = Array.isArray(res) ? res[0] : res;
+  return Number((header as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
+}
+
+function isDuplicateEntry(err: unknown): boolean {
+  const e = err as { errno?: number; code?: string; cause?: { errno?: number; code?: string } } | undefined;
+  return e?.errno === 1062 || e?.code === "ER_DUP_ENTRY" || e?.cause?.errno === 1062 || e?.cause?.code === "ER_DUP_ENTRY";
+}
+
+/**
+ * Apply the reuse rule to an existing bundle row for this triage:
+ *   completed                 → reuse as-is (no LLM call)
+ *   processing, < 15 min old  → CONFLICT (another run owns it)
+ *   failed / stale processing → re-claim the same row (status→processing, error cleared)
+ * Staleness is judged by the DB clock inside the conditional UPDATE (no JS/DB timezone
+ * skew), and the UPDATE bumps updatedAt so exactly one concurrent re-claimer wins.
+ * Returns null if a failed/pending re-claim lost a race (caller re-reads).
+ */
+async function applyBundleRule(db: CorrelationDb, row: CorrelationBundleRow): Promise<BundleClaim | null> {
+  if (row.status === "completed") return { kind: "reuse", row };
+
+  const reclaim = { status: "processing" as const, errorMessage: null, updatedAt: sql`CURRENT_TIMESTAMP` };
+
+  if (row.status === "processing") {
+    const res = await db.update(correlationBundles)
+      .set(reclaim)
+      .where(and(
+        eq(correlationBundles.id, row.id),
+        eq(correlationBundles.status, "processing"),
+        sql`${correlationBundles.updatedAt} < NOW() - INTERVAL ${sql.raw(String(BUNDLE_PROCESSING_STALE_MS / 60_000))} MINUTE`,
+      ));
+    if (affectedRowsOf(res) === 1) {
+      console.warn(`[Correlation] re-claiming stale processing bundle ${row.correlationId} for triage ${row.sourceTriageId}`);
+      return { kind: "claimed", correlationId: row.correlationId };
+    }
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `Correlation for triage '${row.sourceTriageId}' is already in progress (${row.correlationId})`,
+    });
+  }
+
+  // failed or pending → take the row over, guarded on the status we saw.
+  const res = await db.update(correlationBundles)
+    .set(reclaim)
+    .where(and(eq(correlationBundles.id, row.id), eq(correlationBundles.status, row.status)));
+  if (affectedRowsOf(res) === 0) return null;
+  return { kind: "claimed", correlationId: row.correlationId };
+}
+
+async function readBundleByTriage(db: CorrelationDb, triageId: string): Promise<CorrelationBundleRow | undefined> {
+  const [row] = await db.select()
+    .from(correlationBundles)
+    .where(eq(correlationBundles.sourceTriageId, triageId))
+    .limit(1);
+  return row;
+}
+
+async function claimCorrelationBundle(db: CorrelationDb, triageId: string): Promise<BundleClaim> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const existing = await readBundleByTriage(db, triageId);
+    if (existing) {
+      const claim = await applyBundleRule(db, existing);
+      if (claim) return claim;
+      continue; // lost the re-claim race — re-read and re-apply
+    }
+
+    const correlationId = `corr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      await db.insert(correlationBundles).values({
+        correlationId,
+        sourceTriageId: triageId,
+        status: "processing",
+        confidence: 0,
+        bundleData: {} as CorrelationBundle, // placeholder — updated after LLM response
+      });
+      return { kind: "claimed", correlationId };
+    } catch (err) {
+      if (!isDuplicateEntry(err)) throw err;
+      // A concurrent run inserted the bundle for this triage first — re-read and apply the rule.
+    }
+  }
+  throw new TRPCError({
+    code: "CONFLICT",
+    message: `Correlation for triage '${triageId}' is being claimed concurrently — retry`,
+  });
+}
+
 // ── Main Correlation Agent ───────────────────────────────────────────────────
 
 export async function runCorrelationAgent(
@@ -807,16 +907,20 @@ export async function runCorrelationAgent(
     triage.route = triageRow.analystRouteOverride;
   }
 
-  // 2. Generate correlation ID and create pending record
-  const correlationId = `corr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  
-  await db.insert(correlationBundles).values({
-    correlationId,
-    sourceTriageId: input.triageId,
-    status: "processing",
-    confidence: 0,
-    bundleData: {} as CorrelationBundle, // placeholder — updated after LLM response
-  });
+  // 2. H-L7: one bundle per triage (UNIQUE cb_sourceTriageId_uniq). Reuse/claim an
+  //    existing row instead of forking a new bundle on every run/resume.
+  const claim = await claimCorrelationBundle(db, input.triageId);
+  if (claim.kind === "reuse") {
+    const existing = claim.row;
+    return {
+      correlationId: existing.correlationId,
+      bundle: existing.bundleData as CorrelationBundle,
+      latencyMs: existing.latencyMs ?? 0,
+      tokensUsed: existing.tokensUsed ?? 0,
+      evidencePackSize: 0,
+    };
+  }
+  const correlationId = claim.correlationId;
   
   try {
     // 3. Assemble evidence pack (parallel retrieval from 6+ sources)
@@ -842,7 +946,8 @@ export async function runCorrelationAgent(
     const content = llmResult.choices?.[0]?.message?.content;
     if (!content) throw new Error("LLM returned empty response");
     
-    const rawJson = typeof content === "string" ? JSON.parse(content) : content;
+    const { extractJson } = await import("../llm/extractJson");
+    const rawJson = typeof content === "string" ? extractJson(content) : content;
     
     // Zod-validate the raw LLM output — throws ZodError if malformed
     const validatedRaw = parseLLMCorrelation(rawJson);
@@ -895,13 +1000,17 @@ export async function runCorrelationAgent(
       evidencePackSize: evidencePack.totalItems,
     };
   } catch (err) {
-    // Mark as failed
+    // Mark as failed — only while still ours ('processing'); never clobber a bundle
+    // a concurrent re-claim already completed.
     await db.update(correlationBundles)
       .set({
         status: "failed",
         errorMessage: (err as Error).message,
       })
-      .where(eq(correlationBundles.correlationId, correlationId));
+      .where(and(
+        eq(correlationBundles.correlationId, correlationId),
+        eq(correlationBundles.status, "processing"),
+      ));
     throw err;
   }
 }

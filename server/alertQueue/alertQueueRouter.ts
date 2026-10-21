@@ -27,6 +27,17 @@ import { getEffectiveIndexerConfig, indexerSearch, INDEX_PATTERNS } from "../ind
 
 const MAX_QUEUE_DEPTH = 10;
 
+/** Statuses that occupy a queue slot (C14/H-C2: 'triaged' is still active work). */
+const ACTIVE_QUEUE_STATUSES = ["queued", "processing", "triaged"] as const;
+
+/** C14: an item whose auto-triage LLM call is in flight must never be evicted or re-claimed. */
+const NOT_AUTO_TRIAGE_RUNNING = sql`(${alertQueue.autoTriageStatus} IS NULL OR ${alertQueue.autoTriageStatus} <> 'running')`;
+
+function affectedRowsOf(res: unknown): number {
+  const header = Array.isArray(res) ? res[0] : res;
+  return Number((header as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
+}
+
 // ── Indexer confirmation for enqueue ─────────────────────────────────────────
 // Fetch the alert document by _id so severity and payload come from the source of
 // truth rather than the request body. Returns null when the indexer is not
@@ -82,7 +93,7 @@ export const alertQueueRouter = router({
       .select()
       .from(alertQueue)
       .orderBy(
-        sql`FIELD(${alertQueue.status}, 'processing', 'queued', 'completed', 'failed', 'dismissed')`,
+        sql`FIELD(${alertQueue.status}, 'processing', 'triaged', 'queued', 'completed', 'failed', 'dismissed')`,
         desc(alertQueue.ruleLevel),
         asc(alertQueue.queuedAt)
       )
@@ -91,7 +102,7 @@ export const alertQueueRouter = router({
     const [countResult] = await db
       .select({ count: sql<number>`COUNT(*)` })
       .from(alertQueue)
-      .where(inArray(alertQueue.status, ["queued", "processing"]));
+      .where(inArray(alertQueue.status, [...ACTIVE_QUEUE_STATUSES]));
 
     return {
       items,
@@ -100,7 +111,7 @@ export const alertQueueRouter = router({
   }),
 
   /**
-   * Get current queue depth (queued + processing items only).
+   * Get current queue depth (queued + processing + triaged items).
    */
   count: protectedProcedure.query(async () => {
     const db = await requireDb();
@@ -108,7 +119,7 @@ export const alertQueueRouter = router({
     const [result] = await db
       .select({ count: sql<number>`COUNT(*)` })
       .from(alertQueue)
-      .where(inArray(alertQueue.status, ["queued", "processing"]));
+      .where(inArray(alertQueue.status, [...ACTIVE_QUEUE_STATUSES]));
 
     return { count: result?.count ?? 0 };
   }),
@@ -140,7 +151,7 @@ export const alertQueueRouter = router({
         .where(
           and(
             eq(alertQueue.alertId, clientInput.alertId),
-            inArray(alertQueue.status, ["queued", "processing"])
+            inArray(alertQueue.status, [...ACTIVE_QUEUE_STATUSES])
           )
         )
         .limit(1);
@@ -163,17 +174,17 @@ export const alertQueueRouter = router({
       const [countResult] = await db
         .select({ count: sql<number>`COUNT(*)` })
         .from(alertQueue)
-        .where(inArray(alertQueue.status, ["queued", "processing"]));
+        .where(inArray(alertQueue.status, [...ACTIVE_QUEUE_STATUSES]));
 
       const currentCount = countResult?.count ?? 0;
 
       if (currentCount >= MAX_QUEUE_DEPTH) {
-        // Find the lowest-severity queued item (not processing) and dismiss it.
-        // If same severity, evict the oldest (FIFO within same level).
+        // Find the lowest-severity queued item (not processing, not mid auto-triage)
+        // and dismiss it. If same severity, evict the oldest (FIFO within same level).
         const [lowestPriority] = await db
           .select({ id: alertQueue.id, ruleLevel: alertQueue.ruleLevel })
           .from(alertQueue)
-          .where(eq(alertQueue.status, "queued"))
+          .where(and(eq(alertQueue.status, "queued"), NOT_AUTO_TRIAGE_RUNNING))
           .orderBy(asc(alertQueue.ruleLevel), asc(alertQueue.queuedAt))
           .limit(1);
 
@@ -184,10 +195,19 @@ export const alertQueueRouter = router({
             return { success: false, message: "Queue is full — alert severity could not be confirmed against the indexer, so nothing was evicted", id: null };
           }
           if (input.ruleLevel >= lowestPriority.ruleLevel) {
-            await db
+            // C14: re-assert the eviction predicate in the UPDATE — the candidate may have
+            // been claimed by a triage path between the SELECT and now.
+            const evictRes = await db
               .update(alertQueue)
               .set({ status: "dismissed" })
-              .where(eq(alertQueue.id, lowestPriority.id));
+              .where(and(
+                eq(alertQueue.id, lowestPriority.id),
+                eq(alertQueue.status, "queued"),
+                NOT_AUTO_TRIAGE_RUNNING,
+              ));
+            if (affectedRowsOf(evictRes) === 0) {
+              return { success: false, message: "Queue is full — eviction candidate was claimed for triage concurrently; retry", id: null };
+            }
           } else {
             // Incoming alert is lower severity than everything in queue — reject
             return { success: false, message: "Queue is full — all queued alerts have higher severity", id: null };
@@ -293,10 +313,10 @@ export const alertQueueRouter = router({
           processedAt: new Date(),
           autoTriageStatus: "running",
         })
-        .where(and(eq(alertQueue.id, input.id), eq(alertQueue.status, "queued")));
+        // C14: also refuse while an auto-triage LLM call holds the item.
+        .where(and(eq(alertQueue.id, input.id), eq(alertQueue.status, "queued"), NOT_AUTO_TRIAGE_RUNNING));
 
-      const [resultHeader] = claimResult as unknown as [{ affectedRows: number }];
-      if (!resultHeader || resultHeader.affectedRows === 0) {
+      if (affectedRowsOf(claimResult) === 0) {
         throw new TRPCError({ code: "CONFLICT", message: "Queue item is already being processed by another session" });
       }
 
@@ -366,8 +386,9 @@ export const alertQueueRouter = router({
               completedAt: null,  // NOT complete — awaiting analyst advancement
             });
 
-            // Update queue item with triage link + backward-compatible result
-            await tx
+            // Update queue item with triage link + backward-compatible result.
+            // C14: guarded on our own claim — a dismissed item is never resurrected.
+            const doneRes = await tx
               .update(alertQueue)
               .set({
                 status: "completed",
@@ -376,7 +397,10 @@ export const alertQueueRouter = router({
                 triageResult,
                 completedAt: new Date(),
               })
-              .where(eq(alertQueue.id, input.id));
+              .where(and(eq(alertQueue.id, input.id), inArray(alertQueue.status, ["processing"])));
+            if (affectedRowsOf(doneRes) === 0) {
+              console.warn(`[AlertQueue] process: queue item ${input.id} left 'processing' during triage (dismissed/reset) — not overwriting`);
+            }
           });
 
           return {
@@ -406,7 +430,7 @@ export const alertQueueRouter = router({
               completedAt: new Date(),
             });
 
-            await tx
+            const failRes = await tx
               .update(alertQueue)
               .set({
                 status: "failed",
@@ -417,7 +441,10 @@ export const alertQueueRouter = router({
                 },
                 completedAt: new Date(),
               })
-              .where(eq(alertQueue.id, input.id));
+              .where(and(eq(alertQueue.id, input.id), inArray(alertQueue.status, ["processing"])));
+            if (affectedRowsOf(failRes) === 0) {
+              console.warn(`[AlertQueue] process: queue item ${input.id} left 'processing' during triage (dismissed/reset) — not marking failed`);
+            }
           });
 
           return {
@@ -426,8 +453,8 @@ export const alertQueueRouter = router({
           };
         }
       } catch (err) {
-        // Mark as failed
-        await db
+        // Mark as failed — only if we still hold the claim (never resurrect a dismissed item)
+        const catchRes = await db
           .update(alertQueue)
           .set({
             status: "failed",
@@ -438,7 +465,10 @@ export const alertQueueRouter = router({
             },
             completedAt: new Date(),
           })
-          .where(eq(alertQueue.id, input.id));
+          .where(and(eq(alertQueue.id, input.id), inArray(alertQueue.status, ["processing"])));
+        if (affectedRowsOf(catchRes) === 0) {
+          console.warn(`[AlertQueue] process: queue item ${input.id} no longer 'processing' after error — not marking failed`);
+        }
 
         throw err;
       }
@@ -464,17 +494,18 @@ export const alertQueueRouter = router({
   /**
    * Get recently queued alerts since a given timestamp.
    * Used by the global QueueNotifier to detect new arrivals and trigger notifications.
-   * Returns alerts queued within the last N seconds, ordered by severity desc.
+   * H-C2: returns active alerts queued strictly after `since` (when given), newest
+   * first, up to 50 — severity no longer decides which arrivals the notifier sees.
    */
   recentAlerts: protectedProcedure
     .input(z.object({
       /** ISO timestamp — return alerts queued after this time */
-      since: z.string(),
+      since: z.string().datetime({ offset: true }).optional(),
     }))
     .query(async ({ input }) => {
       const db = await requireDb();
 
-      const sinceDate = new Date(input.since);
+      const sinceDate = input.since ? new Date(input.since) : null;
 
       const alerts = await db
         .select({
@@ -491,12 +522,13 @@ export const alertQueueRouter = router({
         .from(alertQueue)
         .where(
           and(
-            gte(alertQueue.queuedAt, sinceDate),
-            inArray(alertQueue.status, ["queued", "processing"])
+            // gte, not gt: queuedAt is second-precision, so a same-second arrival must not be lost (callers dedupe by id)
+            sinceDate ? gte(alertQueue.queuedAt, sinceDate) : undefined,
+            inArray(alertQueue.status, [...ACTIVE_QUEUE_STATUSES])
           )
         )
-        .orderBy(desc(alertQueue.ruleLevel), desc(alertQueue.queuedAt))
-        .limit(10);
+        .orderBy(desc(alertQueue.queuedAt), desc(alertQueue.id))
+        .limit(50);
 
       return { alerts };
     }),

@@ -144,47 +144,36 @@ function matchesRule(alert: WazuhAlert, rule: AutoQueueRule): boolean {
 }
 
 /**
- * Check and reset the hourly rate limit counter for a rule.
- * Returns true if the rule can still auto-queue (under limit).
+ * Consume one slot of a rule's hourly rate limit.
+ * Returns true if the rule could still auto-queue (a slot was taken).
  *
- * Audit #53: Uses atomic UPDATE with WHERE guard to prevent race conditions.
- * Two concurrent calls cannot both read the same count and both increment —
- * the UPDATE ... WHERE currentHourCount < maxPerHour is a single atomic
- * statement that only one caller can win per row per count value.
+ * C13: the window check, window reset and increment are ONE conditional UPDATE
+ * evaluated against the row's current DB state — never against the rule object
+ * read at the top of the poll cycle (which made an expired window return `true`
+ * for every alert in the cycle). Allowed iff exactly one row was affected.
  */
-async function checkRateLimit(rule: AutoQueueRule): Promise<boolean> {
+async function checkRateLimit(ruleId: number): Promise<boolean> {
   const db = await requireDb();
-  const now = new Date();
-  const hourStart = rule.currentHourStart;
 
-  // If no hour window or it's expired (>1 hour old), reset atomically
-  if (!hourStart || now.getTime() - hourStart.getTime() > 3600_000) {
-    // Atomic reset: SET count=1, hourStart=now WHERE id=rule.id
-    // If two callers race on reset, both set count=1 — safe (worst case: one alert uncounted)
-    await db
-      .update(autoQueueRules)
-      .set({ currentHourCount: 1, currentHourStart: now })
-      .where(eq(autoQueueRules.id, rule.id));
-    return true;
-  }
+  // Raw SQL so the SET order is explicit: MySQL evaluates single-table SET
+  // assignments left to right, so currentHourCount's CASE must read the OLD
+  // currentHourStart, i.e. be assigned first.
+  const result = await db.execute(sql`
+    UPDATE auto_queue_rules
+       SET currentHourCount = CASE
+             WHEN currentHourStart IS NULL OR currentHourStart < NOW() - INTERVAL 1 HOUR THEN 1
+             ELSE currentHourCount + 1 END,
+           currentHourStart = CASE
+             WHEN currentHourStart IS NULL OR currentHourStart < NOW() - INTERVAL 1 HOUR THEN NOW()
+             ELSE currentHourStart END
+     WHERE id = ${ruleId}
+       AND (currentHourStart IS NULL
+            OR currentHourStart < NOW() - INTERVAL 1 HOUR
+            OR currentHourCount < maxPerHour)
+  `);
 
-  // Atomic increment: UPDATE SET count = count + 1 WHERE id = ? AND count < maxPerHour
-  // Only succeeds if the current count is still below the limit.
-  // If two concurrent callers race, each gets its own atomic increment —
-  // no read-then-write gap, no double-counting.
-  const result = await db
-    .update(autoQueueRules)
-    .set({ currentHourCount: sql`${autoQueueRules.currentHourCount} + 1` })
-    .where(
-      and(
-        eq(autoQueueRules.id, rule.id),
-        sql`${autoQueueRules.currentHourCount} < ${autoQueueRules.maxPerHour}`,
-      )
-    );
-
-  // If affectedRows === 0, the rule was already at or above maxPerHour
-  const resultObj = result as unknown as { affectedRows?: number } | [{ affectedRows?: number }];
-  return Array.isArray(resultObj) ? (resultObj[0]?.affectedRows ?? 0) > 0 : (resultObj?.affectedRows ?? 0) > 0;
+  const header = (Array.isArray(result) ? result[0] : result) as { affectedRows?: number } | undefined;
+  return (header?.affectedRows ?? 0) === 1;
 }
 
 /**
@@ -239,7 +228,7 @@ async function pollAndEnqueue(): Promise<{ matched: number; queued: number; skip
     const [countResult] = await db
       .select({ count: sql<number>`COUNT(*)` })
       .from(alertQueue)
-      .where(inArray(alertQueue.status, ["queued", "processing"]));
+      .where(inArray(alertQueue.status, ["queued", "processing", "triaged"]));
     let currentQueueDepth = countResult?.count ?? 0;
 
     // Check each alert against each rule
@@ -262,7 +251,7 @@ async function pollAndEnqueue(): Promise<{ matched: number; queued: number; skip
           .where(
             and(
               eq(alertQueue.alertId, alertId),
-              inArray(alertQueue.status, ["queued", "processing"])
+              inArray(alertQueue.status, ["queued", "processing", "triaged"])
             )
           )
           .limit(1);
@@ -273,7 +262,7 @@ async function pollAndEnqueue(): Promise<{ matched: number; queued: number; skip
         }
 
         // Check rate limit
-        const allowed = await checkRateLimit(rule);
+        const allowed = await checkRateLimit(rule.id);
         if (!allowed) {
           result.skipped++;
           break; // Rate limited, skip to next alert

@@ -74,7 +74,9 @@ describe("Bug #6: alertQueueRouter affectedRows", () => {
       fs.readFileSync("server/alertQueue/alertQueueRouter.ts", "utf-8")
     );
     // Should use typed result header with affectedRows check
-    expect(src).toMatch(/resultHeader.*affectedRows/);
+    // Phase 1 moved the typed read into a shared helper (affectedRowsOf) used at every write site.
+    expect(src).toMatch(/function affectedRowsOf\(res: unknown\): number/);
+    expect(src).toMatch(/affectedRowsOf\(\w+\) === 0/);
   });
 });
 
