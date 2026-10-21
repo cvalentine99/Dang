@@ -123,6 +123,8 @@ services:
       SPLUNK_PORT: ${SPLUNK_PORT:-8089}
       SPLUNK_HEC_PORT: ${SPLUNK_HEC_PORT:-8088}
       SPLUNK_HEC_TOKEN: ${SPLUNK_HEC_TOKEN:-}
+      # Splunk is a WRITE integration: it is off unless explicitly enabled here or in Admin > Connection Settings.
+      SPLUNK_ENABLED: ${SPLUNK_ENABLED:-false}
 
       # LLM — Self-hosted OpenAI-compatible endpoint (optional)
       # Use docker-compose.gpu.yml overlay for local Nemotron, or point at external

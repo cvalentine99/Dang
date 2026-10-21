@@ -72,7 +72,8 @@ export async function getEffectiveSplunkConfig(): Promise<SplunkConfig> {
     hecToken: ENV_DEFAULTS.hecToken,
     hecPort: ENV_DEFAULTS.hecPort,
     protocol: "https",
-    enabled: false,
+    // Explicit opt-in only (P2-9): SPLUNK_ENABLED=true in env, or the stored "enabled" setting.
+    enabled: process.env.SPLUNK_ENABLED === "true",
   };
 
   try {
@@ -121,10 +122,8 @@ export async function getEffectiveSplunkConfig(): Promise<SplunkConfig> {
     // Fall back to env-only config
   }
 
-  // If host and token are set from env but no DB override, consider it enabled
-  if (!config.enabled && config.host && config.hecToken) {
-    config.enabled = true;
-  }
+  // P2-9: the presence of credentials never implies enablement. A write
+  // integration (HEC notable events) must be switched on explicitly.
 
   return config;
 }

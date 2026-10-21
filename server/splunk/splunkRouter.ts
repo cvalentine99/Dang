@@ -132,9 +132,7 @@ export const splunkRouter = router({
       protocol: config.protocol,
       enabled: config.enabled,
       hasToken: !!config.hecToken,
-      tokenPreview: config.hecToken
-        ? `${config.hecToken.slice(0, 8)}...${config.hecToken.slice(-4)}`
-        : "",
+      // M6: never return any part of the HEC token; `hasToken` is all the UI needs.
     };
   }),
 
