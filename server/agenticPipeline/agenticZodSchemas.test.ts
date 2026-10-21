@@ -269,7 +269,7 @@ describe("LivingCaseObjectSchema", () => {
   it("accepts optional actionSummary", () => {
     const withSummary = {
       ...VALID_LIVING_CASE,
-      actionSummary: { total: 1, proposed: 1, approved: 0, rejected: 0, executed: 0, deferred: 0 },
+      actionSummary: { total: 1, proposed: 1, approved: 0, rejected: 0, acknowledged: 0, deferred: 0 },
     };
     const result = validateLivingCaseObject(withSummary);
     expect(result.success).toBe(true);

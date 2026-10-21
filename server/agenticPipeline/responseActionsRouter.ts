@@ -9,13 +9,13 @@
  * in stateMachine.ts. This router is the API surface; the state machine is the enforcer.
  *
  * State Machine:
- *   proposed → approved → executed
+ *   proposed → approved → acknowledged
  *   proposed → rejected
  *   proposed → deferred → proposed (re-propose)
  *   approved → rejected (revoke approval)
  *
  * Endpoints:
- *   Mutations: propose, approve, reject, execute, defer, repropose, bulkApprove
+ *   Mutations: propose, approve, reject, acknowledge, defer, repropose, bulkApprove
  *   Queries:   getById, getByCase, listAll, stats, auditTrail
  */
 
@@ -37,7 +37,7 @@ import {
   transitionActionState,
   approveAction,
   rejectAction,
-  executeAction,
+  acknowledgeAction,
   deferAction,
   reproposeAction,
   syncCaseSummaryAfterTransition,
@@ -148,26 +148,23 @@ export const responseActionsRouter = router({
       return rejectAction(input.actionId, ctx.user.id, input.reason);
     }),
 
-  // ── Execute ── (delegates to centralized state machine) ───────────────────
+  // ── Acknowledge ── (delegates to centralized state machine) ───────────────
   //
-  // Audit #48: The execution result metadata (executionResult, executionSuccess)
-  // is now stored inside the state machine's transaction via the extraUpdate
-  // field, ensuring atomicity. Previously, a separate UPDATE after the
-  // transaction could fail and leave the action in "executed" state with no
-  // result metadata.
-  execute: adminProcedure
+  // Dang performs no external action. The analyst carries the approved action out
+  // by hand and records the outcome here; outcome and result text are mandatory
+  // and there is no default success (the former `execute` defaulted
+  // executionSuccess to true with no input from the caller).
+  acknowledge: adminProcedure
     .input(z.object({
       actionId: z.string().min(1),
-      executionResult: z.string().max(5000).optional(),
-      executionSuccess: z.boolean().default(true),
+      outcome: z.enum(["success", "partial", "failed"]),
+      result: z.string().trim().min(1).max(5000),
     }))
     .mutation(async ({ input, ctx }) => {
-      const result = await executeAction(input.actionId, ctx.user.id, {
-        executionResult: input.executionResult,
-        executionSuccess: input.executionSuccess,
+      return acknowledgeAction(input.actionId, ctx.user.id, {
+        executionOutcome: input.outcome,
+        executionResult: input.result,
       });
-
-      return result;
     }),
 
   // ── Defer ── (delegates to centralized state machine) ─────────────────────
@@ -316,7 +313,7 @@ export const responseActionsRouter = router({
           .from(responseActions)
           .where(whereClause)
           .orderBy(
-            sql`FIELD(${responseActions.state}, 'proposed', 'approved', 'deferred', 'executed', 'rejected')`,
+            sql`FIELD(${responseActions.state}, 'proposed', 'approved', 'deferred', 'acknowledged', 'rejected')`,
             sql`FIELD(${responseActions.urgency}, 'immediate', 'next', 'scheduled', 'optional')`,
             desc(responseActions.proposedAt)
           )
@@ -404,7 +401,7 @@ export const responseActionsRouter = router({
         })
           .from(responseActions)
           .where(sql`${responseActions.approvedAt} IS NOT NULL`),
-        // Compute avg time from approved → executed (seconds)
+        // Compute avg time from approved → acknowledged (seconds)
         db.select({
           avgSeconds: sql<number>`AVG(TIMESTAMPDIFF(SECOND, ${responseActions.approvedAt}, ${responseActions.executedAt}))`,
         })
@@ -432,7 +429,7 @@ export const responseActionsRouter = router({
         byUrgency,
         pendingApproval: pendingApprovalResult[0]?.count ?? 0,
         avgTimeToApproval: rawApprovalSec != null ? Math.round(rawApprovalSec) : null, // seconds, null if no approved actions yet
-        avgTimeToExecution: rawExecutionSec != null ? Math.round(rawExecutionSec) : null, // seconds, null if no executed actions yet
+        avgTimeToExecution: rawExecutionSec != null ? Math.round(rawExecutionSec) : null, // seconds, null if no acknowledged actions yet
       };
     }),
 

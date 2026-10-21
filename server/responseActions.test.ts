@@ -22,7 +22,7 @@ describe("Response Actions State Machine", () => {
     "notify_stakeholder", "custom",
   ] as const;
 
-  const VALID_STATES = ["proposed", "approved", "rejected", "executed", "deferred"] as const;
+  const VALID_STATES = ["proposed", "approved", "rejected", "acknowledged", "deferred"] as const;
   const VALID_URGENCY = ["immediate", "next", "scheduled", "optional"] as const;
 
   describe("Action categories", () => {
@@ -44,9 +44,9 @@ describe("Response Actions State Machine", () => {
   describe("State transitions", () => {
     const VALID_TRANSITIONS: Record<string, string[]> = {
       proposed: ["approved", "rejected", "deferred"],
-      approved: ["executed", "rejected"],
+      approved: ["acknowledged", "rejected"],
       rejected: [], // terminal
-      executed: [], // terminal
+      acknowledged: [], // terminal
       deferred: ["proposed"], // can be re-proposed
     };
 
@@ -54,16 +54,16 @@ describe("Response Actions State Machine", () => {
       expect(VALID_TRANSITIONS.proposed).toEqual(["approved", "rejected", "deferred"]);
     });
 
-    it("approved can transition to executed or rejected", () => {
-      expect(VALID_TRANSITIONS.approved).toEqual(["executed", "rejected"]);
+    it("approved can transition to acknowledged or rejected", () => {
+      expect(VALID_TRANSITIONS.approved).toEqual(["acknowledged", "rejected"]);
     });
 
     it("rejected is terminal", () => {
       expect(VALID_TRANSITIONS.rejected).toEqual([]);
     });
 
-    it("executed is terminal", () => {
-      expect(VALID_TRANSITIONS.executed).toEqual([]);
+    it("acknowledged is terminal", () => {
+      expect(VALID_TRANSITIONS.acknowledged).toEqual([]);
     });
 
     it("deferred can be re-proposed", () => {
@@ -71,8 +71,8 @@ describe("Response Actions State Machine", () => {
     });
 
     it("should reject invalid transitions", () => {
-      // Cannot go from proposed directly to executed
-      expect(VALID_TRANSITIONS.proposed).not.toContain("executed");
+      // Cannot go from proposed directly to acknowledged
+      expect(VALID_TRANSITIONS.proposed).not.toContain("acknowledged");
       // Cannot go from rejected to anything
       expect(VALID_TRANSITIONS.rejected).toHaveLength(0);
     });
@@ -110,7 +110,7 @@ describe("Response Action Audit Trail", () => {
   it("should track who made each decision", () => {
     const auditEntries = [
       { fromState: "proposed", toState: "approved", changedBy: "analyst:42" },
-      { fromState: "approved", toState: "executed", changedBy: "analyst:42" },
+      { fromState: "approved", toState: "acknowledged", changedBy: "analyst:42" },
     ];
 
     expect(auditEntries).toHaveLength(2);
@@ -124,11 +124,11 @@ describe("Response Action Audit Trail", () => {
       { fromState: "proposed", toState: "deferred", changedBy: "analyst:42" },
       { fromState: "deferred", toState: "proposed", changedBy: "analyst:42" },
       { fromState: "proposed", toState: "approved", changedBy: "analyst:42" },
-      { fromState: "approved", toState: "executed", changedBy: "analyst:42" },
+      { fromState: "approved", toState: "acknowledged", changedBy: "analyst:42" },
     ];
 
     expect(lifecycle).toHaveLength(5);
-    expect(lifecycle[lifecycle.length - 1].toState).toBe("executed");
+    expect(lifecycle[lifecycle.length - 1].toState).toBe("acknowledged");
   });
 });
 

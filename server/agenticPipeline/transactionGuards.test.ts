@@ -3,7 +3,7 @@
  *
  * Verifies that:
  * 1. The `propose` mutation wraps INSERT + audit INSERT in a single db.transaction()
- * 2. The `execute` state machine case merges executionResult/executionSuccess
+ * 2. The `acknowledged` state machine case merges executionResult/executionOutcome
  *    into the atomic UPDATE payload (no separate UPDATE after the transaction)
  * 3. The `execute` router mutation no longer does a post-transaction UPDATE
  *
@@ -71,9 +71,9 @@ describe("Audit #48 — Response Action Transaction Guards", () => {
   describe("execute — metadata merged into atomic UPDATE", () => {
     const smSrc = fs.readFileSync(STATE_MACHINE_PATH, "utf-8");
 
-    it("merges executionResult into updatePayload inside the executed case", () => {
+    it("merges executionResult into updatePayload inside the acknowledged case", () => {
       // Find the executed case in the switch
-      const executedCase = smSrc.indexOf('case "executed":');
+      const executedCase = smSrc.indexOf('case "acknowledged": {');
       expect(executedCase).toBeGreaterThan(-1);
 
       // Extract the case body (up to the next case or closing brace)
@@ -85,13 +85,13 @@ describe("Audit #48 — Response Action Transaction Guards", () => {
       expect(caseBody).toContain("req.metadata?.executionResult");
     });
 
-    it("merges executionSuccess into updatePayload inside the executed case", () => {
-      const executedCase = smSrc.indexOf('case "executed":');
+    it("merges executionOutcome into updatePayload inside the acknowledged case", () => {
+      const executedCase = smSrc.indexOf('case "acknowledged": {');
       const nextCase = smSrc.indexOf("case \"deferred\":", executedCase);
       const caseBody = smSrc.slice(executedCase, nextCase);
 
-      expect(caseBody).toContain("updatePayload.executionSuccess");
-      expect(caseBody).toContain("req.metadata?.executionSuccess");
+      expect(caseBody).toContain("updatePayload.executionOutcome");
+      expect(caseBody).toContain("req.metadata?.executionOutcome");
     });
   });
 
@@ -99,9 +99,9 @@ describe("Audit #48 — Response Action Transaction Guards", () => {
   describe("execute router mutation — no orphan-risk UPDATE", () => {
     const routerSrc = fs.readFileSync(ROUTER_PATH, "utf-8");
 
-    it("does NOT do a separate db.update(responseActions) after executeAction()", () => {
+    it("does NOT do a separate db.update(responseActions) after acknowledgeAction()", () => {
       // Find the execute mutation body
-      const executeStart = routerSrc.indexOf("execute: adminProcedure");
+      const executeStart = routerSrc.indexOf("acknowledge: adminProcedure");
       expect(executeStart).toBeGreaterThan(-1);
 
       // Extract up to the next endpoint
@@ -113,17 +113,17 @@ describe("Audit #48 — Response Action Transaction Guards", () => {
       expect(executeBody).not.toContain("db.update(responseActions)");
       expect(executeBody).not.toContain("await db");
       // But should still call executeAction
-      expect(executeBody).toContain("executeAction(");
+      expect(executeBody).toContain("acknowledgeAction(");
     });
 
-    it("passes executionResult and executionSuccess as metadata to executeAction", () => {
-      const executeStart = routerSrc.indexOf("execute: adminProcedure");
+    it("passes outcome and result as the attestation to acknowledgeAction", () => {
+      const executeStart = routerSrc.indexOf("acknowledge: adminProcedure");
       const executeEnd = routerSrc.indexOf("defer: adminProcedure", executeStart);
       const executeBody = routerSrc.slice(executeStart, executeEnd);
 
       // The metadata object should contain both fields
-      expect(executeBody).toContain("executionResult: input.executionResult");
-      expect(executeBody).toContain("executionSuccess: input.executionSuccess");
+      expect(executeBody).toContain("executionResult: input.result");
+      expect(executeBody).toContain("executionOutcome: input.outcome");
     });
   });
 });

@@ -522,10 +522,10 @@ export function generateExecutiveSummary(data: LivingCaseReportData): string {
   lines.push(`| Response Actions | ${responseActionsList.length} |`);
   const pendingActions = responseActionsList.filter((a) => a.state === "proposed").length;
   const approvedActions = responseActionsList.filter((a) => a.state === "approved").length;
-  const executedActions = responseActionsList.filter((a) => a.state === "executed").length;
+  const executedActions = responseActionsList.filter((a) => a.state === "acknowledged").length;
   lines.push(`| Actions Pending | ${pendingActions} |`);
   lines.push(`| Actions Approved | ${approvedActions} |`);
-  lines.push(`| Actions Executed | ${executedActions} |`);
+  lines.push(`| Actions Acknowledged (manually carried out) | ${executedActions} |`);
   lines.push("");
 
   // Critical actions needing approval

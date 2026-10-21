@@ -2,9 +2,9 @@
  * State Machine Integration Tests
  *
  * Tests the response action state machine invariants:
- *   - Valid transition graph (proposed→approved→executed, proposed→rejected, etc.)
- *   - Terminal state enforcement (rejected/executed cannot transition)
- *   - requiresApproval gate (cannot skip proposed→approved→executed)
+ *   - Valid transition graph (proposed→approved→acknowledged, proposed→rejected, etc.)
+ *   - Terminal state enforcement (rejected/acknowledged cannot transition)
+ *   - requiresApproval gate (cannot skip proposed→approved→acknowledged)
  *   - Reason requirements for reject/defer
  *   - Audit trail creation on every transition
  *   - Case summary recomputation after transitions
@@ -47,8 +47,8 @@ describe("State Machine — Pure Functions", () => {
       expect(isValidTransition("proposed", "deferred")).toBe(true);
     });
 
-    it("allows approved → executed", () => {
-      expect(isValidTransition("approved", "executed")).toBe(true);
+    it("allows approved → acknowledged", () => {
+      expect(isValidTransition("approved", "acknowledged")).toBe(true);
     });
 
     it("allows approved → rejected (revoke approval)", () => {
@@ -59,30 +59,30 @@ describe("State Machine — Pure Functions", () => {
       expect(isValidTransition("deferred", "proposed")).toBe(true);
     });
 
-    it("blocks proposed → executed (must go through approved)", () => {
-      expect(isValidTransition("proposed", "executed")).toBe(false);
+    it("blocks proposed → acknowledged (must go through approved)", () => {
+      expect(isValidTransition("proposed", "acknowledged")).toBe(false);
     });
 
     it("blocks rejected → anything (terminal)", () => {
       expect(isValidTransition("rejected", "proposed")).toBe(false);
       expect(isValidTransition("rejected", "approved")).toBe(false);
-      expect(isValidTransition("rejected", "executed")).toBe(false);
+      expect(isValidTransition("rejected", "acknowledged")).toBe(false);
       expect(isValidTransition("rejected", "deferred")).toBe(false);
     });
 
-    it("blocks executed → anything (terminal)", () => {
-      expect(isValidTransition("executed", "proposed")).toBe(false);
-      expect(isValidTransition("executed", "approved")).toBe(false);
-      expect(isValidTransition("executed", "rejected")).toBe(false);
-      expect(isValidTransition("executed", "deferred")).toBe(false);
+    it("blocks acknowledged → anything (terminal)", () => {
+      expect(isValidTransition("acknowledged", "proposed")).toBe(false);
+      expect(isValidTransition("acknowledged", "approved")).toBe(false);
+      expect(isValidTransition("acknowledged", "rejected")).toBe(false);
+      expect(isValidTransition("acknowledged", "deferred")).toBe(false);
     });
 
     it("blocks deferred → approved (must re-propose first)", () => {
       expect(isValidTransition("deferred", "approved")).toBe(false);
     });
 
-    it("blocks deferred → executed (must re-propose first)", () => {
-      expect(isValidTransition("deferred", "executed")).toBe(false);
+    it("blocks deferred → acknowledged (must re-propose first)", () => {
+      expect(isValidTransition("deferred", "acknowledged")).toBe(false);
     });
 
     it("handles unknown states gracefully", () => {
@@ -97,8 +97,8 @@ describe("State Machine — Pure Functions", () => {
       expect(isTerminalState("rejected")).toBe(true);
     });
 
-    it("identifies executed as terminal", () => {
-      expect(isTerminalState("executed")).toBe(true);
+    it("identifies acknowledged as terminal", () => {
+      expect(isTerminalState("acknowledged")).toBe(true);
     });
 
     it("identifies proposed as non-terminal", () => {
@@ -128,9 +128,9 @@ describe("State Machine — Pure Functions", () => {
       expect(allowed).toHaveLength(3);
     });
 
-    it("returns [executed, rejected] for approved", () => {
+    it("returns [acknowledged, rejected] for approved", () => {
       const allowed = getAllowedTransitions("approved");
-      expect(allowed).toContain("executed");
+      expect(allowed).toContain("acknowledged");
       expect(allowed).toContain("rejected");
       expect(allowed).toHaveLength(2);
     });
@@ -144,8 +144,8 @@ describe("State Machine — Pure Functions", () => {
       expect(getAllowedTransitions("rejected")).toEqual([]);
     });
 
-    it("returns empty array for executed (terminal)", () => {
-      expect(getAllowedTransitions("executed")).toEqual([]);
+    it("returns empty array for acknowledged (terminal)", () => {
+      expect(getAllowedTransitions("acknowledged")).toEqual([]);
     });
 
     it("returns empty array for unknown states", () => {
@@ -155,7 +155,7 @@ describe("State Machine — Pure Functions", () => {
 
   describe("VALID_TRANSITIONS constant", () => {
     it("has entries for all five states", () => {
-      const states: ActionState[] = ["proposed", "approved", "rejected", "executed", "deferred"];
+      const states: ActionState[] = ["proposed", "approved", "rejected", "acknowledged", "deferred"];
       for (const state of states) {
         expect(VALID_TRANSITIONS).toHaveProperty(state);
         expect(Array.isArray(VALID_TRANSITIONS[state])).toBe(true);
@@ -179,10 +179,10 @@ describe("State Machine — Pure Functions", () => {
   });
 
   describe("Full lifecycle paths", () => {
-    it("supports happy path: proposed → approved → executed", () => {
+    it("supports happy path: proposed → approved → acknowledged", () => {
       expect(isValidTransition("proposed", "approved")).toBe(true);
-      expect(isValidTransition("approved", "executed")).toBe(true);
-      expect(isTerminalState("executed")).toBe(true);
+      expect(isValidTransition("approved", "acknowledged")).toBe(true);
+      expect(isTerminalState("acknowledged")).toBe(true);
     });
 
     it("supports rejection path: proposed → rejected", () => {
@@ -190,11 +190,11 @@ describe("State Machine — Pure Functions", () => {
       expect(isTerminalState("rejected")).toBe(true);
     });
 
-    it("supports defer-repropose path: proposed → deferred → proposed → approved → executed", () => {
+    it("supports defer-repropose path: proposed → deferred → proposed → approved → acknowledged", () => {
       expect(isValidTransition("proposed", "deferred")).toBe(true);
       expect(isValidTransition("deferred", "proposed")).toBe(true);
       expect(isValidTransition("proposed", "approved")).toBe(true);
-      expect(isValidTransition("approved", "executed")).toBe(true);
+      expect(isValidTransition("approved", "acknowledged")).toBe(true);
     });
 
     it("supports late rejection: proposed → approved → rejected", () => {
@@ -374,17 +374,17 @@ describe("transitionActionState (real DB)", () => {
     expect(result.action!.state).toBe("approved");
   });
 
-  it.skipIf(!HAS_DB)("transitions approved → executed", async () => {
+  it.skipIf(!HAS_DB)("transitions approved → acknowledged", async () => {
     const { executeAction } = await import("./stateMachine");
     const result = await executeAction(testActionId, 1, { executionMethod: "manual" });
 
     expect(result.success).toBe(true);
     expect(result.fromState).toBe("approved");
-    expect(result.toState).toBe("executed");
-    expect(result.action!.state).toBe("executed");
+    expect(result.toState).toBe("acknowledged");
+    expect(result.action!.state).toBe("acknowledged");
   });
 
-  it.skipIf(!HAS_DB)("blocks transition from terminal state (executed)", async () => {
+  it.skipIf(!HAS_DB)("blocks transition from terminal state (acknowledged)", async () => {
     const { approveAction } = await import("./stateMachine");
     const result = await approveAction(testActionId, 1);
 
@@ -398,7 +398,7 @@ describe("transitionActionState (real DB)", () => {
 
     expect(summary).toBeDefined();
     expect(summary!.total).toBeGreaterThanOrEqual(1);
-    expect(summary!.executed).toBeGreaterThanOrEqual(1);
+    expect(summary!.acknowledged).toBeGreaterThanOrEqual(1);
     // All states should be non-negative
     expect(summary!.proposed).toBeGreaterThanOrEqual(0);
     expect(summary!.approved).toBeGreaterThanOrEqual(0);

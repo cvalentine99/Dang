@@ -42,7 +42,7 @@ describe("recomputeCaseSummary", () => {
       expect(result).toHaveProperty("proposed");
       expect(result).toHaveProperty("approved");
       expect(result).toHaveProperty("rejected");
-      expect(result).toHaveProperty("executed");
+      expect(result).toHaveProperty("acknowledged");
       expect(result).toHaveProperty("deferred");
     }
   });
@@ -79,7 +79,7 @@ describe("CaseSummary type contract", () => {
       proposed: 3,
       approved: 2,
       rejected: 1,
-      executed: 3,
+      acknowledged: 3,
       deferred: 1,
     };
 
@@ -87,7 +87,7 @@ describe("CaseSummary type contract", () => {
     expect(summary.proposed).toBe(3);
     expect(summary.approved).toBe(2);
     expect(summary.rejected).toBe(1);
-    expect(summary.executed).toBe(3);
+    expect(summary.acknowledged).toBe(3);
     expect(summary.deferred).toBe(1);
   });
 
@@ -97,12 +97,12 @@ describe("CaseSummary type contract", () => {
       proposed: 3,
       approved: 2,
       rejected: 1,
-      executed: 3,
+      acknowledged: 3,
       deferred: 1,
     };
 
     const stateSum = summary.proposed + summary.approved + summary.rejected +
-                     summary.executed + summary.deferred;
+                     summary.acknowledged + summary.deferred;
     expect(summary.total).toBe(stateSum);
   });
 
@@ -112,7 +112,7 @@ describe("CaseSummary type contract", () => {
       proposed: 0,
       approved: 0,
       rejected: 0,
-      executed: 0,
+      acknowledged: 0,
       deferred: 0,
     };
 
@@ -136,7 +136,7 @@ describe("Counter derivation logic", () => {
       proposed: 0,
       approved: 0,
       rejected: 0,
-      executed: 0,
+      acknowledged: 0,
       deferred: 0,
     };
 
@@ -162,7 +162,7 @@ describe("Counter derivation logic", () => {
     expect(result.proposed).toBe(3);
     expect(result.approved).toBe(0);
     expect(result.rejected).toBe(0);
-    expect(result.executed).toBe(0);
+    expect(result.acknowledged).toBe(0);
     expect(result.deferred).toBe(0);
   });
 
@@ -171,7 +171,7 @@ describe("Counter derivation logic", () => {
       { state: "proposed" as ActionState },
       { state: "approved" as ActionState },
       { state: "rejected" as ActionState },
-      { state: "executed" as ActionState },
+      { state: "acknowledged" as ActionState },
       { state: "deferred" as ActionState },
     ];
 
@@ -180,7 +180,7 @@ describe("Counter derivation logic", () => {
     expect(result.proposed).toBe(1);
     expect(result.approved).toBe(1);
     expect(result.rejected).toBe(1);
-    expect(result.executed).toBe(1);
+    expect(result.acknowledged).toBe(1);
     expect(result.deferred).toBe(1);
   });
 
@@ -221,13 +221,13 @@ describe("Counter derivation logic", () => {
 
   it("correctly counts after execute transition", () => {
     const actions = [
-      { state: "executed" as ActionState },
-      { state: "executed" as ActionState },
+      { state: "acknowledged" as ActionState },
+      { state: "acknowledged" as ActionState },
       { state: "proposed" as ActionState },
     ];
 
     const result = deriveCountsFromActions(actions);
-    expect(result.executed).toBe(2);
+    expect(result.acknowledged).toBe(2);
     expect(result.proposed).toBe(1);
   });
 
@@ -247,14 +247,14 @@ describe("Counter derivation logic", () => {
       [],
       [{ state: "proposed" }],
       [{ state: "proposed" }, { state: "approved" }, { state: "rejected" }],
-      [{ state: "executed" }, { state: "executed" }, { state: "executed" }, { state: "deferred" }],
-      [{ state: "proposed" }, { state: "proposed" }, { state: "approved" }, { state: "rejected" }, { state: "executed" }, { state: "deferred" }],
+      [{ state: "acknowledged" }, { state: "acknowledged" }, { state: "acknowledged" }, { state: "deferred" }],
+      [{ state: "proposed" }, { state: "proposed" }, { state: "approved" }, { state: "rejected" }, { state: "acknowledged" }, { state: "deferred" }],
     ];
 
     for (const actions of scenarios) {
       const result = deriveCountsFromActions(actions);
       const stateSum = result.proposed + result.approved + result.rejected +
-                       result.executed + result.deferred;
+                       result.acknowledged + result.deferred;
       expect(result.total).toBe(stateSum);
     }
   });
@@ -281,7 +281,7 @@ describe("Transition → Counter Sync Proof", () => {
 
     // Recompute (what recomputeCaseSummary does)
     const summary: CaseSummary = {
-      total: 0, proposed: 0, approved: 0, rejected: 0, executed: 0, deferred: 0,
+      total: 0, proposed: 0, approved: 0, rejected: 0, acknowledged: 0, deferred: 0,
     };
     for (const a of actions) {
       summary.total++;
@@ -306,15 +306,15 @@ describe("Transition → Counter Sync Proof", () => {
     expect(after.total).toBe(3);
   });
 
-  it("approved → executed: approved decreases, executed increases", () => {
+  it("approved → acknowledged: approved decreases, acknowledged increases", () => {
     const actions = [
       { state: "approved" as ActionState },
       { state: "proposed" as ActionState },
     ];
 
-    const after = simulateTransitionAndRecount(actions, 0, "executed");
+    const after = simulateTransitionAndRecount(actions, 0, "acknowledged");
     expect(after.approved).toBe(0);
-    expect(after.executed).toBe(1);
+    expect(after.acknowledged).toBe(1);
     expect(after.proposed).toBe(1);
   });
 
@@ -361,14 +361,14 @@ describe("Transition → Counter Sync Proof", () => {
 
     // Execute all
     for (let i = 0; i < 3; i++) {
-      const summary = simulateTransitionAndRecount(actions, i, "executed");
+      const summary = simulateTransitionAndRecount(actions, i, "acknowledged");
       expect(summary.total).toBe(3);
     }
-    expect(actions.every(a => a.state === "executed")).toBe(true);
+    expect(actions.every(a => a.state === "acknowledged")).toBe(true);
 
     // Final count
-    const final: CaseSummary = { total: 3, proposed: 0, approved: 0, rejected: 0, executed: 3, deferred: 0 };
-    expect(final.executed).toBe(3);
+    const final: CaseSummary = { total: 3, proposed: 0, approved: 0, rejected: 0, acknowledged: 3, deferred: 0 };
+    expect(final.acknowledged).toBe(3);
     expect(final.proposed).toBe(0);
   });
 });
@@ -393,7 +393,7 @@ describe("Architecture Proof: Counter derivation path", () => {
       proposed: 1,
       approved: 1,
       rejected: 1,
-      executed: 1,
+      acknowledged: 1,
       deferred: 1,
     };
 
@@ -402,7 +402,7 @@ describe("Architecture Proof: Counter derivation path", () => {
     expect(summary).toHaveProperty("proposed");
     expect(summary).toHaveProperty("approved");
     expect(summary).toHaveProperty("rejected");
-    expect(summary).toHaveProperty("executed");
+    expect(summary).toHaveProperty("acknowledged");
     expect(summary).toHaveProperty("deferred");
     expect(Object.keys(summary)).toHaveLength(6);
   });

@@ -1,0 +1,5763 @@
+{
+  "id": "f65fa9e3-2284-4c47-8bf7-9c530a5914ea",
+  "prevId": "9868f7f5-a5c0-4f73-9806-90ae745758c0",
+  "version": "5",
+  "dialect": "mysql",
+  "tables": {
+    "alert_queue": {
+      "name": "alert_queue",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alertId": {
+          "autoincrement": false,
+          "name": "alertId",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ruleId": {
+          "autoincrement": false,
+          "name": "ruleId",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ruleDescription": {
+          "autoincrement": false,
+          "name": "ruleDescription",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ruleLevel": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "ruleLevel",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agentId": {
+          "autoincrement": false,
+          "name": "agentId",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agentName": {
+          "autoincrement": false,
+          "name": "agentName",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "alertTimestamp": {
+          "autoincrement": false,
+          "name": "alertTimestamp",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rawJson": {
+          "autoincrement": false,
+          "name": "rawJson",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "default": "'queued'",
+          "autoincrement": false,
+          "name": "status",
+          "type": "enum('queued','processing','triaged','completed','failed','dismissed')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "triageResult": {
+          "autoincrement": false,
+          "name": "triageResult",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "queuedBy": {
+          "autoincrement": false,
+          "name": "queuedBy",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "queuedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "queuedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "processedAt": {
+          "autoincrement": false,
+          "name": "processedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completedAt": {
+          "autoincrement": false,
+          "name": "completedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pipelineTriageId": {
+          "autoincrement": false,
+          "name": "pipelineTriageId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "autoTriageStatus": {
+          "default": "'pending'",
+          "autoincrement": false,
+          "name": "autoTriageStatus",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "compositePrimaryKeys": {
+        "alert_queue_id": {
+          "name": "alert_queue_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "aq_alertId_idx": {
+          "name": "aq_alertId_idx",
+          "columns": [
+            "alertId"
+          ],
+          "isUnique": false
+        },
+        "aq_queuedAt_idx": {
+          "name": "aq_queuedAt_idx",
+          "columns": [
+            "queuedAt"
+          ],
+          "isUnique": false
+        },
+        "aq_status_idx": {
+          "name": "aq_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "analyst_notes": {
+      "name": "analyst_notes",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "autoincrement": false,
+          "name": "title",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "autoincrement": false,
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "severity": {
+          "default": "'info'",
+          "autoincrement": false,
+          "name": "severity",
+          "type": "enum('critical','high','medium','low','info')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agentId": {
+          "autoincrement": false,
+          "name": "agentId",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ruleId": {
+          "autoincrement": false,
+          "name": "ruleId",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cveId": {
+          "autoincrement": false,
+          "name": "cveId",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tags": {
+          "autoincrement": false,
+          "name": "tags",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolved": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "resolved",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        },
+        "createdBy": {
+          "autoincrement": false,
+          "name": "createdBy",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "compositePrimaryKeys": {
+        "analyst_notes_id": {
+          "name": "analyst_notes_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "an_createdBy_idx": {
+          "name": "an_createdBy_idx",
+          "columns": [
+            "createdBy"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "analyst_notes_v2": {
+      "name": "analyst_notes_v2",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "autoincrement": false,
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entityType": {
+          "autoincrement": false,
+          "name": "entityType",
+          "type": "enum('alert','agent','cve','rule','general')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entityId": {
+          "default": "''",
+          "autoincrement": false,
+          "name": "entityId",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "autoincrement": false,
+          "name": "title",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "autoincrement": false,
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "severity": {
+          "default": "'info'",
+          "autoincrement": false,
+          "name": "severity",
+          "type": "enum('critical','high','medium','low','info')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tags": {
+          "autoincrement": false,
+          "name": "tags",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolved": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "resolved",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "analyst_notes_v2_id": {
+          "name": "analyst_notes_v2_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "notes_v2_entity_lookup_idx": {
+          "name": "notes_v2_entity_lookup_idx",
+          "columns": [
+            "entityType",
+            "entityId"
+          ],
+          "isUnique": false
+        },
+        "notes_v2_entityId_idx": {
+          "name": "notes_v2_entityId_idx",
+          "columns": [
+            "entityId"
+          ],
+          "isUnique": false
+        },
+        "notes_v2_entityType_idx": {
+          "name": "notes_v2_entityType_idx",
+          "columns": [
+            "entityType"
+          ],
+          "isUnique": false
+        },
+        "notes_v2_userId_idx": {
+          "name": "notes_v2_userId_idx",
+          "columns": [
+            "userId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_anv2_userId": {
+          "name": "fk_anv2_userId",
+          "tableFrom": "analyst_notes_v2",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "anomaly_suppression_rules": {
+      "name": "anomaly_suppression_rules",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "autoincrement": false,
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scheduleId": {
+          "autoincrement": false,
+          "name": "scheduleId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "severityFilter": {
+          "default": "'medium'",
+          "autoincrement": false,
+          "name": "severityFilter",
+          "type": "enum('critical','high','medium','all')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "durationHours": {
+          "autoincrement": false,
+          "name": "durationHours",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "autoincrement": false,
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "default": true,
+          "autoincrement": false,
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "autoincrement": false,
+          "name": "expiresAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "suppressedCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "suppressedCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scheduleName": {
+          "autoincrement": false,
+          "name": "scheduleName",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "anomaly_suppression_rules_id": {
+          "name": "anomaly_suppression_rules_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "suppression_active_idx": {
+          "name": "suppression_active_idx",
+          "columns": [
+            "active"
+          ],
+          "isUnique": false
+        },
+        "suppression_expiresAt_idx": {
+          "name": "suppression_expiresAt_idx",
+          "columns": [
+            "expiresAt"
+          ],
+          "isUnique": false
+        },
+        "suppression_scheduleId_idx": {
+          "name": "suppression_scheduleId_idx",
+          "columns": [
+            "scheduleId"
+          ],
+          "isUnique": false
+        },
+        "suppression_userId_idx": {
+          "name": "suppression_userId_idx",
+          "columns": [
+            "userId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_asr_scheduleId": {
+          "name": "fk_asr_scheduleId",
+          "tableFrom": "anomaly_suppression_rules",
+          "tableTo": "baseline_schedules",
+          "columnsFrom": [
+            "scheduleId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "fk_asr_userId": {
+          "name": "fk_asr_userId",
+          "tableFrom": "anomaly_suppression_rules",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "auto_queue_rules": {
+      "name": "auto_queue_rules",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "autoincrement": false,
+          "name": "name",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "default": 1,
+          "autoincrement": false,
+          "name": "enabled",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "minSeverity": {
+          "autoincrement": false,
+          "name": "minSeverity",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ruleIds": {
+          "autoincrement": false,
+          "name": "ruleIds",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agentPattern": {
+          "autoincrement": false,
+          "name": "agentPattern",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mitreTechniqueIds": {
+          "autoincrement": false,
+          "name": "mitreTechniqueIds",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "maxPerHour": {
+          "default": 10,
+          "autoincrement": false,
+          "name": "maxPerHour",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currentHourCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "currentHourCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currentHourStart": {
+          "autoincrement": false,
+          "name": "currentHourStart",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdBy": {
+          "autoincrement": false,
+          "name": "createdBy",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "auto_queue_rules_id": {
+          "name": "auto_queue_rules_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "aqr_enabled_idx": {
+          "name": "aqr_enabled_idx",
+          "columns": [
+            "enabled"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "baseline_schedules": {
+      "name": "baseline_schedules",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "autoincrement": false,
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "autoincrement": false,
+          "name": "name",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agentIds": {
+          "autoincrement": false,
+          "name": "agentIds",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "frequency": {
+          "autoincrement": false,
+          "name": "frequency",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "default": true,
+          "autoincrement": false,
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lastRunAt": {
+          "autoincrement": false,
+          "name": "lastRunAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nextRunAt": {
+          "autoincrement": false,
+          "name": "nextRunAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "retentionCount": {
+          "default": 10,
+          "autoincrement": false,
+          "name": "retentionCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lastError": {
+          "autoincrement": false,
+          "name": "lastError",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "successCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "successCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "failureCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "failureCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "driftThreshold": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "driftThreshold",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notifyOnDrift": {
+          "default": false,
+          "autoincrement": false,
+          "name": "notifyOnDrift",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "baseline_schedules_id": {
+          "name": "baseline_schedules_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_bs_userId": {
+          "name": "fk_bs_userId",
+          "tableFrom": "baseline_schedules",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "config_baselines": {
+      "name": "config_baselines",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "autoincrement": false,
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "autoincrement": false,
+          "name": "name",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agentIds": {
+          "autoincrement": false,
+          "name": "agentIds",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshotData": {
+          "autoincrement": false,
+          "name": "snapshotData",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        },
+        "scheduleId": {
+          "autoincrement": false,
+          "name": "scheduleId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "compositePrimaryKeys": {
+        "config_baselines_id": {
+          "name": "config_baselines_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_cb_scheduleId": {
+          "name": "fk_cb_scheduleId",
+          "tableFrom": "config_baselines",
+          "tableTo": "baseline_schedules",
+          "columnsFrom": [
+            "scheduleId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "fk_cb_userId": {
+          "name": "fk_cb_userId",
+          "tableFrom": "config_baselines",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "connection_settings": {
+      "name": "connection_settings",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "autoincrement": false,
+          "name": "category",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "settingKey": {
+          "autoincrement": false,
+          "name": "settingKey",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "settingValue": {
+          "autoincrement": false,
+          "name": "settingValue",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "isEncrypted": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "isEncrypted",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedBy": {
+          "autoincrement": false,
+          "name": "updatedBy",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "connection_settings_id": {
+          "name": "connection_settings_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "cs_category_key_idx": {
+          "name": "cs_category_key_idx",
+          "columns": [
+            "category",
+            "settingKey"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "cs_category_key_uniq": {
+          "name": "cs_category_key_uniq",
+          "columns": [
+            "category",
+            "settingKey"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "correlation_bundles": {
+      "name": "correlation_bundles",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "correlationId": {
+          "autoincrement": false,
+          "name": "correlationId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sourceTriageId": {
+          "autoincrement": false,
+          "name": "sourceTriageId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "relatedAlertCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "relatedAlertCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "discoveredEntityCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "discoveredEntityCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "blastRadiusHosts": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "blastRadiusHosts",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "blastRadiusUsers": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "blastRadiusUsers",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assetCriticality": {
+          "default": "'unknown'",
+          "autoincrement": false,
+          "name": "assetCriticality",
+          "type": "enum('critical','high','medium','low','unknown')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "likelyCampaign": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "likelyCampaign",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "caseAction": {
+          "default": "'defer_to_analyst'",
+          "autoincrement": false,
+          "name": "caseAction",
+          "type": "enum('merge_existing','create_new','defer_to_analyst')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mergeTargetId": {
+          "autoincrement": false,
+          "name": "mergeTargetId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confidence": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "confidence",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bundleData": {
+          "autoincrement": false,
+          "name": "bundleData",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "default": "'pending'",
+          "autoincrement": false,
+          "name": "status",
+          "type": "enum('pending','processing','completed','failed')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "errorMessage": {
+          "autoincrement": false,
+          "name": "errorMessage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "latencyMs": {
+          "autoincrement": false,
+          "name": "latencyMs",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tokensUsed": {
+          "autoincrement": false,
+          "name": "tokensUsed",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "correlation_bundles_id": {
+          "name": "correlation_bundles_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "cb_caseAction_idx": {
+          "name": "cb_caseAction_idx",
+          "columns": [
+            "caseAction"
+          ],
+          "isUnique": false
+        },
+        "cb_createdAt_idx": {
+          "name": "cb_createdAt_idx",
+          "columns": [
+            "createdAt"
+          ],
+          "isUnique": false
+        },
+        "cb_likelyCampaign_idx": {
+          "name": "cb_likelyCampaign_idx",
+          "columns": [
+            "likelyCampaign"
+          ],
+          "isUnique": false
+        },
+        "cb_sourceTriageId_idx": {
+          "name": "cb_sourceTriageId_idx",
+          "columns": [
+            "sourceTriageId"
+          ],
+          "isUnique": false
+        },
+        "cb_status_idx": {
+          "name": "cb_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "correlation_bundles_correlationId_unique": {
+          "name": "correlation_bundles_correlationId_unique",
+          "columns": [
+            "correlationId"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "drift_anomalies": {
+      "name": "drift_anomalies",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshotId": {
+          "autoincrement": false,
+          "name": "snapshotId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scheduleId": {
+          "autoincrement": false,
+          "name": "scheduleId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "autoincrement": false,
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "driftPercent": {
+          "autoincrement": false,
+          "name": "driftPercent",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rollingAvg": {
+          "autoincrement": false,
+          "name": "rollingAvg",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rollingStdDev": {
+          "autoincrement": false,
+          "name": "rollingStdDev",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "zScore": {
+          "autoincrement": false,
+          "name": "zScore",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sigmaThreshold": {
+          "default": 2,
+          "autoincrement": false,
+          "name": "sigmaThreshold",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "severity": {
+          "autoincrement": false,
+          "name": "severity",
+          "type": "enum('critical','high','medium')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "acknowledged": {
+          "default": false,
+          "autoincrement": false,
+          "name": "acknowledged",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "acknowledgeNote": {
+          "autoincrement": false,
+          "name": "acknowledgeNote",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acknowledgedAt": {
+          "autoincrement": false,
+          "name": "acknowledgedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notificationSent": {
+          "default": false,
+          "autoincrement": false,
+          "name": "notificationSent",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scheduleName": {
+          "default": "''",
+          "autoincrement": false,
+          "name": "scheduleName",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agentIds": {
+          "autoincrement": false,
+          "name": "agentIds",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "byCategory": {
+          "autoincrement": false,
+          "name": "byCategory",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "topDriftItems": {
+          "autoincrement": false,
+          "name": "topDriftItems",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "drift_anomalies_id": {
+          "name": "drift_anomalies_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "anomalies_acknowledged_idx": {
+          "name": "anomalies_acknowledged_idx",
+          "columns": [
+            "acknowledged"
+          ],
+          "isUnique": false
+        },
+        "anomalies_createdAt_idx": {
+          "name": "anomalies_createdAt_idx",
+          "columns": [
+            "createdAt"
+          ],
+          "isUnique": false
+        },
+        "anomalies_scheduleId_idx": {
+          "name": "anomalies_scheduleId_idx",
+          "columns": [
+            "scheduleId"
+          ],
+          "isUnique": false
+        },
+        "anomalies_severity_idx": {
+          "name": "anomalies_severity_idx",
+          "columns": [
+            "severity"
+          ],
+          "isUnique": false
+        },
+        "anomalies_userId_idx": {
+          "name": "anomalies_userId_idx",
+          "columns": [
+            "userId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_da_scheduleId": {
+          "name": "fk_da_scheduleId",
+          "tableFrom": "drift_anomalies",
+          "tableTo": "baseline_schedules",
+          "columnsFrom": [
+            "scheduleId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_da_snapshotId": {
+          "name": "fk_da_snapshotId",
+          "tableFrom": "drift_anomalies",
+          "tableTo": "drift_snapshots",
+          "columnsFrom": [
+            "snapshotId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_da_userId": {
+          "name": "fk_da_userId",
+          "tableFrom": "drift_anomalies",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "drift_notification_history": {
+      "name": "drift_notification_history",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notificationType": {
+          "autoincrement": false,
+          "name": "notificationType",
+          "type": "enum('drift_threshold','anomaly')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scheduleId": {
+          "autoincrement": false,
+          "name": "scheduleId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshotId": {
+          "autoincrement": false,
+          "name": "snapshotId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "anomalyId": {
+          "autoincrement": false,
+          "name": "anomalyId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "userId": {
+          "autoincrement": false,
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "severity": {
+          "autoincrement": false,
+          "name": "severity",
+          "type": "enum('critical','high','medium','info')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "autoincrement": false,
+          "name": "title",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "autoincrement": false,
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deliveryStatus": {
+          "default": "'sent'",
+          "autoincrement": false,
+          "name": "deliveryStatus",
+          "type": "enum('sent','failed','retrying','suppressed')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "errorMessage": {
+          "autoincrement": false,
+          "name": "errorMessage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "retryCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "retryCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "maxRetries": {
+          "default": 3,
+          "autoincrement": false,
+          "name": "maxRetries",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nextRetryAt": {
+          "autoincrement": false,
+          "name": "nextRetryAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lastRetryAt": {
+          "autoincrement": false,
+          "name": "lastRetryAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scheduleName": {
+          "default": "''",
+          "autoincrement": false,
+          "name": "scheduleName",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "driftPercent": {
+          "autoincrement": false,
+          "name": "driftPercent",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agentIds": {
+          "autoincrement": false,
+          "name": "agentIds",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "drift_notification_history_id": {
+          "name": "drift_notification_history_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "notif_history_createdAt_idx": {
+          "name": "notif_history_createdAt_idx",
+          "columns": [
+            "createdAt"
+          ],
+          "isUnique": false
+        },
+        "notif_history_nextRetry_idx": {
+          "name": "notif_history_nextRetry_idx",
+          "columns": [
+            "nextRetryAt"
+          ],
+          "isUnique": false
+        },
+        "notif_history_scheduleId_idx": {
+          "name": "notif_history_scheduleId_idx",
+          "columns": [
+            "scheduleId"
+          ],
+          "isUnique": false
+        },
+        "notif_history_status_idx": {
+          "name": "notif_history_status_idx",
+          "columns": [
+            "deliveryStatus"
+          ],
+          "isUnique": false
+        },
+        "notif_history_type_idx": {
+          "name": "notif_history_type_idx",
+          "columns": [
+            "notificationType"
+          ],
+          "isUnique": false
+        },
+        "notif_history_userId_idx": {
+          "name": "notif_history_userId_idx",
+          "columns": [
+            "userId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_dnh_anomalyId": {
+          "name": "fk_dnh_anomalyId",
+          "tableFrom": "drift_notification_history",
+          "tableTo": "drift_anomalies",
+          "columnsFrom": [
+            "anomalyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "fk_dnh_scheduleId": {
+          "name": "fk_dnh_scheduleId",
+          "tableFrom": "drift_notification_history",
+          "tableTo": "baseline_schedules",
+          "columnsFrom": [
+            "scheduleId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_dnh_snapshotId": {
+          "name": "fk_dnh_snapshotId",
+          "tableFrom": "drift_notification_history",
+          "tableTo": "drift_snapshots",
+          "columnsFrom": [
+            "snapshotId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "fk_dnh_userId": {
+          "name": "fk_dnh_userId",
+          "tableFrom": "drift_notification_history",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "drift_snapshots": {
+      "name": "drift_snapshots",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scheduleId": {
+          "autoincrement": false,
+          "name": "scheduleId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "autoincrement": false,
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "baselineId": {
+          "autoincrement": false,
+          "name": "baselineId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "previousBaselineId": {
+          "autoincrement": false,
+          "name": "previousBaselineId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "driftPercent": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "driftPercent",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "driftCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "driftCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "totalItems": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "totalItems",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "byCategory": {
+          "autoincrement": false,
+          "name": "byCategory",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "byAgent": {
+          "autoincrement": false,
+          "name": "byAgent",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agentIds": {
+          "autoincrement": false,
+          "name": "agentIds",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notificationSent": {
+          "default": false,
+          "autoincrement": false,
+          "name": "notificationSent",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "topDriftItems": {
+          "autoincrement": false,
+          "name": "topDriftItems",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "drift_snapshots_id": {
+          "name": "drift_snapshots_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "ds_createdAt_idx": {
+          "name": "ds_createdAt_idx",
+          "columns": [
+            "createdAt"
+          ],
+          "isUnique": false
+        },
+        "ds_scheduleId_idx": {
+          "name": "ds_scheduleId_idx",
+          "columns": [
+            "scheduleId"
+          ],
+          "isUnique": false
+        },
+        "ds_userId_idx": {
+          "name": "ds_userId_idx",
+          "columns": [
+            "userId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_ds_baselineId": {
+          "name": "fk_ds_baselineId",
+          "tableFrom": "drift_snapshots",
+          "tableTo": "config_baselines",
+          "columnsFrom": [
+            "baselineId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "fk_ds_previousBaselineId": {
+          "name": "fk_ds_previousBaselineId",
+          "tableFrom": "drift_snapshots",
+          "tableTo": "config_baselines",
+          "columnsFrom": [
+            "previousBaselineId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "fk_ds_scheduleId": {
+          "name": "fk_ds_scheduleId",
+          "tableFrom": "drift_snapshots",
+          "tableTo": "baseline_schedules",
+          "columnsFrom": [
+            "scheduleId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_ds_userId": {
+          "name": "fk_ds_userId",
+          "tableFrom": "drift_snapshots",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "investigation_notes": {
+      "name": "investigation_notes",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sessionId": {
+          "autoincrement": false,
+          "name": "sessionId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "autoincrement": false,
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "autoincrement": false,
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "investigation_notes_id": {
+          "name": "investigation_notes_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "in_sessionId_idx": {
+          "name": "in_sessionId_idx",
+          "columns": [
+            "sessionId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_in_sessionId": {
+          "name": "fk_in_sessionId",
+          "tableFrom": "investigation_notes",
+          "tableTo": "investigation_sessions",
+          "columnsFrom": [
+            "sessionId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_in_userId": {
+          "name": "fk_in_userId",
+          "tableFrom": "investigation_notes",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "investigation_sessions": {
+      "name": "investigation_sessions",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "autoincrement": false,
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "autoincrement": false,
+          "name": "title",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "default": "'active'",
+          "autoincrement": false,
+          "name": "status",
+          "type": "enum('active','closed','archived')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evidence": {
+          "autoincrement": false,
+          "name": "evidence",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timeline": {
+          "autoincrement": false,
+          "name": "timeline",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tags": {
+          "autoincrement": false,
+          "name": "tags",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "investigation_sessions_id": {
+          "name": "investigation_sessions_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "is_status_idx": {
+          "name": "is_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        },
+        "is_userId_idx": {
+          "name": "is_userId_idx",
+          "columns": [
+            "userId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_is_userId": {
+          "name": "fk_is_userId",
+          "tableFrom": "investigation_sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "kg_answer_provenance": {
+      "name": "kg_answer_provenance",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_id": {
+          "autoincrement": false,
+          "name": "session_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "question": {
+          "autoincrement": false,
+          "name": "question",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "answer": {
+          "autoincrement": false,
+          "name": "answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confidence": {
+          "autoincrement": false,
+          "name": "confidence",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "endpoint_ids": {
+          "autoincrement": false,
+          "name": "endpoint_ids",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parameter_ids": {
+          "autoincrement": false,
+          "name": "parameter_ids",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "doc_chunk_ids": {
+          "autoincrement": false,
+          "name": "doc_chunk_ids",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "warnings": {
+          "autoincrement": false,
+          "name": "warnings",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "kg_answer_provenance_id": {
+          "name": "kg_answer_provenance_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "kgap_session_id_idx": {
+          "name": "kgap_session_id_idx",
+          "columns": [
+            "session_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "kg_auth_methods": {
+      "name": "kg_auth_methods",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auth_id": {
+          "autoincrement": false,
+          "name": "auth_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auth_type": {
+          "autoincrement": false,
+          "name": "auth_type",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ttl_seconds": {
+          "autoincrement": false,
+          "name": "ttl_seconds",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "kg_auth_methods_id": {
+          "name": "kg_auth_methods_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "kg_endpoints": {
+      "name": "kg_endpoints",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endpoint_id": {
+          "autoincrement": false,
+          "name": "endpoint_id",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "path": {
+          "autoincrement": false,
+          "name": "path",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "method": {
+          "autoincrement": false,
+          "name": "method",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "summary": {
+          "autoincrement": false,
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tags": {
+          "autoincrement": false,
+          "name": "tags",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "operation_id": {
+          "autoincrement": false,
+          "name": "operation_id",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resource": {
+          "autoincrement": false,
+          "name": "resource",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operation_type": {
+          "autoincrement": false,
+          "name": "operation_type",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "risk_level": {
+          "autoincrement": false,
+          "name": "risk_level",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "allowed_for_llm": {
+          "default": 1,
+          "autoincrement": false,
+          "name": "allowed_for_llm",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auth_method": {
+          "autoincrement": false,
+          "name": "auth_method",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trust_score": {
+          "default": "'1.0'",
+          "autoincrement": false,
+          "name": "trust_score",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deprecated": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "deprecated",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "broker_validated": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "broker_validated",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_verified_at": {
+          "autoincrement": false,
+          "name": "last_verified_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "kg_endpoints_id": {
+          "name": "kg_endpoints_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "kge_method_idx": {
+          "name": "kge_method_idx",
+          "columns": [
+            "method"
+          ],
+          "isUnique": false
+        },
+        "kge_path_idx": {
+          "name": "kge_path_idx",
+          "columns": [
+            "path"
+          ],
+          "isUnique": false
+        },
+        "kge_resource_idx": {
+          "name": "kge_resource_idx",
+          "columns": [
+            "resource"
+          ],
+          "isUnique": false
+        },
+        "kge_risk_level_idx": {
+          "name": "kge_risk_level_idx",
+          "columns": [
+            "risk_level"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "kg_error_patterns": {
+      "name": "kg_error_patterns",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "http_status": {
+          "autoincrement": false,
+          "name": "http_status",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cause": {
+          "autoincrement": false,
+          "name": "cause",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mitigation": {
+          "autoincrement": false,
+          "name": "mitigation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "kg_error_patterns_id": {
+          "name": "kg_error_patterns_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "kg_fields": {
+      "name": "kg_fields",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "index_id": {
+          "autoincrement": false,
+          "name": "index_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "field_name": {
+          "autoincrement": false,
+          "name": "field_name",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "field_type": {
+          "autoincrement": false,
+          "name": "field_type",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "kg_fields_id": {
+          "name": "kg_fields_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "kgf_field_name_idx": {
+          "name": "kgf_field_name_idx",
+          "columns": [
+            "field_name"
+          ],
+          "isUnique": false
+        },
+        "kgf_index_id_idx": {
+          "name": "kgf_index_id_idx",
+          "columns": [
+            "index_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_kgf_indexId": {
+          "name": "fk_kgf_indexId",
+          "tableFrom": "kg_fields",
+          "tableTo": "kg_indices",
+          "columnsFrom": [
+            "index_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "kg_indices": {
+      "name": "kg_indices",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pattern": {
+          "autoincrement": false,
+          "name": "pattern",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "kg_indices_id": {
+          "name": "kg_indices_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "kg_parameters": {
+      "name": "kg_parameters",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endpoint_id": {
+          "autoincrement": false,
+          "name": "endpoint_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "autoincrement": false,
+          "name": "name",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "location": {
+          "autoincrement": false,
+          "name": "location",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "required": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "required",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "param_type": {
+          "autoincrement": false,
+          "name": "param_type",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "app_aliases": {
+          "autoincrement": false,
+          "name": "app_aliases",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "kg_parameters_id": {
+          "name": "kg_parameters_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "kgp_endpoint_id_idx": {
+          "name": "kgp_endpoint_id_idx",
+          "columns": [
+            "endpoint_id"
+          ],
+          "isUnique": false
+        },
+        "kgp_name_idx": {
+          "name": "kgp_name_idx",
+          "columns": [
+            "name"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_kgp_endpointId": {
+          "name": "fk_kgp_endpointId",
+          "tableFrom": "kg_parameters",
+          "tableTo": "kg_endpoints",
+          "columnsFrom": [
+            "endpoint_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "kg_resources": {
+      "name": "kg_resources",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "autoincrement": false,
+          "name": "name",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endpoint_count": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "endpoint_count",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "kg_resources_id": {
+          "name": "kg_resources_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "kg_resources_name_unique": {
+          "name": "kg_resources_name_unique",
+          "columns": [
+            "name"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "kg_responses": {
+      "name": "kg_responses",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endpoint_id": {
+          "autoincrement": false,
+          "name": "endpoint_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "http_status": {
+          "autoincrement": false,
+          "name": "http_status",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "kg_responses_id": {
+          "name": "kg_responses_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "kgr_endpoint_id_idx": {
+          "name": "kgr_endpoint_id_idx",
+          "columns": [
+            "endpoint_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_kgr_endpointId": {
+          "name": "fk_kgr_endpointId",
+          "tableFrom": "kg_responses",
+          "tableTo": "kg_endpoints",
+          "columnsFrom": [
+            "endpoint_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "kg_sync_status": {
+      "name": "kg_sync_status",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "layer": {
+          "autoincrement": false,
+          "name": "layer",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_count": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "entity_count",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_sync_at": {
+          "autoincrement": false,
+          "name": "last_sync_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "default": "'idle'",
+          "autoincrement": false,
+          "name": "status",
+          "type": "enum('idle','syncing','completed','error')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "error_message": {
+          "autoincrement": false,
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "duration_ms": {
+          "autoincrement": false,
+          "name": "duration_ms",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "spec_version": {
+          "autoincrement": false,
+          "name": "spec_version",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "evidence": {
+          "autoincrement": false,
+          "name": "evidence",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timeline": {
+          "autoincrement": false,
+          "name": "timeline",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "kg_sync_status_id": {
+          "name": "kg_sync_status_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "kg_sync_status_layer_unique": {
+          "name": "kg_sync_status_layer_unique",
+          "columns": [
+            "layer"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "kg_trust_history": {
+      "name": "kg_trust_history",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endpoint_id": {
+          "autoincrement": false,
+          "name": "endpoint_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "old_score": {
+          "autoincrement": false,
+          "name": "old_score",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "new_score": {
+          "autoincrement": false,
+          "name": "new_score",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "autoincrement": false,
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "kg_trust_history_id": {
+          "name": "kg_trust_history_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "kgth_endpoint_id_idx": {
+          "name": "kgth_endpoint_id_idx",
+          "columns": [
+            "endpoint_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_kgth_endpointId": {
+          "name": "fk_kgth_endpointId",
+          "tableFrom": "kg_trust_history",
+          "tableTo": "kg_endpoints",
+          "columnsFrom": [
+            "endpoint_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "kg_use_cases": {
+      "name": "kg_use_cases",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "intent": {
+          "autoincrement": false,
+          "name": "intent",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "semantic_type": {
+          "autoincrement": false,
+          "name": "semantic_type",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "domain": {
+          "autoincrement": false,
+          "name": "domain",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "endpoint_ids": {
+          "autoincrement": false,
+          "name": "endpoint_ids",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "kg_use_cases_id": {
+          "name": "kg_use_cases_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "living_case_state": {
+      "name": "living_case_state",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sessionId": {
+          "autoincrement": false,
+          "name": "sessionId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "caseData": {
+          "autoincrement": false,
+          "name": "caseData",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "workingTheory": {
+          "autoincrement": false,
+          "name": "workingTheory",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "theoryConfidence": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "theoryConfidence",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "completedPivotCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "completedPivotCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evidenceGapCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "evidenceGapCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pendingActionCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "pendingActionCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approvalRequiredCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "approvalRequiredCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sourceTriageId": {
+          "autoincrement": false,
+          "name": "sourceTriageId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sourceCorrelationId": {
+          "autoincrement": false,
+          "name": "sourceCorrelationId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linkedTriageIds": {
+          "autoincrement": false,
+          "name": "linkedTriageIds",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linkedCorrelationIds": {
+          "autoincrement": false,
+          "name": "linkedCorrelationIds",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lastUpdatedBy": {
+          "default": "'analyst_manual'",
+          "autoincrement": false,
+          "name": "lastUpdatedBy",
+          "type": "enum('case_agent','hypothesis_agent','response_agent','analyst_manual')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "living_case_state_id": {
+          "name": "living_case_state_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "lcs_sessionId_idx": {
+          "name": "lcs_sessionId_idx",
+          "columns": [
+            "sessionId"
+          ],
+          "isUnique": false
+        },
+        "lcs_theoryConfidence_idx": {
+          "name": "lcs_theoryConfidence_idx",
+          "columns": [
+            "theoryConfidence"
+          ],
+          "isUnique": false
+        },
+        "lcs_updatedAt_idx": {
+          "name": "lcs_updatedAt_idx",
+          "columns": [
+            "updatedAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "living_case_state_sessionId_unique": {
+          "name": "living_case_state_sessionId_unique",
+          "columns": [
+            "sessionId"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "llm_usage": {
+      "name": "llm_usage",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model": {
+          "autoincrement": false,
+          "name": "model",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "autoincrement": false,
+          "name": "source",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "promptTokens": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "promptTokens",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "completionTokens": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "completionTokens",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "totalTokens": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "totalTokens",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "latencyMs": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "latencyMs",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "caller": {
+          "autoincrement": false,
+          "name": "caller",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "success": {
+          "default": 1,
+          "autoincrement": false,
+          "name": "success",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "errorMessage": {
+          "autoincrement": false,
+          "name": "errorMessage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "llm_usage_id": {
+          "name": "llm_usage_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "lu_created_idx": {
+          "name": "lu_created_idx",
+          "columns": [
+            "createdAt"
+          ],
+          "isUnique": false
+        },
+        "lu_model_idx": {
+          "name": "lu_model_idx",
+          "columns": [
+            "model"
+          ],
+          "isUnique": false
+        },
+        "lu_source_idx": {
+          "name": "lu_source_idx",
+          "columns": [
+            "source"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "pipeline_runs": {
+      "name": "pipeline_runs",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "runId": {
+          "autoincrement": false,
+          "name": "runId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "queueItemId": {
+          "autoincrement": false,
+          "name": "queueItemId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "alertId": {
+          "autoincrement": false,
+          "name": "alertId",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "currentStage": {
+          "default": "'triage'",
+          "autoincrement": false,
+          "name": "currentStage",
+          "type": "enum('triage','correlation','hypothesis','response_actions','completed','failed')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "default": "'running'",
+          "autoincrement": false,
+          "name": "status",
+          "type": "enum('running','completed','failed','partial')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "triageId": {
+          "autoincrement": false,
+          "name": "triageId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "triageStatus": {
+          "default": "'pending'",
+          "autoincrement": false,
+          "name": "triageStatus",
+          "type": "enum('pending','running','completed','failed','skipped')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "triageLatencyMs": {
+          "autoincrement": false,
+          "name": "triageLatencyMs",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "correlationId": {
+          "autoincrement": false,
+          "name": "correlationId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "correlationStatus": {
+          "default": "'pending'",
+          "autoincrement": false,
+          "name": "correlationStatus",
+          "type": "enum('pending','running','completed','failed','skipped')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "correlationLatencyMs": {
+          "autoincrement": false,
+          "name": "correlationLatencyMs",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "livingCaseId": {
+          "autoincrement": false,
+          "name": "livingCaseId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hypothesisStatus": {
+          "default": "'pending'",
+          "autoincrement": false,
+          "name": "hypothesisStatus",
+          "type": "enum('pending','running','completed','failed','skipped')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hypothesisLatencyMs": {
+          "autoincrement": false,
+          "name": "hypothesisLatencyMs",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "responseActionsCount": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "responseActionsCount",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "responseActionsStatus": {
+          "default": "'pending'",
+          "autoincrement": false,
+          "name": "responseActionsStatus",
+          "type": "enum('pending','running','completed','failed','skipped','partial')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "totalLatencyMs": {
+          "autoincrement": false,
+          "name": "totalLatencyMs",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "autoincrement": false,
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "triggeredBy": {
+          "autoincrement": false,
+          "name": "triggeredBy",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "startedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "startedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "completedAt": {
+          "autoincrement": false,
+          "name": "completedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "compositePrimaryKeys": {
+        "pipeline_runs_id": {
+          "name": "pipeline_runs_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "pr_alertId_idx": {
+          "name": "pr_alertId_idx",
+          "columns": [
+            "alertId"
+          ],
+          "isUnique": false
+        },
+        "pr_queueItemId_idx": {
+          "name": "pr_queueItemId_idx",
+          "columns": [
+            "queueItemId"
+          ],
+          "isUnique": false
+        },
+        "pr_startedAt_idx": {
+          "name": "pr_startedAt_idx",
+          "columns": [
+            "startedAt"
+          ],
+          "isUnique": false
+        },
+        "pr_status_idx": {
+          "name": "pr_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_pr_livingCaseId": {
+          "name": "fk_pr_livingCaseId",
+          "tableFrom": "pipeline_runs",
+          "tableTo": "living_case_state",
+          "columnsFrom": [
+            "livingCaseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "fk_pr_queueItemId": {
+          "name": "fk_pr_queueItemId",
+          "tableFrom": "pipeline_runs",
+          "tableTo": "alert_queue",
+          "columnsFrom": [
+            "queueItemId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {
+        "pr_runId_unique_idx": {
+          "name": "pr_runId_unique_idx",
+          "columns": [
+            "runId"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "rag_sessions": {
+      "name": "rag_sessions",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sessionId": {
+          "autoincrement": false,
+          "name": "sessionId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "autoincrement": false,
+          "name": "role",
+          "type": "enum('user','assistant','system')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "autoincrement": false,
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contextSnapshot": {
+          "autoincrement": false,
+          "name": "contextSnapshot",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "rag_sessions_id": {
+          "name": "rag_sessions_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "response_action_audit": {
+      "name": "response_action_audit",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actionId": {
+          "autoincrement": false,
+          "name": "actionId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actionIdStr": {
+          "autoincrement": false,
+          "name": "actionIdStr",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fromState": {
+          "autoincrement": false,
+          "name": "fromState",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "toState": {
+          "autoincrement": false,
+          "name": "toState",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "performedBy": {
+          "autoincrement": false,
+          "name": "performedBy",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "autoincrement": false,
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "autoincrement": false,
+          "name": "metadata",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "performedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "performedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "response_action_audit_id": {
+          "name": "response_action_audit_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "raa_actionId_idx": {
+          "name": "raa_actionId_idx",
+          "columns": [
+            "actionId"
+          ],
+          "isUnique": false
+        },
+        "raa_actionIdStr_idx": {
+          "name": "raa_actionIdStr_idx",
+          "columns": [
+            "actionIdStr"
+          ],
+          "isUnique": false
+        },
+        "raa_performedAt_idx": {
+          "name": "raa_performedAt_idx",
+          "columns": [
+            "performedAt"
+          ],
+          "isUnique": false
+        },
+        "raa_toState_idx": {
+          "name": "raa_toState_idx",
+          "columns": [
+            "toState"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "response_actions": {
+      "name": "response_actions",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actionId": {
+          "autoincrement": false,
+          "name": "actionId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "autoincrement": false,
+          "name": "category",
+          "type": "enum('isolate_host','disable_account','block_ioc','escalate_ir','suppress_alert','tune_rule','add_watchlist','collect_evidence','notify_stakeholder','custom')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "autoincrement": false,
+          "name": "title",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "urgency": {
+          "default": "'next'",
+          "autoincrement": false,
+          "name": "urgency",
+          "type": "enum('immediate','next','scheduled','optional')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requiresApproval": {
+          "default": 1,
+          "autoincrement": false,
+          "name": "requiresApproval",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "default": "'proposed'",
+          "autoincrement": false,
+          "name": "state",
+          "type": "enum('proposed','approved','rejected','executed','deferred')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proposedBy": {
+          "autoincrement": false,
+          "name": "proposedBy",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proposedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "proposedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approvedBy": {
+          "autoincrement": false,
+          "name": "approvedBy",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approvedAt": {
+          "autoincrement": false,
+          "name": "approvedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "executedBy": {
+          "autoincrement": false,
+          "name": "executedBy",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "executedAt": {
+          "autoincrement": false,
+          "name": "executedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decidedBy": {
+          "autoincrement": false,
+          "name": "decidedBy",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decidedAt": {
+          "autoincrement": false,
+          "name": "decidedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decisionReason": {
+          "autoincrement": false,
+          "name": "decisionReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "evidenceBasis": {
+          "autoincrement": false,
+          "name": "evidenceBasis",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "playbookRef": {
+          "autoincrement": false,
+          "name": "playbookRef",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "targetValue": {
+          "autoincrement": false,
+          "name": "targetValue",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "targetType": {
+          "autoincrement": false,
+          "name": "targetType",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "caseId": {
+          "autoincrement": false,
+          "name": "caseId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "correlationId": {
+          "autoincrement": false,
+          "name": "correlationId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "triageId": {
+          "autoincrement": false,
+          "name": "triageId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linkedAlertIds": {
+          "autoincrement": false,
+          "name": "linkedAlertIds",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linkedAgentIds": {
+          "autoincrement": false,
+          "name": "linkedAgentIds",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "semanticWarning": {
+          "autoincrement": false,
+          "name": "semanticWarning",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "executionResult": {
+          "autoincrement": false,
+          "name": "executionResult",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "executionSuccess": {
+          "autoincrement": false,
+          "name": "executionSuccess",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "response_actions_id": {
+          "name": "response_actions_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "ra_actionId_idx": {
+          "name": "ra_actionId_idx",
+          "columns": [
+            "actionId"
+          ],
+          "isUnique": false
+        },
+        "ra_caseId_idx": {
+          "name": "ra_caseId_idx",
+          "columns": [
+            "caseId"
+          ],
+          "isUnique": false
+        },
+        "ra_category_idx": {
+          "name": "ra_category_idx",
+          "columns": [
+            "category"
+          ],
+          "isUnique": false
+        },
+        "ra_proposedAt_idx": {
+          "name": "ra_proposedAt_idx",
+          "columns": [
+            "proposedAt"
+          ],
+          "isUnique": false
+        },
+        "ra_requiresApproval_state_idx": {
+          "name": "ra_requiresApproval_state_idx",
+          "columns": [
+            "requiresApproval",
+            "state"
+          ],
+          "isUnique": false
+        },
+        "ra_state_idx": {
+          "name": "ra_state_idx",
+          "columns": [
+            "state"
+          ],
+          "isUnique": false
+        },
+        "ra_triageId_idx": {
+          "name": "ra_triageId_idx",
+          "columns": [
+            "triageId"
+          ],
+          "isUnique": false
+        },
+        "ra_urgency_idx": {
+          "name": "ra_urgency_idx",
+          "columns": [
+            "urgency"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_ra_caseId": {
+          "name": "fk_ra_caseId",
+          "tableFrom": "response_actions",
+          "tableTo": "living_case_state",
+          "columnsFrom": [
+            "caseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {
+        "ra_actionId_unique_idx": {
+          "name": "ra_actionId_unique_idx",
+          "columns": [
+            "actionId"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "saved_hunts": {
+      "name": "saved_hunts",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "autoincrement": false,
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "autoincrement": false,
+          "name": "title",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "query": {
+          "autoincrement": false,
+          "name": "query",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "iocType": {
+          "autoincrement": false,
+          "name": "iocType",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "timeFrom": {
+          "autoincrement": false,
+          "name": "timeFrom",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "timeTo": {
+          "autoincrement": false,
+          "name": "timeTo",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "totalHits": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "totalHits",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "totalTimeMs": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "totalTimeMs",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sourcesWithHits": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "sourcesWithHits",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agentsSearched": {
+          "autoincrement": false,
+          "name": "agentsSearched",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "results": {
+          "autoincrement": false,
+          "name": "results",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tags": {
+          "autoincrement": false,
+          "name": "tags",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "severity": {
+          "default": "'info'",
+          "autoincrement": false,
+          "name": "severity",
+          "type": "enum('critical','high','medium','low','info')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resolved": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "resolved",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "saved_hunts_id": {
+          "name": "saved_hunts_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "sh_createdAt_idx": {
+          "name": "sh_createdAt_idx",
+          "columns": [
+            "createdAt"
+          ],
+          "isUnique": false
+        },
+        "sh_iocType_idx": {
+          "name": "sh_iocType_idx",
+          "columns": [
+            "iocType"
+          ],
+          "isUnique": false
+        },
+        "sh_query_idx": {
+          "name": "sh_query_idx",
+          "columns": [
+            "query"
+          ],
+          "isUnique": false
+        },
+        "sh_severity_idx": {
+          "name": "sh_severity_idx",
+          "columns": [
+            "severity"
+          ],
+          "isUnique": false
+        },
+        "sh_userId_idx": {
+          "name": "sh_userId_idx",
+          "columns": [
+            "userId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_sh_userId": {
+          "name": "fk_sh_userId",
+          "tableFrom": "saved_hunts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "saved_searches": {
+      "name": "saved_searches",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "autoincrement": false,
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "autoincrement": false,
+          "name": "name",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "searchType": {
+          "autoincrement": false,
+          "name": "searchType",
+          "type": "enum('siem','hunting','alerts','vulnerabilities','fleet')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "filters": {
+          "autoincrement": false,
+          "name": "filters",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "autoincrement": false,
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "saved_searches_id": {
+          "name": "saved_searches_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_ss_userId": {
+          "name": "fk_ss_userId",
+          "tableFrom": "saved_searches",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "sensitive_access_audit": {
+      "name": "sensitive_access_audit",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "autoincrement": false,
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resourceType": {
+          "autoincrement": false,
+          "name": "resourceType",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resourceId": {
+          "autoincrement": false,
+          "name": "resourceId",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "autoincrement": false,
+          "name": "action",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ipAddress": {
+          "autoincrement": false,
+          "name": "ipAddress",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "userAgent": {
+          "autoincrement": false,
+          "name": "userAgent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "sensitive_access_audit_id": {
+          "name": "sensitive_access_audit_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "saa_createdAt_idx": {
+          "name": "saa_createdAt_idx",
+          "columns": [
+            "createdAt"
+          ],
+          "isUnique": false
+        },
+        "saa_resourceId_idx": {
+          "name": "saa_resourceId_idx",
+          "columns": [
+            "resourceId"
+          ],
+          "isUnique": false
+        },
+        "saa_resourceType_idx": {
+          "name": "saa_resourceType_idx",
+          "columns": [
+            "resourceType"
+          ],
+          "isUnique": false
+        },
+        "saa_userId_idx": {
+          "name": "saa_userId_idx",
+          "columns": [
+            "userId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_saa_userId": {
+          "name": "fk_saa_userId",
+          "tableFrom": "sensitive_access_audit",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "threat_intel_cache": {
+      "name": "threat_intel_cache",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cacheKey": {
+          "autoincrement": false,
+          "name": "cacheKey",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endpointType": {
+          "autoincrement": false,
+          "name": "endpointType",
+          "type": "enum('pulse','indicator','search','activity','status')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "responseData": {
+          "autoincrement": false,
+          "name": "responseData",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fetchedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "fetchedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "autoincrement": false,
+          "name": "expiresAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "threat_intel_cache_id": {
+          "name": "threat_intel_cache_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "tic_cacheKey_idx": {
+          "name": "tic_cacheKey_idx",
+          "columns": [
+            "cacheKey"
+          ],
+          "isUnique": false
+        },
+        "tic_endpointType_idx": {
+          "name": "tic_endpointType_idx",
+          "columns": [
+            "endpointType"
+          ],
+          "isUnique": false
+        },
+        "tic_expiresAt_idx": {
+          "name": "tic_expiresAt_idx",
+          "columns": [
+            "expiresAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "cacheKey": {
+          "name": "cacheKey",
+          "columns": [
+            "cacheKey"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "ticket_artifacts": {
+      "name": "ticket_artifacts",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ticketId": {
+          "autoincrement": false,
+          "name": "ticketId",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "system": {
+          "default": "'splunk_es'",
+          "autoincrement": false,
+          "name": "system",
+          "type": "enum('splunk_es','jira','servicenow','custom')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "queueItemId": {
+          "autoincrement": false,
+          "name": "queueItemId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pipelineRunId": {
+          "autoincrement": false,
+          "name": "pipelineRunId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "triageId": {
+          "autoincrement": false,
+          "name": "triageId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "alertId": {
+          "autoincrement": false,
+          "name": "alertId",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ruleId": {
+          "autoincrement": false,
+          "name": "ruleId",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ruleLevel": {
+          "autoincrement": false,
+          "name": "ruleLevel",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdBy": {
+          "autoincrement": false,
+          "name": "createdBy",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "success": {
+          "autoincrement": false,
+          "name": "success",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "statusMessage": {
+          "autoincrement": false,
+          "name": "statusMessage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rawResponse": {
+          "autoincrement": false,
+          "name": "rawResponse",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "httpStatusCode": {
+          "autoincrement": false,
+          "name": "httpStatusCode",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "ticket_artifacts_id": {
+          "name": "ticket_artifacts_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "ta_alertId_idx": {
+          "name": "ta_alertId_idx",
+          "columns": [
+            "alertId"
+          ],
+          "isUnique": false
+        },
+        "ta_createdAt_idx": {
+          "name": "ta_createdAt_idx",
+          "columns": [
+            "createdAt"
+          ],
+          "isUnique": false
+        },
+        "ta_pipelineRunId_idx": {
+          "name": "ta_pipelineRunId_idx",
+          "columns": [
+            "pipelineRunId"
+          ],
+          "isUnique": false
+        },
+        "ta_queueItemId_idx": {
+          "name": "ta_queueItemId_idx",
+          "columns": [
+            "queueItemId"
+          ],
+          "isUnique": false
+        },
+        "ta_system_idx": {
+          "name": "ta_system_idx",
+          "columns": [
+            "system"
+          ],
+          "isUnique": false
+        },
+        "ta_ticketId_idx": {
+          "name": "ta_ticketId_idx",
+          "columns": [
+            "ticketId"
+          ],
+          "isUnique": false
+        },
+        "ta_triageId_idx": {
+          "name": "ta_triageId_idx",
+          "columns": [
+            "triageId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_ta_pipelineRunId": {
+          "name": "fk_ta_pipelineRunId",
+          "tableFrom": "ticket_artifacts",
+          "tableTo": "pipeline_runs",
+          "columnsFrom": [
+            "pipelineRunId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "fk_ta_queueItemId": {
+          "name": "fk_ta_queueItemId",
+          "tableFrom": "ticket_artifacts",
+          "tableTo": "alert_queue",
+          "columnsFrom": [
+            "queueItemId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "triage_objects": {
+      "name": "triage_objects",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "triageId": {
+          "autoincrement": false,
+          "name": "triageId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alertId": {
+          "autoincrement": false,
+          "name": "alertId",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ruleId": {
+          "autoincrement": false,
+          "name": "ruleId",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ruleDescription": {
+          "autoincrement": false,
+          "name": "ruleDescription",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ruleLevel": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "ruleLevel",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alertTimestamp": {
+          "autoincrement": false,
+          "name": "alertTimestamp",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agentId": {
+          "autoincrement": false,
+          "name": "agentId",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agentName": {
+          "autoincrement": false,
+          "name": "agentName",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "alertFamily": {
+          "autoincrement": false,
+          "name": "alertFamily",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "severity": {
+          "default": "'info'",
+          "autoincrement": false,
+          "name": "severity",
+          "type": "enum('critical','high','medium','low','info')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "severityConfidence": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "severityConfidence",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route": {
+          "autoincrement": false,
+          "name": "route",
+          "type": "enum('A_DUPLICATE_NOISY','B_LOW_CONFIDENCE','C_HIGH_CONFIDENCE','D_LIKELY_BENIGN')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "isDuplicate": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "isDuplicate",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "similarityScore": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "similarityScore",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "similarTriageId": {
+          "autoincrement": false,
+          "name": "similarTriageId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "summary": {
+          "autoincrement": false,
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "triageData": {
+          "autoincrement": false,
+          "name": "triageData",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "triagedBy": {
+          "default": "'triage_agent'",
+          "autoincrement": false,
+          "name": "triagedBy",
+          "type": "enum('triage_agent','analyst_manual')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "triggeredByUserId": {
+          "autoincrement": false,
+          "name": "triggeredByUserId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "alertQueueItemId": {
+          "autoincrement": false,
+          "name": "alertQueueItemId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linkedCaseId": {
+          "autoincrement": false,
+          "name": "linkedCaseId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "default": "'pending'",
+          "autoincrement": false,
+          "name": "status",
+          "type": "enum('pending','processing','completed','failed')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "errorMessage": {
+          "autoincrement": false,
+          "name": "errorMessage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "latencyMs": {
+          "autoincrement": false,
+          "name": "latencyMs",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tokensUsed": {
+          "autoincrement": false,
+          "name": "tokensUsed",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "analystSeverityOverride": {
+          "autoincrement": false,
+          "name": "analystSeverityOverride",
+          "type": "enum('critical','high','medium','low','info')",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "analystRouteOverride": {
+          "autoincrement": false,
+          "name": "analystRouteOverride",
+          "type": "enum('A_DUPLICATE_NOISY','B_LOW_CONFIDENCE','C_HIGH_CONFIDENCE','D_LIKELY_BENIGN')",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "analystNotes": {
+          "autoincrement": false,
+          "name": "analystNotes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "analystConfirmed": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "analystConfirmed",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "analystUserId": {
+          "autoincrement": false,
+          "name": "analystUserId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "feedbackAt": {
+          "autoincrement": false,
+          "name": "feedbackAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "triage_objects_id": {
+          "name": "triage_objects_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "to_agentId_idx": {
+          "name": "to_agentId_idx",
+          "columns": [
+            "agentId"
+          ],
+          "isUnique": false
+        },
+        "to_alertFamily_idx": {
+          "name": "to_alertFamily_idx",
+          "columns": [
+            "alertFamily"
+          ],
+          "isUnique": false
+        },
+        "to_alertId_idx": {
+          "name": "to_alertId_idx",
+          "columns": [
+            "alertId"
+          ],
+          "isUnique": false
+        },
+        "to_createdAt_idx": {
+          "name": "to_createdAt_idx",
+          "columns": [
+            "createdAt"
+          ],
+          "isUnique": false
+        },
+        "to_isDuplicate_idx": {
+          "name": "to_isDuplicate_idx",
+          "columns": [
+            "isDuplicate"
+          ],
+          "isUnique": false
+        },
+        "to_linkedCaseId_idx": {
+          "name": "to_linkedCaseId_idx",
+          "columns": [
+            "linkedCaseId"
+          ],
+          "isUnique": false
+        },
+        "to_route_idx": {
+          "name": "to_route_idx",
+          "columns": [
+            "route"
+          ],
+          "isUnique": false
+        },
+        "to_ruleId_idx": {
+          "name": "to_ruleId_idx",
+          "columns": [
+            "ruleId"
+          ],
+          "isUnique": false
+        },
+        "to_severity_idx": {
+          "name": "to_severity_idx",
+          "columns": [
+            "severity"
+          ],
+          "isUnique": false
+        },
+        "to_status_idx": {
+          "name": "to_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_to_alertQueueItemId": {
+          "name": "fk_to_alertQueueItemId",
+          "tableFrom": "triage_objects",
+          "tableTo": "alert_queue",
+          "columnsFrom": [
+            "alertQueueItemId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "fk_to_analystUserId": {
+          "name": "fk_to_analystUserId",
+          "tableFrom": "triage_objects",
+          "tableTo": "users",
+          "columnsFrom": [
+            "analystUserId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "fk_to_linkedCaseId": {
+          "name": "fk_to_linkedCaseId",
+          "tableFrom": "triage_objects",
+          "tableTo": "living_case_state",
+          "columnsFrom": [
+            "linkedCaseId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "fk_to_triggeredByUserId": {
+          "name": "fk_to_triggeredByUserId",
+          "tableFrom": "triage_objects",
+          "tableTo": "users",
+          "columnsFrom": [
+            "triggeredByUserId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {
+        "triage_objects_triageId_unique": {
+          "name": "triage_objects_triageId_unique",
+          "columns": [
+            "triageId"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "users": {
+      "name": "users",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "openId": {
+          "autoincrement": false,
+          "name": "openId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "autoincrement": false,
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "autoincrement": false,
+          "name": "email",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "loginMethod": {
+          "autoincrement": false,
+          "name": "loginMethod",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "default": "'user'",
+          "autoincrement": false,
+          "name": "role",
+          "type": "enum('user','admin')",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "onUpdate": true
+        },
+        "lastSignedIn": {
+          "default": "(now())",
+          "autoincrement": false,
+          "name": "lastSignedIn",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "passwordHash": {
+          "autoincrement": false,
+          "name": "passwordHash",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isDisabled": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "isDisabled",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "users_id": {
+          "name": "users_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "users_openId_unique": {
+          "name": "users_openId_unique",
+          "columns": [
+            "openId"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    }
+  },
+  "views": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {
+      "alert_queue": {
+        "columns": {
+          "queuedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "analyst_notes": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "analyst_notes_v2": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "anomaly_suppression_rules": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "auto_queue_rules": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "baseline_schedules": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "config_baselines": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "connection_settings": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "correlation_bundles": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "drift_anomalies": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "drift_notification_history": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "drift_snapshots": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "investigation_notes": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "investigation_sessions": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "kg_answer_provenance": {
+        "columns": {
+          "created_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "kg_auth_methods": {
+        "columns": {
+          "created_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "kg_endpoints": {
+        "columns": {
+          "created_at": {
+            "isDefaultAnExpression": true
+          },
+          "updated_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "kg_error_patterns": {
+        "columns": {
+          "created_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "kg_fields": {
+        "columns": {
+          "created_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "kg_indices": {
+        "columns": {
+          "created_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "kg_parameters": {
+        "columns": {
+          "created_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "kg_resources": {
+        "columns": {
+          "created_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "kg_responses": {
+        "columns": {
+          "created_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "kg_sync_status": {
+        "columns": {
+          "updated_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "kg_trust_history": {
+        "columns": {
+          "created_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "kg_use_cases": {
+        "columns": {
+          "created_at": {
+            "isDefaultAnExpression": true
+          },
+          "updated_at": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "living_case_state": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "llm_usage": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "pipeline_runs": {
+        "columns": {
+          "startedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "rag_sessions": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "response_action_audit": {
+        "columns": {
+          "performedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "response_actions": {
+        "columns": {
+          "proposedAt": {
+            "isDefaultAnExpression": true
+          },
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "saved_hunts": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "saved_searches": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "sensitive_access_audit": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "threat_intel_cache": {
+        "columns": {
+          "fetchedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "ticket_artifacts": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "triage_objects": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          }
+        }
+      },
+      "users": {
+        "columns": {
+          "createdAt": {
+            "isDefaultAnExpression": true
+          },
+          "updatedAt": {
+            "isDefaultAnExpression": true
+          },
+          "lastSignedIn": {
+            "isDefaultAnExpression": true
+          }
+        }
+      }
+    },
+    "indexes": {}
+  }
+}

@@ -308,7 +308,7 @@ export const LivingCaseObjectSchema = z.object({
     proposed: z.number().int().min(0),
     approved: z.number().int().min(0),
     rejected: z.number().int().min(0),
-    executed: z.number().int().min(0),
+    acknowledged: z.number().int().min(0),
     deferred: z.number().int().min(0),
   }).optional(),
 
@@ -321,7 +321,7 @@ export const LivingCaseObjectSchema = z.object({
     requiresApproval: z.boolean(),
     evidenceBasis: z.array(z.string()),
     playbookRef: z.string().optional(),
-    state: z.enum(["proposed", "approved", "rejected", "executed", "deferred"]),
+    state: z.enum(["proposed", "approved", "rejected", "acknowledged", "deferred"]),
     decidedBy: z.string().optional(),
     decidedAt: z.string().optional(),
   })),
