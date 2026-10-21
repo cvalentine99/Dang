@@ -7,7 +7,7 @@
 FROM node:22-slim AS deps
 
 # Install pnpm via npm (more reliable than corepack in restricted networks)
-RUN npm install -g pnpm@10.4.1
+RUN npm install -g pnpm@10.34.7
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ RUN pnpm install --frozen-lockfile
 # ── Stage 2: Build ───────────────────────────────────────────────────────────
 FROM node:22-slim AS builder
 
-RUN npm install -g pnpm@10.4.1
+RUN npm install -g pnpm@10.34.7
 
 WORKDIR /app
 
@@ -36,7 +36,7 @@ RUN pnpm run build
 # ── Stage 3: Production ─────────────────────────────────────────────────────
 FROM node:22-slim AS production
 
-RUN npm install -g pnpm@10.4.1
+RUN npm install -g pnpm@10.34.7
 
 # Install curl for health checks and tini for proper signal handling
 RUN apt-get update && apt-get install -y --no-install-recommends \
