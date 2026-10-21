@@ -39,12 +39,16 @@ FROM node:22-slim AS production
 RUN npm install -g pnpm@10.34.7
 
 # Install curl for health checks, tini for proper signal handling, and
-# default-mysql-client for the pre-migration mysqldump in docker-entrypoint.sh
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    default-mysql-client \
     tini \
     && rm -rf /var/lib/apt/lists/*
+
+# Official MySQL client for the pre-migration dump in docker-entrypoint.sh. Debian's
+# default-mysql-client is MariaDB's, which cannot dump MySQL 8 JSON columns
+# ("Lost connection to server during query"). The 8.4 binary needs only libssl3/libcrypto3,
+# both present in bookworm-slim.
+COPY --from=mysql:8.4 /usr/bin/mysqldump /usr/local/bin/mysqldump
 
 WORKDIR /app
 

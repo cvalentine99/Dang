@@ -120,19 +120,35 @@ function splitStatements(sql) {
 const ID = "`([^`]+)`";
 
 /**
- * Inspect one statement and return a list of human-readable conflicts
- * (empty if the statement should apply cleanly).
+ * Per-migration simulation of what earlier statements in the SAME file already did,
+ * so a `DROP FOREIGN KEY x` followed by `ADD CONSTRAINT x` (the normal way to change an
+ * FK's ON DELETE rule) is not reported as "already exists".
  */
-async function checkStatement(conn, stmt) {
+function newSim() {
+  return { idx: new Map(), fk: new Map(), col: new Map() }; // key → true (exists) | false (dropped)
+}
+async function simExists(sim, kind, key, probe) {
+  if (sim[kind].has(key)) return sim[kind].get(key);
+  return probe();
+}
+
+/**
+ * Inspect one statement and return a list of human-readable conflicts
+ * (empty if the statement should apply cleanly), updating `sim` as it goes.
+ */
+async function checkStatement(conn, stmt, sim = newSim()) {
   const conflicts = [];
   let m;
+  const idxKey = (t, n) => `${t}.${n}`;
 
   // CREATE [UNIQUE] INDEX `name` ON `table`
   if ((m = stmt.match(new RegExp(`^CREATE\\s+(?:UNIQUE\\s+)?INDEX\\s+${ID}\\s+ON\\s+${ID}`, "i")))) {
     const [, indexName, tableName] = m;
-    if (await indexExists(conn, tableName, indexName)) {
+    const k = idxKey(tableName, indexName);
+    if (await simExists(sim, "idx", k, () => indexExists(conn, tableName, indexName))) {
       conflicts.push(`index ${tableName}.${indexName} already exists`);
     }
+    sim.idx.set(k, true);
     return conflicts;
   }
 
@@ -148,9 +164,11 @@ async function checkStatement(conn, stmt) {
   // DROP INDEX `name` ON `table`
   if ((m = stmt.match(new RegExp(`^DROP\\s+INDEX\\s+${ID}\\s+ON\\s+${ID}`, "i")))) {
     const [, indexName, tableName] = m;
-    if (!(await indexExists(conn, tableName, indexName))) {
+    const k = idxKey(tableName, indexName);
+    if (!(await simExists(sim, "idx", k, () => indexExists(conn, tableName, indexName)))) {
       conflicts.push(`index ${tableName}.${indexName} does not exist (DROP would fail)`);
     }
+    sim.idx.set(k, false);
     return conflicts;
   }
 
@@ -158,42 +176,58 @@ async function checkStatement(conn, stmt) {
   if ((m = stmt.match(new RegExp(`^ALTER\\s+TABLE\\s+${ID}\\s+([\\s\\S]*)$`, "i")))) {
     const [, tableName, body] = m;
     let c;
+    // DROPs first: within one ALTER they take effect before ADDs of the same name.
+    const dropFkRe = new RegExp(`DROP\\s+FOREIGN\\s+KEY\\s+${ID}`, "gi");
+    while ((c = dropFkRe.exec(body)) !== null) {
+      const k = idxKey(tableName, c[1]);
+      if (!(await simExists(sim, "fk", k, () => constraintExists(conn, tableName, c[1], "FOREIGN KEY")))) {
+        conflicts.push(`foreign key ${tableName}.${c[1]} does not exist (DROP would fail)`);
+      }
+      sim.fk.set(k, false);
+    }
+    const dropIdxRe = new RegExp(`DROP\\s+(?:INDEX|KEY)\\s+${ID}`, "gi");
+    while ((c = dropIdxRe.exec(body)) !== null) {
+      const k = idxKey(tableName, c[1]);
+      if (!(await simExists(sim, "idx", k, () => indexExists(conn, tableName, c[1])))) {
+        conflicts.push(`index ${tableName}.${c[1]} does not exist (DROP would fail)`);
+      }
+      sim.idx.set(k, false);
+    }
+    const dropColRe = new RegExp(`DROP\\s+COLUMN\\s+${ID}`, "gi");
+    while ((c = dropColRe.exec(body)) !== null) sim.col.set(idxKey(tableName, c[1]), false);
+
     const addIndexRe = new RegExp(`ADD\\s+(?:UNIQUE\\s+)?(?:INDEX|KEY)\\s+${ID}`, "gi");
     while ((c = addIndexRe.exec(body)) !== null) {
-      if (await indexExists(conn, tableName, c[1])) {
+      const k = idxKey(tableName, c[1]);
+      if (await simExists(sim, "idx", k, () => indexExists(conn, tableName, c[1]))) {
         conflicts.push(`index ${tableName}.${c[1]} already exists`);
       }
+      sim.idx.set(k, true);
     }
     const addFkRe = new RegExp(`ADD\\s+CONSTRAINT\\s+${ID}\\s+FOREIGN\\s+KEY`, "gi");
     while ((c = addFkRe.exec(body)) !== null) {
-      if (await constraintExists(conn, tableName, c[1], "FOREIGN KEY")) {
+      const k = idxKey(tableName, c[1]);
+      if (await simExists(sim, "fk", k, () => constraintExists(conn, tableName, c[1], "FOREIGN KEY"))) {
         conflicts.push(`foreign key ${tableName}.${c[1]} already exists`);
       }
+      sim.fk.set(k, true);
     }
     const addUniqueConstraintRe = new RegExp(`ADD\\s+CONSTRAINT\\s+${ID}\\s+UNIQUE`, "gi");
     while ((c = addUniqueConstraintRe.exec(body)) !== null) {
-      if (await indexExists(conn, tableName, c[1])) {
+      const k = idxKey(tableName, c[1]);
+      if (await simExists(sim, "idx", k, () => indexExists(conn, tableName, c[1]))) {
         conflicts.push(`unique constraint ${tableName}.${c[1]} already exists`);
       }
+      sim.idx.set(k, true);
     }
     // ADD COLUMN `col` | ADD `col` (bare identifier = column)
     const addColRe = new RegExp(`ADD\\s+(?:COLUMN\\s+)?${ID}`, "gi");
     while ((c = addColRe.exec(body)) !== null) {
-      if (await columnExists(conn, tableName, c[1])) {
+      const k = idxKey(tableName, c[1]);
+      if (await simExists(sim, "col", k, () => columnExists(conn, tableName, c[1]))) {
         conflicts.push(`column ${tableName}.${c[1]} already exists`);
       }
-    }
-    const dropFkRe = new RegExp(`DROP\\s+FOREIGN\\s+KEY\\s+${ID}`, "gi");
-    while ((c = dropFkRe.exec(body)) !== null) {
-      if (!(await constraintExists(conn, tableName, c[1], "FOREIGN KEY"))) {
-        conflicts.push(`foreign key ${tableName}.${c[1]} does not exist (DROP would fail)`);
-      }
-    }
-    const dropIdxRe = new RegExp(`DROP\\s+(?:INDEX|KEY)\\s+${ID}`, "gi");
-    while ((c = dropIdxRe.exec(body)) !== null) {
-      if (!(await indexExists(conn, tableName, c[1]))) {
-        conflicts.push(`index ${tableName}.${c[1]} does not exist (DROP would fail)`);
-      }
+      sim.col.set(k, true);
     }
   }
 
@@ -288,8 +322,9 @@ async function main() {
     console.log(`${TAG} Checking ${pending.length} pending migration(s) for statements that would conflict with the live schema`);
     const allConflicts = [];
     for (const migration of pending) {
+      const sim = newSim(); // statements in one file see each other's effects
       for (const stmt of splitStatements(migration.sql)) {
-        const conflicts = await checkStatement(conn, stmt);
+        const conflicts = await checkStatement(conn, stmt, sim);
         for (const reason of conflicts) {
           console.log(`${TAG} SKIP (conflict) ${migration.tag}: ${reason} — not modifying the schema`);
           allConflicts.push({ tag: migration.tag, reason, stmt: oneLine(stmt) });
