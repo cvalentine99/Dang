@@ -282,9 +282,12 @@ export async function runTriageAgent(input: {
   // Insert a pending triage row — DB persistence is required for pipeline truth.
   // If the INSERT fails, the triage cannot report success because downstream
   // stages (correlation, hypothesis) read from DB, not from in-memory results.
+  // H-D9: DB unavailability is a stage failure (throws) — never hand back a
+  // triageId that was not persisted.
   let dbId: number | undefined;
-  const db = await getDb();
-  if (db) {
+  const { requireDb } = await import("../dbGuard");
+  const db = await requireDb();
+  {
     const result = await db.insert(triageObjects).values({
       triageId,
       alertId: alertId || "unknown",
@@ -392,8 +395,11 @@ Agent context:
 
     // ── Parse and Validate (Audit #23: Zod boundary on LLM output) ────────────────
     const { parseTriageOutput } = await import("./types/LLMTriageRaw");
-    const rawJson = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+    const { extractJson } = await import("../llm/extractJson");
+    const rawJson = typeof content === "string" ? extractJson(content) : content;
     const parsed = parseTriageOutput(rawJson);
+    // M3: unrecognized severity is escalated (never silently "info") and flagged.
+    const severityResult = resolveSeverity(parsed.severity, ruleLevel);
 
     // Build the full TriageObject with provenance
     const triageObject: TriageObject = {
@@ -408,7 +414,7 @@ Agent context:
       alertTimestamp: alertTimestamp || new Date().toISOString(),
       agent: agentInfo,
       alertFamily: parsed.alertFamily || "unknown",
-      severity: validateSeverity(parsed.severity),
+      severity: severityResult.severity,
       severityConfidence: clampConfidence(parsed.severityConfidence),
       severityReasoning: parsed.severityReasoning || "",
       entities: (parsed.entities || []).reduce<ExtractedEntity[]>((acc, e) => {
@@ -456,6 +462,16 @@ Agent context:
       },
       rawAlert: input.rawAlert,
     };
+
+    // M3: flag severity fallback so the UI can mark it. TriageObject has no
+    // typed metadata field yet, so attach it as an additive optional property.
+    if (severityResult.fallback) {
+      (triageObject as TriageObject & { metadata?: Record<string, unknown> }).metadata = {
+        severityFallback: true,
+        severityFallbackRaw: typeof parsed.severity === "string" ? parsed.severity.slice(0, 64) : String(parsed.severity),
+      };
+      console.warn(`[TriageAgent] M3: unrecognized severity '${String(parsed.severity).slice(0, 64)}' — fell back to '${severityResult.severity}' (ruleLevel ${ruleLevel})`);
+    }
 
     // Also add Wazuh-native MITRE mappings if present
     const wazuhMitre = extractWazuhMitre(input.rawAlert);
@@ -886,9 +902,35 @@ function extractTokenCount(result: InvokeResult): number {
 
 // ── Validation Helpers ───────────────────────────────────────────────────────
 
-function validateSeverity(s: unknown): AgenticSeverity {
-  const valid: AgenticSeverity[] = ["critical", "high", "medium", "low", "info"];
-  return valid.includes(s as AgenticSeverity) ? (s as AgenticSeverity) : "info";
+const SEVERITY_RANK: Record<AgenticSeverity, number> = { info: 0, low: 1, medium: 2, high: 3, critical: 4 };
+
+/** Severity implied by the Wazuh rule.level (null when level is unknown). */
+function severityFromRuleLevel(level: number | null | undefined): AgenticSeverity | null {
+  if (level == null || !Number.isFinite(level)) return null;
+  if (level >= 12) return "critical";
+  if (level >= 10) return "high";
+  if (level >= 7) return "medium";
+  return "low";
+}
+
+/**
+ * M3: Validate the model's severity. An unrecognized value must NOT silently
+ * become "info" (which hides the alert); it falls back to the HIGHER of
+ * "medium" and the severity implied by rule.level, and is flagged so the UI
+ * can mark it.
+ */
+export function resolveSeverity(
+  s: unknown,
+  ruleLevel: number | null | undefined
+): { severity: AgenticSeverity; fallback: boolean } {
+  const normalized = typeof s === "string" ? s.trim().toLowerCase() : s;
+  if (typeof normalized === "string" && normalized in SEVERITY_RANK) {
+    return { severity: normalized as AgenticSeverity, fallback: false };
+  }
+  const fromLevel = severityFromRuleLevel(ruleLevel);
+  const severity: AgenticSeverity =
+    fromLevel && SEVERITY_RANK[fromLevel] > SEVERITY_RANK.medium ? fromLevel : "medium";
+  return { severity, fallback: true };
 }
 
 function validateRoute(r: unknown): TriageRoute {

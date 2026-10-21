@@ -448,8 +448,8 @@ function buildHypothesisPrompt(ctx: HypothesisContext, sessionId: number): strin
     "- add_watchlist: target is the entity to monitor",
     "- collect_evidence: target is the data source or artifact to collect",
     "- notify_stakeholder: target is the stakeholder or team to notify",
-    "- requiresApproval MUST be true for: isolate_host, disable_account, block_ioc, escalate_ir",
-    "- requiresApproval can be false for: suppress_alert, tune_rule, add_watchlist, collect_evidence, notify_stakeholder",
+    "- ALL recommended actions require human analyst approval. Always set requiresApproval: true (the server enforces this regardless of the value you return).",
+    "- If an action does not fit one of the category values above, use custom; actions with any other category value are discarded.",
     "",
     "### draftDocumentation",
     "{ shiftHandoff: string, escalationSummary: string|null, executiveSummary: string, tuningSuggestions: string|null }",
@@ -698,7 +698,7 @@ function assembleLivingCase(
       })(),
       targetType: a.targetType ?? undefined,
       targetValue: a.targetValue ?? undefined,
-      requiresApproval: a.requiresApproval ?? true,
+      requiresApproval: true, // every model-proposed action requires human approval (C10)
       evidenceBasis: a.evidenceBasis ?? [],
       state: "proposed" as const,
     })),
@@ -975,10 +975,20 @@ export async function runHypothesisAgent(
   if (!content) throw new Error("LLM returned empty response for hypothesis generation");
 
   // Audit #23: Zod boundary on LLM output
+  // C12/H-L3: parse or validation failure throws so the caller marks the
+  // hypothesis stage failed — an empty/unparseable reply must never become a case.
   const { parseHypothesisOutput } = await import("./types/LLMHypothesisRaw");
-  const llmOutput = parseHypothesisOutput(
-    typeof content === "string" ? JSON.parse(content) : content
-  );
+  const { extractJson } = await import("../llm/extractJson");
+  let llmOutput: LLMHypothesisRaw;
+  try {
+    llmOutput = parseHypothesisOutput(
+      typeof content === "string" ? extractJson(content) : content
+    );
+  } catch (err) {
+    throw new Error(
+      `Hypothesis generation failed: LLM output was not a valid hypothesis (${(err as Error).message.slice(0, 500)})`
+    );
+  }
 
   // 5. Assemble the LivingCaseObject
   const livingCase = assembleLivingCase(sessionId, ctx, llmOutput);
@@ -1233,15 +1243,27 @@ async function materializeResponseActions(
   livingCase: LivingCaseObject,
   caseId: number,
   ctx: HypothesisContext
-): Promise<{ ids: string[]; attempted: number; succeeded: number; failed: Array<{ index: number; action: string; error: string }> }> {
+): Promise<{
+  ids: string[];
+  attempted: number;
+  succeeded: number;
+  failed: Array<{ index: number; action: string; error: string }>;
+  skippedRecommendations: Array<{ index: number; action: string; category: string; reason: string }>;
+}> {
   const db = await getDb();
-  if (!db) return { ids: [], attempted: 0, succeeded: 0, failed: [] };
+  if (!db) return { ids: [], attempted: 0, succeeded: 0, failed: [], skippedRecommendations: [] };
 
   const actions = livingCase.recommendedActions ?? [];
-  if (actions.length === 0) return { ids: [], attempted: 0, succeeded: 0, failed: [] };
+  if (actions.length === 0) return { ids: [], attempted: 0, succeeded: 0, failed: [], skippedRecommendations: [] };
 
   const materializedIds: string[] = [];
   const failedActions: Array<{ index: number; action: string; error: string }> = [];
+  // C10: model-proposed actions whose category cannot be classified are NOT
+  // coerced to "custom" — they are skipped and reported so the analyst can see
+  // the model proposed something unclassifiable.
+  const skippedRecommendations: Array<{ index: number; action: string; category: string; reason: string }> = [];
+  const { RESPONSE_ACTION_CATEGORIES } = await import("../../drizzle/schema");
+  const VALID_CATEGORIES: readonly string[] = RESPONSE_ACTION_CATEGORIES;
 
   // ── BUG-01 Fix: Dedup against existing proposed actions for this case ──────
   // Prevents re-inserting the same action on resume or if the input list has duplicates.
@@ -1257,11 +1279,11 @@ async function materializeResponseActions(
     existingRows.map(r => `${r.title.trim().toLowerCase()}||${r.category}`)
   );
 
-  // Map LLM category strings to our typed enum values
+  // Map LLM category synonyms to our typed enum values.
+  // C10: urgency words (immediate/next/optional) are NOT category synonyms —
+  // mapping them (e.g. optional→tune_rule) let the model relabel a destructive
+  // action as a benign one.
   const CATEGORY_MAP: Record<string, string> = {
-    immediate: "escalate_ir",
-    next: "collect_evidence",
-    optional: "tune_rule",
     isolate: "isolate_host",
     isolate_host: "isolate_host",
     disable_account: "disable_account",
@@ -1289,30 +1311,24 @@ async function materializeResponseActions(
     low: "optional",
   };
 
-  const VALID_CATEGORIES = [
-    "isolate_host", "disable_account", "block_ioc", "escalate_ir",
-    "suppress_alert", "tune_rule", "add_watchlist", "collect_evidence",
-    "notify_stakeholder", "custom",
-  ];
   const VALID_URGENCY = ["immediate", "next", "scheduled", "optional"];
 
   for (const rec of actions) {
     try {
-      // Resolve category — try direct match, then map, then infer from LLM category field
-      let category = CATEGORY_MAP[rec.category?.toLowerCase() ?? ""] ?? null;
-      if (!category || !VALID_CATEGORIES.includes(category)) {
-        // Try to infer from the action text
-        const actionLower = (rec.action ?? "").toLowerCase();
-        if (actionLower.includes("isolat")) category = "isolate_host";
-        else if (actionLower.includes("disabl") || actionLower.includes("account")) category = "disable_account";
-        else if (actionLower.includes("block") || actionLower.includes("firewall")) category = "block_ioc";
-        else if (actionLower.includes("escalat")) category = "escalate_ir";
-        else if (actionLower.includes("suppress") || actionLower.includes("silence")) category = "suppress_alert";
-        else if (actionLower.includes("tune") || actionLower.includes("rule")) category = "tune_rule";
-        else if (actionLower.includes("watch") || actionLower.includes("monitor")) category = "add_watchlist";
-        else if (actionLower.includes("collect") || actionLower.includes("evidence") || actionLower.includes("investigate")) category = "collect_evidence";
-        else if (actionLower.includes("notify") || actionLower.includes("stakeholder")) category = "notify_stakeholder";
-        else category = "custom";
+      // Resolve category — normalized direct match or explicit synonym only.
+      // C10: no free-text inference from the action text and no default to
+      // "custom"; an unclassifiable category is skipped and reported.
+      const rawCategory = (rec.category ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+      const category = CATEGORY_MAP[rawCategory] ?? rawCategory;
+      if (!VALID_CATEGORIES.includes(category)) {
+        const reason = `Unclassifiable category '${(rec.category ?? "").slice(0, 64)}' — not one of [${VALID_CATEGORIES.join(", ")}]; recommendation not materialized`;
+        console.warn(`[HypothesisAgent] C10: skipping recommendation "${(rec.action ?? "").slice(0, 80)}": ${reason}`);
+        const index = actions.indexOf(rec);
+        const actionLabel = (rec.action ?? "Unnamed action").slice(0, 128);
+        skippedRecommendations.push({ index, action: actionLabel, category: (rec.category ?? "").slice(0, 64), reason });
+        // Also surface through the partial-failure channel the UI already renders.
+        failedActions.push({ index, action: actionLabel, error: `skipped: ${reason}` });
+        continue;
       }
 
       // ── BUG-01 Fix: Skip duplicate actions (dedup by title+category in proposed state) ──
@@ -1412,19 +1428,11 @@ async function materializeResponseActions(
         console.warn(`[HypothesisAgent] Missing target: Category '${category}' requires a target value`);
       }
 
-      // ── Ticket 1: Hard-enforce requiresApproval for critical/destructive categories ──
-      // The LLM prompt instructs requiresApproval=true for these categories, and the
-      // Zod schema defaults to true, but neither is a code guarantee. This block is
-      // the authoritative enforcement point — model output cannot override it.
-      const FORCE_APPROVAL_CATEGORIES = new Set([
-        "isolate_host",
-        "disable_account",
-        "block_ioc",
-        "escalate_ir",
-      ]);
-      const enforceApproval = FORCE_APPROVAL_CATEGORIES.has(category)
-        ? true
-        : (rec.requiresApproval ?? true);
+      // ── C10: Every model-proposed action requires human approval ──────────
+      // requiresApproval is NOT taken from model output (rec.requiresApproval is
+      // ignored). Previously only isolate_host/disable_account/block_ioc/escalate_ir
+      // were forced; model-chosen categories could otherwise opt out of the
+      // approval queue. This is the authoritative enforcement point.
 
       // Wrap INSERT + audit in a single transaction so the action is never
       // created without its corresponding audit trail entry.
@@ -1435,7 +1443,7 @@ async function materializeResponseActions(
           title: (rec.action ?? "Unnamed action").slice(0, 512),
           description: rec.evidenceBasis?.join("; ") ?? null,
           urgency: urgency as typeof responseActions.$inferInsert["urgency"],
-          requiresApproval: enforceApproval ? 1 : 0,
+          requiresApproval: 1,
           state: "proposed",
           proposedBy: "hypothesis_agent",
           evidenceBasis: rec.evidenceBasis ?? null,
@@ -1490,8 +1498,11 @@ async function materializeResponseActions(
 
   if (failedActions.length > 0) {
     console.warn(
-      `[HypothesisAgent] Partial failure: ${materializedIds.length}/${actions.length} actions materialized, ${failedActions.length} failed`
+      `[HypothesisAgent] Partial failure: ${materializedIds.length}/${actions.length} actions materialized, ${failedActions.length} failed (${skippedRecommendations.length} skipped as unclassifiable)`
     );
+  }
+  if (skippedRecommendations.length > 0) {
+    console.warn(`[HypothesisAgent] C10 skippedRecommendations: ${JSON.stringify(skippedRecommendations)}`);
   }
 
   return {
@@ -1499,6 +1510,7 @@ async function materializeResponseActions(
     attempted: actions.length,
     succeeded: materializedIds.length,
     failed: failedActions,
+    skippedRecommendations,
   };
 }
 

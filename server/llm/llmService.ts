@@ -15,7 +15,12 @@
 
 import { getEffectiveSettings } from "../admin/connectionSettingsService";
 import { asProtocol } from "../_core/protocol";
-import { invokeLLM as invokeBuiltInLLM, type InvokeParams, type InvokeResult } from "../_core/llm";
+import {
+  invokeLLM as invokeBuiltInLLM,
+  STRUCTURED_OUTPUT_INFERENCE_PARAMS,
+  type InvokeParams,
+  type InvokeResult,
+} from "../_core/llm";
 import { getDb } from "../db";
 import { llmUsage } from "../../drizzle/schema";
 
@@ -61,6 +66,13 @@ export function isNemotronModel(modelName: string): boolean {
 }
 
 // ── NVIDIA-Mandated Inference Parameters ───────────────────────────────────
+
+/** H-L3: log the json_schema → json_object downgrade only once per process. */
+let jsonSchemaDowngradeLogged = false;
+
+/** One-line instruction appended to the system prompt when json_schema is downgraded. */
+export const JSON_ONLY_INSTRUCTION =
+  "Your reply must be a single JSON object only — no prose, no Markdown code fences, and no reasoning or <think> text.";
 
 /**
  * Per Section 4.3 of the Nemotron integration analysis:
@@ -332,7 +344,13 @@ async function invokeCustomLLM(params: InvokeParams, config: LLMConfig): Promise
       );
       // Prepend schema instruction to the first system message, or create one if none exists.
       const messages = payload.messages as Array<{ role: string; content: string }>;
-      const schemaInstruction = `You MUST respond with valid JSON matching this exact schema:\n${schemaStr}`;
+      if (!jsonSchemaDowngradeLogged) {
+        jsonSchemaDowngradeLogged = true;
+        console.debug(
+          "[LLMService] response_format json_schema downgraded to json_object for custom endpoint; schema and JSON-only instruction injected into system prompt"
+        );
+      }
+      const schemaInstruction = `You MUST respond with valid JSON matching this exact schema:\n${schemaStr}\n${JSON_ONLY_INSTRUCTION}`;
       const systemIdx = messages.findIndex(m => m.role === "system");
       if (systemIdx >= 0) {
         messages[systemIdx].content += `\n\n${schemaInstruction}`;
@@ -344,13 +362,25 @@ async function invokeCustomLLM(params: InvokeParams, config: LLMConfig): Promise
     }
   }
 
+  // ── Sampling parameters ───────────────────────────────────────────────────
+  // H-L4: structured output (response_format set) always uses the low-temperature
+  // STRUCTURED_OUTPUT_INFERENCE_PARAMS, regardless of model or tool presence.
+  // The Nemotron presets below apply only to free-form chat.
+  const structuredOutput = !!responseFormat && responseFormat.type !== "text";
+  if (structuredOutput) {
+    payload.temperature = STRUCTURED_OUTPUT_INFERENCE_PARAMS.temperature;
+    payload.top_p = STRUCTURED_OUTPUT_INFERENCE_PARAMS.top_p;
+  }
+
   // ── Nemotron-specific inference parameters ────────────────────────────────
   if (nemotron) {
-    // NVIDIA-mandated temperature/top_p (Section 4.3)
-    const inferenceMode = hasTools ? "tool_calling" : "conversational";
-    const { temperature, top_p } = getNemotronInferenceParams(inferenceMode);
-    payload.temperature = temperature;
-    payload.top_p = top_p;
+    // NVIDIA-mandated temperature/top_p (Section 4.3) — free-form chat only
+    if (!structuredOutput) {
+      const inferenceMode = hasTools ? "tool_calling" : "conversational";
+      const { temperature, top_p } = getNemotronInferenceParams(inferenceMode);
+      payload.temperature = temperature;
+      payload.top_p = top_p;
+    }
 
     // Inject XML schema reminder into system prompt when tools are present (Section 4.3)
     // This prevents the documented 86% parser failure rate
@@ -366,8 +396,8 @@ async function invokeCustomLLM(params: InvokeParams, config: LLMConfig): Promise
         messages.unshift({ role: "system", content: xmlReminder });
       }
     }
-  } else {
-    // Non-Nemotron models: use a reasonable default
+  } else if (!structuredOutput) {
+    // Non-Nemotron models, free-form chat: use a reasonable default
     payload.temperature = 0.7;
   }
 
