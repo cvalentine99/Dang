@@ -41,7 +41,7 @@ describe("Broker Config Param Counts vs Spec v4.14.x", () => {
     { name: "SECURITY_USERS_CONFIG", config: broker.SECURITY_USERS_CONFIG, expectedCount: 8 },
     { name: "CLUSTER_NODE_CONFIGURATION_CONFIG", config: broker.CLUSTER_NODE_CONFIGURATION_CONFIG, expectedCount: 3 },
     { name: "CLUSTER_NODE_LOGS_CONFIG", config: broker.CLUSTER_NODE_LOGS_CONFIG, expectedCount: 7 },
-    { name: "TASKS_STATUS_CONFIG", config: broker.TASKS_STATUS_CONFIG, expectedCount: 12 },
+    { name: "TASKS_STATUS_CONFIG", config: broker.TASKS_STATUS_CONFIG, expectedCount: 13 },
     { name: "AGENTS_OUTDATED_CONFIG", config: broker.AGENTS_OUTDATED_CONFIG, expectedCount: 6 },
     { name: "AGENTS_NO_GROUP_CONFIG", config: broker.AGENTS_NO_GROUP_CONFIG, expectedCount: 6 },
     { name: "AGENTS_STATS_DISTINCT_CONFIG", config: broker.AGENTS_STATS_DISTINCT_CONFIG, expectedCount: 6 },

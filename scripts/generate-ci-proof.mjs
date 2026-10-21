@@ -25,17 +25,17 @@ const JSON_PATH = join(ROOT, "test-output", "vitest.json");
 const MD_PATH = join(ROOT, "docs", "ci-proof-artifact.md");
 
 // ── Self-enforcing structural checks ─────────────────────────────────────────────────
-const SPEC_SYMLINK_PATH = join(ROOT, "spec", "wazuh-api-v4.14.3.yaml");
+const SPEC_SYMLINK_PATH = join(ROOT, "spec", "wazuh-api-v4.14.4.yaml");
 try {
   const stat = lstatSync(SPEC_SYMLINK_PATH);
   if (!stat.isSymbolicLink()) {
-    console.error("PROOF FAIL: spec/wazuh-api-v4.14.3.yaml is NOT a symlink.");
-    console.error("Fix: rm spec/wazuh-api-v4.14.3.yaml && ln -s ../spec-v4.14.3.yaml spec/wazuh-api-v4.14.3.yaml");
+    console.error("PROOF FAIL: spec/wazuh-api-v4.14.4.yaml is NOT a symlink.");
+    console.error("Fix: rm spec/wazuh-api-v4.14.4.yaml && ln -s ../spec-v4.14.4.yaml spec/wazuh-api-v4.14.4.yaml");
     process.exit(1);
   }
-  console.log("✓ spec/wazuh-api-v4.14.3.yaml is a symlink (canonical spec source verified)");
+  console.log("✓ spec/wazuh-api-v4.14.4.yaml is a symlink (canonical spec source verified)");
 } catch {
-  console.error("PROOF FAIL: spec/wazuh-api-v4.14.3.yaml does not exist.");
+  console.error("PROOF FAIL: spec/wazuh-api-v4.14.4.yaml does not exist.");
   process.exit(1);
 }
 

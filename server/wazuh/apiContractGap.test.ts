@@ -1,5 +1,5 @@
 /**
- * API Contract Gap Report v4.14.3 — Verification Tests
+ * API Contract Gap Report v4.14.4 — Verification Tests
  *
  * Tests every finding (C-1..C-5, H-1..H-12, M-1..M-18, L-1..L-6)
  * to prove the fix is structurally correct:
@@ -33,20 +33,18 @@ import {
 // CRITICAL FINDINGS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("C-1: /security/resources uses resource_list (not resource)", () => {
+describe("C-1: /security/resources uses resource (spec wire name)", () => {
   it("router uses brokerParams(SECURITY_RESOURCES_CONFIG) for /security/resources", async () => {
-    // Structural test: read the router source and verify broker wiring
     const fs = await import("fs");
     const src = fs.readFileSync("server/wazuh/wazuhRouter.ts", "utf-8");
-    // Find the securityResources endpoint
     const match = src.match(/securityResources[\s\S]*?brokerParams\(SECURITY_RESOURCES_CONFIG/);
     expect(match).toBeTruthy();
   });
 
-  it("SECURITY_RESOURCES_CONFIG forwards resource as resource_list to Wazuh", () => {
+  it("SECURITY_RESOURCES_CONFIG forwards resource as resource to Wazuh (spec v4.14.4)", () => {
     const result = brokerParams(SECURITY_RESOURCES_CONFIG, { resource: "agent:id" });
     expect(result.unsupportedParams).toHaveLength(0);
-    expect(result.forwardedQuery).toHaveProperty("resource_list", "agent:id");
+    expect(result.forwardedQuery).toHaveProperty("resource", "agent:id");
   });
 });
 
@@ -63,14 +61,14 @@ describe("C-2: /tasks/status accepts all 12+ spec params", () => {
   });
 });
 
-describe("C-3: ROOTCHECK_CONFIG — pci_dss and cis restored per spec v4.14.3", () => {
-  it("should forward pci_dss (restored per spec v4.14.3)", () => {
+describe("C-3: ROOTCHECK_CONFIG — pci_dss and cis restored per spec v4.14.4", () => {
+  it("should forward pci_dss (restored per spec v4.14.4)", () => {
     const result = brokerParams(ROOTCHECK_CONFIG, { pci_dss: "11.5" });
     expect(result.unsupportedParams).not.toContain("pci_dss");
     expect(result.forwardedQuery).toHaveProperty("pci_dss", "11.5");
   });
 
-  it("should forward cis (restored per spec v4.14.3)", () => {
+  it("should forward cis (restored per spec v4.14.4)", () => {
     const result = brokerParams(ROOTCHECK_CONFIG, { cis: "1.1.1" });
     expect(result.unsupportedParams).not.toContain("cis");
     expect(result.forwardedQuery).toHaveProperty("cis", "1.1.1");
@@ -246,7 +244,7 @@ describe("H-10: GROUP_FILES_CONFIG", () => {
 });
 
 describe("H-11: SYSCOLLECTOR_NETIFACE_CONFIG", () => {
-  it("forwards 13+ field filters (mac removed — not in spec v4.14.3)", () => {
+  it("forwards 13+ field filters (mac removed — not in spec v4.14.4)", () => {
     const result = brokerParams(SYSCOLLECTOR_NETIFACE_CONFIG, {
       limit: 10, offset: 0, name: "eth0", adapter: "Intel",
       type: "ethernet", state: "up", mtu: "1500",
@@ -402,7 +400,7 @@ describe("M-1 through M-18: Router input schemas accept expanded params", () => 
     }
   });
 
-  it("M-18: expSyscollectorNetiface accepts 13 field filters (mac removed — not in spec v4.14.3)", () => {
+  it("M-18: expSyscollectorNetiface accepts 13 field filters (mac removed — not in spec v4.14.4)", () => {
     const block = extractProcedureBlock(src, "expSyscollectorNetiface");
     for (const p of ["name", "adapter", "type", "state", "mtu", "tx.packets", "rx.packets", "tx.bytes", "rx.bytes", "tx.errors", "rx.errors", "tx.dropped", "rx.dropped"]) {
       expect(block).toContain(p);

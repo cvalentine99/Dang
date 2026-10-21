@@ -890,12 +890,6 @@
       ]
     },
     {
-      "name": "securityTokenInfo",
-      "routerLine": 2071,
-      "wired": false,
-      "callsites": []
-    },
-    {
       "name": "securityRbacRules",
       "routerLine": 2079,
       "wired": true,

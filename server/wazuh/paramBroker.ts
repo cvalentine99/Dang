@@ -2122,7 +2122,7 @@ export const TASKS_STATUS_CONFIG: EndpointParamConfig = {
     select: UNIVERSAL_PARAMS.select,
     q: UNIVERSAL_PARAMS.q,
     task_list: {
-      wazuhName: "task_list",
+      wazuhName: "tasks_list",
       description: "List of task IDs to filter (comma-separated)",
       type: "csv",
     },
@@ -2148,10 +2148,13 @@ export const TASKS_STATUS_CONFIG: EndpointParamConfig = {
     },
     status: {
       wazuhName: "status",
-      description: "Filter by task status (in_progress, done, failed, cancelled)",
+      description: "Filter by task status",
       type: "string",
-
-      enumValues: ["active", "pending", "never_connected", "disconnected"],
+    },
+    wait_for_complete: {
+      type: "boolean" as const,
+      wazuhName: "wait_for_complete",
+      description: "Disable timeout response (cluster sync wait)",
     },
   },
 };
@@ -3116,9 +3119,8 @@ export const SECURITY_RESOURCES_CONFIG: EndpointParamConfig = {
   params: {
     resource: {
       type: "string",
-
-      enumValues: ["true", "false"],
-      wazuhName: "resource_list",
+      enumValues: ["*:*", "agent:group", "agent:id", "group:id", "node:id", "decoder:file", "list:file", "rule:file", "policy:id", "role:id", "user:id"],
+      wazuhName: "resource",
       description: "List of current RBAC resources",
     },
   },
@@ -3132,8 +3134,6 @@ export const LISTS_FILE_CONTENT_CONFIG: EndpointParamConfig = {
   params: {
     raw: {
       type: "boolean",
-
-      enumValues: ["*:*", "agent:group", "agent:id", "group:id", "node:id", "decoder:file", "list:file", "rule:file", "policy:id", "role:id", "user:id"],
       wazuhName: "raw",
       description: "Format response in plain text",
     },
@@ -3155,7 +3155,6 @@ export const GROUP_CONFIGURATION_CONFIG: EndpointParamConfig = {
     limit: UNIVERSAL_PARAMS.limit,
     wait_for_complete: {
       type: "boolean",
-
       wazuhName: "wait_for_complete",
       description: "Disable timeout response (cluster sync wait)",
     },
@@ -3168,16 +3167,13 @@ export const GROUP_FILE_CONTENT_CONFIG: EndpointParamConfig = {
   params: {
     type: {
       type: "string",
-
-      enumValues: ["true", "false"],
+      enumValues: ["conf", "rootkit_files", "rootkit_trojans", "rcl"],
       wazuhName: "type",
       description: "Type of file (conf, rootkit_files, rootkit_trojans, rcl)",
       aliases: ["type_agents"],
     },
     raw: {
       type: "boolean",
-
-      enumValues: ["file", "registry_key", "registry_value"],
       wazuhName: "raw",
       description: "Format response in plain text",
     },

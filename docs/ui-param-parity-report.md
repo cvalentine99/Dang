@@ -1,9 +1,9 @@
 # UI → Router Schema Parity Report
 
-**Generated:** 2026-03-19  
+**Generated:** 2026-10-21  
 **Script:** `scripts/audit-ui-param-parity.mjs`  
 **Callsites audited:** 182  
-**Unique procedures consumed:** 128 of 130 total  
+**Unique procedures consumed:** 128 of 129 total  
 
 ---
 
@@ -14,10 +14,10 @@
 |--------|-------|
 | Total callsites | 182 |
 | Unique procedures consumed | 128 |
-| Router procedures available | 130 |
+| Router procedures available | 129 |
 | Parameters surfaced in UI | 99 |
 | Parameters hardcoded/constant | 130 |
-| Parameters not supported (classified) | 911 |
+| Parameters not supported (classified) | 912 |
 | Violations | 0 |
 
 **No violations found.** All UI callsites pass only schema-valid keys, all required params are present, and every optional param is classified.
@@ -27,7 +27,6 @@
 | Procedure | Input Keys | Disposition |
 |-----------|-----------|-------------|
 | `remoted` | (void) | Backend-only / Not yet wired to UI |
-| `securityTokenInfo` | (void) | Backend-only / Not yet wired to UI |
 
 ## client/src/components/DriftComparison.tsx
 
@@ -2010,6 +2009,7 @@ Input: void (no parameters) — **OK**
 | `sort` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `status` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `task_list` | Optional | No | — | **Not supported** — optional, not exposed in this view |
+| `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 
 ## client/src/pages/ThreatHunting.tsx
 
@@ -2072,7 +2072,6 @@ Input: void (no parameters) — **OK**
 | `status` | Optional | No | Passed | **Constant** (hardcoded: `"active"`) |
 | `version` | Optional | No | — | **Not supported** — optional, not exposed in this view |
 | `wait_for_complete` | Optional | No | — | **Not supported** — optional, not exposed in this view |
-
 
 
 

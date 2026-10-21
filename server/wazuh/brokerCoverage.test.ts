@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { generateCoverageReport, getRuntimeWiredConfigs, type CoverageReport, type WiringLevel } from "./brokerCoverage";
+import { generateCoverageReport, getRuntimeWiredConfigs, BROKER_CONFIG_REGISTRY, ENDPOINT_REGISTRY, type CoverageReport, type WiringLevel } from "./brokerCoverage";
 import {
   brokerParams,
   EXPERIMENTAL_CISCAT_RESULTS_CONFIG,
@@ -546,8 +546,6 @@ describe("brokerCoverage — registry ↔ router structural parity", () => {
     // ── Sensitive admin-only procedures (special handling, not standard reads) ──
     "agentKey",         // Reveals agent registration key; admin-only with audit trail
 
-    // ── Auth-related procedures (not standard Wazuh data endpoints) ──
-    "securityTokenInfo", // GET /security/user/authenticate — token introspection
   ]);
 
   let routerProcedures: Set<string>;
@@ -925,5 +923,19 @@ describe("specVersion is derived from bundled spec file", () => {
     expect(report.specVersion).toBe(fileVersion);
     // And confirm the concrete value for this repo
     expect(report.specVersion).toBe("4.14.4");
+  });
+});
+
+// ── Registry Completeness Guard ──────────────────────────────────────────────
+
+describe("BROKER_CONFIG_REGISTRY completeness", () => {
+  it("every broker config referenced by ENDPOINT_REGISTRY is in BROKER_CONFIG_REGISTRY", () => {
+    const registryNames = new Set(BROKER_CONFIG_REGISTRY.map(e => e.name));
+    const referencedConfigs = ENDPOINT_REGISTRY
+      .filter(e => e.wiringLevel === "broker" && e.brokerConfig)
+      .map(e => e.brokerConfig!);
+
+    const missing = referencedConfigs.filter(name => !registryNames.has(name));
+    expect(missing, `Broker configs wired at runtime but missing from BROKER_CONFIG_REGISTRY: ${missing.join(", ")}`).toEqual([]);
   });
 });

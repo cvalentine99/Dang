@@ -28,10 +28,15 @@ const __dirname = dirname(__filename);
 function detectBundledSpecVersion(): string {
   const specDir = resolve(process.cwd(), "spec");
   try {
+    // Newest first by parsed semver tuple — a plain string sort would rank 4.14.9 above 4.14.10.
+    const semver = (f: string) => (f.match(/\d+/g) ?? []).map(Number);
     const specFiles = readdirSync(specDir)
-      .filter(f => f.startsWith("wazuh-api-v") && f.endsWith(".yaml"))
-      .sort()
-      .reverse();
+      .filter(f => /^wazuh-api-v\d+\.\d+\.\d+\.yaml$/.test(f))
+      .sort((a, b) => {
+        const va = semver(a), vb = semver(b);
+        for (let i = 0; i < 3; i++) if (va[i] !== vb[i]) return (vb[i] ?? 0) - (va[i] ?? 0);
+        return 0;
+      });
     if (specFiles.length > 0) {
       const specPath = join(specDir, specFiles[0]);
       // Scan line-by-line for the info.version field.
@@ -214,7 +219,7 @@ export interface CategoryBreakdown {
 // To verify a classification, search for the procedure name in wazuhRouter.ts
 // and check whether the query handler calls brokerParams().
 
-const ENDPOINT_REGISTRY: Array<{
+export const ENDPOINT_REGISTRY: Array<{
   procedure: string;
   wazuhPath: string;
   wiringLevel: WiringLevel;
@@ -349,7 +354,7 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "decoderFileContent", wazuhPath: "/decoders/files/{filename}", wiringLevel: "broker", brokerConfig: "DECODER_FILE_CONTENT_CONFIG", paramCount: 3, category: "Decoders" },
 
   // ── Tasks ──
-  { procedure: "taskStatus", wazuhPath: "/tasks/status", wiringLevel: "broker", brokerConfig: "TASKS_STATUS_CONFIG", paramCount: 12, category: "Tasks" },
+  { procedure: "taskStatus", wazuhPath: "/tasks/status", wiringLevel: "broker", brokerConfig: "TASKS_STATUS_CONFIG", paramCount: 13, category: "Tasks" },
 
   // ── Security ──
   { procedure: "securityRoles", wazuhPath: "/security/roles", wiringLevel: "broker", brokerConfig: "SECURITY_ROLES_CONFIG", paramCount: 8, category: "Security" },  // spec: 8 data
@@ -420,6 +425,8 @@ export const BROKER_CONFIG_REGISTRY: Array<{ name: string; config: broker.Endpoi
   { name: "EXP_SYSCOLLECTOR_NETIFACE_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETIFACE_CONFIG },
   { name: "EXP_SYSCOLLECTOR_NETADDR_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETADDR_CONFIG },
   { name: "EXP_SYSCOLLECTOR_NETPROTO_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETPROTO_CONFIG },
+  { name: "SYSCOLLECTOR_OS_CONFIG", config: broker.SYSCOLLECTOR_OS_CONFIG },
+  { name: "SYSCOLLECTOR_HARDWARE_CONFIG", config: broker.SYSCOLLECTOR_HARDWARE_CONFIG },
   { name: "EXP_SYSCOLLECTOR_OS_CONFIG", config: broker.EXP_SYSCOLLECTOR_OS_CONFIG },
   { name: "EXP_SYSCOLLECTOR_HARDWARE_CONFIG", config: broker.EXP_SYSCOLLECTOR_HARDWARE_CONFIG },
   { name: "EXP_SYSCOLLECTOR_HOTFIXES_CONFIG", config: broker.EXP_SYSCOLLECTOR_HOTFIXES_CONFIG },

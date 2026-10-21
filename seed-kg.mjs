@@ -21,7 +21,7 @@
  * Options:
  *   --drop       Truncate all kg_* tables before seeding
  *   --dry-run    Parse and extract only, no database writes
- *   --spec <path>   Path to the Wazuh OpenAPI YAML spec (default: ./spec-v4.14.3.yaml)
+ *   --spec <path>   Path to the Wazuh OpenAPI YAML spec (default: shared/specPath.ts → WAZUH_SPEC_FILENAME)
  *
  * Requires: tsx (for importing .ts modules), mysql2, js-yaml
  */
@@ -40,6 +40,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // These are the SINGLE source of truth for extraction and loading logic.
 import { extract } from "./server/graph/kgExtractor.ts";
 import { loadAll, getLayerNames } from "./server/graph/kgLoader.ts";
+import { resolveSpecPath } from "./shared/specPath.ts";
 
 // ── CLI argument parsing ──────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ const DRY_RUN = args.includes("--dry-run");
 const specIdx = args.indexOf("--spec");
 const specPath = specIdx !== -1
   ? resolve(args[specIdx + 1])
-  : resolve(__dirname, "spec-v4.14.3.yaml");
+  : resolveSpecPath(__dirname);
 
 const DB_URL = process.env.DATABASE_URL;
 if (!DB_URL && !DRY_RUN) {

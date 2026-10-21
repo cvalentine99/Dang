@@ -1,5 +1,5 @@
 {
-  "_comment": "Endpoint inventory governance for the Dang! router vs Wazuh v4.14.3 OpenAPI spec.",
+  "_comment": "Endpoint inventory governance for the Dang! router vs Wazuh v4.14.4 OpenAPI spec.",
 
   "excluded": {
     "_comment": "Spec GET endpoints intentionally NOT wired in the router. Each must have a reason.",
@@ -16,7 +16,7 @@
   },
 
   "extra": {
-    "_comment": "Registry endpoints that exist in the router but are NOT in the Wazuh v4.14.3 OpenAPI spec. These are intentional additions, not drift.",
+    "_comment": "Registry endpoints that exist in the router but are NOT in the Wazuh v4.14.4 OpenAPI spec. These are intentional additions, not drift.",
     "endpoints": [
       "/",
       "/agents/{agent_id}",

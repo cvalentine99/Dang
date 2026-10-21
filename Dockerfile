@@ -66,7 +66,8 @@ COPY drizzle.config.ts ./
 # Copy pre-migration repair script, journal backfill, and KG seeder
 COPY scripts/docker-pre-migrate.mjs scripts/backfill-migrations.mjs ./scripts/
 COPY seed-kg.mjs ./
-COPY spec-v4.14.3.yaml ./
+COPY shared/specPath.ts ./shared/
+COPY spec-v4.14.4.yaml ./
 COPY spec/ ./spec/
 
 # Copy shared KG ETL source modules (seed-kg.mjs imports these via tsx)
@@ -91,6 +92,8 @@ USER dang
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV SKIP_TLS_VERIFY=false
+# Canonical Wazuh OpenAPI spec (see shared/specPath.ts)
+ENV WAZUH_SPEC_PATH=/app/spec-v4.14.4.yaml
 
 EXPOSE 3000
 

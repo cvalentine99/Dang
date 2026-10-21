@@ -124,8 +124,7 @@ Generated: 2026-03-19T23:21:34.056Z
 | 102 | `securityRuleById` | **Wired** | L2037 | `client/src/pages/SecurityExplorer.tsx:242` |
 | 103 | `securityConfig` | **Wired** | L2044 | `client/src/pages/Status.tsx:551` |
 | 104 | `securityCurrentUser` | **Wired** | L2057 | `client/src/pages/SecurityExplorer.tsx:236` |
-| 105 | `securityTokenInfo` | Unwired | L2071 | — |
-| 106 | `securityRbacRules` | **Wired** | L2079 | `client/src/pages/SecurityExplorer.tsx:200` |
+| 105 | `securityRbacRules` | **Wired** | L2068 | `client/src/pages/SecurityExplorer.tsx:200` |
 | 107 | `securityActions` | **Wired** | L2102 | `client/src/pages/SecurityExplorer.tsx:201` |
 | 108 | `securityResources` | **Wired** | L2116 | `client/src/pages/SecurityExplorer.tsx:207` |
 | 109 | `securityCurrentUserPolicies` | **Wired** | L2131 | `client/src/pages/SecurityExplorer.tsx:208` |
@@ -154,8 +153,6 @@ Generated: 2026-03-19T23:21:34.056Z
 ## Unwired Procedures
 
 - `remoted` (router L294)
-- `securityTokenInfo` (router L2071)
-
 ---
 
 *End of machine-generated ledger. Source of truth: `server/wazuh/wazuhRouter.ts` + `client/src/**/*`*

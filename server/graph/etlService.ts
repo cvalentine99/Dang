@@ -11,9 +11,9 @@
  *   3. Call kgLoader.loadAll() or kgLoader.loadLayer() to truncate-and-reload
  *   4. kgLoader updates kg_sync_status with truthful metadata per layer
  *
- * Canonical spec path: spec-v4.14.3.yaml at the project root.
+ * Canonical spec path: see shared/specPath.ts (WAZUH_SPEC_FILENAME at the project root).
  * Both seed-kg.mjs (CLI) and this runtime service use the same file.
- * The spec/wazuh-api-v4.14.3.yaml is a symlink to the canonical copy.
+ * The spec/wazuh-api-v*.yaml file is a symlink to the canonical copy.
  *
  * Metadata contract:
  *   runFullSync() returns KgLoadResult with:
@@ -37,18 +37,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { getDb } from "../db";
 import { kgSyncStatus } from "../../drizzle/schema";
+import { resolveSpecPath } from "../../shared/specPath";
 import { extract } from "./kgExtractor";
 import { loadAll, loadLayer, getLayerNames } from "./kgLoader";
 import type { KgExtractionResult, KgLayerName, KgLoadResult, KgSyncLayerResult } from "./kgTypes";
 import type { SqlExecutor } from "./kgLoader";
 
 // ── Canonical spec path ────────────────────────────────────────────────────
-// Single source of truth: spec-v4.14.3.yaml at the project root.
-// In Docker, the Dockerfile copies it to the same relative path.
+// Single source of truth: shared/specPath.ts. Honors WAZUH_SPEC_PATH, then cwd
+// (Docker WORKDIR /app), then the source-tree project root.
 
 function getSpecPath(): string {
-  const projectRoot = resolve(__dirname, "../..");
-  return resolve(projectRoot, "spec-v4.14.3.yaml");
+  return resolveSpecPath(resolve(__dirname, "../.."));
 }
 
 // ── Drizzle → mysql2 pool adapter ────────────────────────────────────────
