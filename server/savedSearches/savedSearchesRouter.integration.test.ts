@@ -14,6 +14,7 @@
  * Gated by DATABASE_URL — skips gracefully when no DB is available.
  */
 import { describe, it, expect, afterAll, beforeAll, vi } from "vitest";
+import { testDbSslOptions } from "../testHelpers/testDbConnection";
 import { appRouter } from "../routers";
 import type { TrpcContext } from "../_core/context";
 
@@ -74,7 +75,7 @@ async function getTestPool() {
     user: parsed.username,
     password: parsed.password,
     database: parsed.pathname.slice(1),
-    ssl: { rejectUnauthorized: !(process.env.SKIP_TLS_VERIFY === "true" || process.env.SKIP_TLS_VERIFY === "1") },
+    ...testDbSslOptions(),
   });
   return _testPool;
 }

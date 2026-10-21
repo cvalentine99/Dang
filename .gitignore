@@ -10,6 +10,7 @@ build/
 # Environment variables
 .env
 .env.local
+.env.test
 .env.development.local
 .env.test.local
 .env.production.local
@@ -114,7 +115,6 @@ temp/
 .manus-logs/
 __manus__/
 client/public/__manus__/
-.github/workflows/ci.yml
 
 # Local TLS trust material (mounted into the container, never committed)
 certs/

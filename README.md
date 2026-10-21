@@ -1,9 +1,7 @@
 # Dang! SIEM
 
-[![CI](https://github.com/cvalentine99/Dang/actions/workflows/ci.yml/badge.svg)](https://github.com/cvalentine99/Dang/actions/workflows/ci.yml)
-[![Docker Build](https://github.com/cvalentine99/Dang/actions/workflows/docker.yml/badge.svg)](https://github.com/cvalentine99/Dang/actions/workflows/docker.yml)
-[![GHCR](https://img.shields.io/badge/ghcr.io-cvalentine99%2Fdang--siem-purple?logo=github)](https://ghcr.io/cvalentine99/dang-siem)
-[![License: MIT](https://img.shields.io/badge/License-MIT-violet.svg)](LICENSE)
+[![CI](https://github.com/cvalentine99/Dang/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/cvalentine99/Dang/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-violet.svg)](package.json)
 
 An analyst-grade security operations platform that visualizes, correlates, and investigates **Wazuh security telemetry** — agents, alerts, vulnerabilities, FIM, CIS compliance, MITRE ATT&CK mappings, and threat intelligence — through a read-only proxy architecture with an LLM-powered agentic investigation pipeline. Built for SOC analysts on ultrawide monitors.
 
@@ -361,37 +359,47 @@ The test suite uses **Vitest** with 111 test files covering backend procedures, 
 
 ```bash
 pnpm test                      # Run full suite
-pnpm test -- --reporter=json   # JSON output for CI
-pnpm proof:generate            # Regenerate ci-proof-artifact.md from vitest.json
+p## Testing
+
+Tests use **Vitest 2** with three projects, declared in `vitest.workspace.ts`:
+
+| Project | Files | What it is |
+|---|---|---|
+| `unit` | `server/**/*.test.ts` (except `server/__source_checks__/`) | Behavioral tests that import and run application code (tRPC `createCaller`, real modules, network mocked). |
+| `client` | `client/**/*.test.{ts,tsx}` | Pure client modules. Runs in the `node` environment — jsdom is not installed, so there are no component/DOM tests yet. |
+| `source-checks` | `server/__source_checks__/*.test.ts` | Quarantined regression guards whose assertions are on **source text** (`readFileSync(...)` + `toContain(...)`). They catch a reverted fix but execute no runtime behavior, so they are run and reported separately and are not behavioral coverage. |
+
+```bash
+pnpm test                 # unit + client (no database needed; DB-gated suites skip)
+pnpm test:unit            # unit only
+pnpm test:client          # client only
+pnpm test:source-checks   # quarantined source-text checks
+pnpm test:db              # unit project against a test MySQL (fails if no DATABASE_URL)
+pnpm db:check             # drizzle-kit check (migration chain consistency)
 ```
 
-**Current status:** All passing (machine-generated from `test-output/vitest.json`).
+### DB-gated suites
 
-Key test categories:
+Suites that need MySQL (pipeline stage agents, response-action state machine, ETL integration, RBAC/admin users, login/logout, Splunk ticket idempotency, migration application) are wrapped in `describe.skipIf(!process.env.DATABASE_URL)` or `describeWithDb` (`server/testHelpers/requireDb.ts`). **Under plain `pnpm test` they are skipped, not passed** — the skip count in the summary is real untested surface.
 
-| Category | Files | Coverage |
-|---|---|---|
-| Wazuh Proxy | `paramBroker.test.ts`, `paramPropagation.test.ts`, `brokerWarnings.test.ts`, `regressionFixture.test.ts` | Parameter validation, broker warnings, regression fixtures |
-| UI Wiring | `uiWiring.test.ts`, `uiParamParity.test.ts`, `configStatsTab.test.ts`, `trustDocSprint.test.ts` | Every UI callsite maps to a real procedure, parameter shapes match |
-| Security | `securityAuth.test.ts`, `perUserRateLimit.test.ts` | Auth enforcement, rate limiting, RBAC gating |
-| Agentic Pipeline | `triageAgent.test.ts`, `correlationAgent.test.ts`, `hypothesisAgent.test.ts`, `resumePipelineHelper.test.ts`, `stateMachine.test.ts` | Pipeline stages, resume from failure, partial-failure signaling |
-| Knowledge Graph | `kg-hydration.test.ts`, `agentIntrospection.test.ts`, `agenticGates.test.ts`, `etl.test.ts`, `etl-integration.test.ts` | Graph ETL extraction determinism, DB integration (truncate/sync/verify/rerun/failure), introspection, capability gating |
-| Broker Coverage | `brokerCoverage.test.ts`, `apiContractGap.test.ts`, `expSyscollectorBroker.test.ts` | Broker coverage ledger, API contract gap analysis, experimental syscollector validation |
-| Splunk | `resolveTriageData.test.ts` | Triage data resolution, Splunk ticket creation |
-| Drift Analytics | `readinessService.test.ts` | Baseline comparison, anomaly detection |
-| OTX | `otxRouter.test.ts` | Preflight ping with `skipIf(!canReachOtx)`, API validation, pulse queries |
+To run them, point a **dedicated test database** at them:
 
-CI artifacts are generated from physics: `vitest.json` is produced by the test runner, then `scripts/generate-ci-proof.mjs` reads it to produce `docs/ci-proof-artifact.md`. The UI parity audit (`scripts/audit-ui-param-parity.mjs`) verifies that every frontend `trpc.wazuh.*` callsite maps to a real backend procedure with matching parameter shapes. Both scripts are deterministic — the proof artifact numbers always match the raw test output.
+```bash
+cp .env.test.example .env.test       # DATABASE_URL=mysql://dang:dang@127.0.0.1:3307/dang_test
+pnpm test:db
+```
 
----
+- `server/testHelpers/loadTestEnv.ts` (vitest `setupFiles`) loads `.env.test` — never `.env` — and sets `TZ=UTC`.
+- `server/testHelpers/testDb.ts` (vitest `globalSetup`, unit project) creates the database if missing and applies the committed `./drizzle` migrations once per run with drizzle-orm's mysql2 migrator, so DB-gated tests run against the schema the real migration chain produces. `server/migrations.apply.test.ts` asserts the result.
+- The setup refuses any database whose name does not end in `_test` (DB-gated suites insert, update and truncate rows). Never point tests at the live `dang` database.
 
-## Design Language
+Suites that need a live Wazuh, Splunk, OTX or LLM endpoint are gated on their own env vars and skip in CI.
 
-The UI follows the **Amethyst Nexus** dark-only theme, purpose-built for SOC environments:
+### CI
 
-- **Glass-morphism panels** with `backdrop-blur` and semi-transparent backgrounds
-- **Purple/violet primary accents** in OKLCH color space
-- **Threat-level semantic colors**: Critical (red), High (orange), Medium (amber), Low (blue), Info (slate)
+`.github/workflows/ci.yml` runs on every push and pull request: `pnpm install --frozen-lockfile`, `pnpm check` (tsc), `pnpm test`, `pnpm test:source-checks`, `pnpm audit --audit-level=high --prod`, `pnpm audit:broker`, then — against a `mysql:8.4` service container with a `dang_test` database — `pnpm db:check` and `pnpm test:db`. A separate job builds the Docker image (not pushed). The CI badge above reflects that workflow; there is no committed test-result artifact.
+
+tic colors**: Critical (red), High (orange), Medium (amber), Low (blue), Info (slate)
 - **Fonts**: Space Grotesk (headings), Inter (UI), JetBrains Mono (hashes, agent IDs, JSON, rule IDs)
 - **Layout**: Optimized for ultrawide SOC monitors (up to 2400px), dense but readable dashboards
 - **No bright colors, no flat white surfaces** — every surface is a dark glass panel
@@ -465,14 +473,12 @@ drizzle/
   meta/_journal.json       ← Migration journal
 
 docs/
-  ci-proof-artifact.md     ← Test results generated from vitest.json
   gap-closure-matrix.md    ← Wazuh API coverage tracking
   ui-param-parity-report.md ← UI <-> backend parameter parity audit
   broker-coverage-ledger.md ← Parameter broker coverage by domain
   incident-2026-03-07-archive-exposure.md ← Security incident documentation
 
 scripts/
-  generate-ci-proof.mjs    ← vitest.json -> ci-proof-artifact.md (with chain-of-custody guard)
   audit-ui-param-parity.mjs ← UI callsite <-> procedure parity checker
   diff-wazuh-openapi.mjs   ← OpenAPI spec diff tool (compare spec versions)
   verify-param-counts.mjs  ← Parameter count verification

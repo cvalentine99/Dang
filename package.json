@@ -5,18 +5,24 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
-    "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "SELF_HOSTED=1 vite build && node -e \"const h=require('fs').readFileSync('dist/public/index.html','utf8');const m=h.match(/<script(?![^>]*\\bsrc=)[^>]*>/gi);if(m){console.error('H-C3: inline <script> in dist/public/index.html (blocked by prod CSP):',m);process.exit(1)}\" && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
-    "test": "vitest run",
+    "test": "vitest run --project unit --project client",
+    "test:unit": "vitest run --project unit",
+    "test:client": "vitest run --project client",
+    "test:source-checks": "vitest run --project source-checks",
+    "test:db": "TEST_DB=1 vitest run --project unit",
+    "test:db:known-failing": "TEST_DB=1 DB_KNOWN_FAILING=only vitest run --project unit",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "audit:ui-parity": "node scripts/audit-ui-param-parity.mjs",
     "audit:broker": "node scripts/verify-param-counts.mjs",
     "audit:openapi": "node scripts/diff-wazuh-openapi.mjs",
-    "proof:generate": "node scripts/generate-ci-proof.mjs",
     "audit:splitbrain": "node scripts/audit-splitbrain.mjs"
   },
   "dependencies": {
@@ -148,6 +154,17 @@
       "proxy-addr": ">=2.0.8",
       "brace-expansion@5": ">=5.0.11",
       "express>path-to-regexp": "0.1.13"
+    },
+    "auditConfig": {
+      "ignoreCves": [
+        "CVE-2026-42338",
+        "CVE-2026-69192",
+        "CVE-2026-101913",
+        "CVE-2026-101912",
+        "CVE-2026-101911",
+        "CVE-2026-97058"
+      ]
     }
-  }
+  },
+  "x-audit-ignore-rationale": "ip-address/sprintf-js advisories reach us only via geoip-lite, which pins ip-address 5.8.9-5.9.4 (10.x is an API break). geoip-lite's bundled data is also ~2.7 years stale; the planned fix is to drop it in favour of Wazuh's own GeoLocation fields (CODE_REVIEW_2026-10-21.md Phase 3). Remove this block when geoip-lite is removed."
 }
