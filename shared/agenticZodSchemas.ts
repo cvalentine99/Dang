@@ -162,6 +162,8 @@ export const TriageObjectSchema = z.object({
 export const CorrelationBundleSchema = z.object({
   schemaVersion: z.literal("1.0"),
   correlationId: z.string().min(1),
+  mitreValidated: z.boolean().optional(),
+  cveValidated: z.boolean().optional(),
   correlatedAt: z.string(),
   sourceTriageId: z.string(),
 
@@ -315,6 +317,7 @@ export const LivingCaseObjectSchema = z.object({
   recommendedActions: z.array(z.object({
     action: z.string(),
     category: z.enum(["immediate", "next", "scheduled", "optional"]),
+    dbCategory: z.string().max(64).optional(),
     urgency: z.enum(["immediate", "next", "scheduled", "optional"]).optional(),
     targetType: z.string().optional(),
     targetValue: z.string().optional(),

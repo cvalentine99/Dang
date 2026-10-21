@@ -24,6 +24,7 @@ import {
   investigationSessions,
   responseActions,
   responseActionAudit,
+  RESPONSE_ACTION_CATEGORIES,
 } from "../../drizzle/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { recomputeCaseSummary, syncCaseSummaryAfterTransition } from "./stateMachine";
@@ -593,6 +594,38 @@ const HYPOTHESIS_JSON_SCHEMA = {
 
 // ── LivingCaseObject Assembly ───────────────────────────────────────────────
 
+/**
+ * Model category → response_actions.category. Exact DB values and a few explicit
+ * synonyms only; urgency words are NOT categories (C10). Shared by assembleLivingCase
+ * (which stamps `dbCategory` on the case JSON) and materializeResponseActions.
+ */
+const DB_CATEGORY_SYNONYMS: Record<string, string> = {
+    isolate: "isolate_host",
+    isolate_host: "isolate_host",
+    disable_account: "disable_account",
+    block: "block_ioc",
+    block_ioc: "block_ioc",
+    escalate: "escalate_ir",
+    escalate_ir: "escalate_ir",
+    suppress: "suppress_alert",
+    suppress_alert: "suppress_alert",
+    tune: "tune_rule",
+    tune_rule: "tune_rule",
+    watchlist: "add_watchlist",
+    add_watchlist: "add_watchlist",
+    collect: "collect_evidence",
+    collect_evidence: "collect_evidence",
+    notify: "notify_stakeholder",
+    notify_stakeholder: "notify_stakeholder",
+    custom: "custom",
+};
+
+export function resolveDbCategory(raw: string | undefined | null): string | undefined {
+  const norm = (raw ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const mapped = DB_CATEGORY_SYNONYMS[norm] ?? norm;
+  return (RESPONSE_ACTION_CATEGORIES as readonly string[]).includes(mapped) ? mapped : undefined;
+}
+
 function assembleLivingCase(
   sessionId: number,
   ctx: HypothesisContext,
@@ -695,6 +728,8 @@ function assembleLivingCase(
     recommendedActions: (llmOutput.recommendedActions ?? []).map((a) => ({
       action: a.action ?? "",
       category: normCategory(a.category ?? "next"),
+      // The materializer must see the DB category, not the display group above.
+      dbCategory: resolveDbCategory(a.category),
       // Urgency uses canonical DB enum: immediate|next|scheduled|optional
       urgency: (() => {
         const VALID: string[] = ["immediate", "next", "scheduled", "optional"];
@@ -1294,26 +1329,7 @@ async function materializeResponseActions(
   // C10: urgency words (immediate/next/optional) are NOT category synonyms —
   // mapping them (e.g. optional→tune_rule) let the model relabel a destructive
   // action as a benign one.
-  const CATEGORY_MAP: Record<string, string> = {
-    isolate: "isolate_host",
-    isolate_host: "isolate_host",
-    disable_account: "disable_account",
-    block: "block_ioc",
-    block_ioc: "block_ioc",
-    escalate: "escalate_ir",
-    escalate_ir: "escalate_ir",
-    suppress: "suppress_alert",
-    suppress_alert: "suppress_alert",
-    tune: "tune_rule",
-    tune_rule: "tune_rule",
-    watchlist: "add_watchlist",
-    add_watchlist: "add_watchlist",
-    collect: "collect_evidence",
-    collect_evidence: "collect_evidence",
-    notify: "notify_stakeholder",
-    notify_stakeholder: "notify_stakeholder",
-    custom: "custom",
-  };
+  const CATEGORY_MAP = DB_CATEGORY_SYNONYMS;
 
   // LivingCaseObject now uses the same enum as DB — direct passthrough with fallback
   const URGENCY_FALLBACK: Record<string, string> = {
@@ -1329,7 +1345,9 @@ async function materializeResponseActions(
       // Resolve category — normalized direct match or explicit synonym only.
       // C10: no free-text inference from the action text and no default to
       // "custom"; an unclassifiable category is skipped and reported.
-      const rawCategory = (rec.category ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+      // Prefer the resolved DB category stamped by assembleLivingCase; fall back to the raw
+      // field for callers that pass model output directly.
+      const rawCategory = (rec.dbCategory ?? rec.category ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
       const category = CATEGORY_MAP[rawCategory] ?? rawCategory;
       if (!VALID_CATEGORIES.includes(category)) {
         const reason = `Unclassifiable category '${(rec.category ?? "").slice(0, 64)}' — not one of [${VALID_CATEGORIES.join(", ")}]; recommendation not materialized`;

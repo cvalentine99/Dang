@@ -50,6 +50,21 @@ vi.mock("../otx/otxClient", () => ({
 
 const HAS_DB = !!process.env.DATABASE_URL;
 
+/**
+ * FIXED 2026-10-21 (found by the H-T1 burn-down; kept for history):
+ * materializeResponseActions() (hypothesisAgent.ts ~L1332) resolves the DB
+ * category from livingCase.recommendedActions[].category, but
+ * assembleLivingCase() (~L697, DISPLAY_CATEGORY_MAP) has already collapsed that
+ * field to the display bucket "immediate" | "next" | "optional". None of those
+ * is in RESPONSE_ACTION_CATEGORIES, and since C10 removed the urgency-word
+ * synonyms, EVERY model-proposed action is skipped as "Unclassifiable category"
+ * — zero response_actions rows are ever materialized (rematerializeResponseActions
+ * reads the same snapshot field). Fix: assembleLivingCase now stamps `dbCategory`
+ * (the resolved DB enum) next to the display bucket and the materializer reads it.
+ */
+const MATERIALIZATION_BUG =
+  "BUG: materializeResponseActions reads the display-bucketed snapshot category (immediate|next|optional) so every action is skipped as unclassifiable";
+
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
 function makeHypothesisLLMResponse(overrides: Record<string, unknown> = {}) {
@@ -73,7 +88,7 @@ function makeHypothesisLLMResponse(overrides: Record<string, unknown> = {}) {
       recommendedActions: overrides.recommendedActions ?? [
         {
           action: "Isolate host-05 from network",
-          category: "isolate",
+          category: "isolate_host",
           urgency: "immediate",
           targetType: "host",
           targetValue: "host-05",
@@ -194,14 +209,45 @@ describe("runHypothesisAgent — full pipeline", () => {
       mockLLMResponse.mockResolvedValueOnce(makeHypothesisLLMResponse());
 
       const result = await runHypothesisAgent({ correlationId: testCorrelationId, userId: 1 });
-
-      expect(result.caseId).toBeGreaterThan(0);
-      expect(result.materializedActionIds.length).toBeGreaterThan(0);
-      expect(result.latencyMs).toBeGreaterThan(0);
-      expect(result.tokensUsed).toBe(2800); // 2000 + 800
-
       testCaseId = result.caseId;
       testSessionId = result.sessionId;
+
+      expect(result.caseId).toBeGreaterThan(0);
+      expect(result.isNewSession).toBe(true);
+      expect(result.latencyMs).toBeGreaterThan(0);
+      expect(result.tokensUsed).toBe(2800); // 2000 + 800
+      // C10: the snapshot marks every model-proposed action as requiring approval
+      expect(result.livingCase.recommendedActions.length).toBe(1);
+      expect(result.livingCase.recommendedActions.every((a) => a.requiresApproval)).toBe(true);
+
+      // C9: the new investigation session is attributed to the triggering analyst
+      const { getDb } = await import("../db");
+      const { investigationSessions } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      const [session] = await db!.select({ userId: investigationSessions.userId })
+        .from(investigationSessions)
+        .where(eq(investigationSessions.id, result.sessionId));
+      expect(session.userId).toBe(1);
+    }
+  );
+
+  it.skipIf(!HAS_DB)(
+    "materializes the recommended action as a response_actions row on case creation (dbCategory carried through the snapshot)",
+    async () => {
+      const { getDb } = await import("../db");
+      const { responseActions } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      const rows = await db!.select().from(responseActions).where(eq(responseActions.caseId, testCaseId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        category: "isolate_host",
+        state: "proposed",
+        requiresApproval: 1,
+        proposedBy: "hypothesis_agent",
+        targetValue: "host-05",
+      });
     }
   );
 
@@ -224,7 +270,7 @@ describe("runHypothesisAgent — full pipeline", () => {
         recommendedActions: [
           {
             action: "Reset all admin credentials",
-            category: "credential_reset",
+            category: "disable_account",
             urgency: "immediate",
             targetType: "user",
             targetValue: "admin",
@@ -251,8 +297,41 @@ describe("runHypothesisAgent — full pipeline", () => {
       // Should reuse the same session and case state
       expect(result.sessionId).toBe(testSessionId);
       expect(result.caseId).toBe(testCaseId);
-      // Should have new materialized actions
-      expect(result.materializedActionIds.length).toBeGreaterThan(0);
+      expect(result.isNewSession).toBe(false);
+    }
+  );
+
+  it.skipIf(!HAS_DB)(
+    "does not merge into another analyst's session (C9): existingSessionId owned by someone else opens a new session",
+    async () => {
+      const { runHypothesisAgent } = await import("./hypothesisAgent");
+      mockLLMResponse.mockResolvedValueOnce(makeHypothesisLLMResponse());
+
+      // testSessionId is owned by user 1; user 2 must not be able to merge into it
+      const result = await runHypothesisAgent({
+        correlationId: testCorrelationId,
+        existingSessionId: testSessionId,
+        userId: 2,
+      });
+
+      expect(result.sessionId).not.toBe(testSessionId);
+      expect(result.caseId).not.toBe(testCaseId);
+      expect(result.isNewSession).toBe(true);
+    }
+  );
+
+  it.skipIf(!HAS_DB)(
+    "materializes the merge run's new action (credential reset) alongside the first run's",
+    async () => {
+      const { getDb } = await import("../db");
+      const { responseActions } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      const rows = await db!.select().from(responseActions).where(eq(responseActions.caseId, testCaseId));
+      const categories = rows.map((r) => r.category).sort();
+      expect(categories).toEqual(["disable_account", "isolate_host"]);
+      const reset = rows.find((r) => r.category === "disable_account");
+      expect(reset).toMatchObject({ state: "proposed", requiresApproval: 1, targetValue: "admin" });
     }
   );
 
@@ -361,41 +440,29 @@ describe("runHypothesisAgent — response action materialization", () => {
   }
 
   it.skipIf(!HAS_DB)(
-    "materializes response actions with correct initial state (proposed)",
+    "materializes response actions with correct initial state (proposed, requiresApproval=1 regardless of model output)",
     async () => {
-      const correlationId = await createIsolatedCorrelation("hypo-test-actions-materialize-1");
+      const correlationId = await createIsolatedCorrelation("hypo-test-actions-state-1");
       const { runHypothesisAgent } = await import("./hypothesisAgent");
-
       mockLLMResponse.mockResolvedValueOnce(makeHypothesisLLMResponse({
         recommendedActions: [
-          {
-            action: "Block IP at firewall",
-            category: "block",
-            urgency: "immediate",
-            targetType: "ip",
-            targetValue: "10.0.0.99",
-            requiresApproval: true,
-            evidenceBasis: ["Confirmed malicious"],
-          },
-          {
-            action: "Add to watchlist",
-            category: "watchlist",
-            urgency: "next",
-            targetType: "ip",
-            targetValue: "10.0.0.99",
-            requiresApproval: false,
-            evidenceBasis: ["Suspicious activity"],
-          },
+          // Model says no approval needed for a watchlist add — C10 ignores that.
+          { action: "Add host-05 to the watchlist", category: "add_watchlist", urgency: "optional", targetType: "host", targetValue: "host-05", requiresApproval: false, evidenceBasis: ["Suspicious connections"] },
+          // Urgency words are NOT categories: this one is unclassifiable and must be skipped, not stored as custom.
+          { action: "Do something vague", category: "immediate", urgency: "immediate", targetType: "host", targetValue: "host-05", requiresApproval: false, evidenceBasis: [] },
         ],
       }));
-
       const result = await runHypothesisAgent({ correlationId, userId: 1 });
 
-      expect(result.materializedActionIds.length).toBe(2);
-      // All materialized actions should start in "proposed" state
-      for (const actionId of result.materializedActionIds) {
-        expect(actionId).toMatch(/^ra-/);
-      }
+      const { getDb } = await import("../db");
+      const { responseActions } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      const rows = await db!.select().from(responseActions).where(eq(responseActions.caseId, result.caseId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ category: "add_watchlist", state: "proposed", requiresApproval: 1 });
+      // The unclassifiable one is reported, never silently dropped
+      expect(result.materializePartialFailure?.failed.some((f) => /Unclassifiable category 'immediate'/.test(f.error))).toBe(true);
     }
   );
 
@@ -449,7 +516,10 @@ describe("runHypothesisAgent — edge cases", () => {
           supportingEvidence: [],
           conflictingEvidence: ["No clear indicators"],
         },
-        alternateTheories: [],
+        // C12: at least one alternate theory is required for a valid hypothesis
+        alternateTheories: [
+          { statement: "Benign misconfiguration", confidence: 0.1, supportingEvidence: [], conflictingEvidence: [] },
+        ],
         evidenceGaps: [
           { description: "No network context", impact: "Cannot assess scope" },
           { description: "No endpoint data", impact: "Cannot confirm activity" },
@@ -463,7 +533,36 @@ describe("runHypothesisAgent — edge cases", () => {
       const result = await runHypothesisAgent({ correlationId: corr.correlationId, userId: 1 });
 
       expect(result.caseId).toBeGreaterThan(0);
+      expect(result.livingCase.workingTheory.confidence).toBe(0.1);
       expect(result.materializedActionIds.length).toBe(0);
+    }
+  );
+
+  it.skipIf(!HAS_DB)(
+    "fails (does not fabricate a case) when the LLM returns no alternate theories (C12)",
+    async () => {
+      const { runTriageAgent } = await import("./triageAgent");
+      const { runCorrelationAgent } = await import("./correlationAgent");
+      const { runHypothesisAgent } = await import("./hypothesisAgent");
+
+      mockLLMResponse.mockResolvedValueOnce(TRIAGE_LLM_RESPONSE);
+      const triage = await runTriageAgent({
+        rawAlert: {
+          id: `hypo-test-no-alt-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          rule: { id: "100", level: 3, description: "Low-level alert" },
+          agent: { id: "099", name: "test-host" },
+          data: {},
+        },
+        userId: 1,
+      });
+      mockLLMResponse.mockResolvedValueOnce(CORRELATION_LLM_RESPONSE);
+      const corr = await runCorrelationAgent({ triageId: triage.triageId! });
+
+      mockLLMResponse.mockResolvedValueOnce(makeHypothesisLLMResponse({ alternateTheories: [] }));
+      await expect(
+        runHypothesisAgent({ correlationId: corr.correlationId, userId: 1 })
+      ).rejects.toThrow(/not a valid hypothesis/);
     }
   );
 });

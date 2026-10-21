@@ -102,8 +102,9 @@ describe.skipIf(!HAS_DB)("getPipelineRunByQueueItem — shape verification", () 
   });
 
   it("should have valid status enum values", async () => {
+    // Mirror drizzle/schema.ts pipeline_runs enums (responseActionsStatus also allows "partial").
     const validStatuses = ["running", "completed", "failed", "partial"];
-    const validStageStatuses = ["pending", "running", "completed", "failed", "skipped"];
+    const validStageStatuses = ["completed", "failed", "partial", "pending", "running", "skipped"];
     const [rows] = await pool.execute(`SELECT * FROM pipeline_runs LIMIT 10`);
     const items = rows as Record<string, unknown>[];
     for (const row of items) {
