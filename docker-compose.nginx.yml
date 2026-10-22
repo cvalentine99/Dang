@@ -24,6 +24,11 @@ services:
     ports: []
     expose:
       - "3000"
+    environment:
+      # Exactly one trusted hop (Nginx) — req.ip becomes the real client
+      # address from X-Forwarded-For, which the login rate limiter keys on.
+      # Never "true"/all hops: that lets clients spoof their IP.
+      TRUST_PROXY: "1"
 
   # ── Nginx Reverse Proxy ──────────────────────────────────────────────────
   nginx:

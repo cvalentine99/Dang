@@ -9,6 +9,7 @@ import { ExportButton } from "@/components/shared/ExportButton";
 import { ThreatMap } from "@/components/shared/ThreatMap";
 import { ChartSkeleton } from "@/components/shared/ChartSkeleton";
 import { BrokerWarnings } from "@/components/shared/BrokerWarnings";
+import { IndexerErrorState } from "@/components/shared/IndexerStates";
 import { EXPORT_COLUMNS } from "@/lib/exportUtils";
 
 import {
@@ -474,13 +475,22 @@ export default function Home() {
   }, [alertsAggByMitreQ.data, isIndexerConnected]);
 
   const anomalyStats = anomalyStatsQ.data;
-  const isLoading = statusQ.isLoading;
+  // C18: the page is not "loaded" until both manager and indexer status are known,
+  // and indexer-backed panels must show an error (never zeros) while the indexer is down.
+  const isLoading = statusQ.isLoading || indexerStatusQ.isLoading;
+  const isIndexerDown = !indexerStatusQ.isLoading && (!isIndexerConnected || indexerStatusQ.isError);
+  const indexerErrorDetail = indexerStatusQ.isError
+    ? indexerStatusQ.error.message
+    : indexerStatusQ.data?.configured === false
+      ? "Indexer is not configured — set it in Connection Settings"
+      : ((indexerStatusQ.data as Record<string, unknown> | undefined)?.error as string | undefined) ?? "Indexer health check failed";
+  const retryIndexer = () => { void indexerStatusQ.refetch(); utils.indexer.invalidate(); };
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════════════════════════
   return (
-    <WazuhGuard>
+    <WazuhGuard indexer={{ connected: isIndexerConnected && !indexerStatusQ.isError, loading: indexerStatusQ.isLoading }}>
       <div className="space-y-5">
         <PageHeader
           title="SOC Console"
@@ -636,6 +646,14 @@ export default function Home() {
               {epsData.droppedEvents > 0 && <p className="text-[10px] text-threat-high mt-2 flex items-center gap-1"><ArrowDownRight className="h-3 w-3" /> {epsData.droppedEvents.toLocaleString()} dropped</p>}
             </GlassPanel>
 
+            {isIndexerDown ? (
+              <IndexerErrorState
+                className="lg:col-span-6"
+                message="Wazuh Indexer unavailable — threat trends cannot be shown"
+                detail={indexerErrorDetail}
+                onRetry={retryIndexer}
+              />
+            ) : (
             <GlassPanel className="lg:col-span-6">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-2"><TrendingUp className="h-3.5 w-3.5 text-primary" /> Threat Trends — Last 24h</h3>
@@ -663,6 +681,7 @@ export default function Home() {
                 </AreaChart>
               </ResponsiveContainer>
             </GlassPanel>
+            )}
 
             <GlassPanel className="lg:col-span-3 flex flex-col">
               <div className="flex items-center gap-2 mb-2">
@@ -693,7 +712,14 @@ export default function Home() {
         {/* ═══════════════════════════════════════════════════════════════════
             ROW 4: GEO THREAT MAP + TOP TALKERS + TOP FIRING RULES
         ═══════════════════════════════════════════════════════════════════ */}
-        {!isLoading && (
+        {!isLoading && isIndexerDown && (
+          <IndexerErrorState
+            message="Wazuh Indexer unavailable — geographic, top-talker and rule alert analytics are not shown"
+            detail={indexerErrorDetail}
+            onRetry={retryIndexer}
+          />
+        )}
+        {!isLoading && !isIndexerDown && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <GlassPanel className="lg:col-span-5">
               <div className="flex items-center justify-between mb-3">

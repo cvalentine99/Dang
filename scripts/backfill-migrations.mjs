@@ -63,7 +63,11 @@ async function main() {
       // Only backfill migrations that are OLDER than or equal to the newest
       // existing entry. Migrations with newer timestamps are genuinely new
       // and must be applied by drizzle-kit migrate, not backfilled.
-      if (entry.when > maxExistingTimestamp && maxExistingTimestamp > 0) {
+      // An EMPTY journal is not a legacy database — drizzle-kit creates the table
+      // before applying 0000, so empty means "nothing has ever been applied" (or a
+      // first-migration failure / truncated journal). Backfilling here would mark every
+      // migration applied against a schema-less database. Leave it all to drizzle-kit.
+      if (existingRows.length === 0 || entry.when > maxExistingTimestamp) {
         console.log(`[backfill]   ⏭ ${entry.tag} — skipped (newer than applied migrations, will be applied by drizzle-kit)`);
         continue;
       }

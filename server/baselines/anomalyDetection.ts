@@ -21,6 +21,7 @@
 
 import { eq, desc, and, lt } from "drizzle-orm";
 import { getDb } from "../db";
+import { requireDb } from "../dbGuard";
 import {
   driftSnapshots,
   driftAnomalies,
@@ -120,17 +121,9 @@ export async function checkForAnomaly(
   const windowSize = options.windowSize ?? DEFAULT_WINDOW_SIZE;
   const sigmaThreshold = options.sigmaThreshold ?? DEFAULT_SIGMA_THRESHOLD;
 
-  const db = await getDb();
-  if (!db) {
-    return {
-      isAnomaly: false,
-      zScore: 0,
-      rollingAvg: 0,
-      rollingStdDev: 0,
-      windowSize: 0,
-      insufficientData: true,
-    };
-  }
+  // M-11: fail closed. Returning "isAnomaly: false" on a DB outage is a
+  // silent false negative; callers must see the failure.
+  const db = await requireDb();
 
   // Fetch previous snapshots for this schedule (excluding the current one)
   const previousSnapshots = await db

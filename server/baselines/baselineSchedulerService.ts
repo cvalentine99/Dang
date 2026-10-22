@@ -12,7 +12,7 @@
  * and skipped until the next interval. Other schedules are not affected.
  */
 
-import { eq, desc, and, lte, sql } from "drizzle-orm";
+import { eq, desc, and, lte, sql, inArray, or } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   baselineSchedules,
@@ -255,8 +255,16 @@ export async function executeScheduledCapture(
       );
     }
 
-    // Prune old baselines beyond retention limit
-    await pruneOldBaselines(db, schedule.id, schedule.retentionCount);
+    // Prune old baselines beyond retention limit.
+    // H-D3: the capture has already succeeded — a prune failure must NOT mark
+    // the schedule as failed, so it gets its own try/catch and log line.
+    try {
+      await pruneOldBaselines(db, schedule.id, schedule.retentionCount);
+    } catch (pruneErr) {
+      console.error(
+        `[BaselineScheduler] Retention prune failed for schedule ${schedule.id} (capture of baseline ${baselineId} succeeded): ${(pruneErr as Error).message}`
+      );
+    }
 
     return { success: true, baselineId };
   } catch (err) {
@@ -284,6 +292,12 @@ export async function executeScheduledCapture(
 /**
  * Prune baselines beyond the retention limit for a schedule.
  * Keeps the most recent `retentionCount` baselines, deletes the rest.
+ *
+ * H-D3: drift_snapshots.baselineId / previousBaselineId reference
+ * config_baselines ON DELETE RESTRICT, so the referencing snapshots are
+ * deleted first (one inArray delete; drift_anomalies cascade and
+ * drift_notification_history.snapshotId is SET NULL by their FKs), then the
+ * baselines — both in one transaction so a failure leaves nothing half-pruned.
  */
 async function pruneOldBaselines(
   db: Awaited<ReturnType<typeof getDb>>,
@@ -304,11 +318,19 @@ async function pruneOldBaselines(
 
   // Delete the oldest ones beyond the retention limit
   const toDelete = allBaselines.slice(retentionCount);
-  for (const baseline of toDelete) {
-    await db
-      .delete(configBaselines)
-      .where(eq(configBaselines.id, baseline.id));
-  }
+  const ids = toDelete.map((b) => b.id);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(driftSnapshots)
+      .where(
+        or(
+          inArray(driftSnapshots.baselineId, ids),
+          inArray(driftSnapshots.previousBaselineId, ids)
+        )
+      );
+    await tx.delete(configBaselines).where(inArray(configBaselines.id, ids));
+  });
 
   console.log(
     `[BaselineScheduler] Pruned ${toDelete.length} old baselines for schedule ${scheduleId} (retention: ${retentionCount})`

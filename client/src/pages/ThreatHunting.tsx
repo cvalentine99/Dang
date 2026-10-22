@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { GlassPanel } from "@/components/shared/GlassPanel";
@@ -290,23 +290,20 @@ export default function ThreatHunting() {
     setHuntHistory((prev) => [entry, ...prev].slice(0, 50));
   }, [searchValue, iocType]);
 
-  // Update last hunt entry with results
-  useMemo(() => {
-    if (huntHistory.length > 0 && correlationResults.length > 0 && huntHistory[0].query === activeQuery) {
-      setHuntHistory((prev) => {
-        const updated = [...prev];
-        if (updated[0]) {
-          updated[0] = {
-            ...updated[0],
-            totalHits: totalHits,
-            sources: correlationResults.map((r) => r.sourceLabel),
-          };
-        }
-        return updated;
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [correlationResults, totalHits]);
+  // Update last hunt entry with results (side effect → useEffect, not useMemo)
+  useEffect(() => {
+    if (correlationResults.length === 0) return;
+    setHuntHistory((prev) => {
+      if (!prev[0] || prev[0].query !== activeQuery) return prev;
+      const updated = [...prev];
+      updated[0] = {
+        ...updated[0],
+        totalHits: totalHits,
+        sources: correlationResults.map((r) => r.sourceLabel),
+      };
+      return updated;
+    });
+  }, [correlationResults, totalHits, activeQuery]);
 
   // ── Refresh all queries ───────────────────────────────────────────────────
   const handleRefresh = () => {

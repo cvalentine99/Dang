@@ -184,7 +184,33 @@ describe("inferAllRoutes", () => {
 
 // ── Export Utils (pure transformations, no DOM needed) ───────────────────────
 
-import { toCSV, toJSON, makeFilename } from "@/lib/exportUtils";
+import { toCSV, toJSON, makeFilename, neutralizeFormula } from "@/lib/exportUtils";
+
+describe("CSV formula-injection guard", () => {
+  it.each(["=HYPERLINK(\"http://x\")", "+cmd|' /C calc'!A0", "-2+3", "@SUM(A1)", "\tfoo", "\rbar"])(
+    "prefixes %j with a single quote",
+    (v) => {
+      expect(neutralizeFormula(v)).toBe(`'${v}`);
+    }
+  );
+
+  it("leaves ordinary values and plain numbers untouched", () => {
+    expect(neutralizeFormula("srv-web")).toBe("srv-web");
+    expect(neutralizeFormula("-5")).toBe("-5");
+    expect(neutralizeFormula("+1.5")).toBe("+1.5");
+    expect(neutralizeFormula("a=b")).toBe("a=b");
+  });
+
+  it("toCSV neutralises formula cells in data and headers", () => {
+    const csv = toCSV([{ "=evil": "=1+1", host: "@srv", note: "=A1,B1" }]);
+    const [header, row] = csv.split("\n");
+    expect(header.startsWith("'=evil,")).toBe(true);
+    expect(row).toContain("'=1+1");
+    expect(row).toContain("'@srv");
+    // quoting still applies after prefixing
+    expect(row).toContain('"\'=A1,B1"');
+  });
+});
 
 describe("toCSV", () => {
   it("returns empty string for empty data", () => {
@@ -272,5 +298,76 @@ describe("auth constants", () => {
     expect(getLoginUrl()).toBe("/login");
     expect(getLoginUrl("/dashboard")).toBe("/login");
     expect(getLoginUrl(undefined)).toBe("/login");
+  });
+});
+
+// ── Phase 2 client hardening regressions ────────────────────────────────────
+
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+import { computeBackoffMs } from "@/hooks/useAlertStream";
+
+function walk(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) walk(full, out);
+    else if (/\.(ts|tsx)$/.test(name)) out.push(full);
+  }
+  return out;
+}
+
+const CLIENT_SRC = join(__dirname, "..");
+
+describe("H-L8: Streamdown only via SafeMarkdown", () => {
+  it("no module other than SafeMarkdown imports streamdown", () => {
+    const offenders = walk(CLIENT_SRC)
+      .filter((f) => !f.endsWith("SafeMarkdown.tsx") && !f.includes("__tests__"))
+      .filter((f) => /from\s+["']streamdown["']/.test(readFileSync(f, "utf8")))
+      .map((f) => relative(CLIENT_SRC, f));
+    expect(offenders).toEqual([]);
+  });
+
+  it("SafeMarkdown restricts images to same-origin paths", () => {
+    const src = readFileSync(join(CLIENT_SRC, "components", "SafeMarkdown.tsx"), "utf8")
+      .split("\n")
+      .filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l))
+      .join("\n");
+    expect(src).toMatch(/allowedImagePrefixes:\s*\["\/"\]/);
+    expect(src).not.toMatch(/allowedImagePrefixes:\s*\["\*"\]/);
+  });
+});
+
+describe("H-C4: pages are lazy-loaded", () => {
+  it("App.tsx has no static ./pages/* imports except NotFound", () => {
+    const app = readFileSync(join(CLIENT_SRC, "App.tsx"), "utf8");
+    expect(app).not.toMatch(/^import \w+ from "\.\/pages\//m);
+    // every registry pageName has a lazy() entry
+    for (const name of new Set(ROUTE_REGISTRY.map((r) => r.pageName))) {
+      expect(app).toMatch(new RegExp(`\\b${name}: lazy\\(\\(\\) => import\\("\\./pages/`));
+    }
+  });
+});
+
+describe("routeRegistry requiresRole", () => {
+  it("marks every /admin/* route as admin-only", () => {
+    for (const r of ROUTE_REGISTRY.filter((r) => r.path.startsWith("/admin/"))) {
+      expect(r.requiresRole, r.path).toBe("admin");
+    }
+  });
+
+  it("marks group management and auto-queue rules as admin-only", () => {
+    expect(ROUTE_REGISTRY.find((r) => r.pageName === "GroupManagement")?.requiresRole).toBe("admin");
+    expect(ROUTE_REGISTRY.find((r) => r.pageName === "AutoQueueRules")?.requiresRole).toBe("admin");
+    expect(ROUTE_REGISTRY.find((r) => r.pageName === "Home")?.requiresRole).toBeUndefined();
+  });
+});
+
+describe("SSE reconnect backoff", () => {
+  it("grows exponentially from ~1s and caps at 30s, with jitter in [d/2, d]", () => {
+    expect(computeBackoffMs(0, () => 1)).toBe(1000);
+    expect(computeBackoffMs(0, () => 0)).toBe(500);
+    expect(computeBackoffMs(3, () => 1)).toBe(8000);
+    expect(computeBackoffMs(10, () => 1)).toBe(30000);
+    expect(computeBackoffMs(50, () => 0)).toBe(15000);
   });
 });

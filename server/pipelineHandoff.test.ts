@@ -876,7 +876,7 @@ describe("Contract 3: LivingCaseObject (Correlation → Investigation)", () => {
         ]).toContain(action.category);
         expect(typeof action.requiresApproval).toBe("boolean");
         expect(action.evidenceBasis).toBeInstanceOf(Array);
-        expect(["proposed", "approved", "rejected", "executed", "deferred"]).toContain(
+        expect(["proposed", "approved", "rejected", "acknowledged", "deferred"]).toContain(
           action.state
         );
       }
@@ -1088,7 +1088,7 @@ describe("Response Action State Machine (real imports from stateMachine.ts)", ()
     it("defines exactly 5 states", () => {
       expect(Object.keys(VALID_TRANSITIONS)).toHaveLength(5);
       expect(Object.keys(VALID_TRANSITIONS).sort()).toEqual(
-        ["approved", "deferred", "executed", "proposed", "rejected"]
+        ["acknowledged", "approved", "deferred", "proposed", "rejected"]
       );
     });
 
@@ -1098,8 +1098,8 @@ describe("Response Action State Machine (real imports from stateMachine.ts)", ()
       expect(VALID_TRANSITIONS.proposed).toContain("deferred");
     });
 
-    it("approved can transition to executed or rejected", () => {
-      expect(VALID_TRANSITIONS.approved).toContain("executed");
+    it("approved can transition to acknowledged or rejected", () => {
+      expect(VALID_TRANSITIONS.approved).toContain("acknowledged");
       expect(VALID_TRANSITIONS.approved).toContain("rejected");
     });
 
@@ -1107,8 +1107,8 @@ describe("Response Action State Machine (real imports from stateMachine.ts)", ()
       expect(VALID_TRANSITIONS.rejected).toHaveLength(0);
     });
 
-    it("executed has no transitions (terminal)", () => {
-      expect(VALID_TRANSITIONS.executed).toHaveLength(0);
+    it("acknowledged has no transitions (terminal)", () => {
+      expect(VALID_TRANSITIONS.acknowledged).toHaveLength(0);
     });
 
     it("deferred can be re-proposed", () => {
@@ -1117,8 +1117,8 @@ describe("Response Action State Machine (real imports from stateMachine.ts)", ()
   });
 
   describe("TERMINAL_STATES (imported constant)", () => {
-    it("contains exactly rejected and executed", () => {
-      expect([...TERMINAL_STATES].sort()).toEqual(["executed", "rejected"]);
+    it("contains exactly rejected and acknowledged", () => {
+      expect([...TERMINAL_STATES].sort()).toEqual(["acknowledged", "rejected"]);
     });
   });
 
@@ -1135,8 +1135,8 @@ describe("Response Action State Machine (real imports from stateMachine.ts)", ()
       expect(isValidTransition("proposed", "deferred")).toBe(true);
     });
 
-    it("allows approved → executed", () => {
-      expect(isValidTransition("approved", "executed")).toBe(true);
+    it("allows approved → acknowledged", () => {
+      expect(isValidTransition("approved", "acknowledged")).toBe(true);
     });
 
     it("allows approved → rejected", () => {
@@ -1148,19 +1148,19 @@ describe("Response Action State Machine (real imports from stateMachine.ts)", ()
     });
 
     it("rejects rejected → anything", () => {
-      for (const target of ["proposed", "approved", "executed", "deferred"] as ActionState[]) {
+      for (const target of ["proposed", "approved", "acknowledged", "deferred"] as ActionState[]) {
         expect(isValidTransition("rejected", target)).toBe(false);
       }
     });
 
-    it("rejects executed → anything", () => {
+    it("rejects acknowledged → anything", () => {
       for (const target of ["proposed", "approved", "rejected", "deferred"] as ActionState[]) {
-        expect(isValidTransition("executed", target)).toBe(false);
+        expect(isValidTransition("acknowledged", target)).toBe(false);
       }
     });
 
-    it("rejects proposed → executed (must go through approved)", () => {
-      expect(isValidTransition("proposed", "executed")).toBe(false);
+    it("rejects proposed → acknowledged (must go through approved)", () => {
+      expect(isValidTransition("proposed", "acknowledged")).toBe(false);
     });
 
     it("rejects unknown states gracefully", () => {
@@ -1173,8 +1173,8 @@ describe("Response Action State Machine (real imports from stateMachine.ts)", ()
       expect(isTerminalState("rejected")).toBe(true);
     });
 
-    it("executed is terminal", () => {
-      expect(isTerminalState("executed")).toBe(true);
+    it("acknowledged is terminal", () => {
+      expect(isTerminalState("acknowledged")).toBe(true);
     });
 
     it("proposed is NOT terminal", () => {
@@ -1205,7 +1205,7 @@ describe("Response Action State Machine (real imports from stateMachine.ts)", ()
 
     it("terminal states have 0 allowed transitions", () => {
       expect(getAllowedTransitions("rejected")).toHaveLength(0);
-      expect(getAllowedTransitions("executed")).toHaveLength(0);
+      expect(getAllowedTransitions("acknowledged")).toHaveLength(0);
     });
 
     it("unknown state returns empty array", () => {
@@ -1258,9 +1258,9 @@ describe("Response Action State Machine (real imports from stateMachine.ts)", ()
       expect(result.violation).toContain("terminal state");
     });
 
-    it("blocks proposed → executed when requiresApproval=1", () => {
-      // Even though proposed→executed is not a valid transition, checkInvariants catches it
-      const result = checkInvariants(mockAction({ state: "proposed", requiresApproval: 1 }), "executed");
+    it("blocks proposed → acknowledged when requiresApproval=1", () => {
+      // Even though proposed→acknowledged is not a valid transition, checkInvariants catches it
+      const result = checkInvariants(mockAction({ state: "proposed", requiresApproval: 1 }), "acknowledged");
       expect(result.valid).toBe(false);
     });
 

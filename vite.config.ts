@@ -155,7 +155,10 @@ function vitePluginManusDebugCollector(): Plugin {
 
 // In Docker / self-hosted builds, exclude Manus-specific plugins (runtime overlay,
 // analytics, debug collector, jsx-loc) that depend on the Manus hosting platform.
-const isSelfHostedBuild = !!process.env.DOCKER_BUILD || !!process.env.SELF_HOSTED;
+// H-C3: `pnpm build` sets SELF_HOSTED=1, so production builds exclude them by
+// default; MANUS_DEV=1 explicitly opts back in (also overrides DOCKER_BUILD).
+const isSelfHostedBuild =
+  !process.env.MANUS_DEV && (!!process.env.DOCKER_BUILD || !!process.env.SELF_HOSTED);
 const plugins = [
   react(),
   tailwindcss(),

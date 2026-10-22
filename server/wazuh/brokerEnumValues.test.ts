@@ -52,22 +52,20 @@ describe("Broker enum values", () => {
     expect(levelParam.enumValues).toContain("debug2");
   });
 
-  it("hash params have algorithm enum values (not boolean)", () => {
+  it("SYSCHECK hash is a hash-VALUE filter (spec format: hash) — no algorithm enum", () => {
+    // Spec v4.14.x: "Filter files with the specified hash (md5, sha256 or sha1)".
+    // An algorithm enum here would make H-P3 enforcement reject every real hash.
     const hashParam = SYSCHECK_CONFIG.params.hash;
     expect(hashParam).toBeDefined();
-    expect(hashParam.enumValues).toBeDefined();
-    expect(hashParam.enumValues).toContain("md5");
-    expect(hashParam.enumValues).toContain("sha256");
-    // Must NOT be boolean values
-    expect(hashParam.enumValues).not.toContain("true");
-    expect(hashParam.enumValues).not.toContain("false");
+    expect(hashParam.enumValues).toBeUndefined();
   });
 
-  it("ROOTCHECK_CONFIG.status has agent status enum values", () => {
+  it("ROOTCHECK_CONFIG.status has no agent-status enum (spec: free alphanumeric)", () => {
+    // The old ["active","pending",...] list was copied from /agents and is not
+    // what rootcheck status means; enforcing it would break the filter.
     const statusParam = ROOTCHECK_CONFIG.params.status;
-    expect(statusParam.enumValues).toBeDefined();
-    expect(statusParam.enumValues).toContain("active");
-    expect(statusParam.enumValues).toContain("pending");
+    expect(statusParam).toBeDefined();
+    expect(statusParam.enumValues).toBeUndefined();
   });
 
   // ── No duplicate enumValues in any config ─────────────────────────────────

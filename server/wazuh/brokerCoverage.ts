@@ -28,10 +28,15 @@ const __dirname = dirname(__filename);
 function detectBundledSpecVersion(): string {
   const specDir = resolve(process.cwd(), "spec");
   try {
+    // Newest first by parsed semver tuple — a plain string sort would rank 4.14.9 above 4.14.10.
+    const semver = (f: string) => (f.match(/\d+/g) ?? []).map(Number);
     const specFiles = readdirSync(specDir)
-      .filter(f => f.startsWith("wazuh-api-v") && f.endsWith(".yaml"))
-      .sort()
-      .reverse();
+      .filter(f => /^wazuh-api-v\d+\.\d+\.\d+\.yaml$/.test(f))
+      .sort((a, b) => {
+        const va = semver(a), vb = semver(b);
+        for (let i = 0; i < 3; i++) if (va[i] !== vb[i]) return (vb[i] ?? 0) - (va[i] ?? 0);
+        return 0;
+      });
     if (specFiles.length > 0) {
       const specPath = join(specDir, specFiles[0]);
       // Scan line-by-line for the info.version field.
@@ -214,12 +219,18 @@ export interface CategoryBreakdown {
 // To verify a classification, search for the procedure name in wazuhRouter.ts
 // and check whether the query handler calls brokerParams().
 
-const ENDPOINT_REGISTRY: Array<{
+export const ENDPOINT_REGISTRY: Array<{
   procedure: string;
   wazuhPath: string;
   wiringLevel: WiringLevel;
   brokerConfig?: string;
-  paramCount: number;
+  /**
+   * Hand-maintained ONLY for non-broker entries (there is no config to derive
+   * from). Broker-wired entries must NOT set it: generateCoverageReport()
+   * derives their count from `Object.keys(config.params).length` at report
+   * time, and brokerCoverage.test.ts fails if a broker entry carries one.
+   */
+  paramCount?: number;
   category: string;
 }> = [
   // ── Manager ──
@@ -227,153 +238,153 @@ const ENDPOINT_REGISTRY: Array<{
   { procedure: "isConfigured", wazuhPath: "N/A (config check)", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
   { procedure: "managerInfo", wazuhPath: "/manager/info", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
   { procedure: "managerStatus", wazuhPath: "/manager/status", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
-  { procedure: "managerConfiguration", wazuhPath: "/manager/configuration", wiringLevel: "broker", brokerConfig: "MANAGER_CONFIG", paramCount: 4, category: "Manager" },
+  { procedure: "managerConfiguration", wazuhPath: "/manager/configuration", wiringLevel: "broker", brokerConfig: "MANAGER_CONFIG", category: "Manager" },
   { procedure: "managerConfigValidation", wazuhPath: "/manager/configuration/validation", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
   { procedure: "clusterConfigValidation", wazuhPath: "/cluster/configuration/validation", wiringLevel: "passthrough", paramCount: 0, category: "Cluster" },
-  { procedure: "managerStats", wazuhPath: "/manager/stats", wiringLevel: "broker", brokerConfig: "MANAGER_STATS_CONFIG", paramCount: 2, category: "Manager" },
+  { procedure: "managerStats", wazuhPath: "/manager/stats", wiringLevel: "broker", brokerConfig: "MANAGER_STATS_CONFIG", category: "Manager" },
   { procedure: "statsHourly", wazuhPath: "/manager/stats/hourly", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
   { procedure: "statsWeekly", wazuhPath: "/manager/stats/weekly", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
   { procedure: "analysisd", wazuhPath: "/manager/stats/analysisd", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
   { procedure: "remoted", wazuhPath: "/manager/stats/remoted", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
-  { procedure: "daemonStats", wazuhPath: "/manager/daemons/stats", wiringLevel: "broker", brokerConfig: "MANAGER_DAEMON_STATS_CONFIG", paramCount: 2, category: "Manager" },
-  { procedure: "managerLogs", wazuhPath: "/manager/logs", wiringLevel: "broker", brokerConfig: "MANAGER_LOGS_CONFIG", paramCount: 9, category: "Manager" },
+  { procedure: "daemonStats", wazuhPath: "/manager/daemons/stats", wiringLevel: "broker", brokerConfig: "MANAGER_DAEMON_STATS_CONFIG", category: "Manager" },
+  { procedure: "managerLogs", wazuhPath: "/manager/logs", wiringLevel: "broker", brokerConfig: "MANAGER_LOGS_CONFIG", category: "Manager" },
   { procedure: "managerLogsSummary", wazuhPath: "/manager/logs/summary", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
-  { procedure: "managerVersionCheck", wazuhPath: "/manager/version/check", wiringLevel: "broker", brokerConfig: "MANAGER_VERSION_CHECK_CONFIG", paramCount: 1, category: "Manager" },
+  { procedure: "managerVersionCheck", wazuhPath: "/manager/version/check", wiringLevel: "broker", brokerConfig: "MANAGER_VERSION_CHECK_CONFIG", category: "Manager" },
   { procedure: "managerComponentConfig", wazuhPath: "/manager/configuration/{component}/{configuration}", wiringLevel: "passthrough", paramCount: 1, category: "Manager" },
   { procedure: "managerApiConfig", wazuhPath: "/manager/api/config", wiringLevel: "passthrough", paramCount: 0, category: "Manager" },
 
   // ── Cluster ──
   { procedure: "clusterStatus", wazuhPath: "/cluster/status", wiringLevel: "passthrough", paramCount: 0, category: "Cluster" },
-  { procedure: "clusterNodes", wazuhPath: "/cluster/nodes", wiringLevel: "broker", brokerConfig: "CLUSTER_NODES_CONFIG", paramCount: 9, category: "Cluster" },
-  { procedure: "clusterHealthcheck", wazuhPath: "/cluster/healthcheck", wiringLevel: "broker", brokerConfig: "CLUSTER_HEALTHCHECK_CONFIG", paramCount: 2, category: "Cluster" },
+  { procedure: "clusterNodes", wazuhPath: "/cluster/nodes", wiringLevel: "broker", brokerConfig: "CLUSTER_NODES_CONFIG", category: "Cluster" },
+  { procedure: "clusterHealthcheck", wazuhPath: "/cluster/healthcheck", wiringLevel: "broker", brokerConfig: "CLUSTER_HEALTHCHECK_CONFIG", category: "Cluster" },
   { procedure: "clusterLocalInfo", wazuhPath: "/cluster/local/info", wiringLevel: "passthrough", paramCount: 0, category: "Cluster" },
   { procedure: "clusterLocalConfig", wazuhPath: "/cluster/local/config", wiringLevel: "passthrough", paramCount: 0, category: "Cluster" },
   { procedure: "clusterRulesetSync", wazuhPath: "/cluster/ruleset/synchronization", wiringLevel: "passthrough", paramCount: 0, category: "Cluster" },
   { procedure: "clusterApiConfig", wazuhPath: "/cluster/api/config", wiringLevel: "passthrough", paramCount: 0, category: "Cluster" },
   { procedure: "clusterNodeInfo", wazuhPath: "/cluster/{node_id}/info", wiringLevel: "passthrough", paramCount: 1, category: "Cluster" },
-  { procedure: "clusterNodeStats", wazuhPath: "/cluster/{node_id}/stats", wiringLevel: "broker", brokerConfig: "CLUSTER_NODE_STATS_CONFIG", paramCount: 2, category: "Cluster" },
+  { procedure: "clusterNodeStats", wazuhPath: "/cluster/{node_id}/stats", wiringLevel: "broker", brokerConfig: "CLUSTER_NODE_STATS_CONFIG", category: "Cluster" },
   { procedure: "clusterNodeStatsHourly", wazuhPath: "/cluster/{node_id}/stats/hourly", wiringLevel: "passthrough", paramCount: 1, category: "Cluster" },
   { procedure: "clusterNodeStatus", wazuhPath: "/cluster/{node_id}/status", wiringLevel: "passthrough", paramCount: 1, category: "Cluster" },
-  { procedure: "clusterNodeConfiguration", wazuhPath: "/cluster/{node_id}/configuration", wiringLevel: "broker", brokerConfig: "CLUSTER_NODE_CONFIGURATION_CONFIG", paramCount: 4, category: "Cluster" },
+  { procedure: "clusterNodeConfiguration", wazuhPath: "/cluster/{node_id}/configuration", wiringLevel: "broker", brokerConfig: "CLUSTER_NODE_CONFIGURATION_CONFIG", category: "Cluster" },
   { procedure: "clusterNodeComponentConfig", wazuhPath: "/cluster/{node_id}/configuration/{component}/{configuration}", wiringLevel: "passthrough", paramCount: 1, category: "Cluster" },
-  { procedure: "clusterNodeDaemonStats", wazuhPath: "/cluster/{node_id}/daemons/stats", wiringLevel: "broker", brokerConfig: "CLUSTER_NODE_DAEMON_STATS_CONFIG", paramCount: 2, category: "Cluster" },
-  { procedure: "clusterNodeLogs", wazuhPath: "/cluster/{node_id}/logs", wiringLevel: "broker", brokerConfig: "CLUSTER_NODE_LOGS_CONFIG", paramCount: 10, category: "Cluster" },
+  { procedure: "clusterNodeDaemonStats", wazuhPath: "/cluster/{node_id}/daemons/stats", wiringLevel: "broker", brokerConfig: "CLUSTER_NODE_DAEMON_STATS_CONFIG", category: "Cluster" },
+  { procedure: "clusterNodeLogs", wazuhPath: "/cluster/{node_id}/logs", wiringLevel: "broker", brokerConfig: "CLUSTER_NODE_LOGS_CONFIG", category: "Cluster" },
   { procedure: "clusterNodeLogsSummary", wazuhPath: "/cluster/{node_id}/logs/summary", wiringLevel: "passthrough", paramCount: 1, category: "Cluster" },
   { procedure: "clusterNodeStatsAnalysisd", wazuhPath: "/cluster/{node_id}/stats/analysisd", wiringLevel: "passthrough", paramCount: 1, category: "Cluster" },
   { procedure: "clusterNodeStatsRemoted", wazuhPath: "/cluster/{node_id}/stats/remoted", wiringLevel: "passthrough", paramCount: 1, category: "Cluster" },
   { procedure: "clusterNodeStatsWeekly", wazuhPath: "/cluster/{node_id}/stats/weekly", wiringLevel: "passthrough", paramCount: 1, category: "Cluster" },
 
   // ── Agents ──
-  { procedure: "agents", wazuhPath: "/agents", wiringLevel: "broker", brokerConfig: "AGENTS_CONFIG", paramCount: 21, category: "Agents" },  // spec: 21 data params
+  { procedure: "agents", wazuhPath: "/agents", wiringLevel: "broker", brokerConfig: "AGENTS_CONFIG", category: "Agents" },  // spec: 21 data params
   { procedure: "agentSummaryStatus", wazuhPath: "/agents/summary/status", wiringLevel: "passthrough", paramCount: 0, category: "Agents" },
   { procedure: "agentSummaryOs", wazuhPath: "/agents/summary/os", wiringLevel: "passthrough", paramCount: 0, category: "Agents" },
-  { procedure: "agentsSummary", wazuhPath: "/agents/summary", wiringLevel: "broker", brokerConfig: "AGENTS_SUMMARY_CONFIG", paramCount: 2, category: "Agents" },
+  { procedure: "agentsSummary", wazuhPath: "/agents/summary", wiringLevel: "broker", brokerConfig: "AGENTS_SUMMARY_CONFIG", category: "Agents" },
   { procedure: "agentOverview", wazuhPath: "/overview/agents", wiringLevel: "passthrough", paramCount: 0, category: "Agents" },
   { procedure: "agentById", wazuhPath: "/agents/{agent_id}", wiringLevel: "passthrough", paramCount: 1, category: "Agents" },
-  { procedure: "agentDaemonStats", wazuhPath: "/agents/{agent_id}/daemons/stats", wiringLevel: "broker", brokerConfig: "AGENT_DAEMON_STATS_CONFIG", paramCount: 2, category: "Agents" },
+  { procedure: "agentDaemonStats", wazuhPath: "/agents/{agent_id}/daemons/stats", wiringLevel: "broker", brokerConfig: "AGENT_DAEMON_STATS_CONFIG", category: "Agents" },
   { procedure: "agentStats", wazuhPath: "/agents/{agent_id}/stats/{component}", wiringLevel: "passthrough", paramCount: 1, category: "Agents" },
   { procedure: "agentConfig", wazuhPath: "/agents/{agent_id}/config/{component}/{configuration}", wiringLevel: "passthrough", paramCount: 1, category: "Agents" },
-  { procedure: "agentsUpgradeResult", wazuhPath: "/agents/upgrade_result", wiringLevel: "broker", brokerConfig: "AGENTS_UPGRADE_RESULT_CONFIG", paramCount: 13, category: "Agents" },
+  { procedure: "agentsUpgradeResult", wazuhPath: "/agents/upgrade_result", wiringLevel: "broker", brokerConfig: "AGENTS_UPGRADE_RESULT_CONFIG", category: "Agents" },
   { procedure: "agentsUninstallPermission", wazuhPath: "N/A (permission check)", wiringLevel: "passthrough", paramCount: 0, category: "Agents" },
   { procedure: "agentGroupSync", wazuhPath: "/agents/{agent_id}/group/is_sync", wiringLevel: "passthrough", paramCount: 1, category: "Agents" },
   { procedure: "apiInfo", wazuhPath: "/", wiringLevel: "passthrough", paramCount: 0, category: "Agents" },
-  { procedure: "agentGroups", wazuhPath: "/groups", wiringLevel: "broker", brokerConfig: "GROUPS_CONFIG", paramCount: 9, category: "Agents" },
-  { procedure: "agentsOutdated", wazuhPath: "/agents/outdated", wiringLevel: "broker", brokerConfig: "AGENTS_OUTDATED_CONFIG", paramCount: 6, category: "Agents" },
-  { procedure: "agentsNoGroup", wazuhPath: "/agents/no_group", wiringLevel: "broker", brokerConfig: "AGENTS_NO_GROUP_CONFIG", paramCount: 6, category: "Agents" },
-  { procedure: "agentsStatsDistinct", wazuhPath: "/agents/stats/distinct", wiringLevel: "broker", brokerConfig: "AGENTS_STATS_DISTINCT_CONFIG", paramCount: 6, category: "Agents" },
-  { procedure: "agentGroupMembers", wazuhPath: "/groups/{group_id}/agents", wiringLevel: "broker", brokerConfig: "GROUP_AGENTS_CONFIG", paramCount: 8, category: "Agents" },
+  { procedure: "agentGroups", wazuhPath: "/groups", wiringLevel: "broker", brokerConfig: "GROUPS_CONFIG", category: "Agents" },
+  { procedure: "agentsOutdated", wazuhPath: "/agents/outdated", wiringLevel: "broker", brokerConfig: "AGENTS_OUTDATED_CONFIG", category: "Agents" },
+  { procedure: "agentsNoGroup", wazuhPath: "/agents/no_group", wiringLevel: "broker", brokerConfig: "AGENTS_NO_GROUP_CONFIG", category: "Agents" },
+  { procedure: "agentsStatsDistinct", wazuhPath: "/agents/stats/distinct", wiringLevel: "broker", brokerConfig: "AGENTS_STATS_DISTINCT_CONFIG", category: "Agents" },
+  { procedure: "agentGroupMembers", wazuhPath: "/groups/{group_id}/agents", wiringLevel: "broker", brokerConfig: "GROUP_AGENTS_CONFIG", category: "Agents" },
 
   // ── Syscollector (per-agent) ──
-  { procedure: "agentOs", wazuhPath: "/syscollector/{agent_id}/os", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_OS_CONFIG", paramCount: 2, category: "Syscollector" },
-  { procedure: "agentHardware", wazuhPath: "/syscollector/{agent_id}/hardware", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_HARDWARE_CONFIG", paramCount: 2, category: "Syscollector" },
-  { procedure: "agentPackages", wazuhPath: "/syscollector/{agent_id}/packages", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_PACKAGES_CONFIG", paramCount: 12, category: "Syscollector" },
-  { procedure: "agentPorts", wazuhPath: "/syscollector/{agent_id}/ports", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_PORTS_CONFIG", paramCount: 15, category: "Syscollector" },
-  { procedure: "agentProcesses", wazuhPath: "/syscollector/{agent_id}/processes", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_PROCESSES_CONFIG", paramCount: 21, category: "Syscollector" },
-  { procedure: "agentNetaddr", wazuhPath: "/syscollector/{agent_id}/netaddr", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_NETADDR_CONFIG", paramCount: 12, category: "Syscollector" },
-  { procedure: "agentNetiface", wazuhPath: "/syscollector/{agent_id}/netiface", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_NETIFACE_CONFIG", paramCount: 21, category: "Syscollector" },
-  { procedure: "agentHotfixes", wazuhPath: "/syscollector/{agent_id}/hotfixes", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_HOTFIXES_CONFIG", paramCount: 8, category: "Syscollector" },
-  { procedure: "agentBrowserExtensions", wazuhPath: "/syscollector/{agent_id}/browser_extensions", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_BROWSER_EXTENSIONS_CONFIG", paramCount: 8, category: "Syscollector" },
-  { procedure: "agentServices", wazuhPath: "/syscollector/{agent_id}/services", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_SERVICES_CONFIG", paramCount: 7, category: "Syscollector" },
-  { procedure: "agentUsers", wazuhPath: "/syscollector/{agent_id}/users", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_USERS_CONFIG", paramCount: 8, category: "Syscollector" },
-  { procedure: "agentGroups2", wazuhPath: "/syscollector/{agent_id}/groups", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_GROUPS_CONFIG", paramCount: 8, category: "Syscollector" },
-  { procedure: "agentNetproto", wazuhPath: "/syscollector/{agent_id}/netproto", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_NETPROTO_CONFIG", paramCount: 11, category: "Syscollector" },
-  { procedure: "groupFiles", wazuhPath: "/groups/{group_id}/files", wiringLevel: "broker", brokerConfig: "GROUP_FILES_CONFIG", paramCount: 8, category: "Syscollector" },
+  { procedure: "agentOs", wazuhPath: "/syscollector/{agent_id}/os", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_OS_CONFIG", category: "Syscollector" },
+  { procedure: "agentHardware", wazuhPath: "/syscollector/{agent_id}/hardware", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_HARDWARE_CONFIG", category: "Syscollector" },
+  { procedure: "agentPackages", wazuhPath: "/syscollector/{agent_id}/packages", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_PACKAGES_CONFIG", category: "Syscollector" },
+  { procedure: "agentPorts", wazuhPath: "/syscollector/{agent_id}/ports", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_PORTS_CONFIG", category: "Syscollector" },
+  { procedure: "agentProcesses", wazuhPath: "/syscollector/{agent_id}/processes", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_PROCESSES_CONFIG", category: "Syscollector" },
+  { procedure: "agentNetaddr", wazuhPath: "/syscollector/{agent_id}/netaddr", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_NETADDR_CONFIG", category: "Syscollector" },
+  { procedure: "agentNetiface", wazuhPath: "/syscollector/{agent_id}/netiface", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_NETIFACE_CONFIG", category: "Syscollector" },
+  { procedure: "agentHotfixes", wazuhPath: "/syscollector/{agent_id}/hotfixes", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_HOTFIXES_CONFIG", category: "Syscollector" },
+  { procedure: "agentBrowserExtensions", wazuhPath: "/syscollector/{agent_id}/browser_extensions", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_BROWSER_EXTENSIONS_CONFIG", category: "Syscollector" },
+  { procedure: "agentServices", wazuhPath: "/syscollector/{agent_id}/services", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_SERVICES_CONFIG", category: "Syscollector" },
+  { procedure: "agentUsers", wazuhPath: "/syscollector/{agent_id}/users", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_USERS_CONFIG", category: "Syscollector" },
+  { procedure: "agentGroups2", wazuhPath: "/syscollector/{agent_id}/groups", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_GROUPS_CONFIG", category: "Syscollector" },
+  { procedure: "agentNetproto", wazuhPath: "/syscollector/{agent_id}/netproto", wiringLevel: "broker", brokerConfig: "SYSCOLLECTOR_NETPROTO_CONFIG", category: "Syscollector" },
+  { procedure: "groupFiles", wazuhPath: "/groups/{group_id}/files", wiringLevel: "broker", brokerConfig: "GROUP_FILES_CONFIG", category: "Syscollector" },
 
   // ── Experimental Syscollector (cross-agent) ──
-  { procedure: "expSyscollectorPackages", wazuhPath: "/experimental/syscollector/packages", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_PACKAGES_CONFIG", paramCount: 12, category: "Experimental" },  // spec: 12 data (derived + wait_for_complete)
-  { procedure: "expSyscollectorProcesses", wazuhPath: "/experimental/syscollector/processes", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_PROCESSES_CONFIG", paramCount: 21, category: "Experimental" },  // spec: 21 data (derived + wait_for_complete)
-  { procedure: "expSyscollectorPorts", wazuhPath: "/experimental/syscollector/ports", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_PORTS_CONFIG", paramCount: 15, category: "Experimental" },  // spec: 15 data (derived + wait_for_complete)
-  { procedure: "expSyscollectorNetaddr", wazuhPath: "/experimental/syscollector/netaddr", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_NETADDR_CONFIG", paramCount: 12, category: "Experimental" },  // spec: 11+iface (derived + wait_for_complete)
-  { procedure: "expSyscollectorNetiface", wazuhPath: "/experimental/syscollector/netiface", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_NETIFACE_CONFIG", paramCount: 21, category: "Experimental" },  // spec: 20 data (derived + wait_for_complete)
-  { procedure: "expSyscollectorNetproto", wazuhPath: "/experimental/syscollector/netproto", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_NETPROTO_CONFIG", paramCount: 11, category: "Experimental" },  // spec: 11 data (derived + wait_for_complete)
-  { procedure: "expSyscollectorOs", wazuhPath: "/experimental/syscollector/os", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_OS_CONFIG", paramCount: 12, category: "Experimental" },  // spec: 12 data (manual + wait_for_complete)
-  { procedure: "expSyscollectorHardware", wazuhPath: "/experimental/syscollector/hardware", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_HARDWARE_CONFIG", paramCount: 13, category: "Experimental" },  // spec: 13 data (manual + wait_for_complete)
-  { procedure: "expSyscollectorHotfixes", wazuhPath: "/experimental/syscollector/hotfixes", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_HOTFIXES_CONFIG", paramCount: 8, category: "Experimental" },  // spec: 8 data (derived + wait_for_complete)
-  { procedure: "expCiscatResults", wazuhPath: "/experimental/ciscat/results", wiringLevel: "broker", brokerConfig: "EXPERIMENTAL_CISCAT_RESULTS_CONFIG", paramCount: 14, category: "Experimental" },  // spec: 14 data (no q/distinct)
+  { procedure: "expSyscollectorPackages", wazuhPath: "/experimental/syscollector/packages", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_PACKAGES_CONFIG", category: "Experimental" },  // spec: 12 data (derived + wait_for_complete)
+  { procedure: "expSyscollectorProcesses", wazuhPath: "/experimental/syscollector/processes", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_PROCESSES_CONFIG", category: "Experimental" },  // spec: 21 data (derived + wait_for_complete)
+  { procedure: "expSyscollectorPorts", wazuhPath: "/experimental/syscollector/ports", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_PORTS_CONFIG", category: "Experimental" },  // spec: 15 data (derived + wait_for_complete)
+  { procedure: "expSyscollectorNetaddr", wazuhPath: "/experimental/syscollector/netaddr", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_NETADDR_CONFIG", category: "Experimental" },  // spec: 11+iface (derived + wait_for_complete)
+  { procedure: "expSyscollectorNetiface", wazuhPath: "/experimental/syscollector/netiface", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_NETIFACE_CONFIG", category: "Experimental" },  // spec: 20 data (derived + wait_for_complete)
+  { procedure: "expSyscollectorNetproto", wazuhPath: "/experimental/syscollector/netproto", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_NETPROTO_CONFIG", category: "Experimental" },  // spec: 11 data (derived + wait_for_complete)
+  { procedure: "expSyscollectorOs", wazuhPath: "/experimental/syscollector/os", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_OS_CONFIG", category: "Experimental" },  // spec: 12 data (manual + wait_for_complete)
+  { procedure: "expSyscollectorHardware", wazuhPath: "/experimental/syscollector/hardware", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_HARDWARE_CONFIG", category: "Experimental" },  // spec: 13 data (manual + wait_for_complete)
+  { procedure: "expSyscollectorHotfixes", wazuhPath: "/experimental/syscollector/hotfixes", wiringLevel: "broker", brokerConfig: "EXP_SYSCOLLECTOR_HOTFIXES_CONFIG", category: "Experimental" },  // spec: 8 data (derived + wait_for_complete)
+  { procedure: "expCiscatResults", wazuhPath: "/experimental/ciscat/results", wiringLevel: "broker", brokerConfig: "EXPERIMENTAL_CISCAT_RESULTS_CONFIG", category: "Experimental" },  // spec: 14 data (no q/distinct)
 
   // ── Rules ──
-  { procedure: "rules", wazuhPath: "/rules", wiringLevel: "broker", brokerConfig: "RULES_CONFIG", paramCount: 20, category: "Rules" },
-  { procedure: "ruleGroups", wazuhPath: "/rules/groups", wiringLevel: "broker", brokerConfig: "RULE_GROUPS_CONFIG", paramCount: 5, category: "Rules" },
-  { procedure: "rulesByRequirement", wazuhPath: "/rules/requirement/{requirement}", wiringLevel: "broker", brokerConfig: "RULES_BY_REQUIREMENT_CONFIG", paramCount: 5, category: "Rules" },
-  { procedure: "rulesFiles", wazuhPath: "/rules/files", wiringLevel: "broker", brokerConfig: "RULES_FILES_CONFIG", paramCount: 10, category: "Rules" },
-  { procedure: "ruleFileContent", wazuhPath: "/rules/files/{filename}", wiringLevel: "broker", brokerConfig: "RULE_FILE_CONTENT_CONFIG", paramCount: 3, category: "Rules" },
+  { procedure: "rules", wazuhPath: "/rules", wiringLevel: "broker", brokerConfig: "RULES_CONFIG", category: "Rules" },
+  { procedure: "ruleGroups", wazuhPath: "/rules/groups", wiringLevel: "broker", brokerConfig: "RULE_GROUPS_CONFIG", category: "Rules" },
+  { procedure: "rulesByRequirement", wazuhPath: "/rules/requirement/{requirement}", wiringLevel: "broker", brokerConfig: "RULES_BY_REQUIREMENT_CONFIG", category: "Rules" },
+  { procedure: "rulesFiles", wazuhPath: "/rules/files", wiringLevel: "broker", brokerConfig: "RULES_FILES_CONFIG", category: "Rules" },
+  { procedure: "ruleFileContent", wazuhPath: "/rules/files/{filename}", wiringLevel: "broker", brokerConfig: "RULE_FILE_CONTENT_CONFIG", category: "Rules" },
 
   // ── MITRE ATT&CK ──
-  { procedure: "mitreTactics", wazuhPath: "/mitre/tactics", wiringLevel: "broker", brokerConfig: "MITRE_TACTICS_CONFIG", paramCount: 8, category: "MITRE" },
-  { procedure: "mitreTechniques", wazuhPath: "/mitre/techniques", wiringLevel: "broker", brokerConfig: "MITRE_TECHNIQUES_CONFIG", paramCount: 8, category: "MITRE" },
-  { procedure: "mitreMitigations", wazuhPath: "/mitre/mitigations", wiringLevel: "broker", brokerConfig: "MITRE_MITIGATIONS_CONFIG", paramCount: 8, category: "MITRE" },
-  { procedure: "mitreSoftware", wazuhPath: "/mitre/software", wiringLevel: "broker", brokerConfig: "MITRE_SOFTWARE_CONFIG", paramCount: 8, category: "MITRE" },
-  { procedure: "mitreGroups", wazuhPath: "/mitre/groups", wiringLevel: "broker", brokerConfig: "MITRE_GROUPS_CONFIG", paramCount: 8, category: "MITRE" },
+  { procedure: "mitreTactics", wazuhPath: "/mitre/tactics", wiringLevel: "broker", brokerConfig: "MITRE_TACTICS_CONFIG", category: "MITRE" },
+  { procedure: "mitreTechniques", wazuhPath: "/mitre/techniques", wiringLevel: "broker", brokerConfig: "MITRE_TECHNIQUES_CONFIG", category: "MITRE" },
+  { procedure: "mitreMitigations", wazuhPath: "/mitre/mitigations", wiringLevel: "broker", brokerConfig: "MITRE_MITIGATIONS_CONFIG", category: "MITRE" },
+  { procedure: "mitreSoftware", wazuhPath: "/mitre/software", wiringLevel: "broker", brokerConfig: "MITRE_SOFTWARE_CONFIG", category: "MITRE" },
+  { procedure: "mitreGroups", wazuhPath: "/mitre/groups", wiringLevel: "broker", brokerConfig: "MITRE_GROUPS_CONFIG", category: "MITRE" },
   { procedure: "mitreMetadata", wazuhPath: "/mitre/metadata", wiringLevel: "passthrough", paramCount: 0, category: "MITRE" },
-  { procedure: "mitreReferences", wazuhPath: "/mitre/references", wiringLevel: "broker", brokerConfig: "MITRE_REFERENCES_CONFIG", paramCount: 7, category: "MITRE" },  // spec: 7 data (added select)
+  { procedure: "mitreReferences", wazuhPath: "/mitre/references", wiringLevel: "broker", brokerConfig: "MITRE_REFERENCES_CONFIG", category: "MITRE" },  // spec: 7 data (added select)
 
   // ── SCA ──
-  { procedure: "scaPolicies", wazuhPath: "/sca/{agent_id}", wiringLevel: "broker", brokerConfig: "SCA_POLICIES_CONFIG", paramCount: 10, category: "SCA" },
-  { procedure: "scaChecks", wazuhPath: "/sca/{agent_id}/checks/{policy_id}", wiringLevel: "broker", brokerConfig: "SCA_CHECKS_CONFIG", paramCount: 20, category: "SCA" },
+  { procedure: "scaPolicies", wazuhPath: "/sca/{agent_id}", wiringLevel: "broker", brokerConfig: "SCA_POLICIES_CONFIG", category: "SCA" },
+  { procedure: "scaChecks", wazuhPath: "/sca/{agent_id}/checks/{policy_id}", wiringLevel: "broker", brokerConfig: "SCA_CHECKS_CONFIG", category: "SCA" },
 
   // ── CIS-CAT ──
-  { procedure: "ciscatResults", wazuhPath: "/ciscat/{agent_id}/results", wiringLevel: "broker", brokerConfig: "CISCAT_CONFIG", paramCount: 16, category: "CIS-CAT" },  // spec: 1 path + 15 data (7 universal + 8 specific)
+  { procedure: "ciscatResults", wazuhPath: "/ciscat/{agent_id}/results", wiringLevel: "broker", brokerConfig: "CISCAT_CONFIG", category: "CIS-CAT" },  // spec: 1 path + 15 data (7 universal + 8 specific)
 
   // ── Syscheck / FIM ──
-  { procedure: "syscheckFiles", wazuhPath: "/syscheck/{agent_id}", wiringLevel: "broker", brokerConfig: "SYSCHECK_CONFIG", paramCount: 18, category: "FIM" },  // spec: 1 path + 17 data
+  { procedure: "syscheckFiles", wazuhPath: "/syscheck/{agent_id}", wiringLevel: "broker", brokerConfig: "SYSCHECK_CONFIG", category: "FIM" },  // spec: 1 path + 17 data
   { procedure: "syscheckLastScan", wazuhPath: "/syscheck/{agent_id}/last_scan", wiringLevel: "passthrough", paramCount: 1, category: "Syscheck" },
 
   // ── Rootcheck ──
-  { procedure: "rootcheckResults", wazuhPath: "/rootcheck/{agent_id}", wiringLevel: "broker", brokerConfig: "ROOTCHECK_CONFIG", paramCount: 11, category: "Rootcheck" },  // spec: 1 path + 10 data (added cis,pci_dss)
+  { procedure: "rootcheckResults", wazuhPath: "/rootcheck/{agent_id}", wiringLevel: "broker", brokerConfig: "ROOTCHECK_CONFIG", category: "Rootcheck" },  // spec: 1 path + 10 data (added cis,pci_dss)
   { procedure: "rootcheckLastScan", wazuhPath: "/rootcheck/{agent_id}/last_scan", wiringLevel: "passthrough", paramCount: 1, category: "Rootcheck" },
 
   // ── Decoders ──
-  { procedure: "decoders", wazuhPath: "/decoders", wiringLevel: "broker", brokerConfig: "DECODERS_CONFIG", paramCount: 11, category: "Decoders" },
-  { procedure: "decoderFiles", wazuhPath: "/decoders/files", wiringLevel: "broker", brokerConfig: "DECODERS_FILES_CONFIG", paramCount: 10, category: "Decoders" },
-  { procedure: "decoderParents", wazuhPath: "/decoders/parents", wiringLevel: "broker", brokerConfig: "DECODER_PARENTS_CONFIG", paramCount: 7, category: "Decoders" },  // spec: offset,limit,sort,search,select,q,wait_for_complete
-  { procedure: "decoderFileContent", wazuhPath: "/decoders/files/{filename}", wiringLevel: "broker", brokerConfig: "DECODER_FILE_CONTENT_CONFIG", paramCount: 3, category: "Decoders" },
+  { procedure: "decoders", wazuhPath: "/decoders", wiringLevel: "broker", brokerConfig: "DECODERS_CONFIG", category: "Decoders" },
+  { procedure: "decoderFiles", wazuhPath: "/decoders/files", wiringLevel: "broker", brokerConfig: "DECODERS_FILES_CONFIG", category: "Decoders" },
+  { procedure: "decoderParents", wazuhPath: "/decoders/parents", wiringLevel: "broker", brokerConfig: "DECODER_PARENTS_CONFIG", category: "Decoders" },  // spec: offset,limit,sort,search,select,q,wait_for_complete
+  { procedure: "decoderFileContent", wazuhPath: "/decoders/files/{filename}", wiringLevel: "broker", brokerConfig: "DECODER_FILE_CONTENT_CONFIG", category: "Decoders" },
 
   // ── Tasks ──
-  { procedure: "taskStatus", wazuhPath: "/tasks/status", wiringLevel: "broker", brokerConfig: "TASKS_STATUS_CONFIG", paramCount: 12, category: "Tasks" },
+  { procedure: "taskStatus", wazuhPath: "/tasks/status", wiringLevel: "broker", brokerConfig: "TASKS_STATUS_CONFIG", category: "Tasks" },
 
   // ── Security ──
-  { procedure: "securityRoles", wazuhPath: "/security/roles", wiringLevel: "broker", brokerConfig: "SECURITY_ROLES_CONFIG", paramCount: 8, category: "Security" },  // spec: 8 data
-  { procedure: "securityPolicies", wazuhPath: "/security/policies", wiringLevel: "broker", brokerConfig: "SECURITY_POLICIES_CONFIG", paramCount: 8, category: "Security" },  // spec: 8 data
-  { procedure: "securityUsers", wazuhPath: "/security/users", wiringLevel: "broker", brokerConfig: "SECURITY_USERS_CONFIG", paramCount: 8, category: "Security" },  // spec: 8 data
+  { procedure: "securityRoles", wazuhPath: "/security/roles", wiringLevel: "broker", brokerConfig: "SECURITY_ROLES_CONFIG", category: "Security" },  // spec: 8 data
+  { procedure: "securityPolicies", wazuhPath: "/security/policies", wiringLevel: "broker", brokerConfig: "SECURITY_POLICIES_CONFIG", category: "Security" },  // spec: 8 data
+  { procedure: "securityUsers", wazuhPath: "/security/users", wiringLevel: "broker", brokerConfig: "SECURITY_USERS_CONFIG", category: "Security" },  // spec: 8 data
   { procedure: "securityUserById", wazuhPath: "/security/users", wiringLevel: "passthrough", paramCount: 1, category: "Security" },  // uses ?user_ids filter (spec-compliant), no brokerParams()
   { procedure: "securityRoleById", wazuhPath: "/security/roles", wiringLevel: "passthrough", paramCount: 1, category: "Security" },  // uses ?role_ids filter (spec-compliant), no brokerParams()
   { procedure: "securityPolicyById", wazuhPath: "/security/policies", wiringLevel: "passthrough", paramCount: 1, category: "Security" },  // uses ?policy_ids filter (spec-compliant), no brokerParams()
   { procedure: "securityRuleById", wazuhPath: "/security/rules", wiringLevel: "passthrough", paramCount: 1, category: "Security" },  // uses ?rule_ids filter (spec-compliant), no brokerParams()
-  { procedure: "securityConfig", wazuhPath: "/security/config", wiringLevel: "broker", brokerConfig: "SECURITY_CONFIG_CONFIG", paramCount: 1, category: "Security" },
-  { procedure: "securityCurrentUser", wazuhPath: "/security/users/me", wiringLevel: "broker", brokerConfig: "SECURITY_CURRENT_USER_CONFIG", paramCount: 1, category: "Security" },
-  { procedure: "securityRbacRules", wazuhPath: "/security/rules", wiringLevel: "broker", brokerConfig: "SECURITY_RBAC_RULES_CONFIG", paramCount: 5, category: "Security" },  // spec: offset,limit,sort,search,rule_ids
-  { procedure: "securityActions", wazuhPath: "/security/actions", wiringLevel: "broker", brokerConfig: "SECURITY_ACTIONS_CONFIG", paramCount: 1, category: "Security" },
-  { procedure: "securityResources", wazuhPath: "/security/resources", wiringLevel: "broker", brokerConfig: "SECURITY_RESOURCES_CONFIG", paramCount: 2, category: "Security" },
+  { procedure: "securityConfig", wazuhPath: "/security/config", wiringLevel: "broker", brokerConfig: "SECURITY_CONFIG_CONFIG", category: "Security" },
+  { procedure: "securityCurrentUser", wazuhPath: "/security/users/me", wiringLevel: "broker", brokerConfig: "SECURITY_CURRENT_USER_CONFIG", category: "Security" },
+  { procedure: "securityRbacRules", wazuhPath: "/security/rules", wiringLevel: "broker", brokerConfig: "SECURITY_RBAC_RULES_CONFIG", category: "Security" },  // spec: offset,limit,sort,search,rule_ids
+  { procedure: "securityActions", wazuhPath: "/security/actions", wiringLevel: "broker", brokerConfig: "SECURITY_ACTIONS_CONFIG", category: "Security" },
+  { procedure: "securityResources", wazuhPath: "/security/resources", wiringLevel: "broker", brokerConfig: "SECURITY_RESOURCES_CONFIG", category: "Security" },
   { procedure: "securityCurrentUserPolicies", wazuhPath: "/security/users/me/policies", wiringLevel: "passthrough", paramCount: 0, category: "Security" },
 
   // ── Lists (CDB) ──
-  { procedure: "lists", wazuhPath: "/lists", wiringLevel: "broker", brokerConfig: "LISTS_CONFIG", paramCount: 9, category: "Lists" },
-  { procedure: "listsFiles", wazuhPath: "/lists/files", wiringLevel: "broker", brokerConfig: "LISTS_FILES_CONFIG", paramCount: 6, category: "Lists" },
-  { procedure: "listsFileContent", wazuhPath: "/lists/files/{filename}", wiringLevel: "broker", brokerConfig: "LISTS_FILE_CONTENT_CONFIG", paramCount: 2, category: "Lists" },
+  { procedure: "lists", wazuhPath: "/lists", wiringLevel: "broker", brokerConfig: "LISTS_CONFIG", category: "Lists" },
+  { procedure: "listsFiles", wazuhPath: "/lists/files", wiringLevel: "broker", brokerConfig: "LISTS_FILES_CONFIG", category: "Lists" },
+  { procedure: "listsFileContent", wazuhPath: "/lists/files/{filename}", wiringLevel: "broker", brokerConfig: "LISTS_FILE_CONTENT_CONFIG", category: "Lists" },
 
   // ── Groups ──
-  { procedure: "groupConfiguration", wazuhPath: "/groups/{group_id}/configuration", wiringLevel: "broker", brokerConfig: "GROUP_CONFIGURATION_CONFIG", paramCount: 3, category: "Groups" },
-  { procedure: "groupFileContent", wazuhPath: "/groups/{group_id}/files/{file_name}", wiringLevel: "broker", brokerConfig: "GROUP_FILE_CONTENT_CONFIG", paramCount: 3, category: "Groups" },
+  { procedure: "groupConfiguration", wazuhPath: "/groups/{group_id}/configuration", wiringLevel: "broker", brokerConfig: "GROUP_CONFIGURATION_CONFIG", category: "Groups" },
+  { procedure: "groupFileContent", wazuhPath: "/groups/{group_id}/files/{file_name}", wiringLevel: "broker", brokerConfig: "GROUP_FILE_CONTENT_CONFIG", category: "Groups" },
 ];
 
 // ── Broker Config Registry ───────────────────────────────────────────────────
@@ -420,6 +431,8 @@ export const BROKER_CONFIG_REGISTRY: Array<{ name: string; config: broker.Endpoi
   { name: "EXP_SYSCOLLECTOR_NETIFACE_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETIFACE_CONFIG },
   { name: "EXP_SYSCOLLECTOR_NETADDR_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETADDR_CONFIG },
   { name: "EXP_SYSCOLLECTOR_NETPROTO_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETPROTO_CONFIG },
+  { name: "SYSCOLLECTOR_OS_CONFIG", config: broker.SYSCOLLECTOR_OS_CONFIG },
+  { name: "SYSCOLLECTOR_HARDWARE_CONFIG", config: broker.SYSCOLLECTOR_HARDWARE_CONFIG },
   { name: "EXP_SYSCOLLECTOR_OS_CONFIG", config: broker.EXP_SYSCOLLECTOR_OS_CONFIG },
   { name: "EXP_SYSCOLLECTOR_HARDWARE_CONFIG", config: broker.EXP_SYSCOLLECTOR_HARDWARE_CONFIG },
   { name: "EXP_SYSCOLLECTOR_HOTFIXES_CONFIG", config: broker.EXP_SYSCOLLECTOR_HOTFIXES_CONFIG },
@@ -622,6 +635,20 @@ function analyzeBrokerConfig(entry: { name: string; config: broker.EndpointParam
   };
 }
 
+/**
+ * H-P3: param count for a registry entry. Broker-wired entries are counted from
+ * the live config object so the report can never drift from what the broker
+ * actually accepts; non-broker entries fall back to their hand-typed count.
+ */
+export function deriveParamCount(e: { brokerConfig?: string; paramCount?: number }): number {
+  if (e.brokerConfig) {
+    const cfg = BROKER_CONFIG_REGISTRY.find(c => c.name === e.brokerConfig);
+    if (!cfg) throw new Error(`ENDPOINT_REGISTRY references unknown broker config ${e.brokerConfig}`);
+    return Object.keys(cfg.config.params).length;
+  }
+  return e.paramCount ?? 0;
+}
+
 export function generateCoverageReport(): CoverageReport {
   const wiring = loadWiringLedger();
   const parity = loadParityCallsites();
@@ -686,7 +713,7 @@ export function generateCoverageReport(): CoverageReport {
     method: "GET" as const,
     wiringLevel: e.wiringLevel,
     brokerConfig: e.brokerConfig,
-    paramCount: e.paramCount,
+    paramCount: deriveParamCount(e),
     category: e.category,
     callsites: wiring.map.get(e.procedure) || [],
     parityCallsites: parity.map.get(e.procedure) || [],

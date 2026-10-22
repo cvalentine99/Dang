@@ -43,9 +43,19 @@ import {
   generateReport,
   type ReportType,
 } from "./livingCaseReportService";
-import { executeResumePipeline } from "./resumePipelineHelper";
+import {
+  executeResumePipeline,
+  sweepStaleAutoTriage,
+  RunSupersededError,
+  assertRunLive,
+  noteIfSuperseded,
+  getAffectedRows,
+  STALE_RUN_TTL_MS,
+} from "./resumePipelineHelper";
 import { getDb } from "../db";
-import { triageObjects, alertQueue, correlationBundles, livingCaseState, pipelineRuns, responseActions } from "../../drizzle/schema";
+import { triageObjects, alertQueue, correlationBundles, livingCaseState, pipelineRuns, responseActions, investigationSessions } from "../../drizzle/schema";
+import { recordAnalystAction, isAdmin } from "../_core/analystAudit";
+import { recordAutoTriageFailure } from "../alertQueue/triageAttempts";
 import { eq, desc, sql, and, lt, inArray } from "drizzle-orm";
 
 export const pipelineRouter = router({
@@ -155,6 +165,7 @@ export const pipelineRouter = router({
       try {
         const result = await runCorrelationAgent({
           triageId: input.triageId,
+          userId: ctx.user.id,
           lookbackHours: input.lookbackHours,
           includeThreatIntel: input.includeThreatIntel,
           maxAlertsPerSource: input.maxPerSource,
@@ -228,15 +239,30 @@ export const pipelineRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
-      // Find the triage object
+      // Find the triage object (with the current sign-off, for the override check + audit)
       const [row] = await db
-        .select({ id: triageObjects.id, triageId: triageObjects.triageId })
+        .select({
+          id: triageObjects.id,
+          triageId: triageObjects.triageId,
+          analystUserId: triageObjects.analystUserId,
+          analystConfirmed: triageObjects.analystConfirmed,
+          analystSeverityOverride: triageObjects.analystSeverityOverride,
+          analystRouteOverride: triageObjects.analystRouteOverride,
+        })
         .from(triageObjects)
         .where(eq(triageObjects.triageId, input.triageId))
         .limit(1);
 
       if (!row) {
         return { success: false as const, error: "Triage object not found" };
+      }
+
+      // H-A5: overwriting another analyst's sign-off requires admin.
+      if (row.analystUserId != null && row.analystUserId !== ctx.user.id && !isAdmin(ctx)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "This triage was already signed off by another analyst; only that analyst or an admin can change it.",
+        });
       }
 
       // Build the update
@@ -257,6 +283,27 @@ export const pipelineRouter = router({
       if (input.notes !== undefined) {
         updateData.analystNotes = input.notes;
       }
+
+      await recordAnalystAction(db, {
+        userId: ctx.user.id,
+        action: "pipeline.submitFeedback",
+        targetType: "triage_object",
+        targetId: input.triageId,
+        metadata: {
+          before: {
+            analystUserId: row.analystUserId,
+            confirmed: row.analystConfirmed,
+            severityOverride: row.analystSeverityOverride,
+            routeOverride: row.analystRouteOverride,
+          },
+          after: {
+            confirmed: updateData.analystConfirmed ?? row.analystConfirmed,
+            severityOverride: updateData.analystSeverityOverride ?? row.analystSeverityOverride,
+            routeOverride: updateData.analystRouteOverride ?? row.analystRouteOverride,
+          },
+          overrodeOtherAnalyst: row.analystUserId != null && row.analystUserId !== ctx.user.id,
+        },
+      });
 
       await db
         .update(triageObjects)
@@ -449,6 +496,9 @@ export const pipelineRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
+      // H-D2: release items wedged in 'running' by a crashed worker before claiming.
+      await sweepStaleAutoTriage(db);
+
       // ── BUG-1 Fix: Atomic claim via transaction + FOR UPDATE ──────────────
       // Prevents TOCTOU race where two concurrent calls both read the item as
       // un-triaged, then both proceed to run the triage agent on the same item.
@@ -463,11 +513,19 @@ export const pipelineRouter = router({
         if (!item) return { claimed: false as const, reason: "not_found" } as const;
         if (item.pipelineTriageId) return { claimed: false as const, reason: "already_triaged", triageId: item.pipelineTriageId } as const;
         if (item.autoTriageStatus === "running") return { claimed: false as const, reason: "already_running" } as const;
+        if (item.status !== "queued") return { claimed: false as const, reason: "not_queued", status: item.status } as const;
 
-        await tx
+        // C14: the claim advances BOTH status fields in one guarded UPDATE so eviction
+        // (status='queued') and the `process` claim can no longer see this item as free.
+        const claimRes = await tx
           .update(alertQueue)
-          .set({ autoTriageStatus: "running" })
-          .where(eq(alertQueue.id, input.queueItemId));
+          .set({ autoTriageStatus: "running", status: "processing", processedAt: new Date() })
+          .where(and(
+            eq(alertQueue.id, input.queueItemId),
+            eq(alertQueue.status, "queued"),
+            sql`(${alertQueue.autoTriageStatus} IS NULL OR ${alertQueue.autoTriageStatus} <> 'running')`,
+          ));
+        if (getAffectedRows(claimRes) === 0) return { claimed: false as const, reason: "already_running" } as const;
 
         return { claimed: true as const, item } as const;
       });
@@ -476,6 +534,7 @@ export const pipelineRouter = router({
       if (!claimResult.claimed) {
         if (claimResult.reason === "not_found") return { success: false as const, error: "Queue item not found" };
         if (claimResult.reason === "already_triaged") return { success: true as const, alreadyTriaged: true, triageId: claimResult.triageId };
+        if (claimResult.reason === "not_queued") return { success: false as const, error: `Queue item is not queued (status: ${claimResult.status})` };
         return { success: false as const, error: "Auto-triage already in progress" };
       }
 
@@ -507,15 +566,20 @@ export const pipelineRouter = router({
         if (result.success && result.triageId) {
           // Update queue item with triage link.
           // Status is "triaged" — triage completed but correlation/hypothesis/response haven't run.
-          await db
+          // C14: guarded on our claim — a dismissed/swept item is never resurrected.
+          const doneRes = await db
             .update(alertQueue)
             .set({
               pipelineTriageId: result.triageId,
               autoTriageStatus: "completed",
               status: "triaged",
               processedAt: new Date(),
+              triageAttempts: 0, // M6: success resets the poison counter
             })
-            .where(eq(alertQueue.id, input.queueItemId));
+            .where(and(eq(alertQueue.id, input.queueItemId), inArray(alertQueue.status, ["processing"])));
+          if (getAffectedRows(doneRes) === 0) {
+            console.warn(`[Pipeline] autoTriageQueueItem: queue item ${input.queueItemId} left 'processing' during triage — not marking triaged`);
+          }
 
           return {
             success: true as const,
@@ -525,10 +589,15 @@ export const pipelineRouter = router({
             latencyMs: result.latencyMs,
           };
         } else {
-          await db
-            .update(alertQueue)
-            .set({ autoTriageStatus: "failed" })
-            .where(eq(alertQueue.id, input.queueItemId));
+          // Release the claim back to 'queued' (pre-C14 behaviour: a failed auto-triage
+          // leaves the item queued and retryable via Structured Triage / Full Pipeline).
+          // M6: bounded retries — after MAX_TRIAGE_ATTEMPTS the item is parked as exhausted.
+          const fail = await recordAutoTriageFailure(db, input.queueItemId, {
+            actorUserId: ctx.user.id, source: "pipeline.autoTriageQueueItem", error: result.error,
+          });
+          if (!fail.released) {
+            console.warn(`[Pipeline] autoTriageQueueItem: queue item ${input.queueItemId} left 'processing' — not releasing claim`);
+          }
 
           return {
             success: false as const,
@@ -536,10 +605,12 @@ export const pipelineRouter = router({
           };
         }
       } catch (err) {
-        await db
-          .update(alertQueue)
-          .set({ autoTriageStatus: "failed" })
-          .where(eq(alertQueue.id, input.queueItemId));
+        const fail = await recordAutoTriageFailure(db, input.queueItemId, {
+          actorUserId: ctx.user.id, source: "pipeline.autoTriageQueueItem", error: (err as Error).message,
+        });
+        if (!fail.released) {
+          console.warn(`[Pipeline] autoTriageQueueItem: queue item ${input.queueItemId} left 'processing' — not marking failed`);
+        }
 
         return {
           success: false as const,
@@ -604,6 +675,22 @@ export const pipelineRouter = router({
       existingSessionId: z.number().int().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+      // C9: existingSessionId is client-supplied — only the session's owner may merge
+      // into it (investigation sessions are strictly per-analyst; admin read-only).
+      if (input.existingSessionId !== undefined) {
+        const db = await requireDb();
+        const [session] = await db
+          .select({ userId: investigationSessions.userId })
+          .from(investigationSessions)
+          .where(eq(investigationSessions.id, input.existingSessionId))
+          .limit(1);
+        if (!session || session.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You can only merge hypotheses into your own investigation sessions.",
+          });
+        }
+      }
       try {
         const result = await runHypothesisAgent({
           correlationId: input.correlationId,
@@ -716,6 +803,20 @@ export const pipelineRouter = router({
         caseData.lastUpdatedAt = new Date().toISOString();
         caseData.lastUpdatedBy = "analyst_manual";
 
+        // H-A5: team-global write, but every pivot is attributed (same tx as the write).
+        await recordAnalystAction(tx, {
+          userId: ctx.user.id,
+          action: "pipeline.recordPivot",
+          targetType: "living_case",
+          targetId: input.caseId,
+          metadata: {
+            sessionId: row.sessionId,
+            action: input.action.slice(0, 500),
+            impactedTheory: input.impactedTheory,
+            pivotIndex: caseData.completedPivots.length - 1,
+          },
+        });
+
         await tx
           .update(livingCaseState)
           .set({
@@ -739,15 +840,20 @@ export const pipelineRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
+      // H-D2: release items wedged in 'running' by a crashed worker before claiming.
+      await sweepStaleAutoTriage(db);
+
       // ── BUG-2 Fix: Atomic batch claim via transaction + FOR UPDATE ─────────
       // Prevents two concurrent autoTriageAllPending calls from both selecting
       // the same pending items and double-processing them.
+      // H-L10: only items still status='queued' — never human-dismissed/processing/finished ones.
       const pendingItems = await db.transaction(async (tx) => {
         const pending = await tx
           .select({ id: alertQueue.id, alertId: alertQueue.alertId })
           .from(alertQueue)
           .where(
             and(
+              eq(alertQueue.status, "queued"),
               eq(alertQueue.autoTriageStatus, "pending"),
               sql`${alertQueue.pipelineTriageId} IS NULL`
             )
@@ -758,10 +864,15 @@ export const pipelineRouter = router({
         if (pending.length === 0) return [];
 
         const ids = pending.map(p => p.id);
+        // C14: advance status with the claim, re-asserting the predicate in the UPDATE.
         await tx
           .update(alertQueue)
-          .set({ autoTriageStatus: "running" })
-          .where(inArray(alertQueue.id, ids));
+          .set({ autoTriageStatus: "running", status: "processing", processedAt: new Date() })
+          .where(and(
+            inArray(alertQueue.id, ids),
+            eq(alertQueue.status, "queued"),
+            eq(alertQueue.autoTriageStatus, "pending"),
+          ));
 
         return pending;
       });
@@ -789,6 +900,8 @@ export const pipelineRouter = router({
           // Belt-and-suspenders: if another path triaged this item between our
           // claim and now, skip it to avoid duplicate triage work.
           if (fullItem.pipelineTriageId) continue;
+          // C14: dismissed (or otherwise moved) since the claim — do not spend an LLM call on it.
+          if (fullItem.status !== "processing" || fullItem.autoTriageStatus !== "running") continue;
 
           const rawAlert = fullItem.rawJson ?? {
             id: fullItem.alertId,
@@ -814,32 +927,43 @@ export const pipelineRouter = router({
             // BUG-05 Fix: Write the same truth-bearing fields as the single-item
             // path (autoTriageQueueItem) — status:"triaged" and processedAt were
             // previously missing, leaving bulk-processed items appearing queued.
-            await db
+            const doneRes = await db
               .update(alertQueue)
               .set({
                 pipelineTriageId: result.triageId,
                 autoTriageStatus: "completed",
                 status: "triaged",
                 processedAt: new Date(),
+                triageAttempts: 0, // M6: success resets the poison counter
               })
-              .where(eq(alertQueue.id, item.id));
+              .where(and(eq(alertQueue.id, item.id), inArray(alertQueue.status, ["processing"])));
+            if (getAffectedRows(doneRes) === 0) {
+              console.warn(`[Pipeline] autoTriageAllPending: queue item ${item.id} left 'processing' during triage — not marking triaged`);
+            }
 
             triaged++;
             results.push({ queueItemId: item.id, alertId: item.alertId, triageId: result.triageId });
           } else {
-            await db
-              .update(alertQueue)
-              .set({ autoTriageStatus: "failed" })
-              .where(eq(alertQueue.id, item.id));
+            const fail = await recordAutoTriageFailure(db, item.id, {
+              actorUserId: ctx.user.id, source: "pipeline.autoTriageAllPending", error: result.error,
+            });
+            if (!fail.released) {
+              console.warn(`[Pipeline] autoTriageAllPending: queue item ${item.id} left 'processing' — not releasing claim`);
+            }
 
             failed++;
             results.push({ queueItemId: item.id, alertId: item.alertId, error: result.error });
           }
         } catch (err) {
-          await db
-            .update(alertQueue)
-            .set({ autoTriageStatus: "failed" })
-            .where(eq(alertQueue.id, item.id));
+          const fail = await recordAutoTriageFailure(db, item.id, {
+            actorUserId: ctx.user.id, source: "pipeline.autoTriageAllPending", error: (err as Error).message,
+          }).catch((e: Error) => {
+            console.error(`[Pipeline] autoTriageAllPending: failure bookkeeping for ${item.id} failed:`, e.message);
+            return { released: false, exhausted: false, attempts: 0 };
+          });
+          if (!fail.released) {
+            console.warn(`[Pipeline] autoTriageAllPending: queue item ${item.id} left 'processing' — not releasing claim`);
+          }
 
           failed++;
           results.push({ queueItemId: item.id, alertId: item.alertId, error: (err as Error).message });
@@ -887,17 +1011,35 @@ export const pipelineRouter = router({
         : `hash-${createHash("sha256").update(JSON.stringify(input.rawAlert)).digest("hex").slice(0, 16)}`;
       const startTime = Date.now();
 
+      // H-A5: never bind an arbitrary rawAlert's provenance to someone else's queue row.
+      if (input.queueItemId) {
+        const [qi] = await db
+          .select({ alertId: alertQueue.alertId })
+          .from(alertQueue)
+          .where(eq(alertQueue.id, input.queueItemId))
+          .limit(1);
+        if (!qi) throw new TRPCError({ code: "NOT_FOUND", message: "Queue item not found" });
+        if (qi.alertId !== alertId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "rawAlert does not match the alert of the given queueItemId" });
+        }
+      }
+
       // ── Audit #83: Concurrent pipeline guard on same alert ──────────────────
       // Prevent multiple pipelines from processing the same alert simultaneously.
       // Wrapped in a transaction with FOR UPDATE to eliminate the TOCTOU race:
       // the gap lock prevents a concurrent INSERT while this tx holds the lock.
+      // H-D2: release queue items wedged in autoTriageStatus='running' by a crashed worker.
+      await sweepStaleAutoTriage(db);
+
       const [runRow] = await db.transaction(async (tx) => {
         // ── Stale-run TTL: mark runs stuck in "running" for >15 minutes as failed.
         // This prevents permanently blocked alertIds from crashed/hung pipelines.
         // BUG-02 Fix: Also propagate stage-level statuses — any stage still marked
         // "running" is converted to "failed". Completed stages are preserved.
         // Uses CASE WHEN to conditionally update only running stages.
-        const STALE_RUN_TTL_MS = 15 * 60 * 1000;
+        // H-L1: scoped to the alertId being claimed (always known here — sentinel ids
+        // were replaced by a content hash above). A superseded live worker notices on
+        // its next guarded stage write and stops.
         const staleCutoff = new Date(Date.now() - STALE_RUN_TTL_MS);
         await tx.update(pipelineRuns)
           .set({
@@ -913,6 +1055,7 @@ export const pipelineRouter = router({
           .where(
             and(
               eq(pipelineRuns.status, "running"),
+              eq(pipelineRuns.alertId, alertId),
               lt(pipelineRuns.startedAt, staleCutoff),
             )
           );
@@ -973,9 +1116,10 @@ export const pipelineRouter = router({
 
       // ── Stage 1: Triage ──────────────────────────────────────────────────
       try {
-        await db.update(pipelineRuns)
+        const runWrite0 = await db.update(pipelineRuns)
           .set({ currentStage: "triage", triageStatus: "running" })
-          .where(eq(pipelineRuns.id, runRow.id));
+          .where(and(eq(pipelineRuns.id, runRow.id), eq(pipelineRuns.status, "running")));
+        assertRunLive(runWrite0, runId, "triage:running");
 
         const triageResult = await runTriageAgent({
           rawAlert: input.rawAlert,
@@ -993,38 +1137,45 @@ export const pipelineRouter = router({
           latencyMs: triageResult.latencyMs,
         };
 
-        await db.update(pipelineRuns).set({
+        const runWrite1 = await db.update(pipelineRuns).set({
           triageId: triageResult.triageId,
           triageStatus: "completed",
           triageLatencyMs: triageResult.latencyMs,
           currentStage: "correlation",
-        }).where(eq(pipelineRuns.id, runRow.id));
+        }).where(and(eq(pipelineRuns.id, runRow.id), eq(pipelineRuns.status, "running")));
+        assertRunLive(runWrite1, runId, "triage:completed");
 
-        // Update queue item if applicable
+        // Update queue item if applicable — guarded on the expected prior lifecycle
+        // state so a dismissed (or already completed) item is never resurrected.
         if (input.queueItemId) {
-          await db.update(alertQueue).set({
+          const qRes = await db.update(alertQueue).set({
             pipelineTriageId: triageResult.triageId,
             autoTriageStatus: "completed",
             status: "triaged",
             processedAt: new Date(),
-          }).where(eq(alertQueue.id, input.queueItemId));
+          }).where(and(eq(alertQueue.id, input.queueItemId), inArray(alertQueue.status, ["queued", "processing", "triaged"])));
+          if (getAffectedRows(qRes) === 0) console.warn(`[Pipeline] runFullPipeline ${runId}: queue item ${input.queueItemId} not in queued/processing/triaged — status not advanced`);
         }
       } catch (err) {
+        if (err instanceof RunSupersededError) return { ...result, status: "superseded", totalLatencyMs: Date.now() - startTime };
         result.stages.triage = { status: "failed", error: (err as Error).message };
         result.status = "partial";
-        await db.update(pipelineRuns).set({
+        const runWrite2 = await db.update(pipelineRuns).set({
           triageStatus: "failed",
           currentStage: "failed",
           status: "partial",
           error: (err as Error).message,
           totalLatencyMs: Date.now() - startTime,
           completedAt: new Date(),
-        }).where(eq(pipelineRuns.id, runRow.id));
+        }).where(and(eq(pipelineRuns.id, runRow.id), eq(pipelineRuns.status, "running")));
+        const triageSuperseded = noteIfSuperseded(runWrite2, runId, "triage:failed");
         // T2-03 Fix: Triage failed before it could set "triaged", so queue item
         // is still "processing". Mark it failed so it doesn't appear stuck.
-        if (input.queueItemId) {
-          await db.update(alertQueue).set({ status: "failed" })
-            .where(eq(alertQueue.id, input.queueItemId));
+        // C14: guarded — never overwrite a dismissed/completed item.
+        if (input.queueItemId && !triageSuperseded) {
+          const qRes = await db.update(alertQueue).set({ status: "failed" })
+            .where(and(eq(alertQueue.id, input.queueItemId), inArray(alertQueue.status, ["queued", "processing"])));
+          if (getAffectedRows(qRes) === 0) console.warn(`[Pipeline] runFullPipeline ${runId}: queue item ${input.queueItemId} not queued/processing — not marking failed`);
         }
         result.totalLatencyMs = Date.now() - startTime;
         return result;
@@ -1032,12 +1183,14 @@ export const pipelineRouter = router({
 
       // ── Stage 2: Correlation ─────────────────────────────────────────────
       try {
-        await db.update(pipelineRuns)
+        const runWrite3 = await db.update(pipelineRuns)
           .set({ correlationStatus: "running" })
-          .where(eq(pipelineRuns.id, runRow.id));
+          .where(and(eq(pipelineRuns.id, runRow.id), eq(pipelineRuns.status, "running")));
+        assertRunLive(runWrite3, runId, "correlation:running");
 
         const corrResult = await runCorrelationAgent({
           triageId: result.stages.triage.triageId!,
+          userId: ctx.user.id,
         });
 
         result.stages.correlation = {
@@ -1046,28 +1199,32 @@ export const pipelineRouter = router({
           latencyMs: corrResult.latencyMs,
         };
 
-        await db.update(pipelineRuns).set({
+        const runWrite4 = await db.update(pipelineRuns).set({
           correlationId: corrResult.correlationId,
           correlationStatus: "completed",
           correlationLatencyMs: corrResult.latencyMs,
           currentStage: "hypothesis",
-        }).where(eq(pipelineRuns.id, runRow.id));
+        }).where(and(eq(pipelineRuns.id, runRow.id), eq(pipelineRuns.status, "running")));
+        assertRunLive(runWrite4, runId, "correlation:completed");
       } catch (err) {
+        if (err instanceof RunSupersededError) return { ...result, status: "superseded", totalLatencyMs: Date.now() - startTime };
         result.stages.correlation = { status: "failed", error: (err as Error).message };
         result.status = "partial";
-        await db.update(pipelineRuns).set({
+        const runWrite5 = await db.update(pipelineRuns).set({
           correlationStatus: "failed",
           currentStage: "failed",
           status: "partial",
           error: (err as Error).message,
           totalLatencyMs: Date.now() - startTime,
           completedAt: new Date(),
-        }).where(eq(pipelineRuns.id, runRow.id));
+        }).where(and(eq(pipelineRuns.id, runRow.id), eq(pipelineRuns.status, "running")));
+        const corrSuperseded = noteIfSuperseded(runWrite5, runId, "correlation:failed");
         // T2-03 Fix: Queue item was set to "triaged" after triage succeeded,
         // but correlation failed. Demote to "failed" so it doesn't stay stuck.
-        if (input.queueItemId) {
-          await db.update(alertQueue).set({ status: "failed" })
-            .where(eq(alertQueue.id, input.queueItemId));
+        if (input.queueItemId && !corrSuperseded) {
+          const qRes = await db.update(alertQueue).set({ status: "failed" })
+            .where(and(eq(alertQueue.id, input.queueItemId), inArray(alertQueue.status, ["queued", "processing", "triaged"])));
+          if (getAffectedRows(qRes) === 0) console.warn(`[Pipeline] runFullPipeline ${runId}: queue item ${input.queueItemId} not active — not marking failed`);
         }
         result.totalLatencyMs = Date.now() - startTime;
         return result;
@@ -1082,9 +1239,10 @@ export const pipelineRouter = router({
       let fpHypothesisActionIds: string[] | undefined;
 
       try {
-        await db.update(pipelineRuns)
+        const runWrite6 = await db.update(pipelineRuns)
           .set({ hypothesisStatus: "running" })
-          .where(eq(pipelineRuns.id, runRow.id));
+          .where(and(eq(pipelineRuns.id, runRow.id), eq(pipelineRuns.status, "running")));
+        assertRunLive(runWrite6, runId, "hypothesis:running");
 
         const hypoResult = await runHypothesisAgent({
           correlationId: result.stages.correlation.correlationId!,
@@ -1116,7 +1274,7 @@ export const pipelineRouter = router({
           ...(partialFailure ? { partialFailure } : {}),
         };
 
-        await db.update(pipelineRuns).set({
+        const runWrite7 = await db.update(pipelineRuns).set({
           livingCaseId: hypoResult.caseId,
           hypothesisStatus: "completed",
           hypothesisLatencyMs: hypoResult.latencyMs,
@@ -1131,18 +1289,22 @@ export const pipelineRouter = router({
             : null,
           totalLatencyMs: Date.now() - startTime,
           completedAt: new Date(),
-        }).where(eq(pipelineRuns.id, runRow.id));
+        }).where(and(eq(pipelineRuns.id, runRow.id), eq(pipelineRuns.status, "running")));
+        assertRunLive(runWrite7, runId, "hypothesis:completed");
 
         // T2-03 Fix: Update queue item to "completed" now that the full pipeline
         // (triage + correlation + hypothesis + response_actions) has finished.
         // The triage success path above only sets status:"triaged" because at that
         // point only triage is done. Now all stages are done, so promote to "completed".
         if (input.queueItemId) {
-          await db.update(alertQueue).set({
+          const qRes = await db.update(alertQueue).set({
             status: "completed",
-          }).where(eq(alertQueue.id, input.queueItemId));
+          }).where(and(eq(alertQueue.id, input.queueItemId), inArray(alertQueue.status, ["triaged"])));
+          if (getAffectedRows(qRes) === 0) console.warn(`[Pipeline] runFullPipeline ${runId}: queue item ${input.queueItemId} not 'triaged' — not promoting to completed`);
         }
       } catch (err) {
+        if (err instanceof RunSupersededError) return { ...result, status: "superseded", totalLatencyMs: Date.now() - startTime };
+        let hypoSuperseded = false;
         // BUG-04 Fix: If hypothesis itself succeeded (livingCaseId captured) but
         // post-materialization sync threw, preserve truth-bearing fields so
         // response-action recovery is reachable on next resume.
@@ -1155,7 +1317,7 @@ export const pipelineRouter = router({
           };
           result.stages.responseActions = { status: "failed", error: (err as Error).message };
           result.status = "partial";
-          await db.update(pipelineRuns).set({
+          const runWrite8 = await db.update(pipelineRuns).set({
             livingCaseId: fpHypothesisLivingCaseId,
             hypothesisStatus: "completed",
             hypothesisLatencyMs: fpHypothesisLatencyMs ?? null,
@@ -1166,25 +1328,28 @@ export const pipelineRouter = router({
             error: `Post-materialization sync failed: ${(err as Error).message}`,
             totalLatencyMs: Date.now() - startTime,
             completedAt: new Date(),
-          }).where(eq(pipelineRuns.id, runRow.id));
+          }).where(and(eq(pipelineRuns.id, runRow.id), eq(pipelineRuns.status, "running")));
+          hypoSuperseded = noteIfSuperseded(runWrite8, runId, "hypothesis:completed");
         } else {
           result.stages.hypothesis = { status: "failed", error: (err as Error).message };
           result.status = "partial";
-          await db.update(pipelineRuns).set({
+          const runWrite9 = await db.update(pipelineRuns).set({
             hypothesisStatus: "failed",
             currentStage: "failed",
             status: "partial",
             error: (err as Error).message,
             totalLatencyMs: Date.now() - startTime,
             completedAt: new Date(),
-          }).where(eq(pipelineRuns.id, runRow.id));
+          }).where(and(eq(pipelineRuns.id, runRow.id), eq(pipelineRuns.status, "running")));
+          hypoSuperseded = noteIfSuperseded(runWrite9, runId, "hypothesis:failed");
         }
         // T2-03 Fix: Queue item was set to "triaged" after triage succeeded,
         // but hypothesis/response_actions failed. Demote to "failed" so it
         // doesn't stay stuck at "triaged" when the pipeline actually errored.
-        if (input.queueItemId) {
-          await db.update(alertQueue).set({ status: "failed" })
-            .where(eq(alertQueue.id, input.queueItemId));
+        if (input.queueItemId && !hypoSuperseded) {
+          const qRes = await db.update(alertQueue).set({ status: "failed" })
+            .where(and(eq(alertQueue.id, input.queueItemId), inArray(alertQueue.status, ["queued", "processing", "triaged"])));
+          if (getAffectedRows(qRes) === 0) console.warn(`[Pipeline] runFullPipeline ${runId}: queue item ${input.queueItemId} not active — not marking failed`);
         }
         result.totalLatencyMs = Date.now() - startTime;
         return result;

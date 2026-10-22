@@ -25,6 +25,13 @@ const ENV_CHECKS: EnvCheck[] = [
     category: "core",
   },
 
+  {
+    key: "ENCRYPTION_KEY",
+    required: false, // production requirement enforced by checkEncryptionKey()
+    description: "Credential-encryption key, >= 32 chars (REQUIRED in production)",
+    category: "core",
+  },
+
   // Wazuh Manager API
   {
     key: "WAZUH_HOST",
@@ -106,6 +113,48 @@ const CATEGORY_LABELS: Record<string, string> = {
  * Exits the process if critical variables are missing.
  * Prints warnings for optional but recommended variables.
  */
+// ── Log masking ───────────────────────────────────────────────────────────────
+// Never emit any part of a secret to stdout: the boot banner lands in `docker logs`
+// and log shippers. Secrets print as a fixed mask plus a coarse length bucket;
+// connection URLs have their userinfo password replaced before printing.
+const SECRET_KEY_PATTERN = /PASS|SECRET|KEY|TOKEN/;
+const URL_CREDENTIAL_PATTERN = /\/\/([^/:@]+):[^@]*@/g;
+
+function lengthBucket(n: number): string {
+  if (n < 16) return "<16 chars";
+  if (n < 32) return "16–31 chars";
+  if (n < 64) return "32–63 chars";
+  return "64+ chars";
+}
+
+export function maskEnvValue(key: string, value: string): string {
+  if (SECRET_KEY_PATTERN.test(key)) return `******** (set, ${lengthBucket(value.length)})`;
+  const scrubbed = value.replace(URL_CREDENTIAL_PATTERN, "//$1:***@");
+  return scrubbed.length > 60 ? `${scrubbed.substring(0, 57)}...` : scrubbed;
+}
+
+export const MIN_ENCRYPTION_KEY_LENGTH = 32;
+
+/** ENCRYPTION_KEY policy (exported for tests). */
+export function checkEncryptionKey(env: NodeJS.ProcessEnv = process.env): { errors: string[]; warnings: string[] } {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const key = env.ENCRYPTION_KEY ?? "";
+  const isProd = env.NODE_ENV === "production";
+  const gen = "Generate with: openssl rand -hex 32";
+  if (key.trim() === "") {
+    if (isProd) errors.push(`ENCRYPTION_KEY is required in production (>= ${MIN_ENCRYPTION_KEY_LENGTH} chars) — it encrypts stored connection credentials. ${gen}`);
+    else warnings.push(`ENCRYPTION_KEY not set — credential encryption falls back to a JWT_SECRET-derived key (development only). ${gen}`);
+  } else if (key.length < MIN_ENCRYPTION_KEY_LENGTH) {
+    if (isProd) errors.push(`ENCRYPTION_KEY is shorter than ${MIN_ENCRYPTION_KEY_LENGTH} characters. ${gen}`);
+    else warnings.push(`ENCRYPTION_KEY is shorter than ${MIN_ENCRYPTION_KEY_LENGTH} characters and is IGNORED — falling back to a JWT_SECRET-derived key (development only). ${gen}`);
+  } else if (env.JWT_SECRET && key === env.JWT_SECRET) {
+    if (isProd) errors.push("ENCRYPTION_KEY must differ from JWT_SECRET");
+    else warnings.push("ENCRYPTION_KEY equals JWT_SECRET — use an independent secret");
+  }
+  return { errors, warnings };
+}
+
 export function validateEnvironment(): {
   errors: string[];
   warnings: string[];
@@ -136,17 +185,7 @@ export function validateEnvironment(): {
       const isSet = value !== undefined && value.trim() !== "";
 
       if (isSet) {
-        // Mask sensitive values
-        const masked =
-          check.key.includes("PASS") ||
-          check.key.includes("SECRET") ||
-          check.key.includes("KEY") ||
-          check.key.includes("TOKEN")
-            ? `${value!.substring(0, 4)}${"*".repeat(Math.max(0, value!.length - 4))}`
-            : value!.length > 50
-              ? `${value!.substring(0, 47)}...`
-              : value;
-        console.log(`  │  ✅ ${check.key} = ${masked}`);
+        console.log(`  │  ✅ ${check.key} = ${maskEnvValue(check.key, value!)}`);
       } else if (check.required) {
         console.log(`  │  ❌ ${check.key} — MISSING (${check.description})`);
         errors.push(`${check.key}: ${check.description}`);
@@ -226,6 +265,19 @@ export function validateEnvironment(): {
     console.log(
       "  ⚠️  JWT_SECRET is short (< 32 chars) — consider `openssl rand -hex 32` for a stronger secret"
     );
+  }
+
+  // L3/M3: ENCRYPTION_KEY encrypts stored connection credentials (v2, AAD-bound).
+  // Required in production; elsewhere encryptionService falls back to a key
+  // derived from JWT_SECRET with a loud warning.
+  const encErrors = checkEncryptionKey();
+  for (const e of encErrors.errors) {
+    errors.push(e);
+    console.error(`  ❌  ${e}`);
+  }
+  for (const w of encErrors.warnings) {
+    warnings.push(w);
+    console.log(`  ⚠️  ${w}`);
   }
 
   // Summary

@@ -391,7 +391,7 @@ function TypeBadge({ type }: { type: string }) {
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export default function BrokerPlayground() {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [, navigate] = useLocation();
   const { data: configs, isLoading } = trpc.wazuh.brokerConfigList.useQuery(undefined, { enabled: isAdmin });
@@ -552,19 +552,7 @@ export default function BrokerPlayground() {
     toast.success("cURL command copied to clipboard");
   }
 
-  if (!authLoading && !isAdmin) {
-    return (
-      <div className="p-6 space-y-6 max-w-[2400px] mx-auto">
-        <PageHeader
-          title="Broker Playground"
-          subtitle="Admin access required"
-        />
-        <GlassPanel className="p-8 text-center text-muted-foreground">
-          This page is restricted to administrators.
-        </GlassPanel>
-      </div>
-    );
-  }
+  // Non-admin state is rendered by RoleGuard (routeRegistry `requiresRole`).
 
   if (isLoading) {
     return (

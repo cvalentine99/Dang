@@ -19,6 +19,7 @@
 
 import { eq, and, gte, sql } from "drizzle-orm";
 import { getDb } from "../db";
+import { requireDb } from "../dbGuard";
 import { anomalySuppressionRules } from "../../drizzle/schema";
 
 // ─── Severity Ordering ──────────────────────────────────────────────────────
@@ -62,8 +63,9 @@ export async function checkSuppression(
   scheduleId: number,
   severity: "critical" | "high" | "medium"
 ): Promise<SuppressionCheckResult> {
-  const db = await getDb();
-  if (!db) return { suppressed: false };
+  // M-11: fail closed. "suppressed: false" on a DB outage would fire
+  // notifications for anomalies an active rule says to silence.
+  const db = await requireDb();
 
   const now = new Date();
 

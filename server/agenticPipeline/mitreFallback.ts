@@ -1,0 +1,70 @@
+/**
+ * Bundled MITRE ATT&CK (Enterprise) fallback allowlist.
+ *
+ * Used by mitreCatalog.ts ONLY when the Wazuh manager's `/mitre/techniques`
+ * catalog cannot be fetched. It is deliberately small — common, long-stable
+ * parent techniques plus a few heavily used sub-techniques — so validation in
+ * fallback mode is conservative: ids outside this list are treated as unknown
+ * (sub-techniques of a listed parent are accepted via the parent rule).
+ *
+ * Every id here exists in ATT&CK Enterprise v15+ and none are deprecated.
+ */
+export const MITRE_FALLBACK_TECHNIQUES: ReadonlyMap<string, string> = new Map([
+  ["T1003", "OS Credential Dumping"],
+  ["T1005", "Data from Local System"],
+  ["T1012", "Query Registry"],
+  ["T1016", "System Network Configuration Discovery"],
+  ["T1018", "Remote System Discovery"],
+  ["T1021", "Remote Services"],
+  ["T1027", "Obfuscated Files or Information"],
+  ["T1033", "System Owner/User Discovery"],
+  ["T1036", "Masquerading"],
+  ["T1041", "Exfiltration Over C2 Channel"],
+  ["T1046", "Network Service Discovery"],
+  ["T1047", "Windows Management Instrumentation"],
+  ["T1048", "Exfiltration Over Alternative Protocol"],
+  ["T1053", "Scheduled Task/Job"],
+  ["T1055", "Process Injection"],
+  ["T1056", "Input Capture"],
+  ["T1057", "Process Discovery"],
+  ["T1059", "Command and Scripting Interpreter"],
+  ["T1059.001", "PowerShell"],
+  ["T1059.003", "Windows Command Shell"],
+  ["T1059.004", "Unix Shell"],
+  ["T1068", "Exploitation for Privilege Escalation"],
+  ["T1070", "Indicator Removal"],
+  ["T1071", "Application Layer Protocol"],
+  ["T1078", "Valid Accounts"],
+  ["T1082", "System Information Discovery"],
+  ["T1083", "File and Directory Discovery"],
+  ["T1087", "Account Discovery"],
+  ["T1090", "Proxy"],
+  ["T1098", "Account Manipulation"],
+  ["T1105", "Ingress Tool Transfer"],
+  ["T1110", "Brute Force"],
+  ["T1110.001", "Password Guessing"],
+  ["T1112", "Modify Registry"],
+  ["T1133", "External Remote Services"],
+  ["T1136", "Create Account"],
+  ["T1140", "Deobfuscate/Decode Files or Information"],
+  ["T1190", "Exploit Public-Facing Application"],
+  ["T1203", "Exploitation for Client Execution"],
+  ["T1204", "User Execution"],
+  ["T1218", "System Binary Proxy Execution"],
+  ["T1222", "File and Directory Permissions Modification"],
+  ["T1486", "Data Encrypted for Impact"],
+  ["T1489", "Service Stop"],
+  ["T1490", "Inhibit System Recovery"],
+  ["T1498", "Network Denial of Service"],
+  ["T1505", "Server Software Component"],
+  ["T1543", "Create or Modify System Process"],
+  ["T1547", "Boot or Logon Autostart Execution"],
+  ["T1548", "Abuse Elevation Control Mechanism"],
+  ["T1548.003", "Sudo and Sudo Caching"],
+  ["T1550", "Use Alternate Authentication Material"],
+  ["T1562", "Impair Defenses"],
+  ["T1566", "Phishing"],
+  ["T1569", "System Services"],
+  ["T1570", "Lateral Tool Transfer"],
+  ["T1595", "Active Scanning"],
+]);

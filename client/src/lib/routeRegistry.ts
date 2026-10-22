@@ -20,6 +20,11 @@ export interface RouteEntry {
   component?: ComponentType<any>;
   /** Whether this route is outside the DashboardLayout (auth routes) */
   auth?: boolean;
+  /**
+   * Role required to render the page. App.tsx wraps such routes in a single
+   * RoleGuard. UI-only: the server enforces the same via adminProcedure.
+   */
+  requiresRole?: "admin";
 }
 
 /**
@@ -55,15 +60,15 @@ export const ROUTE_REGISTRY: RouteEntry[] = [
   { path: "/notes", pageName: "AnalystNotes" },
   { path: "/assistant", pageName: "Assistant" },
   { path: "/status", pageName: "Status" },
-  { path: "/admin/users", pageName: "AdminUsers" },
-  { path: "/admin/settings", pageName: "AdminSettings" },
-  { path: "/admin/token-usage", pageName: "TokenUsage" },
+  { path: "/admin/users", pageName: "AdminUsers", requiresRole: "admin" },
+  { path: "/admin/settings", pageName: "AdminSettings", requiresRole: "admin" },
+  { path: "/admin/token-usage", pageName: "TokenUsage", requiresRole: "admin" },
   { path: "/analyst", pageName: "AnalystChat" },
   { path: "/graph", pageName: "KnowledgeGraph" },
   { path: "/investigations", pageName: "Investigations" },
   { path: "/pipeline", pageName: "DataPipeline" },
   { path: "/alert-queue", pageName: "AlertQueue" },
-  { path: "/auto-queue-rules", pageName: "AutoQueueRules" },
+  { path: "/auto-queue-rules", pageName: "AutoQueueRules", requiresRole: "admin" },
   { path: "/triage", pageName: "TriagePipeline" },
   { path: "/living-cases", pageName: "LivingCaseView" },
   { path: "/living-cases/:id", pageName: "LivingCaseView" },
@@ -73,11 +78,11 @@ export const ROUTE_REGISTRY: RouteEntry[] = [
   { path: "/drift-analytics", pageName: "DriftAnalytics" },
   { path: "/fleet-inventory", pageName: "FleetInventory" },
   { path: "/security", pageName: "SecurityExplorer" },
-  { path: "/admin/audit", pageName: "SensitiveAccessAudit" },
-  { path: "/groups", pageName: "GroupManagement" },
-  { path: "/admin/broker-coverage", pageName: "BrokerCoverage" },
-  { path: "/admin/dgx-health", pageName: "DGXHealth" },
-  { path: "/admin/broker-playground", pageName: "BrokerPlayground" },
+  { path: "/admin/audit", pageName: "SensitiveAccessAudit", requiresRole: "admin" },
+  { path: "/groups", pageName: "GroupManagement", requiresRole: "admin" },
+  { path: "/admin/broker-coverage", pageName: "BrokerCoverage", requiresRole: "admin" },
+  { path: "/admin/dgx-health", pageName: "DGXHealth", requiresRole: "admin" },
+  { path: "/admin/broker-playground", pageName: "BrokerPlayground", requiresRole: "admin" },
 ];
 
 /**

@@ -6,21 +6,31 @@
  * so the LLM should always return valid JSON matching the schema. This Zod
  * layer is a defense-in-depth check.
  *
- * All fields use .optional().default() because LLM output is inherently
- * unpredictable — the goal is structural validation, not strict enforcement.
+ * C12: The load-bearing fields are REQUIRED — `workingTheory.statement` must be
+ * a non-empty string and `alternateTheories` must contain at least one entry.
+ * An empty object `{}` fails validation so the hypothesis stage is marked
+ * failed instead of rendering a "completed" case at a fabricated 50%.
+ * Ancillary fields (next steps, gaps, timeline, docs) stay tolerant with
+ * .optional().default() because LLM output is inherently unpredictable.
  */
 import { z } from "zod";
 
+/** Confidence: clamped into [0, 1]. Non-numeric values fail validation. */
+const ClampedConfidence = z.number().finite().transform((n) => Math.min(1, Math.max(0, n)));
+
+/** Non-empty after trimming. */
+const RequiredStatement = z.string().trim().min(1, "statement must be a non-empty string");
+
 const WorkingTheorySchema = z.object({
-  statement: z.string().optional().default(""),
-  confidence: z.number().min(0).max(1).optional().default(0.5),
+  statement: RequiredStatement,
+  confidence: ClampedConfidence,
   supportingEvidence: z.array(z.string()).optional().default([]),
   conflictingEvidence: z.array(z.string()).optional().default([]),
 }).strip();
 
 const AlternateTheorySchema = z.object({
-  statement: z.string().optional().default(""),
-  confidence: z.number().min(0).max(1).optional().default(0.5),
+  statement: RequiredStatement,
+  confidence: ClampedConfidence,
   supportingEvidence: z.array(z.string()).optional().default([]),
   whyLessLikely: z.string().optional().default(""),
 }).strip();
@@ -65,10 +75,8 @@ const DraftDocumentationSchema = z.object({
 }).strip();
 
 export const LLMHypothesisRawSchema = z.object({
-  workingTheory: WorkingTheorySchema.optional().default({
-    statement: "", confidence: 0.5, supportingEvidence: [], conflictingEvidence: [],
-  }),
-  alternateTheories: z.array(AlternateTheorySchema).optional().default([]),
+  workingTheory: WorkingTheorySchema,
+  alternateTheories: z.array(AlternateTheorySchema).min(1, "at least one alternate theory is required"),
   suggestedNextSteps: z.array(NextStepSchema).optional().default([]),
   evidenceGaps: z.array(EvidenceGapSchema).optional().default([]),
   timelineSummary: z.array(TimelineEntrySchema).optional().default([]),

@@ -5,8 +5,8 @@
  * Every mutation that changes action state MUST go through this module.
  *
  * Invariants enforced:
- *   1. requiresApproval=true cannot skip proposed→approved→executed
- *   2. Rejected actions are terminal — cannot be executed
+ *   1. requiresApproval=true cannot skip proposed→approved→acknowledged
+ *   2. Rejected actions are terminal — cannot be acknowledged
  *   3. Executed actions are terminal — cannot be modified
  *   4. Deferred actions require a reason
  *   5. Rejected actions require a reason
@@ -15,11 +15,11 @@
  *   8. Only valid transitions are allowed (no arbitrary jumps)
  *
  * State Machine:
- *   proposed → approved → executed
+ *   proposed → approved → acknowledged   (analyst records the manual action's outcome)
  *   proposed → rejected (terminal)
  *   proposed → deferred → proposed (re-propose)
  *   approved → rejected (revoke approval, terminal)
- *   approved → executed (terminal)
+ *   approved → acknowledged (terminal)
  */
 
 import { and, eq, sql } from "drizzle-orm";
@@ -46,9 +46,17 @@ type DbLike = DbRoot | TxLike;
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-export type ActionState = "proposed" | "approved" | "rejected" | "executed" | "deferred";
+/**
+ * `acknowledged` replaced `executed`: Dang has no actuator and performs no external
+ * action. An analyst carries the action out by hand and then records the outcome
+ * here. The DB columns keep their historical names (executedBy/executedAt/
+ * executionResult/executionSuccess) to avoid churn; `executionOutcome` is the
+ * analyst-attested result.
+ */
+export type ActionState = "proposed" | "approved" | "rejected" | "acknowledged" | "deferred";
+export type ExecutionOutcome = "success" | "partial" | "failed";
 
-export const TERMINAL_STATES: readonly ActionState[] = ["rejected", "executed"] as const;
+export const TERMINAL_STATES: readonly ActionState[] = ["rejected", "acknowledged"] as const;
 
 export interface TransitionRequest {
   actionId: string;
@@ -77,10 +85,10 @@ export interface TransitionResult {
 
 export const VALID_TRANSITIONS: Record<ActionState, ActionState[]> = {
   proposed: ["approved", "rejected", "deferred"],
-  approved: ["executed", "rejected"],
+  approved: ["acknowledged", "rejected"],
   deferred: ["proposed"],
   rejected: [],   // terminal
-  executed: [],   // terminal
+  acknowledged: [],   // terminal
 };
 
 export function isValidTransition(from: string, to: string): boolean {
@@ -128,9 +136,10 @@ export function checkInvariants(
     };
   }
 
-  // Invariant 3: requiresApproval=true cannot skip proposed→approved→executed
+  // Invariant 3: requiresApproval=true cannot skip proposed→approved→acknowledged
+  // (unreachable via VALID_TRANSITIONS today; kept as belt-and-braces)
   if (
-    targetState === "executed" &&
+    targetState === "acknowledged" &&
     action.requiresApproval === 1 &&
     action.state !== "approved"
   ) {
@@ -264,19 +273,25 @@ export async function transitionActionState(
         updatePayload.decidedAt = now;
         updatePayload.decisionReason = req.reason ?? null;
         break;
-      case "executed":
+      case "acknowledged": {
+        // The analyst attests what was done by hand. Outcome and a non-empty
+        // result are mandatory — there is no default success.
+        const outcome = req.metadata?.executionOutcome;
+        const result = typeof req.metadata?.executionResult === "string" ? req.metadata.executionResult.trim() : "";
+        if (outcome !== "success" && outcome !== "partial" && outcome !== "failed") {
+          throw new Error("Acknowledging an action requires executionOutcome: success | partial | failed");
+        }
+        if (result.length === 0) {
+          throw new Error("Acknowledging an action requires a non-empty executionResult describing what was done");
+        }
         updatePayload.executedBy = req.performedBy;
         updatePayload.executedAt = now;
-        // Audit #48: Merge execution result metadata into the atomic UPDATE
-        // so executionResult/executionSuccess are written in the same transaction
-        // as the state transition — no orphaned "executed" rows without results.
-        if (req.metadata?.executionResult !== undefined) {
-          updatePayload.executionResult = req.metadata.executionResult as string;
-        }
-        if (req.metadata?.executionSuccess !== undefined) {
-          updatePayload.executionSuccess = req.metadata.executionSuccess ? 1 : 0;
-        }
+        updatePayload.executionOutcome = outcome;
+        updatePayload.executionResult = result;
+        // Legacy boolean kept for reports: only a full success counts.
+        updatePayload.executionSuccess = outcome === "success" ? 1 : 0;
         break;
+      }
       case "deferred":
         updatePayload.decidedBy = req.performedBy;
         updatePayload.decidedAt = now;
@@ -377,7 +392,7 @@ export interface CaseSummary {
   proposed: number;
   approved: number;
   rejected: number;
-  executed: number;
+  acknowledged: number;
   deferred: number;
 }
 
@@ -404,7 +419,7 @@ export async function recomputeCaseSummary(caseId: number, tx?: DbLike): Promise
     proposed: 0,
     approved: 0,
     rejected: 0,
-    executed: 0,
+    acknowledged: 0,
     deferred: 0,
   };
 
@@ -522,12 +537,16 @@ export async function rejectAction(actionId: string, userId: number, reason: str
   });
 }
 
-export async function executeAction(actionId: string, userId: number, metadata?: Record<string, unknown>) {
+export async function acknowledgeAction(
+  actionId: string,
+  userId: number,
+  attestation: { executionOutcome: ExecutionOutcome; executionResult: string },
+) {
   return transitionActionState({
     actionId,
-    targetState: "executed",
+    targetState: "acknowledged",
     performedBy: `user:${userId}`,
-    metadata,
+    metadata: attestation,
   });
 }
 

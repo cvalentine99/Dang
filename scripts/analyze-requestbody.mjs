@@ -10,7 +10,21 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const specPath = resolve(__dirname, "spec-v4.14.3.yaml");
+// Dev script under plain node (no tsx), so it cannot import shared/specPath.ts.
+// Honors the same WAZUH_SPEC_PATH override; otherwise picks the newest spec-v*.yaml at the root.
+import { readdirSync } from "fs";
+function newestRootSpec() {
+  const root = resolve(__dirname, "..");
+  const files = readdirSync(root).filter(f => /^spec-v\d+\.\d+\.\d+\.yaml$/.test(f));
+  files.sort((a, b) => {
+    const va = a.match(/\d+/g).map(Number), vb = b.match(/\d+/g).map(Number);
+    for (let i = 0; i < 3; i++) if (va[i] !== vb[i]) return vb[i] - va[i];
+    return 0;
+  });
+  if (!files.length) throw new Error("No spec-v*.yaml at project root");
+  return resolve(root, files[0]);
+}
+const specPath = process.env.WAZUH_SPEC_PATH ? resolve(process.env.WAZUH_SPEC_PATH) : newestRootSpec();
 const spec = yaml.load(readFileSync(specPath, "utf8"));
 const paths = spec.paths || {};
 

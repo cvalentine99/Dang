@@ -35,7 +35,7 @@ describe("Direction 5: Centralized State Machine", () => {
       expect(VALID_TRANSITIONS).toHaveProperty("proposed");
       expect(VALID_TRANSITIONS).toHaveProperty("approved");
       expect(VALID_TRANSITIONS).toHaveProperty("rejected");
-      expect(VALID_TRANSITIONS).toHaveProperty("executed");
+      expect(VALID_TRANSITIONS).toHaveProperty("acknowledged");
       expect(VALID_TRANSITIONS).toHaveProperty("deferred");
     });
 
@@ -43,8 +43,8 @@ describe("Direction 5: Centralized State Machine", () => {
       expect(VALID_TRANSITIONS.proposed).toEqual(["approved", "rejected", "deferred"]);
     });
 
-    it("approved can transition to executed or rejected", () => {
-      expect(VALID_TRANSITIONS.approved).toEqual(["executed", "rejected"]);
+    it("approved can transition to acknowledged or rejected", () => {
+      expect(VALID_TRANSITIONS.approved).toEqual(["acknowledged", "rejected"]);
     });
 
     it("deferred can only transition back to proposed", () => {
@@ -55,8 +55,8 @@ describe("Direction 5: Centralized State Machine", () => {
       expect(VALID_TRANSITIONS.rejected).toEqual([]);
     });
 
-    it("executed is a terminal state with no transitions", () => {
-      expect(VALID_TRANSITIONS.executed).toEqual([]);
+    it("acknowledged is a terminal state with no transitions", () => {
+      expect(VALID_TRANSITIONS.acknowledged).toEqual([]);
     });
   });
 
@@ -75,8 +75,8 @@ describe("Direction 5: Centralized State Machine", () => {
       expect(isValidTransition("proposed", "deferred")).toBe(true);
     });
 
-    it("allows approved → executed", () => {
-      expect(isValidTransition("approved", "executed")).toBe(true);
+    it("allows approved → acknowledged", () => {
+      expect(isValidTransition("approved", "acknowledged")).toBe(true);
     });
 
     it("allows approved → rejected (revoke)", () => {
@@ -87,20 +87,20 @@ describe("Direction 5: Centralized State Machine", () => {
       expect(isValidTransition("deferred", "proposed")).toBe(true);
     });
 
-    it("rejects proposed → executed (must go through approved)", () => {
-      expect(isValidTransition("proposed", "executed")).toBe(false);
+    it("rejects proposed → acknowledged (must go through approved)", () => {
+      expect(isValidTransition("proposed", "acknowledged")).toBe(false);
     });
 
     it("rejects rejected → anything (terminal)", () => {
       expect(isValidTransition("rejected", "proposed")).toBe(false);
       expect(isValidTransition("rejected", "approved")).toBe(false);
-      expect(isValidTransition("rejected", "executed")).toBe(false);
+      expect(isValidTransition("rejected", "acknowledged")).toBe(false);
     });
 
-    it("rejects executed → anything (terminal)", () => {
-      expect(isValidTransition("executed", "proposed")).toBe(false);
-      expect(isValidTransition("executed", "approved")).toBe(false);
-      expect(isValidTransition("executed", "rejected")).toBe(false);
+    it("rejects acknowledged → anything (terminal)", () => {
+      expect(isValidTransition("acknowledged", "proposed")).toBe(false);
+      expect(isValidTransition("acknowledged", "approved")).toBe(false);
+      expect(isValidTransition("acknowledged", "rejected")).toBe(false);
     });
 
     it("rejects unknown states", () => {
@@ -116,8 +116,8 @@ describe("Direction 5: Centralized State Machine", () => {
       expect(isTerminalState("rejected")).toBe(true);
     });
 
-    it("executed is terminal", () => {
-      expect(isTerminalState("executed")).toBe(true);
+    it("acknowledged is terminal", () => {
+      expect(isTerminalState("acknowledged")).toBe(true);
     });
 
     it("proposed is not terminal", () => {
@@ -150,7 +150,7 @@ describe("Direction 5: Centralized State Machine", () => {
 
     it("returns 0 transitions for terminal states", () => {
       expect(getAllowedTransitions("rejected")).toHaveLength(0);
-      expect(getAllowedTransitions("executed")).toHaveLength(0);
+      expect(getAllowedTransitions("acknowledged")).toHaveLength(0);
     });
 
     it("returns empty array for unknown state", () => {
@@ -207,14 +207,14 @@ describe("Direction 5: Centralized State Machine", () => {
       expect(result.violation).toContain("terminal state");
     });
 
-    it("rejects transition from terminal state (executed)", () => {
-      const result = checkInvariants(makeAction({ state: "executed" }) as any, "proposed");
+    it("rejects transition from terminal state (acknowledged)", () => {
+      const result = checkInvariants(makeAction({ state: "acknowledged" }) as any, "proposed");
       expect(result.valid).toBe(false);
       expect(result.violation).toContain("terminal state");
     });
 
-    it("rejects invalid transition (proposed → executed)", () => {
-      const result = checkInvariants(makeAction() as any, "executed");
+    it("rejects invalid transition (proposed → acknowledged)", () => {
+      const result = checkInvariants(makeAction() as any, "acknowledged");
       expect(result.valid).toBe(false);
       expect(result.violation).toContain("Invalid transition");
     });
@@ -223,7 +223,7 @@ describe("Direction 5: Centralized State Machine", () => {
       // Even if the state machine allowed it, the invariant catches it
       const action = makeAction({ state: "approved", requiresApproval: 1 });
       // This should pass since state is approved
-      const result = checkInvariants(action as any, "executed");
+      const result = checkInvariants(action as any, "acknowledged");
       expect(result.valid).toBe(true);
     });
 
@@ -283,10 +283,10 @@ describe("Direction 5: Centralized State Machine", () => {
   // ── Full State Machine Path Tests ─────────────────────────────────────────
 
   describe("Complete state machine paths", () => {
-    it("happy path: proposed → approved → executed", () => {
+    it("happy path: proposed → approved → acknowledged", () => {
       expect(isValidTransition("proposed", "approved")).toBe(true);
-      expect(isValidTransition("approved", "executed")).toBe(true);
-      expect(isTerminalState("executed")).toBe(true);
+      expect(isValidTransition("approved", "acknowledged")).toBe(true);
+      expect(isTerminalState("acknowledged")).toBe(true);
     });
 
     it("rejection path: proposed → rejected", () => {
@@ -294,11 +294,11 @@ describe("Direction 5: Centralized State Machine", () => {
       expect(isTerminalState("rejected")).toBe(true);
     });
 
-    it("deferral cycle: proposed → deferred → proposed → approved → executed", () => {
+    it("deferral cycle: proposed → deferred → proposed → approved → acknowledged", () => {
       expect(isValidTransition("proposed", "deferred")).toBe(true);
       expect(isValidTransition("deferred", "proposed")).toBe(true);
       expect(isValidTransition("proposed", "approved")).toBe(true);
-      expect(isValidTransition("approved", "executed")).toBe(true);
+      expect(isValidTransition("approved", "acknowledged")).toBe(true);
     });
 
     it("late rejection: proposed → approved → rejected", () => {
@@ -311,8 +311,8 @@ describe("Direction 5: Centralized State Machine", () => {
       expect(isValidTransition("rejected", "proposed")).toBe(false);
     });
 
-    it("cannot re-propose from executed", () => {
-      expect(isValidTransition("executed", "proposed")).toBe(false);
+    it("cannot re-propose from acknowledged", () => {
+      expect(isValidTransition("acknowledged", "proposed")).toBe(false);
     });
   });
 });
@@ -330,7 +330,7 @@ describe("Direction 1: Stale updateActionState removed", () => {
     expect(routerKeys).not.toContain("updateActionState");
   });
 
-  it("responseActionsRouter should export approve, reject, defer, execute, repropose", async () => {
+  it("responseActionsRouter should export approve, reject, defer, acknowledge, repropose", async () => {
     const mod = await import("./agenticPipeline/responseActionsRouter");
     const router = mod.responseActionsRouter;
     // Check that the router has the expected procedure names
@@ -340,7 +340,7 @@ describe("Direction 1: Stale updateActionState removed", () => {
       expect(procNames).toContain("approve");
       expect(procNames).toContain("reject");
       expect(procNames).toContain("defer");
-      expect(procNames).toContain("execute");
+      expect(procNames).toContain("acknowledge");
       expect(procNames).toContain("repropose");
     }
   });
@@ -386,7 +386,7 @@ describe("Direction 5: State Machine Module Exports", () => {
     const mod = await import("./agenticPipeline/stateMachine");
     expect(mod.approveAction).toBeDefined();
     expect(mod.rejectAction).toBeDefined();
-    expect(mod.executeAction).toBeDefined();
+    expect(mod.acknowledgeAction).toBeDefined();
     expect(mod.deferAction).toBeDefined();
     expect(mod.reproposeAction).toBeDefined();
   });
@@ -396,7 +396,7 @@ describe("Direction 5: State Machine Module Exports", () => {
     expect(mod.VALID_TRANSITIONS).toBeDefined();
     expect(mod.TERMINAL_STATES).toBeDefined();
     expect(mod.TERMINAL_STATES).toContain("rejected");
-    expect(mod.TERMINAL_STATES).toContain("executed");
+    expect(mod.TERMINAL_STATES).toContain("acknowledged");
   });
 
   it("exports checkInvariants function", async () => {
@@ -438,7 +438,7 @@ describe("Direction 6: Pipeline Artifacts Endpoint", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("Direction 5: Invariant Exhaustiveness", () => {
-  const allStates: ActionState[] = ["proposed", "approved", "rejected", "executed", "deferred"];
+  const allStates: ActionState[] = ["proposed", "approved", "rejected", "acknowledged", "deferred"];
 
   it("every state has a defined transition list (even if empty)", () => {
     for (const state of allStates) {
@@ -457,7 +457,7 @@ describe("Direction 5: Invariant Exhaustiveness", () => {
 
   it("terminal states have no outgoing transitions", () => {
     expect(VALID_TRANSITIONS.rejected).toHaveLength(0);
-    expect(VALID_TRANSITIONS.executed).toHaveLength(0);
+    expect(VALID_TRANSITIONS.acknowledged).toHaveLength(0);
   });
 
   it("no state can transition to itself", () => {
@@ -466,7 +466,7 @@ describe("Direction 5: Invariant Exhaustiveness", () => {
     }
   });
 
-  it("proposed cannot directly reach executed (must go through approved)", () => {
-    expect(VALID_TRANSITIONS.proposed).not.toContain("executed");
+  it("proposed cannot directly reach acknowledged (must go through approved)", () => {
+    expect(VALID_TRANSITIONS.proposed).not.toContain("acknowledged");
   });
 });

@@ -201,24 +201,24 @@ export const menuItems = [
   { icon: Server, label: "Cluster Health", path: "/cluster", group: "System" },
   { icon: HeartPulse, label: "System Status", path: "/status", group: "System" },
   { icon: Lock, label: "Security Explorer", path: "/security", group: "System" },
-  { icon: FolderOpen, label: "Group Management", path: "/groups", group: "System" },
+  { icon: FolderOpen, label: "Group Management", path: "/groups", group: "System", adminOnly: true },
   { icon: Brain, label: "Security Analyst", path: "/analyst", group: "Intelligence", hasQueueBadge: true },
   { icon: Network, label: "Knowledge Graph", path: "/graph", group: "Intelligence" },
   { icon: FolderSearch, label: "Investigations", path: "/investigations", group: "Intelligence" },
   { icon: Database, label: "Data Pipeline", path: "/pipeline", group: "Intelligence" },
   { icon: Inbox, label: "Alert Queue", path: "/alert-queue", group: "Intelligence" },
-  { icon: Zap, label: "Auto-Queue Rules", path: "/auto-queue-rules", group: "Intelligence" },
+  { icon: Zap, label: "Auto-Queue Rules", path: "/auto-queue-rules", group: "Intelligence", adminOnly: true },
   { icon: Workflow, label: "Triage Pipeline", path: "/triage", group: "Intelligence" },
   { icon: Lightbulb, label: "Living Cases", path: "/living-cases", group: "Intelligence" },
   { icon: ShieldAlert, label: "Response Actions", path: "/response-actions", group: "Intelligence" },
   { icon: ScanSearch, label: "Pipeline Inspector", path: "/pipeline-inspector", group: "Intelligence" },
   { icon: BarChart3, label: "Feedback Analytics", path: "/feedback-analytics", group: "Intelligence" },
-  { icon: Gauge, label: "Token Usage", path: "/admin/token-usage", group: "Admin" },
-  { icon: UserCog, label: "User Management", path: "/admin/users", group: "Admin" },
-  { icon: Settings, label: "Connection Settings", path: "/admin/settings", group: "Admin" },
-  { icon: ShieldAlert, label: "Access Audit", path: "/admin/audit", group: "Admin" },
+  { icon: Gauge, label: "Token Usage", path: "/admin/token-usage", group: "Admin", adminOnly: true },
+  { icon: UserCog, label: "User Management", path: "/admin/users", group: "Admin", adminOnly: true },
+  { icon: Settings, label: "Connection Settings", path: "/admin/settings", group: "Admin", adminOnly: true },
+  { icon: ShieldAlert, label: "Access Audit", path: "/admin/audit", group: "Admin", adminOnly: true },
   { icon: Layers, label: "Broker Coverage", path: "/admin/broker-coverage", group: "Admin", adminOnly: true },
-  { icon: Cpu, label: "DGX Health", path: "/admin/dgx-health", group: "Admin" },
+  { icon: Cpu, label: "DGX Health", path: "/admin/dgx-health", group: "Admin", adminOnly: true },
   { icon: Zap, label: "Broker Playground", path: "/admin/broker-playground", group: "Admin", adminOnly: true },
   { icon: StickyNote, label: "Analyst Notes", path: "/notes", group: "Tools" },
   // Removed: /assistant (generic LLM chat without Wazuh KG context) — use /analyst instead
@@ -309,8 +309,11 @@ export default function DashboardLayout({
     return <DashboardLayoutSkeleton />;
   }
 
-  // Auth gate removed — always show the dashboard so the site is visible
-  // without requiring login. Auth-dependent features degrade gracefully.
+  // Auth gate: no session → sign-in panel instead of the full chrome (which
+  // would otherwise fire a burst of doomed protected queries).
+  if (!user) {
+    return <UnauthenticatedView />;
+  }
 
   return (
     <SidebarProvider

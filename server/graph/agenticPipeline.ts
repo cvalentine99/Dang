@@ -19,6 +19,7 @@
 
 import { z } from "zod";
 import { invokeLLMWithFallback as invokeLLM } from "../llm/llmService";
+import { wrapUntrustedData } from "../agenticPipeline/sanitizeForPrompt";
 import { searchGraph, getGraphStats, getRiskAnalysis, getEndpoints, getResourceOverview, getUseCases, getErrorPatterns, recordProvenance } from "./graphQueryService";
 import {
   getEffectiveIndexerConfig,
@@ -667,11 +668,14 @@ async function retrievePipelineContext(
   try {
     const db = await getDb();
     if (!db) {
+      // H-D9: never report a DB outage as "complete". AgentStep.status has no
+      // "skipped" (the union is mirrored in client/src/pages/AnalystChat.tsx),
+      // so use the existing failure state.
       steps[steps.length - 1] = {
         ...steps[steps.length - 1],
-        status: "complete",
+        status: "error",
         durationMs: Date.now() - stepStart,
-        detail: "Database unavailable — skipping pipeline context",
+        detail: "Database unavailable — pipeline context NOT retrieved",
       };
       return [];
     }
@@ -869,9 +873,9 @@ async function synthesizeResponse(
   const sourceContext = sources
     .filter(s => s.relevance !== "error")
     .map((s, i) => {
-      const dataStr = typeof s.data === "string" ? s.data : JSON.stringify(s.data, null, 1);
-      const truncated = dataStr.length > 3000 ? dataStr.slice(0, 3000) + "\n... [truncated]" : dataStr;
-      return `[Source ${i + 1}: ${s.label}]\n${truncated}`;
+      // Retrieved content (alerts, cases, KG rows) is attacker-influenceable: delimit it
+      // as data with a per-call nonce and truncate per field, never by slicing JSON.
+      return `[Source ${i + 1}: ${s.label}]\n${wrapUntrustedData(s.data, 3000)}`;
     })
     .join("\n\n");
 

@@ -101,13 +101,17 @@ const HYPOTHESIS_LLM_RESPONSE = {
       supportingEvidence: ["Multiple failed attempts"],
       conflictingEvidence: [],
     },
-    alternateTheories: [],
+    // C12: a valid hypothesis needs at least one alternate theory
+    alternateTheories: [
+      { statement: "Misconfigured monitoring script", confidence: 0.1, supportingEvidence: [], whyLessLikely: "Source IP is external" },
+    ],
     evidenceGaps: [],
     suggestedNextSteps: [],
     recommendedActions: [
       {
         action: "Block IP 10.0.0.1 at perimeter firewall",
-        category: "immediate",
+        // Prompt contract (C10): category is the DB enum, urgency is separate
+        category: "block_ioc",
         urgency: "immediate",
         targetType: "ip",
         targetValue: "10.0.0.1",
@@ -149,6 +153,54 @@ beforeEach(async () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("BUG-01: materializeResponseActions dedup", () => {
+  // NOTE: these fixtures put the *DB* category (block_ioc / disable_account) in
+  // the stored snapshot so the dedup branch is actually reached. A realistic
+  // snapshot written by assembleLivingCase() carries the display bucket
+  // ("immediate"|"next"|"optional"), which materializeResponseActions() cannot
+  // resolve — every such action is skipped as unclassifiable (genuine bug, see
+  // the it.todo below and hypothesisAgent.test.ts MATERIALIZATION_BUG).
+  it.skipIf(!HAS_DB)(
+    "rematerializes a case whose snapshot carries the display bucket AND the resolved dbCategory (as assembleLivingCase writes it)",
+    async () => {
+      const db = await getDbOrThrow();
+      const { responseActions, livingCaseState, investigationSessions, correlationBundles, triageObjects } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const triageId = `triage-remat-${uid()}`;
+      await db.insert(triageObjects).values({
+        triageId, alertId: `alert-remat-${uid()}`, ruleId: "5710", severity: "high", alertFamily: "brute_force", route: "C_HIGH_CONFIDENCE",
+        triageData: { schemaVersion: "1.0", triageId, triagedAt: new Date().toISOString(), triagedBy: "triage_agent", alertId: "test", ruleId: "5710", ruleDescription: "SSH brute force", ruleLevel: 10, alertTimestamp: new Date().toISOString(), agent: { id: "001", name: "test-host" }, alertFamily: "brute_force", severity: "high", severityConfidence: 0.85, severityReasoning: "x", entities: [], mitreMapping: [], dedup: { isDuplicate: false, similarityScore: 0.1, reasoning: "New" }, route: "C_HIGH_CONFIDENCE", routeReasoning: "Clear", summary: "x", keyEvidence: [], uncertainties: [], caseLink: { shouldLink: false, confidence: 0.1, reasoning: "No" }, rawAlert: {} } as any,
+      });
+      const corrId = `corr-remat-${uid()}`;
+      await db.insert(correlationBundles).values({
+        correlationId: corrId, sourceTriageId: triageId, status: "completed", confidence: 0.75,
+        bundleData: { schemaVersion: "1.0", correlationId: corrId, correlatedAt: new Date().toISOString(), sourceTriageId: triageId, relatedAlerts: [], discoveredEntities: [], blastRadius: { affectedHosts: 1, affectedUsers: 1, assetCriticality: "medium", confidence: 0.5 }, campaignAssessment: { likelyCampaign: false, clusteredTechniques: [], confidence: 0.3, reasoning: "No" }, caseRecommendation: { action: "create_new", confidence: 0.8, reasoning: "New" }, synthesis: { narrative: "test", supportingEvidence: [], conflictingEvidence: [], missingEvidence: [], confidence: 0.5 } } as any,
+      });
+      const [session] = await db.insert(investigationSessions).values({ userId: 1, title: "remat display-bucket", description: "t", status: "active" }).$returningId();
+      const [caseRow] = await db.insert(livingCaseState).values({
+        sessionId: session.id, workingTheory: "test", theoryConfidence: 0.5, sourceTriageId: triageId, sourceCorrelationId: corrId,
+        caseData: {
+          schemaVersion: "1.0", caseId: 0, lastUpdatedAt: new Date().toISOString(), lastUpdatedBy: "hypothesis_agent",
+          workingTheory: { statement: "test", confidence: 0.5, supportingEvidence: [], conflictingEvidence: [] },
+          alternateTheories: [], completedPivots: [], evidenceGaps: [], suggestedNextSteps: [],
+          // Exactly what assembleLivingCase writes: display bucket in `category`, DB enum in `dbCategory`.
+          recommendedActions: [
+            { action: "Block IP 10.0.0.1 at perimeter firewall", category: "immediate", dbCategory: "block_ioc", urgency: "immediate", targetType: "ip", targetValue: "10.0.0.1", requiresApproval: true, evidenceBasis: ["test"], state: "proposed" },
+          ],
+          timelineSummary: [], linkedAlertIds: [], linkedTriageIds: [], linkedCorrelationIds: [], linkedEntities: [], draftDocumentation: {},
+        } as any,
+      }).$returningId();
+
+      const { rematerializeResponseActions } = await import("./hypothesisAgent");
+      const remat = await rematerializeResponseActions({ livingCaseId: caseRow.id, correlationId: corrId });
+      expect(remat.actionIds).toHaveLength(1);
+      expect(remat.partialFailure).toBeNull();
+      const rows = await db.select().from(responseActions).where(eq(responseActions.caseId, caseRow.id));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ category: "block_ioc", state: "proposed", requiresApproval: 1, targetValue: "10.0.0.1" });
+    },
+  );
+
   it.skipIf(!HAS_DB)(
     "skips duplicate actions already present from prior materialization",
     async () => {
@@ -158,6 +210,7 @@ describe("BUG-01: materializeResponseActions dedup", () => {
 
       // Create a session and living case with one proposed action
       const [session] = await db.insert(investigationSessions).values({
+        userId: 1,
         title: "BUG-01 dedup test",
         description: "Test session",
         status: "active",
@@ -178,7 +231,7 @@ describe("BUG-01: materializeResponseActions dedup", () => {
           recommendedActions: [
             {
               action: "Block IP 10.0.0.1 at perimeter firewall",
-              category: "immediate",
+              category: "block_ioc",
               requiresApproval: true,
               evidenceBasis: ["test"],
               state: "proposed",
@@ -202,7 +255,7 @@ describe("BUG-01: materializeResponseActions dedup", () => {
       // Pre-insert an existing proposed action with matching title+category
       await db.insert(responseActions).values({
         actionId: `ra-existing-${uid()}`,
-        category: "escalate_ir",
+        category: "block_ioc",
         title: "Block IP 10.0.0.1 at perimeter firewall",
         urgency: "immediate",
         requiresApproval: 1,
@@ -297,6 +350,10 @@ describe("BUG-01: materializeResponseActions dedup", () => {
         .where(and(eq(responseActions.caseId, caseId), eq(responseActions.state, "proposed")));
 
       expect(afterRows.length).toBe(beforeCount);
+      // Skipped by dedup — not by the unclassifiable-category path, which would
+      // surface through partialFailure.
+      expect(remat.actionIds).toEqual([]);
+      expect(remat.partialFailure).toBeNull();
     },
   );
 
@@ -311,6 +368,7 @@ describe("BUG-01: materializeResponseActions dedup", () => {
       const { eq, and } = await import("drizzle-orm");
 
       const [session] = await db.insert(investigationSessions).values({
+        userId: 1,
         title: "BUG-01 intra-run dedup",
         description: "Test",
         status: "active",
@@ -318,7 +376,7 @@ describe("BUG-01: materializeResponseActions dedup", () => {
 
       const duplicateAction = {
         action: "Disable account root immediately",
-        category: "immediate",
+        category: "disable_account",
         requiresApproval: true,
         evidenceBasis: ["Compromised credentials"],
         state: "proposed" as const,
@@ -402,6 +460,11 @@ describe("BUG-01: materializeResponseActions dedup", () => {
         .where(eq(responseActions.caseId, caseId));
 
       expect(actionRows.length).toBe(1);
+      expect(remat.actionIds.length).toBe(1);
+      expect(remat.partialFailure).toBeNull();
+      // C10: model-proposed actions always require approval
+      expect(actionRows[0].requiresApproval).toBe(1);
+      expect(actionRows[0].state).toBe("proposed");
     },
   );
 });

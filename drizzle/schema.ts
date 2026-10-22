@@ -2,6 +2,7 @@ import {
   boolean,
   index,
   uniqueIndex,
+  foreignKey,
   int,
   bigint,
   mysqlEnum,
@@ -26,7 +27,9 @@ import { SAVED_SEARCH_TYPES } from "../shared/searchTypes";
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
-  name: text("name"),
+  /** Login name. varchar (not text) so it can carry a UNIQUE index — the first-user
+   *  admin race and account shadowing both depended on duplicates being insertable. */
+  name: varchar("name", { length: 256 }),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   /** Bcrypt hash for local auth (null for OAuth-only users) */
@@ -34,10 +37,22 @@ export const users = mysqlTable("users", {
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   /** Whether the user account is disabled (blocked from login) */
   isDisabled: int("isDisabled").default(0).notNull(),
+  /**
+   * Session revocation. Every JWT carries the tokenVersion it was minted with;
+   * verifySession rejects a token whose version is behind the row. Bumped on
+   * logout, password change, role change and disable — replaces the per-process
+   * in-memory blocklist, so revocation survives restarts and spans replicas.
+   */
+  tokenVersion: int("tokenVersion").default(0).notNull(),
+  /** Set on every password change; tokens issued before it are rejected. */
+  passwordChangedAt: timestamp("passwordChangedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("users_name_uniq").on(table.name),
+  uniqueIndex("users_email_uniq").on(table.email),
+]);
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -67,10 +82,12 @@ export const analystNotes = mysqlTable("analyst_notes", {
   /** Whether the note has been resolved/closed */
   resolved: int("resolved").default(0).notNull(),
   /** User who created this note — used for ownership enforcement */
-  createdBy: int("createdBy"),
+  createdBy: int("createdBy").notNull(),  // owner (team-global read, owner/admin write)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ([
+  index("an_createdBy_idx").on(table.createdBy),
+]));
 
 export type AnalystNote = typeof analystNotes.$inferSelect;
 export type InsertAnalystNote = typeof analystNotes.$inferInsert;
@@ -89,9 +106,12 @@ export const ragSessions = mysqlTable("rag_sessions", {
   /** Optional context snapshot injected for this message */
   contextSnapshot: json("contextSnapshot").$type<Record<string, unknown>>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  /** Owner — chat sessions are strictly per-analyst (C8/H-A4). */
+  userId: int("userId").notNull(),
 }, (table) => ([
   index("rs_sessionId_idx").on(table.sessionId),
   index("rs_createdAt_idx").on(table.createdAt),
+  index("rs_userId_idx").on(table.userId),
 ]));
 
 export type RagSession = typeof ragSessions.$inferSelect;
@@ -117,6 +137,7 @@ export const savedSearches = mysqlTable("saved_searches", {
 }, (table) => ([
   index("ss_userId_searchType_idx").on(table.userId, table.searchType),
   index("ss_updatedAt_idx").on(table.updatedAt),
+  foreignKey({ name: "fk_ss_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("cascade"),
 ]));
 
 export type SavedSearch = typeof savedSearches.$inferSelect;
@@ -142,7 +163,10 @@ export const configBaselines = mysqlTable("config_baselines", {
   snapshotData: json("snapshotData").$type<Record<string, unknown>>().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ([
+  foreignKey({ name: "fk_cb_scheduleId", columns: [table.scheduleId], foreignColumns: [baselineSchedules.id] }).onDelete("set null"),
+  foreignKey({ name: "fk_cb_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("cascade"),
+]));
 
 export type ConfigBaseline = typeof configBaselines.$inferSelect;
 export type InsertConfigBaseline = typeof configBaselines.$inferInsert;
@@ -185,7 +209,9 @@ export const baselineSchedules = mysqlTable("baseline_schedules", {
   notifyOnDrift: boolean("notifyOnDrift").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ([
+  foreignKey({ name: "fk_bs_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("cascade"),
+]));
 
 export type BaselineSchedule = typeof baselineSchedules.$inferSelect;
 export type InsertBaselineSchedule = typeof baselineSchedules.$inferInsert;
@@ -233,7 +259,15 @@ export const driftSnapshots = mysqlTable("drift_snapshots", {
     currentValue?: string;
   }>>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => ([
+  foreignKey({ name: "fk_ds_baselineId", columns: [table.baselineId], foreignColumns: [configBaselines.id] }).onDelete("restrict"),
+  foreignKey({ name: "fk_ds_previousBaselineId", columns: [table.previousBaselineId], foreignColumns: [configBaselines.id] }).onDelete("restrict"),
+  foreignKey({ name: "fk_ds_scheduleId", columns: [table.scheduleId], foreignColumns: [baselineSchedules.id] }).onDelete("cascade"),
+  foreignKey({ name: "fk_ds_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("cascade"),
+  index("ds_createdAt_idx").on(table.createdAt),
+  index("ds_scheduleId_idx").on(table.scheduleId),
+  index("ds_userId_idx").on(table.userId),
+]));
 
 export type DriftSnapshot = typeof driftSnapshots.$inferSelect;
 export type InsertDriftSnapshot = typeof driftSnapshots.$inferInsert;
@@ -299,6 +333,9 @@ export const driftAnomalies = mysqlTable("drift_anomalies", {
   index("anomalies_severity_idx").on(table.severity),
   index("anomalies_acknowledged_idx").on(table.acknowledged),
   index("anomalies_createdAt_idx").on(table.createdAt),
+  foreignKey({ name: "fk_da_scheduleId", columns: [table.scheduleId], foreignColumns: [baselineSchedules.id] }).onDelete("cascade"),
+  foreignKey({ name: "fk_da_snapshotId", columns: [table.snapshotId], foreignColumns: [driftSnapshots.id] }).onDelete("cascade"),
+  foreignKey({ name: "fk_da_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("cascade"),
 ]));
 
 export type DriftAnomaly = typeof driftAnomalies.$inferSelect;
@@ -352,6 +389,10 @@ export const driftNotificationHistory = mysqlTable("drift_notification_history",
   index("notif_history_type_idx").on(table.notificationType),
   index("notif_history_createdAt_idx").on(table.createdAt),
   index("notif_history_nextRetry_idx").on(table.nextRetryAt),
+  foreignKey({ name: "fk_dnh_anomalyId", columns: [table.anomalyId], foreignColumns: [driftAnomalies.id] }).onDelete("set null"),
+  foreignKey({ name: "fk_dnh_scheduleId", columns: [table.scheduleId], foreignColumns: [baselineSchedules.id] }).onDelete("cascade"),
+  foreignKey({ name: "fk_dnh_snapshotId", columns: [table.snapshotId], foreignColumns: [driftSnapshots.id] }).onDelete("set null"),
+  foreignKey({ name: "fk_dnh_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("cascade"),
 ]));
 
 export type DriftNotificationHistory = typeof driftNotificationHistory.$inferSelect;
@@ -387,6 +428,8 @@ export const anomalySuppressionRules = mysqlTable("anomaly_suppression_rules", {
   index("suppression_scheduleId_idx").on(table.scheduleId),
   index("suppression_active_idx").on(table.active),
   index("suppression_expiresAt_idx").on(table.expiresAt),
+  foreignKey({ name: "fk_asr_scheduleId", columns: [table.scheduleId], foreignColumns: [baselineSchedules.id] }).onDelete("set null"),
+  foreignKey({ name: "fk_asr_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("cascade"),
 ]));
 
 export type AnomalySuppressionRule = typeof anomalySuppressionRules.$inferSelect;
@@ -424,6 +467,7 @@ export const analystNotesV2 = mysqlTable("analyst_notes_v2", {
   index("notes_v2_entityType_idx").on(table.entityType),
   index("notes_v2_entityId_idx").on(table.entityId),
   index("notes_v2_entity_lookup_idx").on(table.entityType, table.entityId),
+  foreignKey({ name: "fk_anv2_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("cascade"),
 ]));
 
 export type AnalystNoteV2 = typeof analystNotesV2.$inferSelect;
@@ -466,6 +510,8 @@ export const kgEndpoints = mysqlTable("kg_endpoints", {
   index("kge_resource_idx").on(table.resource),
   index("kge_risk_level_idx").on(table.riskLevel),
   index("kge_path_idx").on(table.path),
+  // Idempotent ETL upserts key on (path, method)
+  uniqueIndex("kg_endpoints_path_method_uniq").on(table.path, table.method),
 ]));
 
 export type KgEndpoint = typeof kgEndpoints.$inferSelect;
@@ -487,6 +533,7 @@ export const kgParameters = mysqlTable("kg_parameters", {
 }, (table) => ([
   index("kgp_endpoint_id_idx").on(table.endpointId),
   index("kgp_name_idx").on(table.name),
+  foreignKey({ name: "fk_kgp_endpointId", columns: [table.endpointId], foreignColumns: [kgEndpoints.id] }).onDelete("cascade"),
 ]));
 
 export type KgParameter = typeof kgParameters.$inferSelect;
@@ -502,6 +549,7 @@ export const kgResponses = mysqlTable("kg_responses", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ([
   index("kgr_endpoint_id_idx").on(table.endpointId),
+  foreignKey({ name: "fk_kgr_endpointId", columns: [table.endpointId], foreignColumns: [kgEndpoints.id] }).onDelete("cascade"),
 ]));
 
 export type KgResponse = typeof kgResponses.$inferSelect;
@@ -573,6 +621,7 @@ export const kgFields = mysqlTable("kg_fields", {
 }, (table) => ([
   index("kgf_index_id_idx").on(table.indexId),
   index("kgf_field_name_idx").on(table.fieldName),
+  foreignKey({ name: "fk_kgf_indexId", columns: [table.indexId], foreignColumns: [kgIndices.id] }).onDelete("cascade"),
 ]));
 
 export type KgField = typeof kgFields.$inferSelect;
@@ -615,6 +664,7 @@ export const kgTrustHistory = mysqlTable("kg_trust_history", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ([
   index("kgth_endpoint_id_idx").on(table.endpointId),
+  foreignKey({ name: "fk_kgth_endpointId", columns: [table.endpointId], foreignColumns: [kgEndpoints.id] }).onDelete("restrict"),
 ]));
 
 export type KgTrustHistory = typeof kgTrustHistory.$inferSelect;
@@ -651,6 +701,9 @@ export const kgSyncStatus = mysqlTable("kg_sync_status", {
   errorMessage: text("error_message"),
   durationMs: int("duration_ms"),
   specVersion: varchar("spec_version", { length: 32 }),
+  /** Present in the live DB (added outside drizzle); kept so generate never drops them. */
+  evidence: json("evidence"),
+  timeline: json("timeline"),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 
@@ -663,7 +716,7 @@ export type KgSyncStatus = typeof kgSyncStatus.$inferSelect;
 export const investigationSessions = mysqlTable("investigation_sessions", {
   id: int("id").autoincrement().primaryKey(),
   /** Nullable: system-created sessions (e.g. hypothesis agent) use null */
-  userId: int("userId"),
+  userId: int("userId").notNull(), // per-analyst; system-created sessions carry the triggering user
   title: varchar("title", { length: 512 }).notNull(),
   description: text("description"),
   status: mysqlEnum("status", ["active", "closed", "archived"]).default("active").notNull(),
@@ -687,6 +740,7 @@ export const investigationSessions = mysqlTable("investigation_sessions", {
 }, (table) => ([
   index("is_userId_idx").on(table.userId),
   index("is_status_idx").on(table.status),
+  foreignKey({ name: "fk_is_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("restrict"), // owner column is NOT NULL; never orphan or cascade-delete investigations
 ]));
 
 export type InvestigationSession = typeof investigationSessions.$inferSelect;
@@ -704,6 +758,8 @@ export const investigationNotes = mysqlTable("investigation_notes", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => ([
   index("in_sessionId_idx").on(table.sessionId),
+  foreignKey({ name: "fk_in_sessionId", columns: [table.sessionId], foreignColumns: [investigationSessions.id] }).onDelete("cascade"),
+  foreignKey({ name: "fk_in_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("cascade"),
 ]));
 
 export type InvestigationNote = typeof investigationNotes.$inferSelect;
@@ -730,6 +786,7 @@ export const connectionSettings = mysqlTable("connection_settings", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => ([
   uniqueIndex("cs_category_key_uniq").on(table.category, table.settingKey),
+  index("cs_category_key_idx").on(table.category, table.settingKey),
 ]));
 
 export type ConnectionSetting = typeof connectionSettings.$inferSelect;
@@ -818,6 +875,8 @@ export const alertQueue = mysqlTable("alert_queue", {
   pipelineTriageId: varchar("pipelineTriageId", { length: 64 }),
   /** Auto-triage pipeline status */
   autoTriageStatus: varchar("autoTriageStatus", { length: 20 }).default("pending"),
+  /** Auto-triage attempts; after MAX_TRIAGE_ATTEMPTS the item is parked as failed (no poison loop, M6). */
+  triageAttempts: int("triageAttempts").default(0).notNull(),
 }, (table) => ([
   index("aq_status_idx").on(table.status),
   index("aq_alertId_idx").on(table.alertId),
@@ -927,6 +986,7 @@ export const savedHunts = mysqlTable("saved_hunts", {
   index("sh_iocType_idx").on(table.iocType),
   index("sh_severity_idx").on(table.severity),
   index("sh_createdAt_idx").on(table.createdAt),
+  foreignKey({ name: "fk_sh_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("cascade"),
 ]));
 
 export type SavedHunt = typeof savedHunts.$inferSelect;
@@ -1033,6 +1093,10 @@ export const triageObjects = mysqlTable("triage_objects", {
   index("to_alertFamily_idx").on(table.alertFamily),
   // Ghost index — linkedCaseId is never populated
   index("to_linkedCaseId_idx").on(table.linkedCaseId),
+  foreignKey({ name: "fk_to_alertQueueItemId", columns: [table.alertQueueItemId], foreignColumns: [alertQueue.id] }).onDelete("set null"),
+  foreignKey({ name: "fk_to_analystUserId", columns: [table.analystUserId], foreignColumns: [users.id] }).onDelete("set null"),
+  foreignKey({ name: "fk_to_linkedCaseId", columns: [table.linkedCaseId], foreignColumns: [livingCaseState.id] }).onDelete("set null"),
+  foreignKey({ name: "fk_to_triggeredByUserId", columns: [table.triggeredByUserId], foreignColumns: [users.id] }).onDelete("set null"),
 ]));
 
 export type TriageObjectRow = typeof triageObjects.$inferSelect;
@@ -1080,7 +1144,8 @@ export const correlationBundles = mysqlTable("correlation_bundles", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => ([
-  index("cb_sourceTriageId_idx").on(table.sourceTriageId),
+  // One bundle per triage: correlation re-runs/resumes must find and reuse it, not fork.
+  uniqueIndex("cb_sourceTriageId_uniq").on(table.sourceTriageId),
   index("cb_status_idx").on(table.status),
   index("cb_caseAction_idx").on(table.caseAction),
   index("cb_likelyCampaign_idx").on(table.likelyCampaign),
@@ -1094,6 +1159,12 @@ export type InsertCorrelationBundleRow = typeof correlationBundles.$inferInsert;
  * Living Case State — extends investigation_sessions with structured agentic state.
  * This is a separate table that links 1:1 with investigation_sessions,
  * keeping the original table stable while adding the agentic case fields.
+ */
+/**
+ * NOTE: the live DB also carries a multi-valued index `lcs_linked_corr_ids_mvi` on
+ * `linkedCorrelationIds` (CAST(... AS CHAR(64) ARRAY), migration 0016). drizzle cannot
+ * express functional indexes, so it is deliberately absent here AND from meta/ snapshots;
+ * `drizzle-kit generate` therefore never touches it. See drizzle/META-NOTES.md.
  */
 export const livingCaseState = mysqlTable("living_case_state", {
   id: int("id").autoincrement().primaryKey(),
@@ -1158,7 +1229,7 @@ export const RESPONSE_ACTION_CATEGORIES = [
 
 /**
  * State machine:
- *   proposed → approved → executed
+ *   proposed → approved → acknowledged   (analyst records the manual action's outcome)
  *   proposed → rejected
  *   proposed → deferred → proposed (re-propose)
  *   approved → executed
@@ -1170,7 +1241,7 @@ export const RESPONSE_ACTION_STATES = [
   "proposed",
   "approved",
   "rejected",
-  "executed",
+  "acknowledged",
   "deferred",
 ] as const;
 
@@ -1186,7 +1257,7 @@ export const responseActions = mysqlTable("response_actions", {
 
   // ── Identity ───────────────────────────────────────────────────────────────
   /** Unique action ID (e.g., "ra-abc123") */
-  actionId: varchar("actionId", { length: 64 }).notNull().unique(),
+  actionId: varchar("actionId", { length: 64 }).notNull(), // UNIQUE via ra_actionId_unique_idx (live name)
 
   // ── Classification ─────────────────────────────────────────────────────────
   /** What kind of response action */
@@ -1210,7 +1281,7 @@ export const responseActions = mysqlTable("response_actions", {
 
   // ── State Machine ──────────────────────────────────────────────────────────
   /** Current state of this action */
-  state: mysqlEnum("state", ["proposed", "approved", "rejected", "executed", "deferred"]).default("proposed").notNull(),
+  state: mysqlEnum("state", ["proposed", "approved", "rejected", "acknowledged", "deferred"]).default("proposed").notNull(),
 
   // ── Provenance ─────────────────────────────────────────────────────────────
   /** Who/what proposed this action (e.g., "hypothesis_agent", "analyst:42") */
@@ -1269,6 +1340,8 @@ export const responseActions = mysqlTable("response_actions", {
   executionResult: text("executionResult"),
   /** Whether execution succeeded */
   executionSuccess: int("executionSuccess"),
+  /** Analyst-attested outcome recorded at acknowledgement: success | partial | failed */
+  executionOutcome: varchar("executionOutcome", { length: 16 }),
 
   // ── Timestamps ─────────────────────────────────────────────────────────────
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1282,6 +1355,8 @@ export const responseActions = mysqlTable("response_actions", {
   index("ra_triageId_idx").on(table.triageId),
   index("ra_proposedAt_idx").on(table.proposedAt),
   index("ra_requiresApproval_state_idx").on(table.requiresApproval, table.state),
+  foreignKey({ name: "fk_ra_caseId", columns: [table.caseId], foreignColumns: [livingCaseState.id] }).onDelete("set null"),
+  uniqueIndex("ra_actionId_unique_idx").on(table.actionId),
 ]));
 
 export type ResponseActionRow = typeof responseActions.$inferSelect;
@@ -1335,7 +1410,7 @@ export const pipelineRuns = mysqlTable("pipeline_runs", {
   id: int("id").autoincrement().primaryKey(),
 
   /** Unique run ID (e.g., "run-abc123") */
-  runId: varchar("runId", { length: 64 }).notNull().unique(),
+  runId: varchar("runId", { length: 64 }).notNull(), // UNIQUE via pr_runId_unique_idx (live name)
 
   /** Alert queue item ID that triggered this run */
   queueItemId: int("queueItemId"),
@@ -1380,6 +1455,8 @@ export const pipelineRuns = mysqlTable("pipeline_runs", {
   /** Who triggered this run */
   triggeredBy: varchar("triggeredBy", { length: 128 }).notNull(),
 
+  /** Set atomically when a resume supersedes this run; a run can be resumed exactly once. */
+  resumedByRunId: varchar("resumedByRunId", { length: 64 }),
   startedAt: timestamp("startedAt").defaultNow().notNull(),
   completedAt: timestamp("completedAt"),
 }, (table) => ([
@@ -1391,6 +1468,9 @@ export const pipelineRuns = mysqlTable("pipeline_runs", {
   index("pr_startedAt_idx").on(table.startedAt),
   index("pr_status_startedAt_idx").on(table.status, table.startedAt),
   index("pr_queueItemId_startedAt_idx").on(table.queueItemId, table.startedAt),
+  foreignKey({ name: "fk_pr_livingCaseId", columns: [table.livingCaseId], foreignColumns: [livingCaseState.id] }).onDelete("set null"),
+  foreignKey({ name: "fk_pr_queueItemId", columns: [table.queueItemId], foreignColumns: [alertQueue.id] }).onDelete("set null"),
+  uniqueIndex("pr_runId_unique_idx").on(table.runId),
 ]));
 
 export type PipelineRunRow = typeof pipelineRuns.$inferSelect;
@@ -1468,6 +1548,8 @@ export const ticketArtifacts = mysqlTable("ticket_artifacts", {
   index("ta_alertId_idx").on(table.alertId),
   index("ta_system_idx").on(table.system),
   index("ta_createdAt_idx").on(table.createdAt),
+  foreignKey({ name: "fk_ta_pipelineRunId", columns: [table.pipelineRunId], foreignColumns: [pipelineRuns.id] }).onDelete("set null"),
+  foreignKey({ name: "fk_ta_queueItemId", columns: [table.queueItemId], foreignColumns: [alertQueue.id] }).onDelete("restrict"),
 ]));
 
 export type TicketArtifactRow = typeof ticketArtifacts.$inferSelect;
@@ -1502,6 +1584,7 @@ export const sensitiveAccessAudit = mysqlTable("sensitive_access_audit", {
   index("saa_resourceType_idx").on(table.resourceType),
   index("saa_resourceId_idx").on(table.resourceId),
   index("saa_createdAt_idx").on(table.createdAt),
+  foreignKey({ name: "fk_saa_userId", columns: [table.userId], foreignColumns: [users.id] }).onDelete("restrict"),
 ]));
 
 export type SensitiveAccessAuditRow = typeof sensitiveAccessAudit.$inferSelect;
@@ -1515,7 +1598,7 @@ export type InsertSensitiveAccessAuditRow = typeof sensitiveAccessAudit.$inferIn
  */
 export const threatIntelCache = mysqlTable("threat_intel_cache", {
   id: int("id").primaryKey().autoincrement(),
-  cacheKey: varchar("cacheKey", { length: 512 }).notNull().unique(),
+  cacheKey: varchar("cacheKey", { length: 512 }).notNull(), // UNIQUE via index `cacheKey` (live name)
   endpointType: mysqlEnum("endpointType", [
     "pulse",
     "indicator",
@@ -1530,43 +1613,33 @@ export const threatIntelCache = mysqlTable("threat_intel_cache", {
   index("tic_cacheKey_idx").on(table.cacheKey),
   index("tic_expiresAt_idx").on(table.expiresAt),
   index("tic_endpointType_idx").on(table.endpointType),
+  uniqueIndex("cacheKey").on(table.cacheKey),
 ]));
 export type ThreatIntelCacheRow = typeof threatIntelCache.$inferSelect;
 export type InsertThreatIntelCacheRow = typeof threatIntelCache.$inferInsert;
 
 // ── Saved Broker Queries ────────────────────────────────────────────────────
-/**
- * Saved queries for the Broker Playground — lets analysts bookmark and share
- * frequently used endpoint + parameter combinations.
- * Each query stores the endpoint key, the param config key, and the param values.
- */
-export const savedBrokerQueries = mysqlTable("saved_broker_queries", {
-  id: int("id").primaryKey().autoincrement(),
-  /** User who saved this query */
-  userId: int("userId").notNull(),
-  /** Human-readable name for the saved query */
-  name: varchar("name", { length: 256 }).notNull(),
-  /** Optional description of what this query does */
-  description: text("description"),
-  /** The endpoint key (e.g., "agentsList", "alertsSummary") */
-  endpointKey: varchar("endpointKey", { length: 128 }).notNull(),
-  /** The broker config key (e.g., "AGENTS_CONFIG") */
-  configKey: varchar("configKey", { length: 128 }).notNull(),
-  /** Serialized param key-value pairs */
-  params: json("params").$type<Record<string, string>>().notNull(),
-  /** Whether this query is shared with all users or private */
-  isShared: int("isShared").default(0).notNull(),
-  /** Number of times this query has been executed */
-  runCount: int("runCount").default(0).notNull(),
-  /** Last time this query was executed */
-  lastRunAt: timestamp("lastRunAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => ([
-  index("sbq_userId_idx").on(table.userId),
-  index("sbq_endpointKey_idx").on(table.endpointKey),
-  index("sbq_isShared_idx").on(table.isShared),
-]));
 
-export type SavedBrokerQuery = typeof savedBrokerQueries.$inferSelect;
-export type InsertSavedBrokerQuery = typeof savedBrokerQueries.$inferInsert;
+/**
+ * Analyst action audit — team-global SOC model (CODE_REVIEW_2026-10-21.md C8/H-A5).
+ * Any analyst may read shared pipeline data; every mutation that changes shared state
+ * (dismiss alert, override triage sign-off, pivot a case, change detection rules, ...)
+ * is attributed here. Append-only; no FK to users so the trail survives account removal.
+ */
+export const analystActionAudit = mysqlTable("analyst_action_audit", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  /** Procedure-style action name, e.g. "alertQueue.remove", "pipeline.submitFeedback" */
+  action: varchar("action", { length: 64 }).notNull(),
+  targetType: varchar("targetType", { length: 64 }).notNull(),
+  targetId: varchar("targetId", { length: 128 }).notNull(),
+  /** Before/after or reason payload — never secrets */
+  metadata: json("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ([
+  index("aaa_userId_createdAt_idx").on(table.userId, table.createdAt),
+  index("aaa_target_idx").on(table.targetType, table.targetId),
+  index("aaa_action_createdAt_idx").on(table.action, table.createdAt),
+]));
+export type AnalystActionAuditRow = typeof analystActionAudit.$inferSelect;
+export type InsertAnalystActionAudit = typeof analystActionAudit.$inferInsert;

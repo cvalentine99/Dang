@@ -250,76 +250,77 @@ describe("LIVE-FIRE: BUG-2 — concurrent autoTriageAllPending", () => {
 
 describe("LIVE-FIRE: BUG-3 — resume with partial failure preserves truth", () => {
   it.skipIf(!HAS_DB)("API result.status matches DB status when response actions partially fail", async () => {
-    // Set up LLM mock for full pipeline
-    let callCount = 0;
-    mockLLMResponse.mockImplementation(async (opts: any) => {
-      callCount++;
-      const callerHint = opts?.caller ?? "";
-      if (callerHint.includes("triage") || callCount === 1) {
-        return makeTriageLLMResponse();
-      }
-      if (callerHint.includes("correlation") || callCount === 2) {
-        return {
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                correlationId: `corr-lf-${Date.now()}`,
-                sourceTriageId: "placeholder",
-                relatedAlerts: [],
-                discoveredEntities: [{ type: "ip", value: "10.0.0.99", confidence: 0.9, source: "triage" }],
-                blastRadius: { affectedHosts: ["test-host"], affectedUsers: [], affectedServices: ["sshd"], assetCriticality: "low" },
-                campaignAssessment: { likelyCampaign: false, campaignName: null, confidence: 0.1, reasoning: "Isolated", indicators: [] },
-                caseRecommendation: { action: "create_new", mergeTargetId: null, mergeTargetTitle: null, reasoning: "New", confidence: 0.8 },
-                riskScore: 30,
-                summary: "Test",
-                evidenceSummary: "Test",
-                inferenceSummary: "Test",
-                uncertainties: [],
-                confidence: 0.7,
-                mitreMapping: [],
-              }),
-            },
-          }],
-          usage: { total_tokens: 200 },
-        };
-      }
-      // Hypothesis response — includes two actions, one with invalid category to force partial
-      return {
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              workingTheory: { statement: "Test theory", confidence: 0.8, supportingEvidence: ["Test"], conflictingEvidence: [] },
-              alternateTheories: [],
-              evidenceGaps: [],
-              suggestedNextSteps: [],
-              recommendedActions: [
-                {
-                  action: "Block 10.0.0.99 at firewall",
-                  category: "block_ioc",
-                  urgency: "immediate",
-                  targetType: "ip",
-                  targetValue: "10.0.0.99",
-                  requiresApproval: true,
-                  justification: "Active source",
-                },
-                {
-                  action: "Valid collection action",
-                  category: "collect_evidence",
-                  urgency: "next",
-                  targetType: "hostname",
-                  targetValue: "test-host",
-                  requiresApproval: false,
-                  justification: "Need more data",
-                },
-              ],
-              timelineReconstruction: [],
-              entities: [{ type: "ip", value: "10.0.0.99", role: "attacker" }],
-            }),
-          },
-        }],
-        usage: { total_tokens: 400 },
-      };
-    });
+    // Behavioral replacement for the former source-text proofs: drive a real
+    // resume whose hypothesis proposes an action with an unclassifiable
+    // category. C10: such a recommendation is NOT coerced to "custom" — it is
+    // skipped and reported through the partial-failure channel, so the resumed
+    // run must be "partial" in BOTH the API result and pipeline_runs.
+    const correlationResponse = {
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            correlationId: "x",
+            sourceTriageId: "placeholder",
+            relatedAlerts: [],
+            discoveredEntities: [{ type: "ip", value: "10.0.0.99", confidence: 0.9, source: "llm_inference" }],
+            blastRadius: { affectedHosts: ["test-host"], affectedUsers: [], affectedServices: ["sshd"], assetCriticality: "low" },
+            campaignAssessment: { likelyCampaign: false, campaignName: null, confidence: 0.1, reasoning: "Isolated", indicators: [] },
+            caseRecommendation: { action: "create_new", mergeTargetId: null, mergeTargetTitle: null, reasoning: "New", confidence: 0.8 },
+            riskScore: 30,
+            summary: "Test",
+            evidenceSummary: "Test",
+            inferenceSummary: "Test",
+            uncertainties: [],
+            confidence: 0.7,
+            mitreMapping: [],
+          }),
+        },
+      }],
+      usage: { prompt_tokens: 150, completion_tokens: 50 },
+    };
+    const hypothesisResponse = {
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            workingTheory: { statement: "Test theory", confidence: 0.8, supportingEvidence: ["Test"], conflictingEvidence: [] },
+            // C12: at least one alternate theory is required
+            alternateTheories: [{ statement: "Benign scanner", confidence: 0.1, supportingEvidence: [], whyLessLikely: "External IP" }],
+            evidenceGaps: [],
+            suggestedNextSteps: [],
+            recommendedActions: [
+              {
+                action: "Block 10.0.0.99 at firewall",
+                category: "block_ioc",
+                urgency: "immediate",
+                targetType: "ip",
+                targetValue: "10.0.0.99",
+                requiresApproval: true,
+                evidenceBasis: ["Active source"],
+                state: "proposed",
+              },
+              {
+                action: "Wipe and reimage test-host",
+                category: "reimage_host", // not a RESPONSE_ACTION_CATEGORIES value
+                urgency: "next",
+                targetType: "hostname",
+                targetValue: "test-host",
+                requiresApproval: false,
+                evidenceBasis: ["Need more data"],
+                state: "proposed",
+              },
+            ],
+            timelineSummary: [],
+            draftDocumentation: { executiveSummary: "Test" },
+          }),
+        },
+      }],
+      usage: { prompt_tokens: 300, completion_tokens: 100 },
+    };
+    mockLLMResponse.mockReset();
+    mockLLMResponse
+      .mockResolvedValueOnce(makeTriageLLMResponse())
+      .mockResolvedValueOnce(correlationResponse)
+      .mockResolvedValueOnce(hypothesisResponse);
 
     const { getDb } = await import("../db");
     const { pipelineRuns } = await import("../../drizzle/schema");
@@ -327,152 +328,136 @@ describe("LIVE-FIRE: BUG-3 — resume with partial failure preserves truth", () 
     const { executeResumePipeline } = await import("./resumePipelineHelper");
     const { runTriageAgent } = await import("./triageAgent");
     const { runCorrelationAgent } = await import("./correlationAgent");
-    const { runHypothesisAgent } = await import("./hypothesisAgent");
     const db = await getDb();
     expect(db).toBeTruthy();
 
-    // Run the first 3 stages to create a complete pipeline
     const alertId = `${TEST_TAG}-bug3-resume`;
     const triage = await runTriageAgent({ rawAlert: { _id: alertId, timestamp: new Date().toISOString(), rule: { id: "5710", description: "test", level: 10 }, agent: { id: "009", name: "test-host" }, data: { srcip: "10.0.0.99" } }, userId: 1 });
     expect(triage.success).toBe(true);
-
     const corr = await runCorrelationAgent({ triageId: triage.triageId! });
-    expect(corr.correlationId).toBeDefined();
 
-    const hypo = await runHypothesisAgent({ correlationId: corr.correlationId, userId: 1 });
-    expect(hypo.caseId).toBeDefined();
-
-    // Create a pipeline_runs row simulating a completed run
+    // A run whose hypothesis stage failed — resume auto-detects hypothesis
     const runId = `test-bug3-${Date.now().toString(36)}`;
     await db!.insert(pipelineRuns).values({
       runId,
       alertId,
-      currentStage: "completed",
-      status: "completed",
+      currentStage: "hypothesis",
+      status: "failed",
       triggeredBy: "user:1",
       triageId: triage.triageId,
       triageStatus: "completed",
       correlationId: corr.correlationId,
       correlationStatus: "completed",
-      livingCaseId: hypo.caseId,
-      hypothesisStatus: "completed",
-      responseActionsStatus: "completed",
+      hypothesisStatus: "failed",
     });
 
-    // Now test the ACTUAL status truth contract:
-    // Verify the function's status-setting logic by checking all result.status
-    // assignments align with DB writes.
-    //
-    // We can't easily force a partial failure in materializeResponseActions
-    // without deep mocking, but we CAN verify the API/DB truth contract:
-    // read resumePipelineHelper.ts and trace that every path where DB gets
-    // "partial", result.status also gets "partial".
-    //
-    // For the live receipt, verify the guard exists and the function works:
-    const { readFileSync } = await import("fs");
-    const { resolve } = await import("path");
-    const source = readFileSync(resolve(__dirname, "resumePipelineHelper.ts"), "utf-8");
+    const result = await executeResumePipeline({ runId }, { user: { id: 1 } }, "replay");
 
-    // PROOF 1: The unconditional overwrite is gone — replaced by guarded assignment
-    const finalBlock = source.slice(source.lastIndexOf("result.totalLatencyMs = Date.now()"));
-    expect(finalBlock).toContain('if (result.status === "running")');
-    // The old unconditional pattern was:
-    //   result.status = "completed";   (bare, not inside any if-block)
-    // The fix wraps it: if (result.status === "running") { result.status = "completed"; }
-    // Verify the guard exists and the assignment is INSIDE the guard, not bare:
-    const guardedPattern = /if\s*\(\s*result\.status\s*===\s*"running"\s*\)\s*\{[^}]*result\.status\s*=\s*"completed"/;
-    expect(finalBlock).toMatch(guardedPattern);
+    expect(result.startedFromStage).toBe("hypothesis");
+    expect(result.stages.hypothesis.status).toBe("completed");
+    expect(result.stages.responseActions.status).toBe("partial");
+    const failed = (result.stages.responseActions as any).partialFailure?.failed ?? [];
+    expect(failed.some((f: any) => f.action === "Wipe and reimage test-host" && /skipped/.test(f.error))).toBe(true);
+    expect(result.status).toBe("partial");
 
-    // PROOF 2: Stage 3 try-block sets result.status to match DB partial
-    const stage3Idx = source.indexOf("// BUG-03 adjacent fix: sync result.status with DB truth so the API");
-    const stage3Try = source.slice(stage3Idx, stage3Idx + 400);
-    expect(stage3Try).toContain('result.status = partialFailure ? "partial" : "completed"');
-
-    // PROOF 3: Stage 4 try-block sets result.status to match DB partial
-    const stage4Idx = source.indexOf("// BUG-03 adjacent fix: sync result.status with DB truth for stage-4");
-    const stage4Fix = source.slice(stage4Idx, stage4Idx + 400);
-    expect(stage4Fix).toContain('result.status = partialFailure ? "partial" : "completed"');
-
-    // PROOF 4: All catch blocks that return result set status to "partial"
-    const catchBlocks = source.match(/}\s*catch\s*\(err\)\s*\{[\s\S]*?return result;/g) ?? [];
-    expect(catchBlocks.length).toBeGreaterThan(0);
-    for (const block of catchBlocks) {
-      expect(block).toContain('result.status = "partial"');
-    }
+    // PROOF: the API result and the DB row agree
+    const [row] = await db!.select().from(pipelineRuns)
+      .where(eq(pipelineRuns.runId, result.resumedRunId)).limit(1);
+    expect(row.status).toBe(result.status);
+    expect(row.responseActionsStatus).toBe("partial");
+    expect(row.hypothesisStatus).toBe("completed");
+    expect(row.livingCaseId).toBe(result.stages.hypothesis.caseId);
   }, 60_000);
 });
 
 describe("LIVE-FIRE: BUG-4 — correlation finds match beyond old LIMIT(50)", () => {
-  it.skipIf(!HAS_DB)("55 active sessions: match at rank 55 is found", async () => {
+  it.skipIf(!HAS_DB)("55 active sessions: the oldest matching session still reaches the correlation prompt", async () => {
     const { getDb } = await import("../db");
     const { investigationSessions } = await import("../../drizzle/schema");
-    const { eq, and, like } = await import("drizzle-orm");
+    const { eq } = await import("drizzle-orm");
+    const { runTriageAgent } = await import("./triageAgent");
+    const { runCorrelationAgent } = await import("./correlationAgent");
     const db = await getDb();
     expect(db).toBeTruthy();
 
     const targetEntity = "10.99.99.99";
     const tag = `${TEST_TAG}-bug4`;
+    const targetTitle = `${tag} Target investigation for ${targetEntity}`;
+    const uniqueAgent = `bug4-${Math.random().toString(36).slice(2, 10)}`;
 
-    // Insert 55 active sessions. The matching one is at position 55 (oldest).
+    // 1 matching session (oldest by updatedAt) + 54 newer decoys. fetchPriorInvestigations
+    // orders by updatedAt DESC, so with the old LIMIT(50) the target was never seen.
     const sessionIds: number[] = [];
-    for (let i = 0; i < 55; i++) {
-      const isTarget = i === 54; // last one = oldest = would be beyond old LIMIT(50)
+    const old = new Date(Date.now() - 60 * 60 * 1000);
+    const [target] = await db!.insert(investigationSessions).values({
+      userId: 1, // owner column is NOT NULL (C9)
+      title: targetTitle,
+      description: `Investigation involving ${targetEntity}`,
+      status: "active",
+      evidence: [{ type: "ip", label: "Source IP", data: { srcip: targetEntity }, addedAt: old.toISOString() }],
+      createdAt: old,
+      updatedAt: old,
+    }).$returningId();
+    sessionIds.push(target.id);
+    for (let i = 0; i < 54; i++) {
       const [row] = await db!.insert(investigationSessions).values({
-        title: isTarget ? `[${tag}] Target investigation for ${targetEntity}` : `[${tag}] Decoy investigation ${i}`,
-        description: isTarget ? `Investigation involving ${targetEntity}` : `Unrelated investigation ${i}`,
+        userId: 1,
+        title: `${tag} Decoy investigation ${i}`,
+        description: `Unrelated investigation ${i}`,
         status: "active",
-        evidence: isTarget
-          ? [{ type: "ip", label: "Source IP", data: { srcip: targetEntity }, addedAt: new Date().toISOString() }]
-          : [{ type: "host", label: "Server", data: { hostname: `decoy-${i}` }, addedAt: new Date().toISOString() }],
+        evidence: [{ type: "host", label: "Server", data: { hostname: `decoy-${i}` }, addedAt: new Date().toISOString() }],
       }).$returningId();
       sessionIds.push(row.id);
     }
 
     try {
-      // Now call fetchPriorInvestigations indirectly via the correlation agent's
-      // internal logic. Since it's a private function, we test it by importing
-      // and reading the source to verify no LIMIT, AND by querying directly to
-      // prove the match would be found.
+      mockLLMResponse.mockReset();
+      mockLLMResponse.mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({
+          severity: "high",
+          alertFamily: "brute_force",
+          summary: `Brute force from ${targetEntity}`,
+          entities: [{ type: "ip", value: targetEntity, confidence: 1.0 }],
+          route: "C_HIGH_CONFIDENCE",
+        }) } }],
+        usage: { prompt_tokens: 100, completion_tokens: 50 },
+      });
+      const triage = await runTriageAgent({
+        rawAlert: {
+          id: `${tag}-alert`,
+          timestamp: new Date().toISOString(),
+          rule: { id: "199713", description: "sshd: auth failed", level: 10 },
+          // Unique agent + rule: fetchPriorInvestigations also matches on agent id,
+          // host name and rule id, and keeps the 10 most recent matches, so a shared "test-host"
+          // would let other suites' sessions crowd out the target.
+          agent: { id: uniqueAgent, name: `${uniqueAgent}-host` },
+          data: { srcip: targetEntity },
+        },
+        userId: 1,
+      });
+      expect(triage.success).toBe(true);
 
-      // Direct DB query simulating what fetchPriorInvestigations now does:
-      // No LIMIT, filter by status=active, then entity overlap in memory
-      const sessions = await db!.select()
-        .from(investigationSessions)
-        .where(eq(investigationSessions.status, "active"))
-        .orderBy(investigationSessions.updatedAt);
+      let correlationPrompt = "";
+      mockLLMResponse.mockImplementationOnce(async (opts: any) => {
+        correlationPrompt = (opts.messages ?? []).map((m: any) => String(m.content)).join("\n");
+        return {
+          choices: [{ message: { content: JSON.stringify({
+            correlationId: "x", sourceTriageId: "x", relatedAlerts: [], discoveredEntities: [],
+            blastRadius: { affectedHosts: [], affectedUsers: [], affectedServices: [], assetCriticality: "low" },
+            campaignAssessment: { likelyCampaign: false, campaignName: null, confidence: 0.1, reasoning: "-", indicators: [] },
+            caseRecommendation: { action: "create_new", mergeTargetId: null, mergeTargetTitle: null, reasoning: "-", confidence: 0.5 },
+            riskScore: 10, summary: "-", evidenceSummary: "-", inferenceSummary: "-", uncertainties: [], confidence: 0.5, mitreMapping: [],
+          }) } }],
+          usage: { prompt_tokens: 100, completion_tokens: 50 },
+        };
+      });
+      await runCorrelationAgent({ triageId: triage.triageId! });
 
-      // Apply the same entity-overlap filter as the runtime code
-      const entityValues = new Set([targetEntity.toLowerCase()]);
-      const matches = sessions.filter((s: any) => {
-        if (Array.isArray(s.evidence)) {
-          for (const ev of s.evidence) {
-            const data = ev.data ?? {};
-            for (const val of Object.values(data)) {
-              if (typeof val === "string" && entityValues.has(val.toLowerCase())) return true;
-            }
-          }
-        }
-        if (s.title?.toLowerCase().includes(targetEntity)) return true;
-        if (s.description?.toLowerCase().includes(targetEntity)) return true;
-        return false;
-      }).slice(0, 10);
-
-      // PROOF: The target session (at rank 55 by insertion) IS found
-      expect(matches.length).toBeGreaterThanOrEqual(1);
-      const targetMatch = matches.find((m: any) => m.title.includes(tag) && m.title.includes("Target"));
-      expect(targetMatch).toBeDefined();
-      expect(targetMatch!.title).toContain(targetEntity);
-
-      // PROOF: With old LIMIT(50), this match would NOT have been found
-      // because we inserted 54 decoys before it, pushing it beyond position 50
-      const allActive = await db!.select()
-        .from(investigationSessions)
-        .where(eq(investigationSessions.status, "active"))
-        .orderBy(investigationSessions.updatedAt);
-      expect(allActive.length).toBeGreaterThanOrEqual(55);
-
+      // PROOF: the oldest of 55+ active sessions was matched and handed to the LLM
+      expect(correlationPrompt).toContain("Prior Investigations");
+      expect(correlationPrompt).toContain(targetTitle);
+      expect(correlationPrompt).not.toContain(`${tag} Decoy investigation`);
     } finally {
-      // Cleanup: delete test sessions
       for (const id of sessionIds) {
         await db!.delete(investigationSessions).where(eq(investigationSessions.id, id));
       }

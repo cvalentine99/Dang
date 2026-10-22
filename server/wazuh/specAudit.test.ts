@@ -5,7 +5,7 @@
  * match the Wazuh API spec v4.14.x (resolved $ref parameters).
  *
  * These tests ensure:
- * 1. Registry paramCounts match spec (path + data params)
+ * 1. Broker config param NAMES match the parsed spec YAML per endpoint
  * 2. Broker configs contain exactly the params the spec defines
  * 3. No phantom params exist in configs that aren't in the spec
  * 4. No missing params that the spec defines but configs omit
@@ -13,46 +13,87 @@
  */
 import { describe, it, expect } from "vitest";
 import * as broker from "./paramBroker";
+import { BROKER_CONFIG_REGISTRY } from "./brokerCoverage";
+import {
+  diffConfigAgainstSpec,
+  isSpecMismatch,
+  specQueryParams,
+  SPEC_OPTIONAL_OMISSIONS,
+} from "./specParamAudit";
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 1. Broker Config Param Count Validation
+// 1. Broker Config Params vs the real spec YAML (names, not hand-typed counts)
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe("Broker Config Param Counts vs Spec v4.14.x", () => {
-  const configCounts: Array<{ name: string; config: broker.EndpointParamConfig; expectedCount: number }> = [
-    { name: "AGENTS_CONFIG", config: broker.AGENTS_CONFIG, expectedCount: 22 },
-    { name: "RULES_CONFIG", config: broker.RULES_CONFIG, expectedCount: 21 },
-    { name: "SYSCHECK_CONFIG", config: broker.SYSCHECK_CONFIG, expectedCount: 18 },
-    { name: "ROOTCHECK_CONFIG", config: broker.ROOTCHECK_CONFIG, expectedCount: 11 },
-    { name: "CISCAT_CONFIG", config: broker.CISCAT_CONFIG, expectedCount: 16 },
-    { name: "MITRE_REFERENCES_CONFIG", config: broker.MITRE_REFERENCES_CONFIG, expectedCount: 8 },
-    { name: "MITRE_TECHNIQUES_CONFIG", config: broker.MITRE_TECHNIQUES_CONFIG, expectedCount: 9 },
-    { name: "MITRE_TACTICS_CONFIG", config: broker.MITRE_TACTICS_CONFIG, expectedCount: 9 },
-    { name: "MITRE_GROUPS_CONFIG", config: broker.MITRE_GROUPS_CONFIG, expectedCount: 9 },
-    { name: "MITRE_MITIGATIONS_CONFIG", config: broker.MITRE_MITIGATIONS_CONFIG, expectedCount: 9 },
-    { name: "MITRE_SOFTWARE_CONFIG", config: broker.MITRE_SOFTWARE_CONFIG, expectedCount: 9 },
-    { name: "DECODERS_CONFIG", config: broker.DECODERS_CONFIG, expectedCount: 12 },
-    { name: "SYSCOLLECTOR_NETIFACE_CONFIG", config: broker.SYSCOLLECTOR_NETIFACE_CONFIG, expectedCount: 21 },  // 7 universal + 13 specific + wait_for_complete (mac removed — not in spec v4.14.x)
-    { name: "SYSCOLLECTOR_NETADDR_CONFIG", config: broker.SYSCOLLECTOR_NETADDR_CONFIG, expectedCount: 13 },
-    { name: "SYSCOLLECTOR_HOTFIXES_CONFIG", config: broker.SYSCOLLECTOR_HOTFIXES_CONFIG, expectedCount: 9 },
-    { name: "SYSCOLLECTOR_NETPROTO_CONFIG", config: broker.SYSCOLLECTOR_NETPROTO_CONFIG, expectedCount: 12 },
-    { name: "SECURITY_ROLES_CONFIG", config: broker.SECURITY_ROLES_CONFIG, expectedCount: 8 },
-    { name: "SECURITY_POLICIES_CONFIG", config: broker.SECURITY_POLICIES_CONFIG, expectedCount: 8 },
-    { name: "SECURITY_USERS_CONFIG", config: broker.SECURITY_USERS_CONFIG, expectedCount: 8 },
-    { name: "CLUSTER_NODE_CONFIGURATION_CONFIG", config: broker.CLUSTER_NODE_CONFIGURATION_CONFIG, expectedCount: 3 },
-    { name: "CLUSTER_NODE_LOGS_CONFIG", config: broker.CLUSTER_NODE_LOGS_CONFIG, expectedCount: 7 },
-    { name: "TASKS_STATUS_CONFIG", config: broker.TASKS_STATUS_CONFIG, expectedCount: 12 },
-    { name: "AGENTS_OUTDATED_CONFIG", config: broker.AGENTS_OUTDATED_CONFIG, expectedCount: 6 },
-    { name: "AGENTS_NO_GROUP_CONFIG", config: broker.AGENTS_NO_GROUP_CONFIG, expectedCount: 6 },
-    { name: "AGENTS_STATS_DISTINCT_CONFIG", config: broker.AGENTS_STATS_DISTINCT_CONFIG, expectedCount: 6 },
+/**
+ * Opens the bundled spec (shared/specPath.ts) and compares, per endpoint, the
+ * real query-parameter names with the broker config's wazuhNames. Phantom
+ * params (in config, not in spec) and missing params (in spec, not in config,
+ * other than the tolerated `wait_for_complete`) both fail, as does any
+ * enumValues list that differs from the spec's enum.
+ */
+function expectConfigMatchesSpec(name: string, config: broker.EndpointParamConfig) {
+  const specNames = specQueryParams(config.endpoint);
+  expect(specNames, `${config.endpoint} not found in spec`).not.toBeNull();
+  const d = diffConfigAgainstSpec(config);
+  expect(d.extra, `${name}: phantom params not in spec`).toEqual([]);
+  expect(d.missing, `${name}: spec params missing from config`).toEqual([]);
+  expect(d.enumDrift, `${name}: enumValues differ from spec enum`).toEqual([]);
+  // Every non-tolerated spec param is present in the config
+  const cfgNames = new Set(Object.values(config.params).map(p => p.wazuhName));
+  for (const n of specNames!) {
+    if (!SPEC_OPTIONAL_OMISSIONS.has(n)) expect(cfgNames.has(n), `${name} lacks spec param ${n}`).toBe(true);
+  }
+}
+
+describe("Broker config params vs spec v4.14.x (parsed YAML)", () => {
+  const configs: Array<{ name: string; config: broker.EndpointParamConfig }> = [
+    { name: "AGENTS_CONFIG", config: broker.AGENTS_CONFIG },
+    { name: "RULES_CONFIG", config: broker.RULES_CONFIG },
+    { name: "SYSCHECK_CONFIG", config: broker.SYSCHECK_CONFIG },
+    { name: "ROOTCHECK_CONFIG", config: broker.ROOTCHECK_CONFIG },
+    { name: "CISCAT_CONFIG", config: broker.CISCAT_CONFIG },
+    { name: "MITRE_REFERENCES_CONFIG", config: broker.MITRE_REFERENCES_CONFIG },
+    { name: "MITRE_TECHNIQUES_CONFIG", config: broker.MITRE_TECHNIQUES_CONFIG },
+    { name: "MITRE_TACTICS_CONFIG", config: broker.MITRE_TACTICS_CONFIG },
+    { name: "MITRE_GROUPS_CONFIG", config: broker.MITRE_GROUPS_CONFIG },
+    { name: "MITRE_MITIGATIONS_CONFIG", config: broker.MITRE_MITIGATIONS_CONFIG },
+    { name: "MITRE_SOFTWARE_CONFIG", config: broker.MITRE_SOFTWARE_CONFIG },
+    { name: "DECODERS_CONFIG", config: broker.DECODERS_CONFIG },
+    { name: "SYSCOLLECTOR_NETIFACE_CONFIG", config: broker.SYSCOLLECTOR_NETIFACE_CONFIG },
+    { name: "SYSCOLLECTOR_NETADDR_CONFIG", config: broker.SYSCOLLECTOR_NETADDR_CONFIG },
+    { name: "SYSCOLLECTOR_HOTFIXES_CONFIG", config: broker.SYSCOLLECTOR_HOTFIXES_CONFIG },
+    { name: "SYSCOLLECTOR_NETPROTO_CONFIG", config: broker.SYSCOLLECTOR_NETPROTO_CONFIG },
+    { name: "SECURITY_ROLES_CONFIG", config: broker.SECURITY_ROLES_CONFIG },
+    { name: "SECURITY_POLICIES_CONFIG", config: broker.SECURITY_POLICIES_CONFIG },
+    { name: "SECURITY_USERS_CONFIG", config: broker.SECURITY_USERS_CONFIG },
+    { name: "CLUSTER_NODE_CONFIGURATION_CONFIG", config: broker.CLUSTER_NODE_CONFIGURATION_CONFIG },
+    { name: "CLUSTER_NODE_LOGS_CONFIG", config: broker.CLUSTER_NODE_LOGS_CONFIG },
+    { name: "TASKS_STATUS_CONFIG", config: broker.TASKS_STATUS_CONFIG },
+    { name: "AGENTS_OUTDATED_CONFIG", config: broker.AGENTS_OUTDATED_CONFIG },
+    { name: "AGENTS_NO_GROUP_CONFIG", config: broker.AGENTS_NO_GROUP_CONFIG },
+    { name: "AGENTS_STATS_DISTINCT_CONFIG", config: broker.AGENTS_STATS_DISTINCT_CONFIG },
   ];
 
-  for (const { name, config, expectedCount } of configCounts) {
-    it(`${name} has ${expectedCount} params matching spec`, () => {
-      const actual = Object.keys(config.params).length;
-      expect(actual).toBe(expectedCount);
-    });
+  for (const { name, config } of configs) {
+    it(`${name} params match spec ${config.endpoint}`, () => expectConfigMatchesSpec(name, config));
   }
+
+  it("every BROKER_CONFIG_REGISTRY config matches the spec (same check as npm run audit:broker)", () => {
+    const failures = BROKER_CONFIG_REGISTRY
+      .map(({ name, config }) => ({ name, d: diffConfigAgainstSpec(config) }))
+      .filter(({ name, d }) => isSpecMismatch(name, d))
+      .map(({ name, d }) => `${name}: ${JSON.stringify(d)}`);
+    expect(failures).toEqual([]);
+  });
+
+  it("a phantom param is detected (self-test of the audit)", () => {
+    const phantom: broker.EndpointParamConfig = {
+      endpoint: "/agents",
+      params: { ...broker.AGENTS_CONFIG.params, bogus: { wazuhName: "bogus", description: "", type: "string" } },
+    };
+    expect(diffConfigAgainstSpec(phantom).extra).toEqual(["bogus"]);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -140,28 +181,25 @@ describe("Critical param presence checks", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 4. Experimental Config Param Counts (spec-aligned)
+// 4. Experimental Config Params vs the real spec YAML
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe("Experimental config param counts vs spec v4.14.x", () => {
-  const expCounts: Array<{ name: string; config: broker.EndpointParamConfig; expectedCount: number }> = [
-    { name: "EXP_SYSCOLLECTOR_PACKAGES_CONFIG", config: broker.EXP_SYSCOLLECTOR_PACKAGES_CONFIG, expectedCount: 12 },
-    { name: "EXP_SYSCOLLECTOR_PROCESSES_CONFIG", config: broker.EXP_SYSCOLLECTOR_PROCESSES_CONFIG, expectedCount: 21 },
-    { name: "EXP_SYSCOLLECTOR_PORTS_CONFIG", config: broker.EXP_SYSCOLLECTOR_PORTS_CONFIG, expectedCount: 15 },
-    { name: "EXP_SYSCOLLECTOR_NETIFACE_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETIFACE_CONFIG, expectedCount: 20 },  // 5 universal (no q/distinct) + agents_list + wait_for_complete + 13 specific (mac removed)
-    { name: "EXP_SYSCOLLECTOR_NETADDR_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETADDR_CONFIG, expectedCount: 12 },
-    { name: "EXP_SYSCOLLECTOR_NETPROTO_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETPROTO_CONFIG, expectedCount: 11 },
-    { name: "EXP_SYSCOLLECTOR_OS_CONFIG", config: broker.EXP_SYSCOLLECTOR_OS_CONFIG, expectedCount: 12 },
-    { name: "EXP_SYSCOLLECTOR_HARDWARE_CONFIG", config: broker.EXP_SYSCOLLECTOR_HARDWARE_CONFIG, expectedCount: 13 },
-    { name: "EXP_SYSCOLLECTOR_HOTFIXES_CONFIG", config: broker.EXP_SYSCOLLECTOR_HOTFIXES_CONFIG, expectedCount: 8 },
-    { name: "EXPERIMENTAL_CISCAT_RESULTS_CONFIG", config: broker.EXPERIMENTAL_CISCAT_RESULTS_CONFIG, expectedCount: 14 },
+describe("Experimental config params vs spec v4.14.x (parsed YAML)", () => {
+  const expConfigs: Array<{ name: string; config: broker.EndpointParamConfig }> = [
+    { name: "EXP_SYSCOLLECTOR_PACKAGES_CONFIG", config: broker.EXP_SYSCOLLECTOR_PACKAGES_CONFIG },
+    { name: "EXP_SYSCOLLECTOR_PROCESSES_CONFIG", config: broker.EXP_SYSCOLLECTOR_PROCESSES_CONFIG },
+    { name: "EXP_SYSCOLLECTOR_PORTS_CONFIG", config: broker.EXP_SYSCOLLECTOR_PORTS_CONFIG },
+    { name: "EXP_SYSCOLLECTOR_NETIFACE_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETIFACE_CONFIG },
+    { name: "EXP_SYSCOLLECTOR_NETADDR_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETADDR_CONFIG },
+    { name: "EXP_SYSCOLLECTOR_NETPROTO_CONFIG", config: broker.EXP_SYSCOLLECTOR_NETPROTO_CONFIG },
+    { name: "EXP_SYSCOLLECTOR_OS_CONFIG", config: broker.EXP_SYSCOLLECTOR_OS_CONFIG },
+    { name: "EXP_SYSCOLLECTOR_HARDWARE_CONFIG", config: broker.EXP_SYSCOLLECTOR_HARDWARE_CONFIG },
+    { name: "EXP_SYSCOLLECTOR_HOTFIXES_CONFIG", config: broker.EXP_SYSCOLLECTOR_HOTFIXES_CONFIG },
+    { name: "EXPERIMENTAL_CISCAT_RESULTS_CONFIG", config: broker.EXPERIMENTAL_CISCAT_RESULTS_CONFIG },
   ];
 
-  for (const { name, config, expectedCount } of expCounts) {
-    it(`${name} has ${expectedCount} params`, () => {
-      const actual = Object.keys(config.params).length;
-      expect(actual).toBe(expectedCount);
-    });
+  for (const { name, config } of expConfigs) {
+    it(`${name} params match spec ${config.endpoint}`, () => expectConfigMatchesSpec(name, config));
   }
 });
 

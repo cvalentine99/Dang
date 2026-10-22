@@ -10,7 +10,7 @@
  */
 
 import { trpc } from "@/lib/trpc";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { ReadinessBanner } from "@/components/shared/ReadinessBanner";
@@ -40,6 +40,10 @@ export default function AlertQueue() {
       utils.alertQueue.list.invalidate();
       utils.alertQueue.count.invalidate();
     },
+    // Server returns FORBIDDEN for non-owners — surface its message verbatim.
+    onError: (err) => {
+      toast.error("Could not dismiss alert", { description: err.message });
+    },
   });
 
   const clearHistoryMutation = trpc.alertQueue.clearHistory.useMutation({
@@ -54,17 +58,28 @@ export default function AlertQueue() {
   const splunkEnabled = trpc.splunk.isEnabled.useQuery(undefined, { staleTime: 60_000 });
   const [isBatchRunning, setIsBatchRunning] = useState(false);
 
+  // H-C7: batchId of the last run whose completion we already handled. A poll that
+  // still reports that batch (server not yet switched to the new run) is stale.
+  const handledBatchIdRef = useRef<string | null>(null);
+
   const batchProgress = trpc.splunk.batchProgress.useQuery(undefined, {
     enabled: isBatchRunning,
-    refetchInterval: isBatchRunning ? 500 : false,
+    refetchInterval: (query) => {
+      if (!isBatchRunning) return false;
+      const d = query.state.data;
+      const done = d?.status === "completed" || d?.status === "failed";
+      return done && d?.batchId !== handledBatchIdRef.current ? false : 500;
+    },
     staleTime: 0,
   });
 
   // Stop polling when batch completes — truthful toast based on actual results
   useEffect(() => {
-    const status = batchProgress.data?.status;
-    if (status === "completed" || status === "failed") {
-      const p = batchProgress.data;
+    const p = batchProgress.data;
+    if (!isBatchRunning || !p) return;
+    const status = p.status;
+    if ((status === "completed" || status === "failed") && p.batchId !== handledBatchIdRef.current) {
+      handledBatchIdRef.current = p.batchId;
       if (p && p.sent > 0 && p.failed === 0) {
         toast.success(`${p.sent} Splunk ticket${p.sent > 1 ? "s" : ""} created`, {
           description: `All ${p.sent} tickets sent to Splunk ES`,
@@ -84,10 +99,16 @@ export default function AlertQueue() {
       utils.alertQueue.list.invalidate();
       utils.splunk.ticketArtifactCountsByQueueItem.invalidate();
     }
-  }, [batchProgress.data?.status]);
+  }, [batchProgress.data, isBatchRunning, utils]);
 
   const batchCreateMutation = trpc.splunk.batchCreateTickets.useMutation({
-    onMutate: () => {
+    onMutate: async () => {
+      // H-C7: remember which batch the server reports *before* this run starts (so a
+      // stale "completed" from an earlier run is never mistaken for this one), then drop
+      // the cached progress before polling resumes. onMutate is awaited before the request.
+      const prior = await utils.splunk.batchProgress.fetch(undefined, { staleTime: 0 }).catch(() => null);
+      handledBatchIdRef.current = prior?.batchId ?? null;
+      await utils.splunk.batchProgress.reset();
       setIsBatchRunning(true);
     },
     onSuccess: (result) => {

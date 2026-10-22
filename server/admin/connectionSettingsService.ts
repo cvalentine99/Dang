@@ -8,9 +8,10 @@
  */
 
 import { eq, and } from "drizzle-orm";
+import { asProtocol } from "../_core/protocol";
 import { getDb } from "../db";
 import { connectionSettings } from "../../drizzle/schema";
-import { encrypt, decrypt } from "./encryptionService";
+import { encrypt, decrypt, isLegacyCiphertext, settingAad } from "./encryptionService";
 import type { WazuhConfig } from "../wazuh/wazuhClient";
 import type { IndexerConfig } from "../indexer/indexerClient";
 
@@ -101,7 +102,9 @@ async function getDbSettings(category: string): Promise<Record<string, string>> 
   const result: Record<string, string> = {};
   for (const row of rows) {
     try {
-      result[row.settingKey] = row.isEncrypted ? decrypt(row.settingValue) : row.settingValue;
+      result[row.settingKey] = row.isEncrypted
+        ? decrypt(row.settingValue, settingAad(category, row.settingKey))
+        : row.settingValue;
     } catch {
       // If decryption fails (e.g. key changed), skip this value
       console.error(`[ConnectionSettings] Failed to decrypt ${category}.${row.settingKey}`);
@@ -111,7 +114,38 @@ async function getDbSettings(category: string): Promise<Record<string, string>> 
 }
 
 /**
- * Get the effective settings for a category (DB override → env fallback → defaults).
+ * L4 — credentials resolve ATOMICALLY per source.
+ *
+ * Per-key DB→env merging used to pair an env password with a DB host (or a
+ * DB api_key with an env host), sending a credential to a destination it was
+ * never configured for. Rule:
+ *
+ *   If the DB supplies ANY `identity` key of a category (the destination host
+ *   or a credential), then EVERY key in that category's credential set comes
+ *   from the DB or the built-in default — never from env. Otherwise the whole
+ *   set comes from env (→ default) as before.
+ *
+ * Keys outside the credential set (llm.model, *.enabled, …) still merge per key.
+ * Consequence: an admin who changes only the host in the UI must also enter
+ * the user/password (or token) for that host; until then the source reports
+ * "not configured" rather than reusing the env secret.
+ */
+const CREDENTIAL_SETS: Record<string, { identity: string[]; set: string[] }> = {
+  wazuh_manager: { identity: ["host", "user", "pass"], set: ["host", "port", "user", "pass"] },
+  wazuh_indexer: { identity: ["host", "user", "pass"], set: ["host", "port", "user", "pass", "protocol"] },
+  llm: { identity: ["host", "api_key"], set: ["host", "port", "api_key", "protocol"] },
+  splunk: { identity: ["host", "hec_token"], set: ["host", "port", "hec_token", "hec_port", "protocol"] },
+};
+
+/** True when the DB owns the credential set for `category` (see CREDENTIAL_SETS). */
+export function dbOwnsCredentialSet(category: string, dbSettings: Record<string, string>): boolean {
+  const spec = CREDENTIAL_SETS[category];
+  return !!spec && spec.identity.some(k => dbSettings[k] !== undefined && dbSettings[k] !== "");
+}
+
+/**
+ * Get the effective settings for a category (DB override → env fallback → defaults),
+ * with the credential set resolved atomically per source (L4, see CREDENTIAL_SETS).
  */
 export async function getEffectiveSettings(
   category: string
@@ -136,10 +170,19 @@ export async function getEffectiveSettings(
     ...Object.keys(defaults),
   ]));
 
+  const credentialSet = new Set(CREDENTIAL_SETS[category]?.set ?? []);
+  const dbOwnsCreds = dbOwnsCredentialSet(category, dbSettings);
+
   for (const key of allKeys) {
     if (dbSettings[key] !== undefined && dbSettings[key] !== "") {
       values[key] = dbSettings[key];
       sources[key] = "database";
+    } else if (dbOwnsCreds && credentialSet.has(key)) {
+      // L4: DB owns this credential set — env must not fill the gap
+      if (defaults[key]) {
+        values[key] = defaults[key];
+        sources[key] = "default";
+      }
     } else if (envMap[key] && process.env[envMap[key]]) {
       values[key] = process.env[envMap[key]]!;
       sources[key] = "env";
@@ -167,7 +210,7 @@ export async function saveSettings(
     if (value === undefined || value === "") continue;
 
     const isSensitive = SENSITIVE_KEYS.has(key);
-    const storedValue = isSensitive ? encrypt(value) : value;
+    const storedValue = isSensitive ? encrypt(value, settingAad(category, key)) : value;
 
     // Atomic upsert: INSERT ... ON DUPLICATE KEY UPDATE
     // Requires unique index on (category, settingKey)
@@ -240,7 +283,7 @@ export async function getEffectiveIndexerConfig(): Promise<IndexerConfig | null>
     port: parseInt(values.port ?? "9200", 10),
     user: values.user,
     pass: values.pass,
-    protocol: (values.protocol ?? "https") as "https" | "http",
+    protocol: asProtocol(values.protocol, "https"),
   };
 }
 
@@ -258,4 +301,51 @@ export async function isWazuhEffectivelyConfigured(): Promise<boolean> {
 export async function isIndexerEffectivelyConfigured(): Promise<boolean> {
   const config = await getEffectiveIndexerConfig();
   return config !== null;
+}
+
+/**
+ * ENCRYPTION_KEY migration (review L3/M3): rewrite every legacy v1 ciphertext
+ * (16-byte IV, no AAD, key derived from JWT_SECRET) as v2 (12-byte IV, AAD =
+ * "<category>:<settingKey>", key derived from ENCRYPTION_KEY).
+ *
+ * Called once at boot from server/_core/index.ts. Idempotent: v2 rows are
+ * skipped, so later boots are a single SELECT. The UPDATE is compare-and-swap
+ * on the old ciphertext, so an admin save that lands mid-migration wins.
+ * Rows that fail to decrypt are left untouched (and logged) — getDbSettings()
+ * already skips those values. The read path still decrypts v1, so a boot where
+ * the DB is not reachable yet just defers the rewrite to the next boot.
+ */
+export async function reencryptLegacySettings(): Promise<{ migrated: number; failed: number }> {
+  const db = await getDb();
+  if (!db) return { migrated: 0, failed: 0 };
+
+  const rows = await db
+    .select()
+    .from(connectionSettings)
+    .where(eq(connectionSettings.isEncrypted, 1));
+
+  let migrated = 0;
+  let failed = 0;
+  for (const row of rows) {
+    if (!isLegacyCiphertext(row.settingValue)) continue;
+    const aad = settingAad(row.category, row.settingKey);
+    let plaintext: string;
+    try {
+      plaintext = decrypt(row.settingValue, aad);
+    } catch {
+      failed++;
+      console.error(`[ConnectionSettings] Legacy value ${row.category}.${row.settingKey} could not be decrypted — left as-is`);
+      continue;
+    }
+    await db
+      .update(connectionSettings)
+      .set({ settingValue: encrypt(plaintext, aad) })
+      .where(and(eq(connectionSettings.id, row.id), eq(connectionSettings.settingValue, row.settingValue)));
+    migrated++;
+  }
+  if (migrated > 0) {
+    invalidateCache();
+    console.log(`[ConnectionSettings] Re-encrypted ${migrated} legacy credential(s) as v2`);
+  }
+  return { migrated, failed };
 }

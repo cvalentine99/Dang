@@ -10,7 +10,8 @@ vi.mock("../admin/connectionSettingsService", () => ({
 }));
 
 // Mock the built-in LLM
-vi.mock("../_core/llm", () => ({
+vi.mock("../_core/llm", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../_core/llm")>()),
   invokeLLM: vi.fn(),
 }));
 
@@ -175,6 +176,57 @@ describe("LLM Service", () => {
 
       expect(result).toEqual(mockBuiltInResponse);
       expect(mockInvokeBuiltIn).toHaveBeenCalled();
+    });
+  });
+
+  describe("M10 — fallback must not be the same server", () => {
+    it("skips the fallback and surfaces the primary error when fallback host:port equals the primary", async () => {
+      const prevHost = process.env.LLM_HOST;
+      const prevPort = process.env.LLM_PORT;
+      process.env.LLM_HOST = "unreachable-host";
+      process.env.LLM_PORT = "9999";
+      try {
+        mockGetEffectiveSettings.mockResolvedValue({
+          values: { host: "unreachable-host", port: "9999", enabled: "true", protocol: "http", model: "test-model" },
+          sources: { host: "database", port: "database", enabled: "database", protocol: "database", model: "database" },
+        });
+        await expect(
+          invokeLLMWithFallback({ messages: [{ role: "user", content: "hi" }] })
+        ).rejects.toThrow(/Custom LLM request failed|fetch failed|ENOTFOUND|EAI_AGAIN|getaddrinfo/i);
+        expect(mockInvokeBuiltIn).not.toHaveBeenCalled();
+      } finally {
+        if (prevHost === undefined) delete process.env.LLM_HOST; else process.env.LLM_HOST = prevHost;
+        if (prevPort === undefined) delete process.env.LLM_PORT; else process.env.LLM_PORT = prevPort;
+      }
+    }, 20000);
+
+    it("isFallbackSameAsPrimary normalizes host case and localhost", async () => {
+      const { isFallbackSameAsPrimary } = await import("./llmService");
+      const prevHost = process.env.LLM_HOST;
+      const prevPort = process.env.LLM_PORT;
+      process.env.LLM_HOST = "LOCALHOST";
+      process.env.LLM_PORT = "30000";
+      try {
+        expect(isFallbackSameAsPrimary({ host: "127.0.0.1", port: 30000 })).toBe(true);
+        expect(isFallbackSameAsPrimary({ host: "127.0.0.1", port: 30001 })).toBe(false);
+        expect(isFallbackSameAsPrimary({ host: "10.0.0.9", port: 30000 })).toBe(false);
+      } finally {
+        if (prevHost === undefined) delete process.env.LLM_HOST; else process.env.LLM_HOST = prevHost;
+        if (prevPort === undefined) delete process.env.LLM_PORT; else process.env.LLM_PORT = prevPort;
+      }
+    });
+
+    it("inspectLLMResult rejects empty / choice-less responses (no blind success:true)", async () => {
+      const { inspectLLMResult } = await import("./llmService");
+      const base = { id: "x", created: 0, model: "m" };
+      expect(inspectLLMResult({ ...base, choices: [] }).ok).toBe(false);
+      expect(inspectLLMResult({ ...base, choices: [{ index: 0, message: { role: "assistant", content: "  " }, finish_reason: "length" }] }).ok).toBe(false);
+      expect(inspectLLMResult({ ...base, choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }] }).ok).toBe(true);
+      expect(inspectLLMResult({
+        ...base,
+        choices: [{ index: 0, message: { role: "assistant", content: "", tool_calls: [{ id: "t", type: "function", function: { name: "f", arguments: "{}" } }] }, finish_reason: "tool_calls" }],
+      }).ok).toBe(true);
+      expect(inspectLLMResult(undefined).ok).toBe(false);
     });
   });
 

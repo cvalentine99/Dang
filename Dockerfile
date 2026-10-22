@@ -7,7 +7,7 @@
 FROM node:22-slim AS deps
 
 # Install pnpm via npm (more reliable than corepack in restricted networks)
-RUN npm install -g pnpm@10.4.1
+RUN npm install -g pnpm@10.34.7
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ RUN pnpm install --frozen-lockfile
 # ── Stage 2: Build ───────────────────────────────────────────────────────────
 FROM node:22-slim AS builder
 
-RUN npm install -g pnpm@10.4.1
+RUN npm install -g pnpm@10.34.7
 
 WORKDIR /app
 
@@ -36,13 +36,19 @@ RUN pnpm run build
 # ── Stage 3: Production ─────────────────────────────────────────────────────
 FROM node:22-slim AS production
 
-RUN npm install -g pnpm@10.4.1
+RUN npm install -g pnpm@10.34.7
 
-# Install curl for health checks and tini for proper signal handling
+# Install curl for health checks, tini for proper signal handling, and
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     tini \
     && rm -rf /var/lib/apt/lists/*
+
+# Official MySQL client for the pre-migration dump in docker-entrypoint.sh. Debian's
+# default-mysql-client is MariaDB's, which cannot dump MySQL 8 JSON columns
+# ("Lost connection to server during query"). The 8.4 binary needs only libssl3/libcrypto3,
+# both present in bookworm-slim.
+COPY --from=mysql:8.4 /usr/bin/mysqldump /usr/local/bin/mysqldump
 
 WORKDIR /app
 
@@ -66,7 +72,8 @@ COPY drizzle.config.ts ./
 # Copy pre-migration repair script, journal backfill, and KG seeder
 COPY scripts/docker-pre-migrate.mjs scripts/backfill-migrations.mjs ./scripts/
 COPY seed-kg.mjs ./
-COPY spec-v4.14.3.yaml ./
+COPY shared/specPath.ts ./shared/
+COPY spec-v4.14.4.yaml ./
 COPY spec/ ./spec/
 
 # Copy shared KG ETL source modules (seed-kg.mjs imports these via tsx)
@@ -84,6 +91,8 @@ RUN chmod +x docker-entrypoint.sh
 
 # Non-root user for security
 RUN groupadd -r dang && useradd -r -g dang -d /app dang
+# Pre-migration dump target (named volume mounted here; must pre-exist and be owned by dang)
+RUN mkdir -p /app/backups
 RUN chown -R dang:dang /app
 USER dang
 
@@ -91,6 +100,8 @@ USER dang
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV SKIP_TLS_VERIFY=false
+# Canonical Wazuh OpenAPI spec (see shared/specPath.ts)
+ENV WAZUH_SPEC_PATH=/app/spec-v4.14.4.yaml
 
 EXPOSE 3000
 

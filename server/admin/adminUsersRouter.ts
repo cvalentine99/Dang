@@ -1,10 +1,36 @@
 import { z } from "zod";
-import { eq, desc, sql } from "drizzle-orm";
+import { and, eq, desc, ne, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { users } from "../../drizzle/schema";
 import { hashPassword } from "../localAuth/localAuthService";
+import { passwordChangedAtNow } from "../_core/sdk";
+
+/** P2-10: bumping tokenVersion revokes every outstanding session of that user. */
+const bumpTokenVersion = sql`${users.tokenVersion} + 1`;
+
+type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/**
+ * H-A7: last-admin guard. Counts active admins (role='admin' AND isDisabled=0)
+ * other than `excludeUserId`, with a locking read so two concurrent demotions
+ * cannot both pass. Throws PRECONDITION_FAILED if none would remain.
+ */
+async function assertAnotherActiveAdmin(tx: Tx, excludeUserId: number): Promise<void> {
+  const others = await tx
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.role, "admin"), eq(users.isDisabled, 0), ne(users.id, excludeUserId)))
+    .for("update");
+  if (others.length < 1) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "This change would leave no active admin. Promote or enable another admin first.",
+    });
+  }
+}
 
 export const adminUsersRouter = router({
   /**
@@ -102,15 +128,31 @@ export const adminUsersRouter = router({
         });
       }
 
-      // Verify target user exists
-      const target = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, input.userId)).limit(1);
-      if (target.length === 0) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
-      }
+      return await db.transaction(async (tx) => {
+        // Verify target user exists (locked for the duration of the change)
+        const target = await tx
+          .select({ id: users.id, name: users.name, role: users.role, isDisabled: users.isDisabled })
+          .from(users)
+          .where(eq(users.id, input.userId))
+          .limit(1)
+          .for("update");
+        if (target.length === 0) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+        }
 
-      await db.update(users).set({ role: input.role }).where(eq(users.id, input.userId));
+        // H-A7: demoting an active admin must leave at least one active admin
+        if (target[0].role === "admin" && input.role !== "admin" && !target[0].isDisabled) {
+          await assertAnotherActiveAdmin(tx, input.userId);
+        }
 
-      return { success: true, userId: input.userId, newRole: input.role, userName: target[0].name };
+        // P2-10: role change revokes the target's sessions (re-login picks up the new role)
+        await tx
+          .update(users)
+          .set({ role: input.role, tokenVersion: bumpTokenVersion })
+          .where(eq(users.id, input.userId));
+
+        return { success: true, userId: input.userId, newRole: input.role, userName: target[0].name };
+      });
     }),
 
   /**
@@ -121,17 +163,29 @@ export const adminUsersRouter = router({
     .input(
       z.object({
         userId: z.number().int(),
-        newPassword: z.string().min(8, "Password must be at least 8 characters"),
+        newPassword: z
+          .string()
+          .min(8, "Password must be at least 8 characters")
+          .max(128, "Password must be at most 128 characters"),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       // Verify target user exists and is a local auth user
-      const target = await db.select({ id: users.id, name: users.name, loginMethod: users.loginMethod }).from(users).where(eq(users.id, input.userId)).limit(1);
+      const target = await db.select({ id: users.id, name: users.name, loginMethod: users.loginMethod, role: users.role }).from(users).where(eq(users.id, input.userId)).limit(1);
       if (target.length === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+      }
+
+      // H-A7: an admin's password may only be reset by that admin (self-service).
+      // Otherwise any admin could take over the founding admin's account.
+      if (target[0].role === "admin" && target[0].id !== ctx.user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You cannot reset another admin's password. That admin must change it themselves, or first be demoted to user.",
+        });
       }
 
       if (target[0].loginMethod !== "local") {
@@ -142,7 +196,16 @@ export const adminUsersRouter = router({
       }
 
       const newHash = await hashPassword(input.newPassword);
-      await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, input.userId));
+      // H-A7 / P2-10: revoke every existing session of the target — tokens issued
+      // before passwordChangedAt and tokens with the old tokenVersion are rejected.
+      await db
+        .update(users)
+        .set({
+          passwordHash: newHash,
+          passwordChangedAt: passwordChangedAtNow(),
+          tokenVersion: bumpTokenVersion,
+        })
+        .where(eq(users.id, input.userId));
 
       return { success: true, userId: input.userId, userName: target[0].name };
     }),
@@ -170,14 +233,31 @@ export const adminUsersRouter = router({
         });
       }
 
-      // Verify target user exists
-      const target = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, input.userId)).limit(1);
-      if (target.length === 0) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
-      }
+      return await db.transaction(async (tx) => {
+        // Verify target user exists (locked for the duration of the change)
+        const target = await tx
+          .select({ id: users.id, name: users.name, role: users.role, isDisabled: users.isDisabled })
+          .from(users)
+          .where(eq(users.id, input.userId))
+          .limit(1)
+          .for("update");
+        if (target.length === 0) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+        }
 
-      await db.update(users).set({ isDisabled: input.isDisabled ? 1 : 0 }).where(eq(users.id, input.userId));
+        // H-A7: disabling an active admin must leave at least one active admin
+        if (input.isDisabled && target[0].role === "admin" && !target[0].isDisabled) {
+          await assertAnotherActiveAdmin(tx, input.userId);
+        }
 
-      return { success: true, userId: input.userId, isDisabled: input.isDisabled, userName: target[0].name };
+        // P2-10: disable (and re-enable) revokes the target's sessions — open SSE
+        // streams are closed on their next heartbeat.
+        await tx
+          .update(users)
+          .set({ isDisabled: input.isDisabled ? 1 : 0, tokenVersion: bumpTokenVersion })
+          .where(eq(users.id, input.userId));
+
+        return { success: true, userId: input.userId, isDisabled: input.isDisabled, userName: target[0].name };
+      });
     }),
 });

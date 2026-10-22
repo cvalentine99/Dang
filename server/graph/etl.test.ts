@@ -16,10 +16,11 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import yaml from "js-yaml";
+import { WAZUH_SPEC_FILENAME, WAZUH_SPEC_ALIAS, resolveSpecPath } from "../../shared/specPath";
 
 // ── Spec path ──────────────────────────────────────────────────────────────
 
-const SPEC_PATH = resolve(__dirname, "../../spec-v4.14.3.yaml");
+const SPEC_PATH = resolveSpecPath(resolve(__dirname, "../.."));
 const SPEC_EXISTS = existsSync(SPEC_PATH);
 
 // ── 1. Extraction Determinism ──────────────────────────────────────────────
@@ -295,13 +296,13 @@ describe("ETL — Use Case Endpoint IDs", () => {
 // ── 7. Canonical Spec Source ───────────────────────────────────────────────
 
 describe("ETL — Canonical Spec Source", () => {
-  it("spec-v4.14.3.yaml exists at project root", () => {
+  it(`${WAZUH_SPEC_FILENAME} exists at project root`, () => {
     expect(SPEC_EXISTS).toBe(true);
   });
 
-  it.skipIf(!SPEC_EXISTS)("spec/wazuh-api-v4.14.3.yaml is identical to root spec (symlink or same content)", () => {
+  it.skipIf(!SPEC_EXISTS)(`spec/${WAZUH_SPEC_ALIAS} is identical to root spec (symlink or same content)`, () => {
     const { lstatSync } = require("fs");
-    const altPath = resolve(__dirname, "../../spec/wazuh-api-v4.14.3.yaml");
+    const altPath = resolve(__dirname, "../../spec", WAZUH_SPEC_ALIAS);
     if (!existsSync(altPath)) return; // OK if only one copy exists
 
     // Prefer symlink (single source of truth)
@@ -310,7 +311,7 @@ describe("ETL — Canonical Spec Source", () => {
       // Good — it's a symlink, no duplicate data
       const { readlinkSync } = require("fs");
       const target = readlinkSync(altPath);
-      expect(target).toContain("spec-v4.14.3.yaml");
+      expect(target).toContain(WAZUH_SPEC_FILENAME);
     } else {
       // Fallback: at least verify content is identical
       const rootSpec = readFileSync(SPEC_PATH, "utf8");

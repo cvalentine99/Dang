@@ -24,6 +24,7 @@ import {
   Clock,
   ExternalLink,
 } from "lucide-react";
+import { toastIfSuperseded } from "@/lib/pipelineResult";
 
 type StageStatus = "pending" | "running" | "completed" | "failed" | "skipped";
 
@@ -106,8 +107,8 @@ export function PipelineStageIndicator({
   const utils = trpc.useUtils();
 
   const continueMutation = trpc.pipeline.continuePipelineRun.useMutation({
-    onSuccess: () => {
-      toast.success("Pipeline continued successfully");
+    onSuccess: (result) => {
+      if (!toastIfSuperseded(result)) toast.success("Pipeline continued successfully");
       utils.pipeline.getPipelineRunByQueueItem.invalidate({ queueItemId });
       utils.alertQueue.list.invalidate();
       onPipelineUpdated?.();
@@ -118,8 +119,8 @@ export function PipelineStageIndicator({
   });
 
   const resumeMutation = trpc.pipeline.resumePipelineRun.useMutation({
-    onSuccess: () => {
-      toast.success("Pipeline resumed from failed stage");
+    onSuccess: (result) => {
+      if (!toastIfSuperseded(result)) toast.success("Pipeline resumed from failed stage");
       utils.pipeline.getPipelineRunByQueueItem.invalidate({ queueItemId });
       utils.alertQueue.list.invalidate();
       onPipelineUpdated?.();

@@ -13,6 +13,7 @@
 import { getDb } from "../db";
 import { triageObjects, correlationBundles, investigationSessions } from "../../drizzle/schema";
 import { eq, desc, and, inArray, sql, gte } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { invokeLLMWithFallback } from "../llm/llmService";
 import type { InvokeResult } from "../_core/llm";
 import {
@@ -24,6 +25,7 @@ import {
 } from "../indexer/indexerClient";
 import { getEffectiveWazuhConfig, type WazuhConfig } from "../wazuh/wazuhClient";
 import { wazuhGet } from "../wazuh/wazuhClient";
+import { sanitizeUpstreamError } from "../wazuh/upstreamError";
 import { otxGet, isOtxConfigured } from "../otx/otxClient";
 import type {
   TriageObject,
@@ -47,6 +49,8 @@ export interface CorrelationAgentInput {
   maxAlertsPerSource?: number;
   /** Whether to include OTX threat intel lookups */
   includeThreatIntel?: boolean;
+  /** H-L5: triggering user, for per-user LLM fairness in the dispatcher (optional) */
+  userId?: number;
 }
 
 export interface CorrelationAgentResult {
@@ -101,6 +105,17 @@ interface PriorInvestigation {
   [key: string]: unknown;
 }
 
+/**
+ * M2: an evidence source that was queried but FAILED. An empty array in the
+ * pack means "searched, nothing found" only when the source is NOT listed here;
+ * a listed source means the evidence is MISSING, not absent.
+ */
+export interface DegradedEvidenceSource {
+  source: "sameHostAlerts" | "sameUserAlerts" | "sameIocAlerts" | "vulnerabilities" | "fimEvents";
+  /** Sanitized message with correlation id (full detail is in the server log) */
+  error: string;
+}
+
 interface EvidencePack {
   sameHostAlerts: IndexerAlertHit[];
   sameUserAlerts: IndexerAlertHit[];
@@ -110,6 +125,20 @@ interface EvidencePack {
   threatIntel: ThreatIntelResult[];
   priorInvestigations: PriorInvestigation[];
   totalItems: number;
+  /** M2: sources whose retrieval failed (added field; empty when all succeeded) */
+  degradedSources: DegradedEvidenceSource[];
+}
+
+/** Record a failed evidence retrieval instead of silently returning `[]`. */
+function recordDegraded(
+  sink: DegradedEvidenceSource[] | undefined,
+  source: DegradedEvidenceSource["source"],
+  err: unknown
+): void {
+  const upstream = source === "fimEvents" ? "Wazuh" : "Indexer";
+  const error = sanitizeUpstreamError(upstream, err, `correlation evidence ${source}`).message;
+  console.warn(`[CorrelationAgent] evidence source ${source} unavailable: ${error}`);
+  sink?.push({ source, error });
 }
 
 /**
@@ -121,7 +150,8 @@ async function fetchSameHostAlerts(
   agentName: string | undefined,
   alertId: string,
   lookbackHours: number,
-  limit: number
+  limit: number,
+  degraded?: DegradedEvidenceSource[]
 ): Promise<IndexerAlertHit[]> {
   if (!agentId && !agentName) return [];
   try {
@@ -155,7 +185,9 @@ async function fetchSameHostAlerts(
     };
     const result = await indexerSearch(config, INDEX_PATTERNS.ALERTS, body, "correlation");
     return result.hits.hits.map((h) => ({ _id: h._id, ...h._source } as IndexerAlertHit));
-  } catch {
+  } catch (err) {
+    // M2: missing ≠ empty — report the failure so the bundle can say so
+    recordDegraded(degraded, "sameHostAlerts", err);
     return [];
   }
 }
@@ -169,7 +201,8 @@ async function fetchSameUserAlerts(
   agentId: string | undefined,
   alertId: string,
   lookbackHours: number,
-  limit: number
+  limit: number,
+  degraded?: DegradedEvidenceSource[]
 ): Promise<IndexerAlertHit[]> {
   if (users.length === 0) return [];
   try {
@@ -200,7 +233,9 @@ async function fetchSameUserAlerts(
     };
     const result = await indexerSearch(config, INDEX_PATTERNS.ALERTS, body, "correlation");
     return result.hits.hits.map((h) => ({ _id: h._id, ...h._source } as IndexerAlertHit));
-  } catch {
+  } catch (err) {
+    // M2: missing ≠ empty — report the failure so the bundle can say so
+    recordDegraded(degraded, "sameUserAlerts", err);
     return [];
   }
 }
@@ -213,7 +248,8 @@ async function fetchSameIocAlerts(
   iocs: { ips: string[]; hashes: string[]; domains: string[] },
   alertId: string,
   lookbackHours: number,
-  limit: number
+  limit: number,
+  degraded?: DegradedEvidenceSource[]
 ): Promise<IndexerAlertHit[]> {
   const allIocs = [...iocs.ips, ...iocs.hashes, ...iocs.domains];
   if (allIocs.length === 0) return [];
@@ -248,7 +284,9 @@ async function fetchSameIocAlerts(
     };
     const result = await indexerSearch(config, INDEX_PATTERNS.ALERTS, body, "correlation");
     return result.hits.hits.map((h) => ({ _id: h._id, ...h._source } as IndexerAlertHit));
-  } catch {
+  } catch (err) {
+    // M2: missing ≠ empty — report the failure so the bundle can say so
+    recordDegraded(degraded, "sameIocAlerts", err);
     return [];
   }
 }
@@ -259,7 +297,8 @@ async function fetchSameIocAlerts(
 async function fetchVulnerabilities(
   config: IndexerConfig,
   agentId: string | undefined,
-  limit: number
+  limit: number,
+  degraded?: DegradedEvidenceSource[]
 ): Promise<IndexerVulnHit[]> {
   if (!agentId) return [];
   try {
@@ -279,7 +318,9 @@ async function fetchVulnerabilities(
     };
     const result = await indexerSearch(config, INDEX_PATTERNS.VULNERABILITIES, body, "correlation");
     return result.hits.hits.map((h) => h._source as IndexerVulnHit);
-  } catch {
+  } catch (err) {
+    // M2: missing ≠ empty — report the failure so the bundle can say so
+    recordDegraded(degraded, "vulnerabilities", err);
     return [];
   }
 }
@@ -290,7 +331,8 @@ async function fetchVulnerabilities(
 async function fetchFimEvents(
   wazuhConfig: WazuhConfig,
   agentId: string | undefined,
-  limit: number
+  limit: number,
+  degraded?: DegradedEvidenceSource[]
 ): Promise<FimEvent[]> {
   if (!agentId || !wazuhConfig) return [];
   try {
@@ -300,7 +342,9 @@ async function fetchFimEvents(
       rateLimitGroup: "correlation",
     }) as { data?: { affected_items?: FimEvent[] } };
     return result?.data?.affected_items ?? [];
-  } catch {
+  } catch (err) {
+    // M2: missing ≠ empty — report the failure so the bundle can say so
+    recordDegraded(degraded, "fimEvents", err);
     return [];
   }
 }
@@ -488,23 +532,26 @@ async function assembleEvidencePack(
   const hashes = entities.filter((e) => e.type === "hash").map((e) => e.value);
   const domains = entities.filter((e) => e.type === "domain").map((e) => e.value);
   
+  // M2: collectors push failures here instead of masking them as empty results
+  const degradedSources: DegradedEvidenceSource[] = [];
+
   // Run all retrievals in parallel
   const [sameHostAlerts, sameUserAlerts, sameIocAlerts, vulnerabilities, fimEvents, threatIntel, priorInvestigations] =
     await Promise.all([
       indexerConfig
-        ? fetchSameHostAlerts(indexerConfig, triage.agent?.id, triage.agent?.name, triage.alertId, lookbackHours, maxPerSource)
+        ? fetchSameHostAlerts(indexerConfig, triage.agent?.id, triage.agent?.name, triage.alertId, lookbackHours, maxPerSource, degradedSources)
         : Promise.resolve([]),
       indexerConfig
-        ? fetchSameUserAlerts(indexerConfig, users, triage.agent?.id, triage.alertId, lookbackHours, maxPerSource)
+        ? fetchSameUserAlerts(indexerConfig, users, triage.agent?.id, triage.alertId, lookbackHours, maxPerSource, degradedSources)
         : Promise.resolve([]),
       indexerConfig
-        ? fetchSameIocAlerts(indexerConfig, { ips, hashes, domains }, triage.alertId, lookbackHours, maxPerSource)
+        ? fetchSameIocAlerts(indexerConfig, { ips, hashes, domains }, triage.alertId, lookbackHours, maxPerSource, degradedSources)
         : Promise.resolve([]),
       indexerConfig
-        ? fetchVulnerabilities(indexerConfig, triage.agent?.id, maxPerSource)
+        ? fetchVulnerabilities(indexerConfig, triage.agent?.id, maxPerSource, degradedSources)
         : Promise.resolve([]),
       wazuhConfig
-        ? fetchFimEvents(wazuhConfig, triage.agent?.id, maxPerSource)
+        ? fetchFimEvents(wazuhConfig, triage.agent?.id, maxPerSource, degradedSources)
         : Promise.resolve([]),
       includeThreatIntel ? fetchThreatIntel(entities) : Promise.resolve([]),
       fetchPriorInvestigations(entities, triage.agent?.id),
@@ -522,12 +569,15 @@ async function assembleEvidencePack(
     threatIntel,
     priorInvestigations,
     totalItems,
+    degradedSources,
   };
 }
 
 // ── LLM Correlation Synthesis ────────────────────────────────────────────────
 
-const CORRELATION_SYSTEM_PROMPT = `You are a senior SOC analyst performing evidence correlation.
+const CORRELATION_SYSTEM_PROMPT = `${UNTRUSTED_DATA_SYSTEM_INSTRUCTION}
+
+You are a senior SOC analyst performing evidence correlation.
 You receive a triage object (the alert that triggered this analysis) and an evidence pack
 (related alerts, vulnerabilities, FIM events, threat intel, and prior investigations).
 
@@ -549,12 +599,14 @@ Rules:
 // Re-export from shared module for backward compatibility — the canonical
 // implementation now lives in sanitizeForPrompt.ts (Ticket 2 / Ticket 3).
 import { sanitizeForPrompt } from "./sanitizeForPrompt";
+import { truncateForPrompt, wrapUntrustedData, UNTRUSTED_DATA_SYSTEM_INSTRUCTION } from "./sanitizeForPrompt";
 
 function buildCorrelationPrompt(triage: TriageObject, pack: EvidencePack): string {
   const parts: string[] = [
     "## Triggering Triage Object",
-    "```json",
-    JSON.stringify(sanitizeForPrompt({
+    // H-L2: sanitize keys+values, truncate per field BEFORE stringify, frame
+    // with a nonce delimiter. No post-stringify .slice (malformed JSON).
+    wrapUntrustedData(truncateForPrompt(sanitizeForPrompt({
       triageId: triage.triageId,
       alertId: triage.alertId,
       ruleId: triage.ruleId,
@@ -568,8 +620,7 @@ function buildCorrelationPrompt(triage: TriageObject, pack: EvidencePack): strin
       entities: triage.entities,
       mitreMapping: triage.mitreMapping,
       summary: triage.summary,
-    }), null, 2).slice(0, 3000),
-    "```",
+    }), 3000), 4500),
     "",
     "## Evidence Pack",
     "",
@@ -577,57 +628,43 @@ function buildCorrelationPrompt(triage: TriageObject, pack: EvidencePack): strin
   
   if (pack.sameHostAlerts.length > 0) {
     parts.push(`### Same-Host Alerts (${pack.sameHostAlerts.length} found)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.sameHostAlerts.slice(0, 15)), null, 2).slice(0, 3000));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.sameHostAlerts.slice(0, 15)), 3000), 4500));
     parts.push("");
   }
   
   if (pack.sameUserAlerts.length > 0) {
     parts.push(`### Cross-Host Same-User Alerts (${pack.sameUserAlerts.length} found)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.sameUserAlerts.slice(0, 10)), null, 2).slice(0, 2000));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.sameUserAlerts.slice(0, 10)), 2000), 3000));
     parts.push("");
   }
   
   if (pack.sameIocAlerts.length > 0) {
     parts.push(`### Same-IOC Alerts (${pack.sameIocAlerts.length} found)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.sameIocAlerts.slice(0, 10)), null, 2).slice(0, 2000));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.sameIocAlerts.slice(0, 10)), 2000), 3000));
     parts.push("");
   }
   
   if (pack.vulnerabilities.length > 0) {
     parts.push(`### Agent Vulnerabilities (${pack.vulnerabilities.length} found)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.vulnerabilities.slice(0, 10)), null, 2).slice(0, 2000));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.vulnerabilities.slice(0, 10)), 2000), 3000));
     parts.push("");
   }
   
   if (pack.fimEvents.length > 0) {
     parts.push(`### FIM Events (${pack.fimEvents.length} found)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.fimEvents.slice(0, 10)), null, 2).slice(0, 2000));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.fimEvents.slice(0, 10)), 2000), 3000));
     parts.push("");
   }
   
   if (pack.threatIntel.length > 0) {
     parts.push(`### Threat Intelligence (${pack.threatIntel.length} lookups)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.threatIntel), null, 2).slice(0, 2000));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.threatIntel), 2000), 3000));
     parts.push("");
   }
   
   if (pack.priorInvestigations.length > 0) {
     parts.push(`### Prior Investigations (${pack.priorInvestigations.length} related)`);
-    parts.push("```json");
-    parts.push(JSON.stringify(sanitizeForPrompt(pack.priorInvestigations), null, 2).slice(0, 1500));
-    parts.push("```");
+    parts.push(wrapUntrustedData(truncateForPrompt(sanitizeForPrompt(pack.priorInvestigations), 1500), 2250));
     parts.push("");
   }
   
@@ -654,7 +691,17 @@ function buildCorrelationPrompt(triage: TriageObject, pack: EvidencePack): strin
   parts.push("- uncertainties: array of { description, impact, suggestedAction }");
   parts.push("- confidence: number 0.0-1.0 — overall correlation confidence");
   parts.push("- mitreMapping: array of { techniqueId, techniqueName, tactic, confidence } — aggregated across all evidence");
-  
+
+  // M2: missing evidence is not the same as no evidence. Tell the model which
+  // sources failed so it lowers confidence and records an uncertainty, instead of
+  // reading an empty section as "nothing happened".
+  if (pack.degradedSources.length > 0) {
+    parts.push("");
+    parts.push("## Evidence Sources UNAVAILABLE (query failed — treat as unknown, not as absent)");
+    for (const d of pack.degradedSources) parts.push(`- ${d.source}: unavailable`);
+    parts.push("Lower your confidence accordingly and add an uncertainty entry for each unavailable source.");
+  }
+
   return parts.join("\n");
 }
 
@@ -779,6 +826,105 @@ const CORRELATION_JSON_SCHEMA = {
   },
 };
 
+// ── Bundle idempotency (H-L7) ───────────────────────────────────────────────
+
+/** A 'processing' bundle younger than this is presumed live; older is a crashed run. */
+const BUNDLE_PROCESSING_STALE_MS = 15 * 60 * 1000;
+
+type CorrelationBundleRow = typeof correlationBundles.$inferSelect;
+type CorrelationDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type BundleClaim =
+  | { kind: "reuse"; row: CorrelationBundleRow }
+  | { kind: "claimed"; correlationId: string };
+
+function affectedRowsOf(res: unknown): number {
+  const header = Array.isArray(res) ? res[0] : res;
+  return Number((header as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
+}
+
+function isDuplicateEntry(err: unknown): boolean {
+  const e = err as { errno?: number; code?: string; cause?: { errno?: number; code?: string } } | undefined;
+  return e?.errno === 1062 || e?.code === "ER_DUP_ENTRY" || e?.cause?.errno === 1062 || e?.cause?.code === "ER_DUP_ENTRY";
+}
+
+/**
+ * Apply the reuse rule to an existing bundle row for this triage:
+ *   completed                 → reuse as-is (no LLM call)
+ *   processing, < 15 min old  → CONFLICT (another run owns it)
+ *   failed / stale processing → re-claim the same row (status→processing, error cleared)
+ * Staleness is judged by the DB clock inside the conditional UPDATE (no JS/DB timezone
+ * skew), and the UPDATE bumps updatedAt so exactly one concurrent re-claimer wins.
+ * Returns null if a failed/pending re-claim lost a race (caller re-reads).
+ */
+async function applyBundleRule(db: CorrelationDb, row: CorrelationBundleRow): Promise<BundleClaim | null> {
+  if (row.status === "completed") return { kind: "reuse", row };
+
+  const reclaim = { status: "processing" as const, errorMessage: null, updatedAt: sql`CURRENT_TIMESTAMP` };
+
+  if (row.status === "processing") {
+    const res = await db.update(correlationBundles)
+      .set(reclaim)
+      .where(and(
+        eq(correlationBundles.id, row.id),
+        eq(correlationBundles.status, "processing"),
+        sql`${correlationBundles.updatedAt} < NOW() - INTERVAL ${sql.raw(String(BUNDLE_PROCESSING_STALE_MS / 60_000))} MINUTE`,
+      ));
+    if (affectedRowsOf(res) === 1) {
+      console.warn(`[Correlation] re-claiming stale processing bundle ${row.correlationId} for triage ${row.sourceTriageId}`);
+      return { kind: "claimed", correlationId: row.correlationId };
+    }
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `Correlation for triage '${row.sourceTriageId}' is already in progress (${row.correlationId})`,
+    });
+  }
+
+  // failed or pending → take the row over, guarded on the status we saw.
+  const res = await db.update(correlationBundles)
+    .set(reclaim)
+    .where(and(eq(correlationBundles.id, row.id), eq(correlationBundles.status, row.status)));
+  if (affectedRowsOf(res) === 0) return null;
+  return { kind: "claimed", correlationId: row.correlationId };
+}
+
+async function readBundleByTriage(db: CorrelationDb, triageId: string): Promise<CorrelationBundleRow | undefined> {
+  const [row] = await db.select()
+    .from(correlationBundles)
+    .where(eq(correlationBundles.sourceTriageId, triageId))
+    .limit(1);
+  return row;
+}
+
+async function claimCorrelationBundle(db: CorrelationDb, triageId: string): Promise<BundleClaim> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const existing = await readBundleByTriage(db, triageId);
+    if (existing) {
+      const claim = await applyBundleRule(db, existing);
+      if (claim) return claim;
+      continue; // lost the re-claim race — re-read and re-apply
+    }
+
+    const correlationId = `corr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      await db.insert(correlationBundles).values({
+        correlationId,
+        sourceTriageId: triageId,
+        status: "processing",
+        confidence: 0,
+        bundleData: {} as CorrelationBundle, // placeholder — updated after LLM response
+      });
+      return { kind: "claimed", correlationId };
+    } catch (err) {
+      if (!isDuplicateEntry(err)) throw err;
+      // A concurrent run inserted the bundle for this triage first — re-read and apply the rule.
+    }
+  }
+  throw new TRPCError({
+    code: "CONFLICT",
+    message: `Correlation for triage '${triageId}' is being claimed concurrently — retry`,
+  });
+}
+
 // ── Main Correlation Agent ───────────────────────────────────────────────────
 
 export async function runCorrelationAgent(
@@ -807,16 +953,20 @@ export async function runCorrelationAgent(
     triage.route = triageRow.analystRouteOverride;
   }
 
-  // 2. Generate correlation ID and create pending record
-  const correlationId = `corr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  
-  await db.insert(correlationBundles).values({
-    correlationId,
-    sourceTriageId: input.triageId,
-    status: "processing",
-    confidence: 0,
-    bundleData: {} as CorrelationBundle, // placeholder — updated after LLM response
-  });
+  // 2. H-L7: one bundle per triage (UNIQUE cb_sourceTriageId_uniq). Reuse/claim an
+  //    existing row instead of forking a new bundle on every run/resume.
+  const claim = await claimCorrelationBundle(db, input.triageId);
+  if (claim.kind === "reuse") {
+    const existing = claim.row;
+    return {
+      correlationId: existing.correlationId,
+      bundle: existing.bundleData as CorrelationBundle,
+      latencyMs: existing.latencyMs ?? 0,
+      tokensUsed: existing.tokensUsed ?? 0,
+      evidencePackSize: 0,
+    };
+  }
+  const correlationId = claim.correlationId;
   
   try {
     // 3. Assemble evidence pack (parallel retrieval from 6+ sources)
@@ -836,13 +986,15 @@ export async function runCorrelationAgent(
       ],
       response_format: CORRELATION_JSON_SCHEMA,
       caller: "correlation_agent",
+      userId: input.userId,
     });
     
     // 5. Parse and validate the structured LLM response via Zod schema
     const content = llmResult.choices?.[0]?.message?.content;
     if (!content) throw new Error("LLM returned empty response");
     
-    const rawJson = typeof content === "string" ? JSON.parse(content) : content;
+    const { extractJson } = await import("../llm/extractJson");
+    const rawJson = typeof content === "string" ? extractJson(content) : content;
     
     // Zod-validate the raw LLM output — throws ZodError if malformed
     const validatedRaw = parseLLMCorrelation(rawJson);
@@ -895,13 +1047,17 @@ export async function runCorrelationAgent(
       evidencePackSize: evidencePack.totalItems,
     };
   } catch (err) {
-    // Mark as failed
+    // Mark as failed — only while still ours ('processing'); never clobber a bundle
+    // a concurrent re-claim already completed.
     await db.update(correlationBundles)
       .set({
         status: "failed",
         errorMessage: (err as Error).message,
       })
-      .where(eq(correlationBundles.correlationId, correlationId));
+      .where(and(
+        eq(correlationBundles.correlationId, correlationId),
+        eq(correlationBundles.status, "processing"),
+      ));
     throw err;
   }
 }

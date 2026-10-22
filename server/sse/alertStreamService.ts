@@ -9,6 +9,10 @@
  * - Severity threshold: configurable (default: level >= 10, i.e. high+critical)
  * - Deduplication: tracks last-seen alert timestamp to avoid replays
  * - Connection management: heartbeat every 15s, cleanup on disconnect
+ * - H-A2: every heartbeat re-validates the session (user exists, not disabled,
+ *   tokenVersion unchanged, JWT not expired) and ends the stream on failure
+ * - Per-user cap: MAX_STREAMS_PER_USER; opening one more closes that user's
+ *   OLDEST stream (newest tab wins; a client can never hold more than the cap)
  * - Rate-limited: uses the indexer client's built-in rate limiter
  */
 
@@ -20,6 +24,7 @@ import {
   boolQuery,
   type ESSearchResponse,
 } from "../indexer/indexerClient";
+import { sdk } from "../_core/sdk";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,11 +47,30 @@ export interface StreamedAlert {
   location?: string;
 }
 
+/** Verified identity of an SSE connection, set by the auth middleware. */
+export interface SSEAuth {
+  userId: number;
+  openId: string;
+  /** users.tokenVersion when the stream was opened */
+  tokenVersion: number;
+  /** JWT expiry, epoch ms */
+  expiresAtMs: number;
+}
+
 interface SSEClient {
   id: string;
   res: Response;
   connectedAt: number;
   severityThreshold: number;
+  auth: SSEAuth;
+  heartbeat?: ReturnType<typeof setInterval>;
+}
+
+const sseAuthByRequest = new WeakMap<Request, SSEAuth>();
+
+/** Called by the SSE auth middleware after sdk.authenticateRequestWithSession. */
+export function setSSEAuth(req: Request, auth: SSEAuth): void {
+  sseAuthByRequest.set(req, auth);
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -66,6 +90,7 @@ const HEARTBEAT_INTERVAL_MS = 15_000;
 const DEFAULT_SEVERITY_THRESHOLD = 10; // rule.level >= 10 (high + critical)
 const MAX_ALERTS_PER_POLL = 50;
 const LOOKBACK_WINDOW = "now-2m"; // On first poll, look back 2 minutes
+export const MAX_STREAMS_PER_USER = 5;
 
 // ── Client Management ────────────────────────────────────────────────────────
 
@@ -83,9 +108,44 @@ function sendEvent(client: SSEClient, event: string, data: unknown): boolean {
     return true;
   } catch {
     // Client disconnected
-    clients.delete(client.id);
+    removeClient(client.id);
     return false;
   }
+}
+
+/** Remove a client: stop its heartbeat, optionally end the response, stop polling if idle. */
+function removeClient(clientId: string, end = false): void {
+  const client = clients.get(clientId);
+  if (!client) return;
+  if (client.heartbeat) clearInterval(client.heartbeat);
+  clients.delete(clientId);
+  if (end) {
+    try {
+      client.res.end();
+    } catch {
+      /* already closed */
+    }
+  }
+  if (clients.size === 0) {
+    stopPolling();
+    lastPollTimestamp = null; // Reset on last disconnect
+  }
+}
+
+/** H-A2: is this stream's session still valid? Fails closed. */
+async function isClientSessionValid(client: SSEClient): Promise<boolean> {
+  if (Date.now() >= client.auth.expiresAtMs) return false;
+  return sdk.isUserSessionStillValid(client.auth.openId, client.auth.tokenVersion);
+}
+
+/** Close a client with a final status event explaining why. */
+function closeClient(client: SSEClient, type: string, message: string): void {
+  try {
+    client.res.write(`event: status\ndata: ${JSON.stringify({ type, message })}\n\n`);
+  } catch {
+    /* ignore */
+  }
+  removeClient(client.id, true);
 }
 
 function broadcastAlerts(alerts: StreamedAlert[]): void {
@@ -235,12 +295,27 @@ function stopPolling(): void {
 // ── SSE Handler ──────────────────────────────────────────────────────────────
 
 export function handleSSEConnection(req: Request, res: Response): void {
+  // H-A2: identity must have been established by sseAuthMiddleware. Fail closed.
+  const auth = sseAuthByRequest.get(req);
+  if (!auth) {
+    res.status(401).json({ error: "Authentication required for SSE stream" });
+    return;
+  }
+
   // Parse severity threshold from query string
   const severityParam = req.query.severity;
   const severityThreshold =
     typeof severityParam === "string"
       ? Math.max(1, Math.min(15, parseInt(severityParam, 10) || DEFAULT_SEVERITY_THRESHOLD))
       : DEFAULT_SEVERITY_THRESHOLD;
+
+  // Per-user cap: close this user's oldest streams so at most
+  // MAX_STREAMS_PER_USER remain including the new one. (Map preserves
+  // insertion order, so the first matches are the oldest.)
+  const mine = Array.from(clients.values()).filter((c) => c.auth.userId === auth.userId);
+  for (const old of mine.slice(0, Math.max(0, mine.length - (MAX_STREAMS_PER_USER - 1)))) {
+    closeClient(old, "stream_limit", `Closed: more than ${MAX_STREAMS_PER_USER} streams open for this user`);
+  }
 
   // Set SSE headers
   res.writeHead(200, {
@@ -256,6 +331,7 @@ export function handleSSEConnection(req: Request, res: Response): void {
     res,
     connectedAt: Date.now(),
     severityThreshold,
+    auth,
   };
 
   clients.set(clientId, client);
@@ -273,27 +349,24 @@ export function handleSSEConnection(req: Request, res: Response): void {
     startPolling();
   }
 
-  // Heartbeat to keep connection alive
-  const heartbeat = setInterval(() => {
-    const ok = sendEvent(client, "heartbeat", {
+  // Heartbeat to keep connection alive + H-A2 session re-validation
+  client.heartbeat = setInterval(async () => {
+    if (!clients.has(clientId)) return;
+    const valid = await isClientSessionValid(client);
+    if (!clients.has(clientId)) return; // closed while validating
+    if (!valid) {
+      closeClient(client, "session_revoked", "Session is no longer valid. Please sign in again.");
+      return;
+    }
+    sendEvent(client, "heartbeat", {
       timestamp: new Date().toISOString(),
       connectedClients: clients.size,
     });
-    if (!ok) {
-      clearInterval(heartbeat);
-      clients.delete(clientId);
-      if (clients.size === 0) stopPolling();
-    }
   }, HEARTBEAT_INTERVAL_MS);
 
   // Cleanup on disconnect
   req.on("close", () => {
-    clearInterval(heartbeat);
-    clients.delete(clientId);
-    if (clients.size === 0) {
-      stopPolling();
-      lastPollTimestamp = null; // Reset on last disconnect
-    }
+    removeClient(clientId);
   });
 }
 

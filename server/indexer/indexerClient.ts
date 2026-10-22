@@ -13,11 +13,19 @@
  */
 
 import axios, { AxiosInstance } from "axios";
+import { TRPCError } from "@trpc/server";
+import { asProtocol } from "../_core/protocol";
 import { sharedHttpsAgent } from "../_core/tlsAgent";
+import { sanitizeUpstreamError, UPSTREAM_AXIOS_LIMITS } from "../wazuh/upstreamError";
 
 // ── Rate-limit state ─────────────────────────────────────────────────────────
+// M6: buckets are keyed `${group}:${userId ?? "system"}` so one analyst cannot
+// exhaust everyone's budget; a looser per-group global ceiling still protects
+// the Indexer itself. Background callers (no userId) share the "system" bucket.
 const rateLimitState: Record<string, { count: number; resetAt: number }> = {};
+const globalRateLimitState: Record<string, { count: number; resetAt: number }> = {};
 const RATE_LIMIT_WINDOW_MS = 60_000;
+/** Per-(group, user) limits per minute. Every group a caller uses is declared here. */
 const RATE_LIMITS: Record<string, number> = {
   default: 50,
   alerts: 30,
@@ -25,33 +33,85 @@ const RATE_LIMITS: Record<string, number> = {
   monitoring: 20,
   statistics: 20,
   archives: 15,
+  // Previously undeclared — silently fell through to `default`:
+  correlation: 40,          // agenticPipeline/correlationAgent evidence collection
+  "auto-queue": 10,         // alertQueue/autoQueueRouter poller (once per interval)
+  "sse-alerts": 30,         // sse/alertStreamService poll loop
+  "alert-queue-enqueue": 30, // alertQueue/alertQueueRouter single-alert lookup
+  "index-status": 30,       // indexerIndexExists (5 HEADs per indexStatus call)
+  states: 60,               // statesClient — syscollector/FIM/SCA reads (Wazuh 5.0 de-risk)
 };
+/** Global (all users) ceiling = per-user limit × this factor. */
+const GLOBAL_LIMIT_FACTOR = 3;
 
-function checkRateLimit(group: string): void {
+let lastPruneAt = 0;
+/** M6: drop expired buckets so the map cannot grow with every user ever seen. */
+function pruneRateLimitState(now: number): void {
+  if (now - lastPruneAt < RATE_LIMIT_WINDOW_MS) return;
+  lastPruneAt = now;
+  for (const state of [rateLimitState, globalRateLimitState]) {
+    for (const key of Object.keys(state)) {
+      if (now > state[key].resetAt) delete state[key];
+    }
+  }
+}
+
+function bump(state: Record<string, { count: number; resetAt: number }>, key: string, now: number): { count: number; resetAt: number } {
+  if (!state[key] || now > state[key].resetAt) {
+    state[key] = { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+  }
+  state[key].count++;
+  return state[key];
+}
+
+function checkRateLimit(group: string, userId?: string | number): void {
   const limit = RATE_LIMITS[group] ?? RATE_LIMITS.default;
   const now = Date.now();
-  if (!rateLimitState[group] || now > rateLimitState[group].resetAt) {
-    rateLimitState[group] = { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+  pruneRateLimitState(now);
+  const key = `${group}:${userId ?? "system"}`;
+  const bucket = bump(rateLimitState, key, now);
+  if (bucket.count > limit) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `Indexer rate limit exceeded for '${group}'. Retry after ${Math.ceil((bucket.resetAt - now) / 1000)}s.`,
+    });
   }
-  rateLimitState[group].count++;
-  if (rateLimitState[group].count > limit) {
-    throw new Error(
-      `Indexer rate limit exceeded for '${group}'. Retry after ${Math.ceil((rateLimitState[group].resetAt - now) / 1000)}s.`
-    );
+  const global = bump(globalRateLimitState, group, now);
+  if (global.count > limit * GLOBAL_LIMIT_FACTOR) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `Indexer global rate limit exceeded for '${group}'. Retry after ${Math.ceil((global.resetAt - now) / 1000)}s.`,
+    });
   }
 }
 
 // ── Sensitive fields to strip ────────────────────────────────────────────────
 const STRIP_FIELDS = new Set([
+  "apikey",
+  "api_token",
+  "hec_token",
+  "rbac_token",
+  "private_key",
+  "passphrase",
   "password", "token", "secret", "api_key", "auth", "credential",
 ]);
+
+/** L5: case-insensitive substring match (same rule as wazuhClient); bare `key` is not stripped. */
+const STRIP_SUBSTRINGS = ["token", "secret", "password"];
+const STRIP_SUBSTRING_EXCEPTIONS = new Set(["auth_token_exp_timeout"]);
+function isSensitiveFieldName(key: string): boolean {
+  const k = key.toLowerCase();
+  if (STRIP_FIELDS.has(k)) return true;
+  if (STRIP_SUBSTRING_EXCEPTIONS.has(k)) return false;
+  return STRIP_SUBSTRINGS.some(sub => k.includes(sub));
+}
 
 function stripSensitiveFields(obj: unknown): unknown {
   if (Array.isArray(obj)) return obj.map(stripSensitiveFields);
   if (obj && typeof obj === "object") {
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-      if (!STRIP_FIELDS.has(k.toLowerCase())) {
+      if (!isSensitiveFieldName(k)) {
         result[k] = stripSensitiveFields(v);
       }
     }
@@ -74,7 +134,7 @@ export function getIndexerConfig(): IndexerConfig {
   const port = parseInt(process.env.WAZUH_INDEXER_PORT ?? "9200", 10);
   const user = process.env.WAZUH_INDEXER_USER;
   const pass = process.env.WAZUH_INDEXER_PASS;
-  const protocol = (process.env.WAZUH_INDEXER_PROTOCOL ?? "https") as "https" | "http";
+  const protocol = asProtocol(process.env.WAZUH_INDEXER_PROTOCOL, "https");
 
   if (!host || !user || !pass) {
     throw new Error(
@@ -127,6 +187,7 @@ function createInstance(config: IndexerConfig): AxiosInstance {
     httpsAgent: sharedHttpsAgent,
     auth: { username: config.user, password: config.pass },
     headers: { "Content-Type": "application/json" },
+    ...UPSTREAM_AXIOS_LIMITS, // M5: 25 MB response cap, no redirects
   });
 }
 
@@ -136,7 +197,25 @@ export const INDEX_PATTERNS = {
   ARCHIVES: "wazuh-archives-*",
   MONITORING: "wazuh-monitoring-*",
   STATISTICS: "wazuh-statistics-*",
-  VULNERABILITIES: "wazuh-states-vulnerabilities-*",
+  // Suffix-tolerant: 4.x names state indices `<base>-<cluster>`, 5.0 drops the
+  // `-<cluster>` suffix. `<base>*` matches both (verified live on 4.14.9).
+  VULNERABILITIES: "wazuh-states-vulnerabilities*",
+  STATES_PACKAGES: "wazuh-states-inventory-packages*",
+  STATES_PORTS: "wazuh-states-inventory-ports*",
+  STATES_PROCESSES: "wazuh-states-inventory-processes*",
+  STATES_NETWORKS: "wazuh-states-inventory-networks*",
+  STATES_PROTOCOLS: "wazuh-states-inventory-protocols*",
+  STATES_INTERFACES: "wazuh-states-inventory-interfaces*",
+  STATES_HOTFIXES: "wazuh-states-inventory-hotfixes*",
+  STATES_SYSTEM: "wazuh-states-inventory-system*",
+  STATES_HARDWARE: "wazuh-states-inventory-hardware*",
+  STATES_USERS: "wazuh-states-inventory-users*",
+  STATES_GROUPS: "wazuh-states-inventory-groups*",
+  STATES_SERVICES: "wazuh-states-inventory-services*",
+  STATES_BROWSER_EXTENSIONS: "wazuh-states-inventory-browser-extensions*",
+  STATES_FIM_FILES: "wazuh-states-fim-files*",
+  STATES_FIM_REGISTRIES: "wazuh-states-fim-registries*",
+  STATES_SCA: "wazuh-states-sca*",
 } as const;
 
 // ── Elasticsearch/OpenSearch query types ─────────────────────────────────────
@@ -169,9 +248,11 @@ export async function indexerSearch(
   config: IndexerConfig,
   index: string,
   body: ESSearchBody,
-  rateLimitGroup: string = "default"
+  rateLimitGroup: string = "default",
+  /** Requesting user for per-user rate limiting; omit for background/system callers. */
+  userId?: string | number
 ): Promise<ESSearchResponse> {
-  checkRateLimit(rateLimitGroup);
+  checkRateLimit(rateLimitGroup, userId);
 
   const instance = createInstance(config);
 
@@ -179,46 +260,89 @@ export async function indexerSearch(
     const response = await instance.post(`/${index}/_search`, body);
     return stripSensitiveFields(response.data) as ESSearchResponse;
   } catch (err: unknown) {
-    if (axios.isAxiosError(err)) {
-      const status = err.response?.status;
-      const message = err.response?.data?.error?.reason ?? err.message;
-      throw new Error(`Indexer query failed (${status}): ${message}`);
-    }
-    throw err;
+    // M1: the error.reason / body (index names, query fragments, mappings) is
+    // logged server-side under a correlation id, never relayed to the client.
+    throw sanitizeUpstreamError("Indexer", err, `POST /${index}/_search`);
   }
 }
 
 // ── Cluster health check ─────────────────────────────────────────────────────
 export async function indexerHealth(
-  config: IndexerConfig
+  config: IndexerConfig,
+  userId?: string | number
 ): Promise<Record<string, unknown>> {
-  checkRateLimit("default");
+  checkRateLimit("default", userId);
   const instance = createInstance(config);
 
   try {
     const response = await instance.get("/_cluster/health");
     return stripSensitiveFields(response.data) as Record<string, unknown>;
   } catch (err: unknown) {
-    if (axios.isAxiosError(err)) {
-      throw new Error(`Indexer health check failed: ${err.message}`);
-    }
-    throw err;
+    throw sanitizeUpstreamError("Indexer", err, "GET /_cluster/health");
   }
 }
 
 // ── Index existence check ────────────────────────────────────────────────────
 export async function indexerIndexExists(
   config: IndexerConfig,
-  index: string
+  index: string,
+  userId?: string | number
 ): Promise<boolean> {
+  // M6: HEAD requests count against a declared bucket like every other call
+  checkRateLimit("index-status", userId);
   const instance = createInstance(config);
   try {
     await instance.head(`/${index}`);
     return true;
-  } catch {
-    return false;
+  } catch (err: unknown) {
+    // 404 = the pattern genuinely matches nothing. Anything else (auth, TLS,
+    // network) is a failure, not "does not exist" — surface it sanitized.
+    if (axios.isAxiosError(err) && err.response?.status === 404) return false;
+    throw sanitizeUpstreamError("Indexer", err, `HEAD /${index}`);
   }
 }
+
+// ── Index listing (_cat/indices) ─────────────────────────────────────────────
+/**
+ * List concrete indices matching `pattern` with their doc counts. A wildcard
+ * that matches nothing yields `[]` (not an error). Read-only GET.
+ */
+export async function indexerCatIndices(
+  config: IndexerConfig,
+  pattern: string,
+  userId?: string | number
+): Promise<Array<{ index: string; docsCount: number }>> {
+  if (!/^[a-z0-9*,._-]+$/.test(pattern)) throw new Error(`Invalid index pattern: ${pattern}`);
+  checkRateLimit("index-status", userId);
+  const instance = createInstance(config);
+  try {
+    const response = await instance.get(`/_cat/indices/${pattern}`, {
+      params: { format: "json", h: "index,docs.count", expand_wildcards: "open" },
+    });
+    const rows = Array.isArray(response.data) ? (response.data as Array<Record<string, unknown>>) : [];
+    return rows.map(r => ({ index: String(r.index ?? ""), docsCount: Number(r["docs.count"] ?? 0) || 0 }));
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.status === 404) return [];
+    throw sanitizeUpstreamError("Indexer", err, `GET /_cat/indices/${pattern}`);
+  }
+}
+
+// ── Exported for testing ─────────────────────────────────────────────────────
+export const _testing = {
+  checkRateLimit,
+  rateLimitState,
+  globalRateLimitState,
+  RATE_LIMITS,
+  GLOBAL_LIMIT_FACTOR,
+  RATE_LIMIT_WINDOW_MS,
+  pruneRateLimitState,
+  isSensitiveFieldName,
+  resetRateLimits() {
+    for (const k of Object.keys(rateLimitState)) delete rateLimitState[k];
+    for (const k of Object.keys(globalRateLimitState)) delete globalRateLimitState[k];
+    lastPruneAt = 0;
+  },
+};
 
 // ── Query builder helpers ────────────────────────────────────────────────────
 

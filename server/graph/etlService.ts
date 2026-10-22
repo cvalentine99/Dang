@@ -11,9 +11,9 @@
  *   3. Call kgLoader.loadAll() or kgLoader.loadLayer() to truncate-and-reload
  *   4. kgLoader updates kg_sync_status with truthful metadata per layer
  *
- * Canonical spec path: spec-v4.14.3.yaml at the project root.
+ * Canonical spec path: see shared/specPath.ts (WAZUH_SPEC_FILENAME at the project root).
  * Both seed-kg.mjs (CLI) and this runtime service use the same file.
- * The spec/wazuh-api-v4.14.3.yaml is a symlink to the canonical copy.
+ * The spec/wazuh-api-v*.yaml file is a symlink to the canonical copy.
  *
  * Metadata contract:
  *   runFullSync() returns KgLoadResult with:
@@ -37,18 +37,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { getDb } from "../db";
 import { kgSyncStatus } from "../../drizzle/schema";
+import { resolveSpecPath } from "../../shared/specPath";
 import { extract } from "./kgExtractor";
 import { loadAll, loadLayer, getLayerNames } from "./kgLoader";
 import type { KgExtractionResult, KgLayerName, KgLoadResult, KgSyncLayerResult } from "./kgTypes";
 import type { SqlExecutor } from "./kgLoader";
 
 // ── Canonical spec path ────────────────────────────────────────────────────
-// Single source of truth: spec-v4.14.3.yaml at the project root.
-// In Docker, the Dockerfile copies it to the same relative path.
+// Single source of truth: shared/specPath.ts. Honors WAZUH_SPEC_PATH, then cwd
+// (Docker WORKDIR /app), then the source-tree project root.
 
 function getSpecPath(): string {
-  const projectRoot = resolve(__dirname, "../..");
-  return resolve(projectRoot, "spec-v4.14.3.yaml");
+  return resolveSpecPath(resolve(__dirname, "../.."));
 }
 
 // ── Drizzle → mysql2 pool adapter ────────────────────────────────────────
@@ -82,14 +82,52 @@ function getPromisePool(db: any): any | null {
   return null;
 }
 
+/** Minimal mysql2 PromisePoolConnection surface used for transactions. */
+interface PromisePoolConnectionLike {
+  execute: (...args: unknown[]) => unknown;
+  beginTransaction: () => Promise<unknown>;
+  commit: () => Promise<unknown>;
+  rollback: () => Promise<unknown>;
+  release: () => void;
+}
+
+function executeOn(target: { execute: (...args: unknown[]) => unknown }, query: string, params?: unknown[]): Promise<unknown> {
+  if (params && params.length > 0) {
+    return target.execute(query, params) as Promise<unknown>;
+  }
+  return target.execute(query) as Promise<unknown>;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mysql2 PromisePool is untyped at this layer
-function makeSqlExecutor(promisePool: { execute: (...args: unknown[]) => unknown }): SqlExecutor {
+function makeSqlExecutor(promisePool: {
+  execute: (...args: unknown[]) => unknown;
+  getConnection?: () => Promise<PromisePoolConnectionLike>;
+}): SqlExecutor {
   return {
     async execute(query: string, params?: unknown[]): Promise<unknown> {
-      if (params && params.length > 0) {
-        return promisePool.execute(query, params);
+      return executeOn(promisePool, query, params);
+    },
+    // H-D1: pin one pooled connection for the whole layer reload so
+    // DELETE + INSERT commit (or roll back) atomically.
+    async transaction<T>(fn: (tx: SqlExecutor) => Promise<T>): Promise<T> {
+      if (typeof promisePool.getConnection !== "function") {
+        throw new Error("mysql2 pool does not expose getConnection() — cannot run KG load transactionally");
       }
-      return promisePool.execute(query);
+      const conn = await promisePool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const tx: SqlExecutor = {
+          execute: (query: string, params?: unknown[]) => executeOn(conn, query, params),
+        };
+        const result = await fn(tx);
+        await conn.commit();
+        return result;
+      } catch (err) {
+        try { await conn.rollback(); } catch { /* surface the original error */ }
+        throw err;
+      } finally {
+        conn.release();
+      }
     },
   };
 }

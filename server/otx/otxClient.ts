@@ -12,6 +12,8 @@
 
 import axios, { AxiosInstance } from "axios";
 import NodeCache from "node-cache";
+import { TRPCError } from "@trpc/server";
+import { sanitizeUpstreamError, UpstreamError, newCorrelationId, UPSTREAM_AXIOS_LIMITS } from "../wazuh/upstreamError";
 import { eq, and, gt, lt, sql } from "drizzle-orm";
 import { threatIntelCache } from "../../drizzle/schema";
 import { getDb } from "../db";
@@ -49,9 +51,10 @@ function checkRateLimit(group: string): void {
   }
   rateLimitState[group].count++;
   if (rateLimitState[group].count > limit) {
-    throw new Error(
-      `OTX rate limit exceeded for '${group}'. Retry after ${Math.ceil((rateLimitState[group].resetAt - now) / 1000)}s.`
-    );
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `OTX rate limit exceeded for '${group}'. Retry after ${Math.ceil((rateLimitState[group].resetAt - now) / 1000)}s.`,
+    });
   }
 }
 
@@ -73,6 +76,7 @@ function createInstance(): AxiosInstance {
   return axios.create({
     baseURL: OTX_BASE_URL,
     timeout: 15_000,
+    ...UPSTREAM_AXIOS_LIMITS, // M5: 25 MB response cap, never follow redirects (the API key header would follow)
     headers: {
       "X-OTX-API-KEY": getOtxApiKey(),
       "Content-Type": "application/json",
@@ -219,19 +223,21 @@ export async function otxGet(
     return data;
   } catch (err: unknown) {
     if (axios.isAxiosError(err)) {
+      const fixed = (msg: string) => new UpstreamError("OTX", newCorrelationId(), err.response?.status, err.code, msg);
       if (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT") {
-        throw new Error("OTX API request timed out — AlienVault OTX may be unreachable from this network.");
+        throw fixed("OTX API request timed out — AlienVault OTX may be unreachable from this network.");
       }
       const status = err.response?.status;
       if (status === 401 || status === 403) {
-        throw new Error("OTX authentication failed. Check your API key.");
+        throw fixed("OTX authentication failed. Check your API key.");
       }
       if (status === 429) {
-        throw new Error("OTX API rate limit exceeded. Please wait before retrying.");
+        throw fixed("OTX API rate limit exceeded. Please wait before retrying.");
       }
-      throw new Error(`OTX API error (${status}): ${err.response?.data?.detail ?? err.message}`);
+      // M1: the upstream `detail` is logged under a correlation id, not relayed
+      throw sanitizeUpstreamError("OTX", err, `GET ${path}`);
     }
-    throw err;
+    throw sanitizeUpstreamError("OTX", err, `GET ${path}`);
   }
 }
 

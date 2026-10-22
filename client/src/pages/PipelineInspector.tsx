@@ -41,6 +41,7 @@ import {
   Ticket,
   ExternalLink,
 } from "lucide-react";
+import { toastIfSuperseded } from "@/lib/pipelineResult";
 
 // ── Stage Config ───────────────────────────────────────────────────────────
 
@@ -465,13 +466,15 @@ function PipelineContinuationButton({ runId, runStatus }: { runId: string; runSt
   //   partial runs → continuePipelineRun ("Continue Pipeline")
   //   failed runs  → resumePipelineRun  ("Replay Pipeline")
   const continueMutation = trpc.pipeline.continuePipelineRun.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
+      toastIfSuperseded(result);
       utils.pipeline.listPipelineRuns.invalidate();
       utils.pipeline.pipelineRunStats.invalidate();
     },
   });
   const resumeMutation = trpc.pipeline.resumePipelineRun.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
+      toastIfSuperseded(result);
       utils.pipeline.listPipelineRuns.invalidate();
       utils.pipeline.pipelineRunStats.invalidate();
     },
@@ -706,10 +709,10 @@ function ArtifactsDrillDown({ runId }: { runId: string }) {
                                       action.state === "proposed" ? "bg-amber-500/10 border-amber-500/20 text-amber-300" :
                                       action.state === "approved" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" :
                                       action.state === "rejected" ? "bg-red-500/10 border-red-500/20 text-red-300" :
-                                      action.state === "executed" ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-300" :
+                                      action.state === "acknowledged" ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-300" :
                                       "bg-yellow-500/10 border-yellow-500/20 text-yellow-300"
                                     }`}>
-                                      {action.state}
+                                      {action.state === "acknowledged" ? "Acknowledged" : action.state}
                                     </span>
                                     <span className="text-[10px] font-mono text-foreground/60 truncate">{action.title}</span>
                                     <span className="text-[9px] text-muted-foreground/30 ml-auto">{action.category}</span>

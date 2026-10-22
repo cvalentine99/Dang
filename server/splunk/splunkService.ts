@@ -13,19 +13,35 @@
  */
 
 import { getDb } from "../db";
+import { asProtocol } from "../_core/protocol";
 import { connectionSettings } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { Agent } from "undici";
 import { SKIP_TLS_VERIFY } from "../_core/tlsAgent";
-import { decrypt } from "../admin/encryptionService";
+import { decrypt, settingAad } from "../admin/encryptionService";
+import { newCorrelationId } from "../wazuh/upstreamError";
 
-// Audit #28: Use centralized TLS policy for Splunk connections
+// Audit #28: Use centralized TLS policy for Splunk connections.
+// M5: bound header/body waits so a stalled HEC endpoint cannot pin a socket
+// beyond the request's own AbortController timeout.
 function getSplunkDispatcher() {
   return new Agent({
     connect: {
       rejectUnauthorized: !SKIP_TLS_VERIFY,
     },
+    headersTimeout: 15_000,
+    bodyTimeout: 15_000,
   });
+}
+
+/**
+ * M1: log the full Splunk failure (response body / exception text) server-side
+ * under a correlation id and return only a generic, client-safe message.
+ */
+function splunkFailure(what: string, detail: string, status?: number): string {
+  const id = newCorrelationId();
+  console.error(`[Splunk] upstream error [${id}] ${what}: status=${status ?? "-"} ${detail.slice(0, 2000)}`);
+  return `${what}${status !== undefined ? ` (HTTP ${status})` : ""} [${id}]`;
 }
 
 // ── Environment defaults ──────────────────────────────────────────────────
@@ -56,7 +72,8 @@ export async function getEffectiveSplunkConfig(): Promise<SplunkConfig> {
     hecToken: ENV_DEFAULTS.hecToken,
     hecPort: ENV_DEFAULTS.hecPort,
     protocol: "https",
-    enabled: false,
+    // Explicit opt-in only (P2-9): SPLUNK_ENABLED=true in env, or the stored "enabled" setting.
+    enabled: process.env.SPLUNK_ENABLED === "true",
   };
 
   try {
@@ -67,6 +84,17 @@ export async function getEffectiveSplunkConfig(): Promise<SplunkConfig> {
         .from(connectionSettings)
         .where(eq(connectionSettings.category, "splunk"));
 
+      // L4 (same rule as connectionSettingsService CREDENTIAL_SETS): if the DB
+      // supplies the host or the HEC token, the whole destination+credential
+      // set (host, port, hec_token, hec_port) comes from the DB or built-in
+      // defaults — never the env token sent to a DB host, or vice versa.
+      const dbOwnsCreds = rows.some(r => (r.settingKey === "host" || r.settingKey === "hec_token") && !!r.settingValue);
+      if (dbOwnsCreds) {
+        config.host = "";
+        config.hecToken = "";
+        config.port = "8000";
+        config.hecPort = "8088";
+      }
       for (const row of rows) {
         switch (row.settingKey) {
           case "host":
@@ -76,13 +104,13 @@ export async function getEffectiveSplunkConfig(): Promise<SplunkConfig> {
             if (row.settingValue) config.port = row.settingValue;
             break;
           case "hec_token":
-            if (row.settingValue) config.hecToken = row.isEncrypted ? decrypt(row.settingValue) : row.settingValue;
+            if (row.settingValue) config.hecToken = row.isEncrypted ? decrypt(row.settingValue, settingAad("splunk", row.settingKey)) : row.settingValue;
             break;
           case "hec_port":
             if (row.settingValue) config.hecPort = row.settingValue;
             break;
           case "protocol":
-            if (row.settingValue) config.protocol = row.settingValue;
+            if (row.settingValue) config.protocol = asProtocol(row.settingValue, "https");
             break;
           case "enabled":
             config.enabled = row.settingValue === "true";
@@ -94,10 +122,8 @@ export async function getEffectiveSplunkConfig(): Promise<SplunkConfig> {
     // Fall back to env-only config
   }
 
-  // If host and token are set from env but no DB override, consider it enabled
-  if (!config.enabled && config.host && config.hecToken) {
-    config.enabled = true;
-  }
+  // P2-9: the presence of credentials never implies enablement. A write
+  // integration (HEC notable events) must be switched on explicitly.
 
   return config;
 }
@@ -224,7 +250,7 @@ export async function sendHECEvent(event: SplunkHECEvent): Promise<{
     } else {
       return {
         success: false,
-        message: `Splunk HEC error (${response.status}): ${body}`,
+        message: splunkFailure("Splunk HEC error", body, response.status),
         statusCode: response.status,
       };
     }
@@ -233,7 +259,7 @@ export async function sendHECEvent(event: SplunkHECEvent): Promise<{
     if (msg.includes("abort")) {
       return { success: false, message: "Splunk HEC request timed out (15s)" };
     }
-    return { success: false, message: `Splunk HEC connection error: ${msg}` };
+    return { success: false, message: splunkFailure("Splunk HEC connection error", msg) };
   }
 }
 
@@ -312,8 +338,17 @@ export async function testSplunkConnection(overrides?: {
     ...(overrides?.port && { port: overrides.port }),
     ...(overrides?.hecToken && { hecToken: overrides.hecToken }),
     ...(overrides?.hecPort && { hecPort: overrides.hecPort }),
-    ...(overrides?.protocol && { protocol: overrides.protocol }),
+    ...(overrides?.protocol && { protocol: asProtocol(overrides.protocol, "https") }),
   };
+
+  // Stored credentials are never sent to a host the caller supplied: testing a new
+  // host requires the caller to supply the token for that host as well.
+  if (overrides?.host && overrides.host !== saved.host && !overrides.hecToken) {
+    return {
+      success: false,
+      message: "Provide the HEC token when testing a new host — stored credentials are not sent to unsaved hosts.",
+    };
+  }
 
   // SSRF prevention: validate user-provided host overrides
   if (overrides?.host) {
@@ -363,7 +398,7 @@ export async function testSplunkConnection(overrides?: {
     const latencyMs = Date.now() - start;
     return {
       success: false,
-      message: `Cannot reach Splunk HEC: ${(err as Error).message}`,
+      message: splunkFailure("Cannot reach Splunk HEC", (err as Error)?.message ?? String(err)),
       latencyMs,
     };
   }

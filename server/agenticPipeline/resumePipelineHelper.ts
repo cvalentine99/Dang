@@ -17,7 +17,7 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { eq, and, ne, sql } from "drizzle-orm";
+import { eq, and, ne, sql, inArray } from "drizzle-orm";
 import { getDb } from "../db";
 import {
   pipelineRuns,
@@ -27,8 +27,82 @@ import {
   livingCaseState,
 } from "../../drizzle/schema";
 import { runTriageAgent } from "./triageAgent";
+import { MAX_TRIAGE_ATTEMPTS, EXHAUSTED_STATUS } from "../alertQueue/triageAttempts";
 import { runCorrelationAgent } from "./correlationAgent";
 import { runHypothesisAgent, rematerializeResponseActions } from "./hypothesisAgent";
+
+/** Shared stale TTL for pipeline_runs (status='running') and alert_queue (autoTriageStatus='running'). */
+export const STALE_RUN_TTL_MS = 15 * 60 * 1000;
+
+/**
+ * H-L1: thrown when a stage/status write on pipeline_runs matches 0 rows because
+ * the run is no longer 'running' (stale-swept or otherwise superseded). Callers
+ * treat it as a benign abort: no further writes for that run.
+ */
+export class RunSupersededError extends Error {
+  readonly code = "RUN_SUPERSEDED" as const;
+  constructor(readonly runId: string, readonly stage: string) {
+    super(`Pipeline run '${runId}' superseded during ${stage} — worker stopped`);
+    this.name = "RunSupersededError";
+  }
+}
+
+/** affectedRows from a mysql2 UPDATE result ([ResultSetHeader, ...] or ResultSetHeader). */
+export function getAffectedRows(res: unknown): number {
+  const header = Array.isArray(res) ? res[0] : res;
+  return Number((header as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
+}
+
+/** Throw RunSupersededError when a guarded pipeline_runs write touched nothing. */
+export function assertRunLive(res: unknown, runId: string, stage: string): void {
+  if (getAffectedRows(res) === 0) {
+    console.warn(`[Pipeline] run superseded: ${runId} (${stage}) — no longer 'running', stopping worker`);
+    throw new RunSupersededError(runId, stage);
+  }
+}
+
+/** Best-effort guarded write for failure paths: logs (never throws) and returns true when the run was superseded. */
+export function noteIfSuperseded(res: unknown, runId: string, stage: string): boolean {
+  if (getAffectedRows(res) === 0) {
+    console.warn(`[Pipeline] run superseded: ${runId} (${stage} failure write skipped)`);
+    return true;
+  }
+  return false;
+}
+
+type PipelineDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
+/**
+ * H-D2: reset queue items whose auto-triage claim has been 'running' for more than
+ * STALE_RUN_TTL_MS (process crashed mid-LLM call) back to pending/queued.
+ * Age is measured from processedAt, which every claim now stamps; legacy rows
+ * claimed before processedAt was stamped fall back to queuedAt.
+ * Only rows still in a claimable lifecycle state are touched — a dismissed item stays dismissed.
+ */
+export async function sweepStaleAutoTriage(db: PipelineDb): Promise<number> {
+  try {
+    const cutoff = new Date(Date.now() - STALE_RUN_TTL_MS);
+    // A crashed attempt still counts as an attempt (M6): an alert that crashes the
+    // worker must not loop forever. Items at the cap are parked as exhausted.
+    const res = await db.update(alertQueue)
+      .set({
+        autoTriageStatus: sql`CASE WHEN ${alertQueue.triageAttempts} + 1 >= ${MAX_TRIAGE_ATTEMPTS} THEN ${EXHAUSTED_STATUS} ELSE 'pending' END`,
+        status: sql`CASE WHEN ${alertQueue.triageAttempts} + 1 >= ${MAX_TRIAGE_ATTEMPTS} THEN 'failed' ELSE 'queued' END`,
+        triageAttempts: sql`${alertQueue.triageAttempts} + 1`,
+      })
+      .where(and(
+        eq(alertQueue.autoTriageStatus, "running"),
+        inArray(alertQueue.status, ["queued", "processing"]),
+        sql`COALESCE(${alertQueue.processedAt}, ${alertQueue.queuedAt}) < ${cutoff}`,
+      ));
+    const n = getAffectedRows(res);
+    if (n > 0) console.warn(`[Pipeline] stale auto-triage sweep released ${n} queue item(s) (attempt counted; exhausted ones parked as failed)`);
+    return n;
+  } catch (sweepErr) {
+    console.error("[Pipeline] stale auto-triage sweep failed:", (sweepErr as Error).message);
+    return 0;
+  }
+}
 
 /** The stage names in pipeline execution order. */
 const STAGE_ORDER = ["triage", "correlation", "hypothesis", "response_actions"] as const;
@@ -211,33 +285,40 @@ export async function executeResumePipeline(
   const resumedRunId = `${runIdPrefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const startTime = Date.now();
 
+  // H-D2: release queue items wedged in autoTriageStatus='running' by a crashed worker.
+  await sweepStaleAutoTriage(db);
+
   const [resumedRow] = await db.transaction(async (tx) => {
     // ── Stale-run TTL: mark runs stuck in "running" for >15 minutes as failed.
     // Mirrors the cleanup in runFullPipeline — without this, crashed pipelines
     // permanently block their alertId via the dedup guard.
-    const STALE_RUN_TTL_MS = 15 * 60 * 1000;
-    const staleCutoff = new Date(Date.now() - STALE_RUN_TTL_MS);
-    await tx.update(pipelineRuns)
-      .set({
-        status: "failed",
-        error: "Pipeline run timed out (stale TTL exceeded)",
-        completedAt: new Date(),
-        currentStage: "failed",
-        triageStatus: sql`CASE WHEN ${pipelineRuns.triageStatus} = 'running' THEN 'failed' ELSE ${pipelineRuns.triageStatus} END`,
-        correlationStatus: sql`CASE WHEN ${pipelineRuns.correlationStatus} = 'running' THEN 'failed' ELSE ${pipelineRuns.correlationStatus} END`,
-        hypothesisStatus: sql`CASE WHEN ${pipelineRuns.hypothesisStatus} = 'running' THEN 'failed' ELSE ${pipelineRuns.hypothesisStatus} END`,
-        responseActionsStatus: sql`CASE WHEN ${pipelineRuns.responseActionsStatus} = 'running' THEN 'failed' ELSE ${pipelineRuns.responseActionsStatus} END`,
-      })
-      .where(
-        and(
-          eq(pipelineRuns.status, "running"),
-          sql`${pipelineRuns.startedAt} < ${staleCutoff}`,
-        )
-      );
+    // H-L1: scoped to THIS alert. A global sweep failed every long-running run
+    // system-wide; with no usable alertId we do not sweep at all.
+    const SENTINEL_ALERT_IDS = new Set(["", "unknown", "none", "null", "undefined", "n/a"]);
+    const alertIdVal = (originalRun.alertId ?? "").trim();
+    const alertIdKnown = !SENTINEL_ALERT_IDS.has(alertIdVal.toLowerCase());
+    if (alertIdKnown) {
+      const staleCutoff = new Date(Date.now() - STALE_RUN_TTL_MS);
+      await tx.update(pipelineRuns)
+        .set({
+          status: "failed",
+          error: "Pipeline run timed out (stale TTL exceeded)",
+          completedAt: new Date(),
+          currentStage: "failed",
+          triageStatus: sql`CASE WHEN ${pipelineRuns.triageStatus} = 'running' THEN 'failed' ELSE ${pipelineRuns.triageStatus} END`,
+          correlationStatus: sql`CASE WHEN ${pipelineRuns.correlationStatus} = 'running' THEN 'failed' ELSE ${pipelineRuns.correlationStatus} END`,
+          hypothesisStatus: sql`CASE WHEN ${pipelineRuns.hypothesisStatus} = 'running' THEN 'failed' ELSE ${pipelineRuns.hypothesisStatus} END`,
+          responseActionsStatus: sql`CASE WHEN ${pipelineRuns.responseActionsStatus} = 'running' THEN 'failed' ELSE ${pipelineRuns.responseActionsStatus} END`,
+        })
+        .where(
+          and(
+            eq(pipelineRuns.status, "running"),
+            eq(pipelineRuns.alertId, alertIdVal),
+            sql`${pipelineRuns.startedAt} < ${staleCutoff}`,
+          )
+        );
 
-    // Dedup guard: check for in-flight runs on the same alert
-    const alertIdVal = originalRun.alertId ?? "";
-    if (alertIdVal && alertIdVal !== "unknown") {
+      // Dedup guard: check for in-flight runs on the same alert
       const existingRows = await tx
         .select({ id: pipelineRuns.id, runId: pipelineRuns.runId })
         .from(pipelineRuns)
@@ -257,6 +338,24 @@ export async function executeResumePipeline(
           message: `Another pipeline run '${existingRows[0].runId}' is already in-flight for alert '${originalRun.alertId}'. Wait for it to complete or cancel it first.`,
         });
       }
+    }
+
+    // H-L6: atomically claim the ORIGINAL run (applies whether or not alertId is known —
+    // an unknown alertId is guarded on the original runId). A run can be resumed exactly once.
+    const claimRes = await tx.update(pipelineRuns)
+      .set({ resumedByRunId: resumedRunId })
+      .where(
+        and(
+          eq(pipelineRuns.runId, input.runId),
+          sql`${pipelineRuns.resumedByRunId} IS NULL`,
+          inArray(pipelineRuns.status, ["failed", "partial"]),
+        )
+      );
+    if (getAffectedRows(claimRes) === 0) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: `Pipeline run '${input.runId}' already resumed or still running`,
+      });
     }
 
     return tx.insert(pipelineRuns).values({
@@ -307,6 +406,14 @@ export async function executeResumePipeline(
     status: "running",
   };
 
+  // H-L1: a superseded run (stale-swept while we were in an LLM call) stops here
+  // with no further writes — benign abort, surfaced as status "superseded".
+  const abortSuperseded = (): ResumePipelineResult => {
+    result.status = "superseded";
+    result.totalLatencyMs = Date.now() - startTime;
+    return result;
+  };
+
   let currentTriageId = originalRun.triageId;
   let currentCorrelationId = originalRun.correlationId;
 
@@ -331,9 +438,10 @@ export async function executeResumePipeline(
         throw new TRPCError({ code: "NOT_FOUND", message: "Cannot resume triage — original raw alert not found" });
       }
 
-      await db.update(pipelineRuns)
+      const runWrite0 = await db.update(pipelineRuns)
         .set({ currentStage: "triage", triageStatus: "running" })
-        .where(eq(pipelineRuns.id, resumedRow.id));
+        .where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+      assertRunLive(runWrite0, resumedRunId, "triage:running");
 
       const triageResult = await runTriageAgent({
         rawAlert,
@@ -352,22 +460,25 @@ export async function executeResumePipeline(
         latencyMs: triageResult.latencyMs,
       };
 
-      await db.update(pipelineRuns).set({
+      const runWrite1 = await db.update(pipelineRuns).set({
         triageId: triageResult.triageId,
         triageStatus: "completed",
         triageLatencyMs: triageResult.latencyMs,
         currentStage: "correlation",
-      }).where(eq(pipelineRuns.id, resumedRow.id));
+      }).where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+      assertRunLive(runWrite1, resumedRunId, "triage:completed");
     } catch (err) {
+      if (err instanceof RunSupersededError) return abortSuperseded();
       result.stages.triage = { status: "failed", error: (err as Error).message };
       result.status = "partial";
-      await db.update(pipelineRuns).set({
+      const runWrite2 = await db.update(pipelineRuns).set({
         triageStatus: "failed",
         status: "partial",
         error: (err as Error).message,
         totalLatencyMs: Date.now() - startTime,
         completedAt: new Date(),
-      }).where(eq(pipelineRuns.id, resumedRow.id));
+      }).where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+      noteIfSuperseded(runWrite2, resumedRunId, "triage:failed");
       result.totalLatencyMs = Date.now() - startTime;
       return result;
     }
@@ -378,9 +489,10 @@ export async function executeResumePipeline(
     try {
       if (!currentTriageId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No triage ID available for correlation" });
 
-      await db.update(pipelineRuns)
+      const runWrite3 = await db.update(pipelineRuns)
         .set({ correlationStatus: "running", currentStage: "correlation" })
-        .where(eq(pipelineRuns.id, resumedRow.id));
+        .where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+      assertRunLive(runWrite3, resumedRunId, "correlation:running");
 
       const corrResult = await runCorrelationAgent({
         triageId: currentTriageId,
@@ -393,22 +505,25 @@ export async function executeResumePipeline(
         latencyMs: corrResult.latencyMs,
       };
 
-      await db.update(pipelineRuns).set({
+      const runWrite4 = await db.update(pipelineRuns).set({
         correlationId: corrResult.correlationId,
         correlationStatus: "completed",
         correlationLatencyMs: corrResult.latencyMs,
         currentStage: "hypothesis",
-      }).where(eq(pipelineRuns.id, resumedRow.id));
+      }).where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+      assertRunLive(runWrite4, resumedRunId, "correlation:completed");
     } catch (err) {
+      if (err instanceof RunSupersededError) return abortSuperseded();
       result.stages.correlation = { status: "failed", error: (err as Error).message };
       result.status = "partial";
-      await db.update(pipelineRuns).set({
+      const runWrite5 = await db.update(pipelineRuns).set({
         correlationStatus: "failed",
         status: "partial",
         error: (err as Error).message,
         totalLatencyMs: Date.now() - startTime,
         completedAt: new Date(),
-      }).where(eq(pipelineRuns.id, resumedRow.id));
+      }).where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+      noteIfSuperseded(runWrite5, resumedRunId, "correlation:failed");
       result.totalLatencyMs = Date.now() - startTime;
       return result;
     }
@@ -441,9 +556,10 @@ export async function executeResumePipeline(
     try {
       if (!currentCorrelationId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No correlation ID available for hypothesis" });
 
-      await db.update(pipelineRuns)
+      const runWrite6 = await db.update(pipelineRuns)
         .set({ hypothesisStatus: "running", currentStage: "hypothesis" })
-        .where(eq(pipelineRuns.id, resumedRow.id));
+        .where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+      assertRunLive(runWrite6, resumedRunId, "hypothesis:running");
 
       const hypoResult = await runHypothesisAgent({
         correlationId: currentCorrelationId,
@@ -480,7 +596,7 @@ export async function executeResumePipeline(
       // response does not claim "completed" when actions partially failed.
       result.status = partialFailure ? "partial" : "completed";
 
-      await db.update(pipelineRuns).set({
+      const runWrite7 = await db.update(pipelineRuns).set({
         livingCaseId: hypoResult.caseId,
         hypothesisStatus: "completed",
         hypothesisLatencyMs: hypoResult.latencyMs,
@@ -495,8 +611,10 @@ export async function executeResumePipeline(
           : null,
         totalLatencyMs: Date.now() - startTime,
         completedAt: new Date(),
-      }).where(eq(pipelineRuns.id, resumedRow.id));
+      }).where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+      assertRunLive(runWrite7, resumedRunId, "hypothesis:completed");
     } catch (err) {
+      if (err instanceof RunSupersededError) return abortSuperseded();
       // BUG-04 Fix: If hypothesis itself succeeded (livingCaseId captured) but
       // post-materialization sync threw, preserve the truth-bearing fields so
       // response-action recovery/rematerialization is reachable on next resume.
@@ -513,7 +631,7 @@ export async function executeResumePipeline(
           error: (err as Error).message,
         };
         result.status = "partial";
-        await db.update(pipelineRuns).set({
+        const runWrite8 = await db.update(pipelineRuns).set({
           livingCaseId: hypothesisLivingCaseId,
           hypothesisStatus: "completed",
           hypothesisLatencyMs: hypothesisLatencyMs ?? null,
@@ -523,18 +641,20 @@ export async function executeResumePipeline(
           error: `Post-materialization sync failed: ${(err as Error).message}`,
           totalLatencyMs: Date.now() - startTime,
           completedAt: new Date(),
-        }).where(eq(pipelineRuns.id, resumedRow.id));
+        }).where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+        noteIfSuperseded(runWrite8, resumedRunId, "hypothesis:completed");
       } else {
         // Hypothesis itself failed — no truth to preserve
         result.stages.hypothesis = { status: "failed", error: (err as Error).message };
         result.status = "partial";
-        await db.update(pipelineRuns).set({
+        const runWrite9 = await db.update(pipelineRuns).set({
           hypothesisStatus: "failed",
           status: "partial",
           error: (err as Error).message,
           totalLatencyMs: Date.now() - startTime,
           completedAt: new Date(),
-        }).where(eq(pipelineRuns.id, resumedRow.id));
+        }).where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+        noteIfSuperseded(runWrite9, resumedRunId, "hypothesis:failed");
       }
       result.totalLatencyMs = Date.now() - startTime;
       return result;
@@ -546,9 +666,10 @@ export async function executeResumePipeline(
   // re-materialize from the existing living case without re-running the LLM.
   if (startIdx === 3) {
     try {
-      await db.update(pipelineRuns)
+      const runWrite10 = await db.update(pipelineRuns)
         .set({ responseActionsStatus: "running", currentStage: "response_actions" })
-        .where(eq(pipelineRuns.id, resumedRow.id));
+        .where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+      assertRunLive(runWrite10, resumedRunId, "responseActions:running");
 
       const remat = await rematerializeResponseActions({
         livingCaseId: originalRun.livingCaseId!,
@@ -569,7 +690,7 @@ export async function executeResumePipeline(
       // BUG-03 adjacent fix: sync result.status with DB truth for stage-4 path.
       result.status = partialFailure ? "partial" : "completed";
 
-      await db.update(pipelineRuns).set({
+      const runWrite11 = await db.update(pipelineRuns).set({
         livingCaseId: originalRun.livingCaseId,
         responseActionsCount: actionIds.length,
         responseActionsStatus: partialFailure
@@ -582,17 +703,20 @@ export async function executeResumePipeline(
           : null,
         totalLatencyMs: Date.now() - startTime,
         completedAt: new Date(),
-      }).where(eq(pipelineRuns.id, resumedRow.id));
+      }).where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+      assertRunLive(runWrite11, resumedRunId, "final");
     } catch (err) {
+      if (err instanceof RunSupersededError) return abortSuperseded();
       result.stages.responseActions = { status: "failed", error: (err as Error).message };
       result.status = "partial";
-      await db.update(pipelineRuns).set({
+      const runWrite12 = await db.update(pipelineRuns).set({
         responseActionsStatus: "failed",
         status: "partial",
         error: (err as Error).message,
         totalLatencyMs: Date.now() - startTime,
         completedAt: new Date(),
-      }).where(eq(pipelineRuns.id, resumedRow.id));
+      }).where(and(eq(pipelineRuns.id, resumedRow.id), eq(pipelineRuns.status, "running")));
+      noteIfSuperseded(runWrite12, resumedRunId, "responseActions:failed");
       result.totalLatencyMs = Date.now() - startTime;
       return result;
     }

@@ -34,6 +34,7 @@
  */
 
 import type { LLMCorrelationRaw } from "./types/LLMCorrelationRaw";
+import { filterMitreMappings, isKnownTechnique, normalizeCveId } from "./mitreCatalog";
 import type {
   CorrelationBundle,
   ExtractedEntity,
@@ -84,21 +85,31 @@ function normalizeCaseAction(
 /**
  * Map raw campaign indicators to MitreMapping[].
  *
- * If an indicator looks like a MITRE technique ID (e.g., "T1059", "T1053.005"),
- * it is mapped to a MitreMapping. Otherwise it is dropped.
- * This is intentionally lossy — we do not fabricate technique metadata.
+ * M4: an indicator is kept only if it is a technique id present in the Wazuh
+ * manager's ATT&CK catalog (or the bundled fallback allowlist when the manager
+ * is unreachable — see mitreCatalog.ts). Free-text indicators and unknown ids
+ * such as "T9999" are dropped. Unknown technique-shaped ids are returned so the
+ * caller can log them. This is intentionally lossy — we do not fabricate
+ * technique metadata.
  */
-function mapIndicatorsToClusteredTechniques(indicators: string[]): MitreMapping[] {
-  const mitreTechniquePattern = /^T\d{4}(\.\d{3})?$/;
-  return indicators
-    .filter((ind) => mitreTechniquePattern.test(ind.trim()))
+function mapIndicatorsToClusteredTechniques(indicators: string[]): {
+  techniques: MitreMapping[];
+  unknown: string[];
+  validated: boolean;
+} {
+  const techniqueShaped = /^T\d{4}(\.\d{3})?$/i;
+  const candidates = indicators
+    .map((ind) => (typeof ind === "string" ? ind.trim() : ""))
+    .filter((ind) => techniqueShaped.test(ind))
     .map((ind) => ({
-      techniqueId: ind.trim(),
-      techniqueName: ind.trim(),
+      techniqueId: ind,
+      techniqueName: ind.toUpperCase(),
       tactic: "unknown",
       confidence: 0.5,
       source: "llm_inference" as const,
     }));
+  const res = filterMitreMappings(candidates);
+  return { techniques: res.kept, unknown: res.unknown, validated: res.validated };
 }
 
 // ── Entity Normalization ────────────────────────────────────────────────────
@@ -166,7 +177,19 @@ export function normalizeCorrelationBundle(
   }));
 
   // ── Discovered Entities ─────────────────────────────────────────────────
-  const discoveredEntities = (raw.discoveredEntities ?? []).map(normalizeEntity);
+  // M4: CVE / technique entities from model output must be well-formed / known.
+  const droppedIds: string[] = [];
+  const discoveredEntities = (raw.discoveredEntities ?? []).map(normalizeEntity).filter((e) => {
+    if (e.type === "cve") {
+      const cve = normalizeCveId(e.value);
+      if (!cve) { droppedIds.push(String(e.value).slice(0, 64)); return false; }
+      e.value = cve;
+    } else if (e.type === "mitre_technique") {
+      if (!isKnownTechnique(e.value)) { droppedIds.push(String(e.value).slice(0, 64)); return false; }
+      e.value = String(e.value).trim().toUpperCase();
+    }
+    return true;
+  });
 
   // ── Blast Radius ────────────────────────────────────────────────────────
   // Raw: string[] → Canonical: number (count)
@@ -182,9 +205,17 @@ export function normalizeCorrelationBundle(
   // ── Campaign Assessment ─────────────────────────────────────────────────
   // Raw: campaignName → Canonical: campaignLabel
   // Raw: indicators (string[]) → Canonical: clusteredTechniques (MitreMapping[])
-  const clusteredTechniques = mapIndicatorsToClusteredTechniques(
-    raw.campaignAssessment.indicators
-  );
+  const {
+    techniques: clusteredTechniques,
+    unknown: unknownTechniques,
+    validated: mitreValidated,
+  } = mapIndicatorsToClusteredTechniques(raw.campaignAssessment.indicators);
+  if (unknownTechniques.length > 0 || droppedIds.length > 0) {
+    console.warn(
+      `[normalizeCorrelationBundle] M4: dropped unknown/malformed ids for ${opts.correlationId}: ` +
+        [...unknownTechniques, ...droppedIds].slice(0, 10).join(", ")
+    );
+  }
   const campaignAssessment = {
     likelyCampaign: raw.campaignAssessment.likelyCampaign,
     campaignLabel: raw.campaignAssessment.campaignName ?? undefined,
@@ -241,6 +272,8 @@ export function normalizeCorrelationBundle(
   const bundle: CorrelationBundle = {
     schemaVersion: "1.0",
     correlationId: opts.correlationId,
+    mitreValidated,
+    cveValidated: true,
     correlatedAt: now.toISOString(),
     sourceTriageId: opts.triageId,
     relatedAlerts,

@@ -2,9 +2,9 @@
  * State Machine Integration Tests
  *
  * Tests the response action state machine invariants:
- *   - Valid transition graph (proposed→approved→executed, proposed→rejected, etc.)
- *   - Terminal state enforcement (rejected/executed cannot transition)
- *   - requiresApproval gate (cannot skip proposed→approved→executed)
+ *   - Valid transition graph (proposed→approved→acknowledged, proposed→rejected, etc.)
+ *   - Terminal state enforcement (rejected/acknowledged cannot transition)
+ *   - requiresApproval gate (cannot skip proposed→approved→acknowledged)
  *   - Reason requirements for reject/defer
  *   - Audit trail creation on every transition
  *   - Case summary recomputation after transitions
@@ -19,7 +19,7 @@
  *   - Nothing for pure function tests
  *   - LLM (for DB-dependent tests that need a case + action setup)
  */
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import {
   isValidTransition,
   isTerminalState,
@@ -47,8 +47,8 @@ describe("State Machine — Pure Functions", () => {
       expect(isValidTransition("proposed", "deferred")).toBe(true);
     });
 
-    it("allows approved → executed", () => {
-      expect(isValidTransition("approved", "executed")).toBe(true);
+    it("allows approved → acknowledged", () => {
+      expect(isValidTransition("approved", "acknowledged")).toBe(true);
     });
 
     it("allows approved → rejected (revoke approval)", () => {
@@ -59,30 +59,30 @@ describe("State Machine — Pure Functions", () => {
       expect(isValidTransition("deferred", "proposed")).toBe(true);
     });
 
-    it("blocks proposed → executed (must go through approved)", () => {
-      expect(isValidTransition("proposed", "executed")).toBe(false);
+    it("blocks proposed → acknowledged (must go through approved)", () => {
+      expect(isValidTransition("proposed", "acknowledged")).toBe(false);
     });
 
     it("blocks rejected → anything (terminal)", () => {
       expect(isValidTransition("rejected", "proposed")).toBe(false);
       expect(isValidTransition("rejected", "approved")).toBe(false);
-      expect(isValidTransition("rejected", "executed")).toBe(false);
+      expect(isValidTransition("rejected", "acknowledged")).toBe(false);
       expect(isValidTransition("rejected", "deferred")).toBe(false);
     });
 
-    it("blocks executed → anything (terminal)", () => {
-      expect(isValidTransition("executed", "proposed")).toBe(false);
-      expect(isValidTransition("executed", "approved")).toBe(false);
-      expect(isValidTransition("executed", "rejected")).toBe(false);
-      expect(isValidTransition("executed", "deferred")).toBe(false);
+    it("blocks acknowledged → anything (terminal)", () => {
+      expect(isValidTransition("acknowledged", "proposed")).toBe(false);
+      expect(isValidTransition("acknowledged", "approved")).toBe(false);
+      expect(isValidTransition("acknowledged", "rejected")).toBe(false);
+      expect(isValidTransition("acknowledged", "deferred")).toBe(false);
     });
 
     it("blocks deferred → approved (must re-propose first)", () => {
       expect(isValidTransition("deferred", "approved")).toBe(false);
     });
 
-    it("blocks deferred → executed (must re-propose first)", () => {
-      expect(isValidTransition("deferred", "executed")).toBe(false);
+    it("blocks deferred → acknowledged (must re-propose first)", () => {
+      expect(isValidTransition("deferred", "acknowledged")).toBe(false);
     });
 
     it("handles unknown states gracefully", () => {
@@ -97,8 +97,8 @@ describe("State Machine — Pure Functions", () => {
       expect(isTerminalState("rejected")).toBe(true);
     });
 
-    it("identifies executed as terminal", () => {
-      expect(isTerminalState("executed")).toBe(true);
+    it("identifies acknowledged as terminal", () => {
+      expect(isTerminalState("acknowledged")).toBe(true);
     });
 
     it("identifies proposed as non-terminal", () => {
@@ -128,9 +128,9 @@ describe("State Machine — Pure Functions", () => {
       expect(allowed).toHaveLength(3);
     });
 
-    it("returns [executed, rejected] for approved", () => {
+    it("returns [acknowledged, rejected] for approved", () => {
       const allowed = getAllowedTransitions("approved");
-      expect(allowed).toContain("executed");
+      expect(allowed).toContain("acknowledged");
       expect(allowed).toContain("rejected");
       expect(allowed).toHaveLength(2);
     });
@@ -144,8 +144,8 @@ describe("State Machine — Pure Functions", () => {
       expect(getAllowedTransitions("rejected")).toEqual([]);
     });
 
-    it("returns empty array for executed (terminal)", () => {
-      expect(getAllowedTransitions("executed")).toEqual([]);
+    it("returns empty array for acknowledged (terminal)", () => {
+      expect(getAllowedTransitions("acknowledged")).toEqual([]);
     });
 
     it("returns empty array for unknown states", () => {
@@ -155,7 +155,7 @@ describe("State Machine — Pure Functions", () => {
 
   describe("VALID_TRANSITIONS constant", () => {
     it("has entries for all five states", () => {
-      const states: ActionState[] = ["proposed", "approved", "rejected", "executed", "deferred"];
+      const states: ActionState[] = ["proposed", "approved", "rejected", "acknowledged", "deferred"];
       for (const state of states) {
         expect(VALID_TRANSITIONS).toHaveProperty(state);
         expect(Array.isArray(VALID_TRANSITIONS[state])).toBe(true);
@@ -179,10 +179,10 @@ describe("State Machine — Pure Functions", () => {
   });
 
   describe("Full lifecycle paths", () => {
-    it("supports happy path: proposed → approved → executed", () => {
+    it("supports happy path: proposed → approved → acknowledged", () => {
       expect(isValidTransition("proposed", "approved")).toBe(true);
-      expect(isValidTransition("approved", "executed")).toBe(true);
-      expect(isTerminalState("executed")).toBe(true);
+      expect(isValidTransition("approved", "acknowledged")).toBe(true);
+      expect(isTerminalState("acknowledged")).toBe(true);
     });
 
     it("supports rejection path: proposed → rejected", () => {
@@ -190,11 +190,11 @@ describe("State Machine — Pure Functions", () => {
       expect(isTerminalState("rejected")).toBe(true);
     });
 
-    it("supports defer-repropose path: proposed → deferred → proposed → approved → executed", () => {
+    it("supports defer-repropose path: proposed → deferred → proposed → approved → acknowledged", () => {
       expect(isValidTransition("proposed", "deferred")).toBe(true);
       expect(isValidTransition("deferred", "proposed")).toBe(true);
       expect(isValidTransition("proposed", "approved")).toBe(true);
-      expect(isValidTransition("approved", "executed")).toBe(true);
+      expect(isValidTransition("approved", "acknowledged")).toBe(true);
     });
 
     it("supports late rejection: proposed → approved → rejected", () => {
@@ -211,156 +211,56 @@ describe("State Machine — Pure Functions", () => {
 
 const HAS_DB = !!process.env.DATABASE_URL;
 
-// Mock LLM (needed for hypothesis agent which creates response actions)
-const mockLLMResponse = vi.fn();
-vi.mock("../llm/llmService", () => ({
-  invokeLLMWithFallback: (...args: any[]) => mockLLMResponse(...args),
-  getEffectiveLLMConfig: async () => ({ host: "mock", port: 0, model: "mock", enabled: true }),
-  isCustomLLMEnabled: async () => true,
-}));
-vi.mock("../indexer/indexerClient", () => ({
-  getEffectiveIndexerConfig: async () => ({ host: "mock", port: 9200, user: "admin", pass: "admin", protocol: "https" }),
-  indexerSearch: async () => ({ hits: { hits: [], total: { value: 0 } } }),
-  indexerGet: async () => ({}),
-}));
-vi.mock("../wazuh/wazuhClient", () => ({
-  wazuhGet: async () => ({ data: { affected_items: [] } }),
-  getEffectiveWazuhConfig: async () => ({ host: "mock", port: 55000, user: "admin", pass: "admin", protocol: "https" }),
-}));
-vi.mock("../threatIntel/otxService", () => ({
-  otxGet: async () => ({}),
-}));
-
 describe("transitionActionState (real DB)", () => {
   let testActionId: string;
   let testCaseId: number;
 
+  // Fixture rows are created directly (not via runHypothesisAgent): this suite
+  // exercises the state machine, and the materialization path is covered (and
+  // currently it.todo — see hypothesisAgent.test.ts MATERIALIZATION_BUG) elsewhere.
+  async function insertProposedAction(caseId: number, title: string): Promise<string> {
+    const { getDb } = await import("../db");
+    const { responseActions } = await import("../../drizzle/schema");
+    const db = (await getDb())!;
+    const actionId = `ra-smtest-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    await db.insert(responseActions).values({
+      actionId,
+      category: "block_ioc",
+      title,
+      urgency: "immediate",
+      requiresApproval: 1, // C10: every model-proposed action requires approval
+      state: "proposed",
+      proposedBy: "hypothesis_agent",
+      caseId,
+      evidenceBasis: ["Multiple failed SSH attempts from this IP"],
+      targetType: "ip",
+      targetValue: "10.0.0.1",
+    });
+    return actionId;
+  }
+
   beforeAll(async () => {
     if (!HAS_DB) return;
+    const { getDb } = await import("../db");
+    const { investigationSessions, livingCaseState } = await import("../../drizzle/schema");
+    const db = (await getDb())!;
 
-    // Create a full pipeline run to get a real response action
-    const { runTriageAgent } = await import("./triageAgent");
-    const { runCorrelationAgent } = await import("./correlationAgent");
-    const { runHypothesisAgent } = await import("./hypothesisAgent");
+    const [session] = await db.insert(investigationSessions).values({
+      userId: 1, // owner column is NOT NULL (C9)
+      title: `State machine test ${Date.now()}`,
+      description: "State machine fixture",
+      status: "active",
+    }).$returningId();
 
-    // Triage
-    mockLLMResponse.mockResolvedValueOnce({
-      choices: [{ message: { content: JSON.stringify({
-        alertFamily: "brute_force",
-        severity: "high",
-        severityConfidence: 0.85,
-        severityReasoning: "SSH brute force",
-        entities: [{ type: "ip", value: "10.0.0.1", confidence: 1.0 }],
-        mitreMapping: [{ techniqueId: "T1110", techniqueName: "Brute Force", tactic: "Credential Access", confidence: 0.9 }],
-        dedup: { isDuplicate: false, similarityScore: 0.1, reasoning: "New alert" },
-        route: "C_HIGH_CONFIDENCE",
-        routeReasoning: "Clear brute force",
-        summary: "SSH brute force from 10.0.0.1",
-        uncertainties: [],
-        caseLink: { shouldLink: false, confidence: 0.1, reasoning: "No match" },
-      }) } }],
-      usage: { prompt_tokens: 100, completion_tokens: 50 },
-    });
+    const [caseRow] = await db.insert(livingCaseState).values({
+      sessionId: session.id,
+      caseData: { workingTheory: { statement: "SSH brute force", confidence: 0.85 } } as any,
+      workingTheory: "SSH brute force",
+      theoryConfidence: 0.85,
+    }).$returningId();
+    testCaseId = caseRow.id;
 
-    const triageResult = await runTriageAgent({
-      rawAlert: {
-        id: "sm-test-1",
-        timestamp: new Date().toISOString(),
-        rule: { id: "5710", level: 10, description: "SSH brute force", mitre: { id: ["T1110"], technique: ["Brute Force"], tactic: ["Credential Access"] } },
-        agent: { id: "001", name: "test-server", ip: "192.168.1.1" },
-        data: { srcip: "10.0.0.1" },
-      },
-      userId: 1,
-    });
-
-    // Correlation
-    mockLLMResponse.mockResolvedValueOnce({
-      choices: [{ message: { content: JSON.stringify({
-        correlationId: "x",
-        sourceTriageId: "x",
-        relatedAlerts: [],
-        discoveredEntities: [],
-        blastRadius: {
-          affectedHosts: ["web-server-01"],
-          affectedUsers: ["root"],
-          affectedServices: ["sshd"],
-          assetCriticality: "medium",
-        },
-        campaignAssessment: {
-          likelyCampaign: false,
-          campaignName: null,
-          confidence: 0.3,
-          reasoning: "No campaign",
-          indicators: [],
-        },
-        caseRecommendation: {
-          action: "create_new",
-          mergeTargetId: null,
-          mergeTargetTitle: null,
-          confidence: 0.8,
-          reasoning: "New case",
-        },
-        riskScore: 55,
-        summary: "SSH brute force from 10.0.0.1",
-        evidenceSummary: "Multiple failed SSH login attempts",
-        inferenceSummary: "No conflicting evidence",
-        uncertainties: [],
-        confidence: 0.75,
-        mitreMapping: [
-          { techniqueId: "T1110", techniqueName: "Brute Force", tactic: "Credential Access", confidence: 0.9 },
-        ],
-      }) } }],
-      usage: { prompt_tokens: 200, completion_tokens: 100 },
-    });
-
-    const corrResult = await runCorrelationAgent({ triageId: triageResult.triageId! });
-
-    // Hypothesis (with response actions)
-    mockLLMResponse.mockResolvedValueOnce({
-      choices: [{ message: { content: JSON.stringify({
-        workingTheory: {
-          statement: "SSH brute force attack from external IP",
-          confidence: 0.85,
-          supportingEvidence: ["Multiple failed SSH attempts"],
-          conflictingEvidence: [],
-        },
-        alternateTheories: [],
-        evidenceGaps: [],
-        suggestedNextSteps: [],
-        recommendedActions: [
-          {
-            action: "Block source IP 10.0.0.1 at firewall",
-            category: "block",
-            urgency: "immediate",
-            targetType: "ip",
-            targetValue: "10.0.0.1",
-            requiresApproval: true,
-            evidenceBasis: ["Multiple failed SSH attempts from this IP"],
-          },
-          {
-            action: "Add 10.0.0.1 to watchlist for 30 days",
-            category: "watchlist",
-            urgency: "next",
-            targetType: "ip",
-            targetValue: "10.0.0.1",
-            requiresApproval: false,
-            evidenceBasis: ["Suspicious activity pattern"],
-          },
-        ],
-        timelineSummary: [{ timestamp: new Date().toISOString(), event: "SSH brute force detected", source: "wazuh_alert", significance: "high" }],
-        linkedEntities: [{ type: "ip", value: "10.0.0.1" }],
-        draftDocumentation: { executiveSummary: "SSH brute force attack" },
-      }) } }],
-      usage: { prompt_tokens: 300, completion_tokens: 150 },
-    });
-
-    const hypoResult = await runHypothesisAgent({ correlationId: corrResult.correlationId });
-    testCaseId = hypoResult.caseId;
-
-    // Get the first materialized action ID
-    if (hypoResult.materializedActionIds.length > 0) {
-      testActionId = hypoResult.materializedActionIds[0];
-    }
+    testActionId = await insertProposedAction(testCaseId, "Block source IP 10.0.0.1 at firewall");
   });
 
   it.skipIf(!HAS_DB)("transitions proposed → approved with audit trail", async () => {
@@ -372,19 +272,80 @@ describe("transitionActionState (real DB)", () => {
     expect(result.toState).toBe("approved");
     expect(result.action).toBeDefined();
     expect(result.action!.state).toBe("approved");
+
+    // Invariant 6: every transition writes an audit row
+    const { getDb } = await import("../db");
+    const { responseActionAudit } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const audits = await (await getDb())!.select()
+      .from(responseActionAudit)
+      .where(eq(responseActionAudit.actionIdStr, testActionId));
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      fromState: "proposed",
+      toState: "approved",
+      performedBy: "user:1",
+      reason: "Approved by analyst",
+    });
   });
 
-  it.skipIf(!HAS_DB)("transitions approved → executed", async () => {
-    const { executeAction } = await import("./stateMachine");
-    const result = await executeAction(testActionId, 1, { executionMethod: "manual" });
+  it.skipIf(!HAS_DB)("requires approval before acknowledging and a reason to reject/defer", async () => {
+    const { acknowledgeAction, rejectAction, deferAction } = await import("./stateMachine");
+    const actionId = await insertProposedAction(testCaseId, "Add 10.0.0.1 to watchlist");
+
+    const ack = await acknowledgeAction(actionId, 1, { executionOutcome: "success", executionResult: "done" });
+    expect(ack.success).toBe(false);
+    expect(ack.fromState).toBe("proposed");
+
+    const rej = await rejectAction(actionId, 1, "  ");
+    expect(rej.success).toBe(false);
+    expect(rej.invariantViolation).toMatch(/require a reason/);
+
+    const def = await deferAction(actionId, 1, "");
+    expect(def.success).toBe(false);
+    expect(def.invariantViolation).toMatch(/require a reason/);
+
+    const rejOk = await rejectAction(actionId, 1, "False positive — internal scanner");
+    expect(rejOk.success).toBe(true);
+    expect(rejOk.action!.state).toBe("rejected");
+    expect(rejOk.action!.decisionReason).toBe("False positive — internal scanner");
+  });
+
+  it.skipIf(!HAS_DB)("refuses to acknowledge without an outcome and a non-empty result", async () => {
+    const { acknowledgeAction } = await import("./stateMachine");
+    await expect(
+      acknowledgeAction(testActionId, 1, { executionOutcome: "success", executionResult: "   " }),
+    ).rejects.toThrow(/non-empty executionResult/);
+    await expect(
+      acknowledgeAction(testActionId, 1, { executionOutcome: "bogus" as any, executionResult: "done" }),
+    ).rejects.toThrow(/executionOutcome/);
+
+    // Nothing was written — still approved
+    const { getDb } = await import("../db");
+    const { responseActions } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const [row] = await (await getDb())!.select({ state: responseActions.state })
+      .from(responseActions).where(eq(responseActions.actionId, testActionId));
+    expect(row.state).toBe("approved");
+  });
+
+  it.skipIf(!HAS_DB)("transitions approved → acknowledged with the analyst's attestation", async () => {
+    const { acknowledgeAction } = await import("./stateMachine");
+    const result = await acknowledgeAction(testActionId, 1, {
+      executionOutcome: "success",
+      executionResult: "Blocked 10.0.0.1 on perimeter firewall (rule 4021)",
+    });
 
     expect(result.success).toBe(true);
     expect(result.fromState).toBe("approved");
-    expect(result.toState).toBe("executed");
-    expect(result.action!.state).toBe("executed");
+    expect(result.toState).toBe("acknowledged");
+    expect(result.action!.state).toBe("acknowledged");
+    expect(result.action!.executionOutcome).toBe("success");
+    expect(result.action!.executionResult).toBe("Blocked 10.0.0.1 on perimeter firewall (rule 4021)");
+    expect(result.action!.executedBy).toBe("user:1");
   });
 
-  it.skipIf(!HAS_DB)("blocks transition from terminal state (executed)", async () => {
+  it.skipIf(!HAS_DB)("blocks transition from terminal state (acknowledged)", async () => {
     const { approveAction } = await import("./stateMachine");
     const result = await approveAction(testActionId, 1);
 
@@ -398,7 +359,9 @@ describe("transitionActionState (real DB)", () => {
 
     expect(summary).toBeDefined();
     expect(summary!.total).toBeGreaterThanOrEqual(1);
-    expect(summary!.executed).toBeGreaterThanOrEqual(1);
+    expect(summary!.total).toBe(2);
+    expect(summary!.acknowledged).toBe(1);
+    expect(summary!.rejected).toBe(1);
     // All states should be non-negative
     expect(summary!.proposed).toBeGreaterThanOrEqual(0);
     expect(summary!.approved).toBeGreaterThanOrEqual(0);

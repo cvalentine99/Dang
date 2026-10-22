@@ -24,10 +24,12 @@ import {
   investigationSessions,
   responseActions,
   responseActionAudit,
+  RESPONSE_ACTION_CATEGORIES,
 } from "../../drizzle/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { recomputeCaseSummary, syncCaseSummaryAfterTransition } from "./stateMachine";
 import { invokeLLMWithFallback } from "../llm/llmService";
+import { sanitizeForPrompt, sanitizeKey as sanitizeKeyLike, truncateForPrompt, wrapUntrustedData, UNTRUSTED_DATA_SYSTEM_INSTRUCTION } from "./sanitizeForPrompt";
 import type { InvokeResult } from "../_core/llm";
 import type { CorrelationBundleRow, TriageObjectRow } from "../../drizzle/schema";
 import type { LLMHypothesisRaw } from "./types/LLMHypothesisRaw";
@@ -47,8 +49,11 @@ export interface HypothesisAgentInput {
   correlationId: string;
   /** Optional: existing investigation session to merge into */
   existingSessionId?: number;
-  /** Optional: authenticated user ID to attribute the session to */
-  userId?: number;
+  /**
+   * Triggering analyst (ctx.user.id). Required (C9): an existingSessionId is only
+   * honoured when owned by this user, and new sessions are always attributed to it.
+   */
+  userId: number;
 }
 
 export interface HypothesisAgentResult {
@@ -125,18 +130,26 @@ async function assembleContext(correlationId: string): Promise<HypothesisContext
  */
 async function resolveSession(
   ctx: HypothesisContext,
-  existingSessionId?: number,
-  userId?: number
+  existingSessionId: number | undefined,
+  userId: number
 ): Promise<{ sessionId: number; isNew: boolean }> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  // C9: investigation sessions are strictly per-analyst — never create/merge unattributed.
+  if (!Number.isInteger(userId) || userId <= 0) {
+    throw new Error("Hypothesis agent requires the triggering analyst's user id");
+  }
 
-  // If merging into an existing session, verify it exists
+  // If merging into an existing session, verify it exists AND belongs to the
+  // triggering analyst (C9: existingSessionId is client-supplied).
   if (existingSessionId) {
     const [existing] = await db
       .select({ id: investigationSessions.id })
       .from(investigationSessions)
-      .where(eq(investigationSessions.id, existingSessionId))
+      .where(and(
+        eq(investigationSessions.id, existingSessionId),
+        eq(investigationSessions.userId, userId),
+      ))
       .limit(1);
 
     if (existing) {
@@ -157,6 +170,8 @@ async function resolveSession(
       .where(and(
         eq(investigationSessions.id, caseRec.mergeTargetId),
         eq(investigationSessions.status, "active"),
+        // C9 sibling: the model may only merge into the triggering analyst's own session
+        eq(investigationSessions.userId, userId),
       ))
       .limit(1);
 
@@ -185,10 +200,8 @@ async function resolveSession(
     title,
     description: ctx.triage.summary ?? `Investigation triggered by alert ${ctx.triage.alertId}`,
     status: "active",
-    // Use spread to conditionally include userId — avoids Drizzle null-serialization bug
-    // When userId is provided (e.g., from Continue Pipeline), attribute session to the analyst
-    // When omitted, column defaults to NULL for system-created sessions
-    ...(userId ? { userId } : {}),
+    // C9: always attributed to the triggering analyst — never NULL.
+    userId,
   }).$returningId();
 
   return { sessionId: result.id, isNew: true };
@@ -293,7 +306,9 @@ function buildSessionTitle(triage: TriageObject, bundle: CorrelationBundle): str
 
 // ── LLM Hypothesis Synthesis ────────────────────────────────────────────────
 
-const HYPOTHESIS_SYSTEM_PROMPT = `You are a senior SOC analyst performing hypothesis generation for a security investigation.
+const HYPOTHESIS_SYSTEM_PROMPT = `${UNTRUSTED_DATA_SYSTEM_INSTRUCTION}
+
+You are a senior SOC analyst performing hypothesis generation for a security investigation.
 
 You receive:
 1. A TriageObject (the alert that started this investigation)
@@ -349,9 +364,10 @@ Rules:
 function buildHypothesisPrompt(ctx: HypothesisContext, sessionId: number): string {
   const parts: string[] = [
     "## Source Triage Object",
-    "```json",
-    JSON.stringify(
-      {
+    // H-L2: sanitize keys+values and truncate per field BEFORE serialization,
+    // then frame with a nonce delimiter (no post-stringify .slice).
+    wrapUntrustedData(
+      truncateForPrompt(sanitizeForPrompt({
         triageId: ctx.triage.triageId,
         alertId: ctx.triage.alertId,
         ruleId: ctx.triage.ruleId,
@@ -372,16 +388,13 @@ function buildHypothesisPrompt(ctx: HypothesisContext, sessionId: number): strin
         keyEvidence: ctx.triage.keyEvidence?.slice(0, 5),
         uncertainties: ctx.triage.uncertainties,
         caseLink: ctx.triage.caseLink,
-      },
-      null,
-      2
-    ).slice(0, 4000),
-    "```",
+      }), 4000),
+      6000
+    ),
     "",
     "## Correlation Bundle",
-    "```json",
-    JSON.stringify(
-      {
+    wrapUntrustedData(
+      truncateForPrompt(sanitizeForPrompt({
         correlationId: ctx.bundle.correlationId,
         relatedAlerts: ctx.bundle.relatedAlerts?.slice(0, 15),
         discoveredEntities: ctx.bundle.discoveredEntities?.slice(0, 20),
@@ -395,17 +408,15 @@ function buildHypothesisPrompt(ctx: HypothesisContext, sessionId: number): strin
         synthesis: ctx.bundle.synthesis,
         synthesisConfidence: ctx.bundle.synthesis?.confidence,
         clusteredTechniques: ctx.bundle.campaignAssessment?.clusteredTechniques?.slice(0, 10),
-      },
-      null,
-      2
-    ).slice(0, 6000),
-    "```",
+      }), 6000),
+      9000
+    ),
     "",
     `## Investigation Context`,
     `- Case ID: ${sessionId}`,
     `- Blast Radius: ${ctx.bundle.blastRadius?.affectedHosts ?? 0} hosts, ${ctx.bundle.blastRadius?.affectedUsers ?? 0} users`,
     `- Synthesis Confidence: ${ctx.bundle.synthesis?.confidence ?? "N/A"}`,
-    `- Campaign: ${ctx.bundle.campaignAssessment?.likelyCampaign ? ctx.bundle.campaignAssessment.campaignLabel ?? "Unnamed" : "Not detected"}`,
+    `- Campaign: ${ctx.bundle.campaignAssessment?.likelyCampaign ? JSON.stringify(sanitizeKeyLike(ctx.bundle.campaignAssessment.campaignLabel ?? "Unnamed")) : "Not detected"}`,
     `- Related Alerts: ${ctx.bundle.relatedAlerts?.length ?? 0}`,
     `- Vulnerabilities: ${ctx.bundle.vulnerabilityContext?.length ?? 0}`,
     `- FIM Events: ${ctx.bundle.fimContext?.length ?? 0}`,
@@ -448,8 +459,8 @@ function buildHypothesisPrompt(ctx: HypothesisContext, sessionId: number): strin
     "- add_watchlist: target is the entity to monitor",
     "- collect_evidence: target is the data source or artifact to collect",
     "- notify_stakeholder: target is the stakeholder or team to notify",
-    "- requiresApproval MUST be true for: isolate_host, disable_account, block_ioc, escalate_ir",
-    "- requiresApproval can be false for: suppress_alert, tune_rule, add_watchlist, collect_evidence, notify_stakeholder",
+    "- ALL recommended actions require human analyst approval. Always set requiresApproval: true (the server enforces this regardless of the value you return).",
+    "- If an action does not fit one of the category values above, use custom; actions with any other category value are discarded.",
     "",
     "### draftDocumentation",
     "{ shiftHandoff: string, escalationSummary: string|null, executiveSummary: string, tuningSuggestions: string|null }",
@@ -583,6 +594,38 @@ const HYPOTHESIS_JSON_SCHEMA = {
 
 // ── LivingCaseObject Assembly ───────────────────────────────────────────────
 
+/**
+ * Model category → response_actions.category. Exact DB values and a few explicit
+ * synonyms only; urgency words are NOT categories (C10). Shared by assembleLivingCase
+ * (which stamps `dbCategory` on the case JSON) and materializeResponseActions.
+ */
+const DB_CATEGORY_SYNONYMS: Record<string, string> = {
+    isolate: "isolate_host",
+    isolate_host: "isolate_host",
+    disable_account: "disable_account",
+    block: "block_ioc",
+    block_ioc: "block_ioc",
+    escalate: "escalate_ir",
+    escalate_ir: "escalate_ir",
+    suppress: "suppress_alert",
+    suppress_alert: "suppress_alert",
+    tune: "tune_rule",
+    tune_rule: "tune_rule",
+    watchlist: "add_watchlist",
+    add_watchlist: "add_watchlist",
+    collect: "collect_evidence",
+    collect_evidence: "collect_evidence",
+    notify: "notify_stakeholder",
+    notify_stakeholder: "notify_stakeholder",
+    custom: "custom",
+};
+
+export function resolveDbCategory(raw: string | undefined | null): string | undefined {
+  const norm = (raw ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const mapped = DB_CATEGORY_SYNONYMS[norm] ?? norm;
+  return (RESPONSE_ACTION_CATEGORIES as readonly string[]).includes(mapped) ? mapped : undefined;
+}
+
 function assembleLivingCase(
   sessionId: number,
   ctx: HypothesisContext,
@@ -685,6 +728,8 @@ function assembleLivingCase(
     recommendedActions: (llmOutput.recommendedActions ?? []).map((a) => ({
       action: a.action ?? "",
       category: normCategory(a.category ?? "next"),
+      // The materializer must see the DB category, not the display group above.
+      dbCategory: resolveDbCategory(a.category),
       // Urgency uses canonical DB enum: immediate|next|scheduled|optional
       urgency: (() => {
         const VALID: string[] = ["immediate", "next", "scheduled", "optional"];
@@ -698,7 +743,7 @@ function assembleLivingCase(
       })(),
       targetType: a.targetType ?? undefined,
       targetValue: a.targetValue ?? undefined,
-      requiresApproval: a.requiresApproval ?? true,
+      requiresApproval: true, // every model-proposed action requires human approval (C10)
       evidenceBasis: a.evidenceBasis ?? [],
       state: "proposed" as const,
     })),
@@ -968,6 +1013,7 @@ export async function runHypothesisAgent(
     ],
     response_format: HYPOTHESIS_JSON_SCHEMA,
     caller: "hypothesis_agent",
+    userId: input.userId,
   });
 
   // 4. Parse the structured response
@@ -975,10 +1021,20 @@ export async function runHypothesisAgent(
   if (!content) throw new Error("LLM returned empty response for hypothesis generation");
 
   // Audit #23: Zod boundary on LLM output
+  // C12/H-L3: parse or validation failure throws so the caller marks the
+  // hypothesis stage failed — an empty/unparseable reply must never become a case.
   const { parseHypothesisOutput } = await import("./types/LLMHypothesisRaw");
-  const llmOutput = parseHypothesisOutput(
-    typeof content === "string" ? JSON.parse(content) : content
-  );
+  const { extractJson } = await import("../llm/extractJson");
+  let llmOutput: LLMHypothesisRaw;
+  try {
+    llmOutput = parseHypothesisOutput(
+      typeof content === "string" ? extractJson(content) : content
+    );
+  } catch (err) {
+    throw new Error(
+      `Hypothesis generation failed: LLM output was not a valid hypothesis (${(err as Error).message.slice(0, 500)})`
+    );
+  }
 
   // 5. Assemble the LivingCaseObject
   const livingCase = assembleLivingCase(sessionId, ctx, llmOutput);
@@ -1233,15 +1289,27 @@ async function materializeResponseActions(
   livingCase: LivingCaseObject,
   caseId: number,
   ctx: HypothesisContext
-): Promise<{ ids: string[]; attempted: number; succeeded: number; failed: Array<{ index: number; action: string; error: string }> }> {
+): Promise<{
+  ids: string[];
+  attempted: number;
+  succeeded: number;
+  failed: Array<{ index: number; action: string; error: string }>;
+  skippedRecommendations: Array<{ index: number; action: string; category: string; reason: string }>;
+}> {
   const db = await getDb();
-  if (!db) return { ids: [], attempted: 0, succeeded: 0, failed: [] };
+  if (!db) return { ids: [], attempted: 0, succeeded: 0, failed: [], skippedRecommendations: [] };
 
   const actions = livingCase.recommendedActions ?? [];
-  if (actions.length === 0) return { ids: [], attempted: 0, succeeded: 0, failed: [] };
+  if (actions.length === 0) return { ids: [], attempted: 0, succeeded: 0, failed: [], skippedRecommendations: [] };
 
   const materializedIds: string[] = [];
   const failedActions: Array<{ index: number; action: string; error: string }> = [];
+  // C10: model-proposed actions whose category cannot be classified are NOT
+  // coerced to "custom" — they are skipped and reported so the analyst can see
+  // the model proposed something unclassifiable.
+  const skippedRecommendations: Array<{ index: number; action: string; category: string; reason: string }> = [];
+  const { RESPONSE_ACTION_CATEGORIES } = await import("../../drizzle/schema");
+  const VALID_CATEGORIES: readonly string[] = RESPONSE_ACTION_CATEGORIES;
 
   // ── BUG-01 Fix: Dedup against existing proposed actions for this case ──────
   // Prevents re-inserting the same action on resume or if the input list has duplicates.
@@ -1257,30 +1325,11 @@ async function materializeResponseActions(
     existingRows.map(r => `${r.title.trim().toLowerCase()}||${r.category}`)
   );
 
-  // Map LLM category strings to our typed enum values
-  const CATEGORY_MAP: Record<string, string> = {
-    immediate: "escalate_ir",
-    next: "collect_evidence",
-    optional: "tune_rule",
-    isolate: "isolate_host",
-    isolate_host: "isolate_host",
-    disable_account: "disable_account",
-    block: "block_ioc",
-    block_ioc: "block_ioc",
-    escalate: "escalate_ir",
-    escalate_ir: "escalate_ir",
-    suppress: "suppress_alert",
-    suppress_alert: "suppress_alert",
-    tune: "tune_rule",
-    tune_rule: "tune_rule",
-    watchlist: "add_watchlist",
-    add_watchlist: "add_watchlist",
-    collect: "collect_evidence",
-    collect_evidence: "collect_evidence",
-    notify: "notify_stakeholder",
-    notify_stakeholder: "notify_stakeholder",
-    custom: "custom",
-  };
+  // Map LLM category synonyms to our typed enum values.
+  // C10: urgency words (immediate/next/optional) are NOT category synonyms —
+  // mapping them (e.g. optional→tune_rule) let the model relabel a destructive
+  // action as a benign one.
+  const CATEGORY_MAP = DB_CATEGORY_SYNONYMS;
 
   // LivingCaseObject now uses the same enum as DB — direct passthrough with fallback
   const URGENCY_FALLBACK: Record<string, string> = {
@@ -1289,30 +1338,26 @@ async function materializeResponseActions(
     low: "optional",
   };
 
-  const VALID_CATEGORIES = [
-    "isolate_host", "disable_account", "block_ioc", "escalate_ir",
-    "suppress_alert", "tune_rule", "add_watchlist", "collect_evidence",
-    "notify_stakeholder", "custom",
-  ];
   const VALID_URGENCY = ["immediate", "next", "scheduled", "optional"];
 
   for (const rec of actions) {
     try {
-      // Resolve category — try direct match, then map, then infer from LLM category field
-      let category = CATEGORY_MAP[rec.category?.toLowerCase() ?? ""] ?? null;
-      if (!category || !VALID_CATEGORIES.includes(category)) {
-        // Try to infer from the action text
-        const actionLower = (rec.action ?? "").toLowerCase();
-        if (actionLower.includes("isolat")) category = "isolate_host";
-        else if (actionLower.includes("disabl") || actionLower.includes("account")) category = "disable_account";
-        else if (actionLower.includes("block") || actionLower.includes("firewall")) category = "block_ioc";
-        else if (actionLower.includes("escalat")) category = "escalate_ir";
-        else if (actionLower.includes("suppress") || actionLower.includes("silence")) category = "suppress_alert";
-        else if (actionLower.includes("tune") || actionLower.includes("rule")) category = "tune_rule";
-        else if (actionLower.includes("watch") || actionLower.includes("monitor")) category = "add_watchlist";
-        else if (actionLower.includes("collect") || actionLower.includes("evidence") || actionLower.includes("investigate")) category = "collect_evidence";
-        else if (actionLower.includes("notify") || actionLower.includes("stakeholder")) category = "notify_stakeholder";
-        else category = "custom";
+      // Resolve category — normalized direct match or explicit synonym only.
+      // C10: no free-text inference from the action text and no default to
+      // "custom"; an unclassifiable category is skipped and reported.
+      // Prefer the resolved DB category stamped by assembleLivingCase; fall back to the raw
+      // field for callers that pass model output directly.
+      const rawCategory = (rec.dbCategory ?? rec.category ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+      const category = CATEGORY_MAP[rawCategory] ?? rawCategory;
+      if (!VALID_CATEGORIES.includes(category)) {
+        const reason = `Unclassifiable category '${(rec.category ?? "").slice(0, 64)}' — not one of [${VALID_CATEGORIES.join(", ")}]; recommendation not materialized`;
+        console.warn(`[HypothesisAgent] C10: skipping recommendation "${(rec.action ?? "").slice(0, 80)}": ${reason}`);
+        const index = actions.indexOf(rec);
+        const actionLabel = (rec.action ?? "Unnamed action").slice(0, 128);
+        skippedRecommendations.push({ index, action: actionLabel, category: (rec.category ?? "").slice(0, 64), reason });
+        // Also surface through the partial-failure channel the UI already renders.
+        failedActions.push({ index, action: actionLabel, error: `skipped: ${reason}` });
+        continue;
       }
 
       // ── BUG-01 Fix: Skip duplicate actions (dedup by title+category in proposed state) ──
@@ -1412,19 +1457,11 @@ async function materializeResponseActions(
         console.warn(`[HypothesisAgent] Missing target: Category '${category}' requires a target value`);
       }
 
-      // ── Ticket 1: Hard-enforce requiresApproval for critical/destructive categories ──
-      // The LLM prompt instructs requiresApproval=true for these categories, and the
-      // Zod schema defaults to true, but neither is a code guarantee. This block is
-      // the authoritative enforcement point — model output cannot override it.
-      const FORCE_APPROVAL_CATEGORIES = new Set([
-        "isolate_host",
-        "disable_account",
-        "block_ioc",
-        "escalate_ir",
-      ]);
-      const enforceApproval = FORCE_APPROVAL_CATEGORIES.has(category)
-        ? true
-        : (rec.requiresApproval ?? true);
+      // ── C10: Every model-proposed action requires human approval ──────────
+      // requiresApproval is NOT taken from model output (rec.requiresApproval is
+      // ignored). Previously only isolate_host/disable_account/block_ioc/escalate_ir
+      // were forced; model-chosen categories could otherwise opt out of the
+      // approval queue. This is the authoritative enforcement point.
 
       // Wrap INSERT + audit in a single transaction so the action is never
       // created without its corresponding audit trail entry.
@@ -1435,7 +1472,7 @@ async function materializeResponseActions(
           title: (rec.action ?? "Unnamed action").slice(0, 512),
           description: rec.evidenceBasis?.join("; ") ?? null,
           urgency: urgency as typeof responseActions.$inferInsert["urgency"],
-          requiresApproval: enforceApproval ? 1 : 0,
+          requiresApproval: 1,
           state: "proposed",
           proposedBy: "hypothesis_agent",
           evidenceBasis: rec.evidenceBasis ?? null,
@@ -1490,8 +1527,11 @@ async function materializeResponseActions(
 
   if (failedActions.length > 0) {
     console.warn(
-      `[HypothesisAgent] Partial failure: ${materializedIds.length}/${actions.length} actions materialized, ${failedActions.length} failed`
+      `[HypothesisAgent] Partial failure: ${materializedIds.length}/${actions.length} actions materialized, ${failedActions.length} failed (${skippedRecommendations.length} skipped as unclassifiable)`
     );
+  }
+  if (skippedRecommendations.length > 0) {
+    console.warn(`[HypothesisAgent] C10 skippedRecommendations: ${JSON.stringify(skippedRecommendations)}`);
   }
 
   return {
@@ -1499,6 +1539,7 @@ async function materializeResponseActions(
     attempted: actions.length,
     succeeded: materializedIds.length,
     failed: failedActions,
+    skippedRecommendations,
   };
 }
 

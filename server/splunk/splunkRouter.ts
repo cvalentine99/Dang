@@ -29,7 +29,21 @@
  */
 
 import { z } from "zod";
+import { protocolSchema } from "../_core/protocol";
 import { router, protectedProcedure, adminProcedure } from "../_core/trpc";
+import { isAdmin } from "../_core/analystAudit";
+
+/**
+ * M9: a ticket artifact's rawResponse carries upstream (Splunk HEC) response detail —
+ * admin-only. Analysts still see the rest of the audit record, with an explicit flag.
+ */
+export function redactTicketArtifactForViewer<T extends { rawResponse?: unknown }>(
+  artifact: T,
+  ctx: { user: { id: number; role?: string | null } },
+): T & { rawResponseRedacted: boolean } {
+  if (isAdmin(ctx)) return { ...artifact, rawResponseRedacted: false };
+  return { ...artifact, rawResponse: null, rawResponseRedacted: true };
+}
 import { TRPCError } from "@trpc/server";
 import {
   testSplunkConnection,
@@ -118,9 +132,7 @@ export const splunkRouter = router({
       protocol: config.protocol,
       enabled: config.enabled,
       hasToken: !!config.hecToken,
-      tokenPreview: config.hecToken
-        ? `${config.hecToken.slice(0, 8)}...${config.hecToken.slice(-4)}`
-        : "",
+      // M6: never return any part of the HEC token; `hasToken` is all the UI needs.
     };
   }),
 
@@ -129,14 +141,17 @@ export const splunkRouter = router({
    */
   // Audit #29: Accept optional form overrides so the "Test Connection" button
   // tests the values currently in the form, not just the saved config.
-  testConnection: protectedProcedure
+  // Admin-only: this call can send the stored HEC token to the configured host, so it
+  // must never be reachable from a non-admin account (a form override of `host` or
+  // `protocol` would otherwise turn it into a credential-exfiltration primitive).
+  testConnection: adminProcedure
     .input(
       z.object({
-        host: z.string().optional(),
-        port: z.string().optional(),
-        hecToken: z.string().optional(),
-        hecPort: z.string().optional(),
-        protocol: z.string().optional(),
+        host: z.string().max(253).optional(),
+        port: z.string().max(5).optional(),
+        hecToken: z.string().max(256).optional(),
+        hecPort: z.string().max(5).optional(),
+        protocol: protocolSchema.optional(),
       }).optional()
     )
     .mutation(async ({ input }) => {
@@ -181,11 +196,16 @@ export const splunkRouter = router({
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
       }
 
-      const [item] = await db
+      // P1-4: one ticket per queue item. The row lock serializes concurrent creates for
+      // the same item (double-click, retry, two analysts); the loser then sees the
+      // winner's artifact and returns it instead of posting to HEC again.
+      return await db.transaction(async (tx) => {
+      const [item] = await tx
         .select()
         .from(alertQueue)
         .where(eq(alertQueue.id, input.queueItemId))
-        .limit(1);
+        .limit(1)
+        .for("update");
 
       if (!item) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Queue item not found" });
@@ -200,6 +220,21 @@ export const splunkRouter = router({
           code: "PRECONDITION_FAILED",
           message: "Can only create tickets for completed or pipeline-triaged items",
         });
+      }
+
+      const [existingArtifact] = await tx
+        .select({ ticketId: ticketArtifacts.ticketId })
+        .from(ticketArtifacts)
+        .where(and(eq(ticketArtifacts.queueItemId, input.queueItemId), eq(ticketArtifacts.success, true)))
+        .orderBy(sql`${ticketArtifacts.id} DESC`)
+        .limit(1);
+      if (existingArtifact) {
+        return {
+          success: true as const,
+          ticketId: existingArtifact.ticketId,
+          message: "A Splunk ticket already exists for this alert",
+          alreadyExisted: true as const,
+        };
       }
 
       // Resolve triage data from triage_objects (canonical) or legacy triageResult
@@ -247,7 +282,7 @@ export const splunkRouter = router({
           payloadFields: Object.keys(resolved.payload),
         },
         httpStatusCode: result.statusCode ?? null,
-      });
+      }, tx);
 
       // NOTE: Legacy write-back of splunkTicketId into alertQueue.triageResult
       // has been removed. Canonical ticket truth lives in ticket_artifacts only.
@@ -269,6 +304,7 @@ export const splunkRouter = router({
         ticketId: null,
         message: result.message || "Splunk HEC did not confirm ticket creation",
       };
+      }); // end row-locked transaction
     }),
 
   /**
@@ -557,7 +593,7 @@ export const splunkRouter = router({
         offset: z.number().int().min(0).default(0),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
@@ -592,7 +628,10 @@ export const splunkRouter = router({
           .where(whereClause),
       ]);
 
-      return { artifacts: rows, count: Number(totalRow?.total ?? rows.length) };
+      return {
+        artifacts: rows.map((r) => redactTicketArtifactForViewer(r, ctx)),
+        count: Number(totalRow?.total ?? rows.length),
+      };
     }),
 
   /**
@@ -688,7 +727,7 @@ export const splunkRouter = router({
    */
   getTicketArtifact: protectedProcedure
     .input(z.object({ id: z.number().int() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
@@ -704,6 +743,6 @@ export const splunkRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Ticket artifact not found" });
       }
 
-      return artifact;
+      return redactTicketArtifactForViewer(artifact, ctx);
     }),
 });

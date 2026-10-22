@@ -23,6 +23,7 @@ import {
   flushRamCache,
   purgeExpiredDbCache,
 } from "./otxClient";
+import { publicUpstreamMessage } from "../wazuh/upstreamError";
 
 export const otxRouter = router({
   // ── Status / connectivity check ────────────────────────────────────────────
@@ -34,7 +35,7 @@ export const otxRouter = router({
       const user = await otxGet("/api/v1/users/me", {}, "default", 600);
       return { configured: true, user };
     } catch (err) {
-      return { configured: true, user: null, error: (err as Error).message };
+      return { configured: true, user: null, error: publicUpstreamMessage("OTX", err, "status") };
     }
   }),
 
@@ -79,7 +80,7 @@ export const otxRouter = router({
         return { configured: false, data: null };
       }
       const data = await otxGet(
-        `/api/v1/pulses/${input.pulseId}`,
+        `/api/v1/pulses/${encodeURIComponent(input.pulseId)}`, // L1: no path injection via pulseId
         {},
         "pulses",
         300,
@@ -103,7 +104,7 @@ export const otxRouter = router({
         return { configured: false, data: null };
       }
       const data = await otxGet(
-        `/api/v1/pulses/${input.pulseId}/indicators`,
+        `/api/v1/pulses/${encodeURIComponent(input.pulseId)}/indicators`,
         { page: input.page, limit: input.limit },
         "pulses",
         300,
@@ -116,7 +117,7 @@ export const otxRouter = router({
   searchPulses: protectedProcedure
     .input(
       z.object({
-        query: z.string().min(1),
+        query: z.string().min(1).max(500),
         page: z.number().int().min(1).default(1),
         limit: z.number().int().min(1).max(50).default(10),
         forceRefresh: z.boolean().optional().default(false),
@@ -141,7 +142,7 @@ export const otxRouter = router({
     .input(
       z.object({
         type: z.enum(["IPv4", "IPv6", "domain", "hostname", "file", "url", "cve"]),
-        value: z.string().min(1),
+        value: z.string().min(1).max(2048),
         section: z
           .enum(["general", "reputation", "geo", "malware", "url_list", "passive_dns", "http_scans", "analysis"])
           .default("general"),

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-03-19T23:21:34.094Z",
+  "generated": "2026-10-21T21:40:42.820Z",
   "callsiteCount": 182,
   "procedureCount": 130,
   "consumedProcedures": [
@@ -1054,42 +1054,42 @@
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 240,
+      "line": 241,
       "procedure": "status",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 243,
+      "line": 244,
       "procedure": "agentSummaryStatus",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 244,
+      "line": 245,
       "procedure": "analysisd",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 245,
+      "line": 246,
       "procedure": "statsHourly",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 246,
+      "line": 247,
       "procedure": "managerStatus",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 247,
+      "line": 248,
       "procedure": "rules",
       "passedKeys": {
         "limit": "10",
@@ -1099,7 +1099,7 @@
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 248,
+      "line": 249,
       "procedure": "agents",
       "passedKeys": {
         "limit": "8",
@@ -1109,28 +1109,28 @@
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 249,
+      "line": 250,
       "procedure": "mitreTactics",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 250,
+      "line": 251,
       "procedure": "managerLogsSummary",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 251,
+      "line": 252,
       "procedure": "agentOverview",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Home.tsx",
-      "line": 252,
+      "line": 253,
       "procedure": "agentsSummary",
       "passedKeys": {},
       "isVoid": true
@@ -1609,42 +1609,42 @@
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 541,
+      "line": 560,
       "procedure": "apiInfo",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 546,
+      "line": 565,
       "procedure": "managerVersionCheck",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 551,
+      "line": 570,
       "procedure": "securityConfig",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 566,
+      "line": 585,
       "procedure": "managerStats",
       "passedKeys": {},
       "isVoid": false
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 571,
+      "line": 590,
       "procedure": "isConfigured",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 580,
+      "line": 599,
       "procedure": "managerComponentConfig",
       "passedKeys": {
         "component": "compConfigComponent",
@@ -1654,14 +1654,14 @@
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 585,
+      "line": 604,
       "procedure": "agentsUninstallPermission",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/pages/Status.tsx",
-      "line": 590,
+      "line": 609,
       "procedure": "taskStatus",
       "passedKeys": {
         "offset": "taskPage * taskPageSize",
@@ -1749,14 +1749,14 @@
     },
     {
       "file": "client/src/components/shared/WazuhGuard.tsx",
-      "line": 21,
+      "line": 26,
       "procedure": "status",
       "passedKeys": {},
       "isVoid": true
     },
     {
       "file": "client/src/components/shared/WazuhGuard.tsx",
-      "line": 72,
+      "line": 89,
       "procedure": "status",
       "passedKeys": {},
       "isVoid": true
@@ -4430,6 +4430,10 @@
         }
       }
     },
+    "statesSource": {
+      "inputType": "void",
+      "keys": {}
+    },
     "decoders": {
       "inputType": "object",
       "keys": {
@@ -4621,6 +4625,10 @@
           "required": false,
           "default": null
         },
+        "wait_for_complete": {
+          "required": false,
+          "default": null
+        },
         "sort": {
           "required": false,
           "default": null
@@ -4803,10 +4811,6 @@
           "default": null
         }
       }
-    },
-    "securityTokenInfo": {
-      "inputType": "object",
-      "keys": {}
     },
     "securityRbacRules": {
       "inputType": "object",

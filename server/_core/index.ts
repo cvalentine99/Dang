@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 import { createServer } from "http";
 import net from "net";
+import fs from "fs";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -31,7 +32,25 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+/**
+ * Docker secrets support: when NAME is unset and NAME_FILE points at a file
+ * (e.g. /run/secrets/encryption_key), load NAME from it (trailing newline
+ * trimmed). Only for the two secrets the app derives keys from.
+ */
+function loadSecretFiles() {
+  for (const name of ["JWT_SECRET", "ENCRYPTION_KEY"]) {
+    const file = process.env[`${name}_FILE`];
+    if (!file || (process.env[name] ?? "").trim() !== "") continue;
+    try {
+      process.env[name] = fs.readFileSync(file, "utf8").trim();
+    } catch (e) {
+      console.error(`[Startup] ${name}_FILE=${file} could not be read: ${(e as Error).message}`);
+    }
+  }
+}
+
 async function startServer() {
+  loadSecretFiles();
   // Validate environment variables before anything else
   const { validateEnvironment } = await import("./envValidation");
   const { errors: envErrors } = validateEnvironment();
@@ -49,14 +68,54 @@ async function startServer() {
     console.warn("[Startup] Admin seeding skipped:", (e as Error).message);
   }
 
+  // L3/M3: rewrite legacy v1 credential ciphertexts (JWT_SECRET-derived key,
+  // no AAD) as v2 (ENCRYPTION_KEY, AAD-bound). Idempotent; non-fatal — v1 rows
+  // still decrypt on the read path, so a DB that is not ready yet only defers it.
+  try {
+    const { reencryptLegacySettings } = await import("../admin/connectionSettingsService");
+    const { failed } = await reencryptLegacySettings();
+    if (failed > 0) {
+      console.warn(`[Startup] ${failed} stored credential(s) could not be decrypted (JWT_SECRET changed?) — re-enter them in Admin → Connection Settings`);
+    }
+  } catch (e) {
+    console.warn("[Startup] Credential re-encryption skipped:", (e as Error).message);
+  }
+
   const app = express();
 
   // Configure trust proxy from environment.
-  // Required when running behind nginx/caddy so req.ip reflects the real client.
-  // Values: "1" (one hop), "2", "loopback", "true" (all), or unset (direct exposure).
-  if (process.env.TRUST_PROXY) {
-    const tp = process.env.TRUST_PROXY;
-    app.set("trust proxy", tp === "true" ? true : /^\d+$/.test(tp) ? Number(tp) : tp);
+  // Required when running behind nginx/caddy so req.ip reflects the real client
+  // (the login/register rate limiter keys on req.ip; cookies use req.secure).
+  // Values: "1"/N (hop count), "true" (treated as 1 hop), a comma-separated
+  // list of CIDRs / proxy-addr keywords (loopback, linklocal, uniquelocal),
+  // or unset/"false"/"0" (direct exposure — X-Forwarded-* ignored).
+  // H-A3: "true" is NOT passed through as Express `true` (trust every hop),
+  // because then req.ip is the left-most X-Forwarded-For entry — client-chosen.
+  const trustProxyRaw = (process.env.TRUST_PROXY ?? "").trim();
+  if (trustProxyRaw && trustProxyRaw !== "false" && trustProxyRaw !== "0") {
+    let trustProxy: number | string[];
+    if (trustProxyRaw === "true") {
+      trustProxy = 1;
+      console.warn('[Startup] TRUST_PROXY="true" interpreted as 1 trusted hop (trusting all hops allows client IP spoofing). Set a hop count or CIDR list to silence this.');
+    } else if (/^\d+$/.test(trustProxyRaw)) {
+      trustProxy = Number(trustProxyRaw);
+    } else {
+      trustProxy = trustProxyRaw.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    app.set("trust proxy", trustProxy);
+    console.log(`[Startup] trust proxy = ${JSON.stringify(trustProxy)}`);
+  } else {
+    // Operator hint: X-Forwarded-For on a login attempt while TRUST_PROXY is unset
+    // means a proxy is in front but untrusted — every client shares the proxy's
+    // rate-limit bucket and cookies may lack Secure. Logged once.
+    let warnedUntrustedXff = false;
+    app.use("/api/trpc", (req, _res, next) => {
+      if (!warnedUntrustedXff && req.headers["x-forwarded-for"] && /localAuth\.(?:login|register)/.test(req.path)) {
+        warnedUntrustedXff = true;
+        console.warn("[Startup] X-Forwarded-For seen on a login request but TRUST_PROXY is unset — set TRUST_PROXY=1 (one proxy hop) so rate limiting sees real client IPs.");
+      }
+      next();
+    });
   }
 
   const server = createServer(app);
@@ -81,7 +140,19 @@ async function startServer() {
     try {
       const { getDb } = await import("../db");
       const db = await getDb();
-      const dbOk = !!db;
+      // createPool() is lazy — a pool object exists even when MySQL is down — so a
+      // real round-trip is the only honest readiness signal. This endpoint drives the
+      // container HEALTHCHECK and the proxies' depends_on.
+      let dbOk = false;
+      if (db) {
+        try {
+          const { sql } = await import("drizzle-orm");
+          await db.execute(sql`SELECT 1`);
+          dbOk = true;
+        } catch {
+          dbOk = false;
+        }
+      }
       res.status(dbOk ? 200 : 503).json({
         status: dbOk ? "healthy" : "degraded",
         timestamp: new Date().toISOString(),
@@ -235,12 +306,20 @@ async function startServer() {
   });
 
   // SSE alert stream endpoint — authenticated
-  const { handleSSEConnection, getStreamStats } = await import("../sse/alertStreamService");
+  const { handleSSEConnection, getStreamStats, setSSEAuth } = await import("../sse/alertStreamService");
 
-  // SSE auth middleware: validates session cookie before allowing connection
+  // SSE auth middleware: validates session cookie before allowing connection.
+  // H-A2: stores the verified identity on the request so the stream can
+  // re-validate it on every heartbeat (logout / disable / role change / expiry).
   const sseAuthMiddleware: import("express").RequestHandler = async (req, res, next) => {
     try {
-      await sdk.authenticateRequest(req);
+      const { user, session } = await sdk.authenticateRequestWithSession(req);
+      setSSEAuth(req, {
+        userId: user.id,
+        openId: user.openId,
+        tokenVersion: user.tokenVersion,
+        expiresAtMs: session.exp * 1000,
+      });
       next();
     } catch {
       res.status(401).json({ error: "Authentication required for SSE stream" });

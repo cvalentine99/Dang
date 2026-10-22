@@ -8,7 +8,9 @@
  * Ticket 5: Add regression tests for prompt safety claim coverage
  *
  * Covered:
- *   1. requiresApproval enforcement for critical/destructive categories
+ *   1. requiresApproval enforced for ALL model-proposed actions (C10),
+ *      hypothesis fail-closed (C12), triage severity fallback (M3),
+ *      shared extractJson at LLM parse sites (H-L3)
  *   2. sanitizeForPrompt behavior on hostile input
  *   3. wrapUntrustedData delimiter presence
  *   4. Follow-up suggestion Zod boundary
@@ -17,68 +19,164 @@
 import { describe, it, expect } from "vitest";
 import { sanitizeForPrompt } from "./sanitizeForPrompt";
 import { wrapUntrustedData } from "../enhancedLLM/enhancedLLMService";
+import { readFileSync } from "fs";
+import { resolve } from "path";
+import { parseHypothesisOutput } from "./types/LLMHypothesisRaw";
+import { resolveSeverity } from "./triageAgent";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 1. requiresApproval Hard Enforcement
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe("requiresApproval — hard enforcement for critical categories", () => {
+describe("requiresApproval — every model-proposed action requires approval (C10)", () => {
   /**
-   * The FORCE_APPROVAL_CATEGORIES set in materializeResponseActions() must
-   * override any model output for these categories. We test the logic inline
-   * since the actual function requires a DB. The contract is:
-   *   - isolate_host, disable_account, block_ioc, escalate_ir → always true
-   *   - other categories → respect model output
+   * C10: the model must not control its own approval gate. materializeResponseActions()
+   * persists requiresApproval = 1 unconditionally, ignores rec.requiresApproval,
+   * and skips (rather than coercing to "custom") unclassifiable categories.
+   * The function needs a DB, so these are source-level guards.
    */
-  const FORCE_APPROVAL_CATEGORIES = new Set([
-    "isolate_host",
-    "disable_account",
-    "block_ioc",
-    "escalate_ir",
-  ]);
+  const src = readFileSync(resolve(__dirname, "hypothesisAgent.ts"), "utf-8");
+  const start = src.indexOf("async function materializeResponseActions(");
+  const end = src.indexOf("// ── Helpers", start);
+  const fn = src.slice(start, end);
 
-  function enforceApproval(category: string, modelValue: boolean | undefined): boolean {
-    return FORCE_APPROVAL_CATEGORIES.has(category)
-      ? true
-      : (modelValue ?? true);
+  it("locates materializeResponseActions", () => {
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+  });
+
+  it("persists requiresApproval = 1 unconditionally", () => {
+    expect(fn).toContain("requiresApproval: 1,");
+    expect(fn).not.toMatch(/requiresApproval:\s*enforceApproval/);
+    expect(fn).not.toContain("rec.requiresApproval ??");
+  });
+
+  it("does not map urgency words to categories (optional→tune_rule bypass)", () => {
+    expect(fn).not.toMatch(/optional:\s*"tune_rule"/);
+    expect(fn).not.toMatch(/immediate:\s*"escalate_ir"/);
+    expect(fn).not.toMatch(/next:\s*"collect_evidence"/);
+  });
+
+  it("never defaults an unmappable category to custom", () => {
+    expect(fn).not.toContain('category = "custom"');
+    expect(fn).not.toContain("actionLower.includes(");
+  });
+
+  it("validates against RESPONSE_ACTION_CATEGORIES and reports skipped recommendations", () => {
+    expect(fn).toContain("RESPONSE_ACTION_CATEGORIES");
+    expect(fn).toContain("skippedRecommendations.push(");
+    expect(fn).toMatch(/return \{[\s\S]*skippedRecommendations,[\s\S]*\};\s*\}\s*$/);
+  });
+
+  it("prompt no longer invites requiresApproval: false", () => {
+    expect(src).not.toContain("requiresApproval can be false");
+    expect(src).toContain("ALL recommended actions require human analyst approval");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1b. Hypothesis Zod boundary — empty output must fail (C12)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("parseHypothesisOutput — fail closed on empty output (C12)", () => {
+  const valid = {
+    workingTheory: { statement: "Credential stuffing against VPN", confidence: 0.7 },
+    alternateTheories: [{ statement: "Misconfigured service account", confidence: 0.2 }],
+  };
+
+  it("rejects an empty object", () => {
+    expect(() => parseHypothesisOutput({})).toThrow();
+  });
+
+  it("rejects a blank working theory statement", () => {
+    expect(() => parseHypothesisOutput({ ...valid, workingTheory: { statement: "   ", confidence: 0.5 } })).toThrow();
+  });
+
+  it("rejects missing or empty alternateTheories", () => {
+    expect(() => parseHypothesisOutput({ workingTheory: valid.workingTheory })).toThrow();
+    expect(() => parseHypothesisOutput({ ...valid, alternateTheories: [] })).toThrow();
+  });
+
+  it("rejects a working theory with no confidence (no fabricated 0.5)", () => {
+    expect(() => parseHypothesisOutput({ ...valid, workingTheory: { statement: "x" } })).toThrow();
+  });
+
+  it("accepts a minimal valid hypothesis and keeps other fields tolerant", () => {
+    const out = parseHypothesisOutput(valid);
+    expect(out.workingTheory.statement).toBe("Credential stuffing against VPN");
+    expect(out.recommendedActions).toEqual([]);
+    expect(out.suggestedNextSteps).toEqual([]);
+  });
+
+  it("clamps confidence into [0, 1]", () => {
+    const out = parseHypothesisOutput({ ...valid, workingTheory: { statement: "x", confidence: 7 } });
+    expect(out.workingTheory.confidence).toBe(1);
+    const out2 = parseHypothesisOutput({ ...valid, workingTheory: { statement: "x", confidence: -3 } });
+    expect(out2.workingTheory.confidence).toBe(0);
+  });
+
+  it("hypothesisAgent wraps parse/validation failure in a thrown error", () => {
+    const src = readFileSync(resolve(__dirname, "hypothesisAgent.ts"), "utf-8");
+    expect(src).toContain("Hypothesis generation failed: LLM output was not a valid hypothesis");
+    expect(src).toContain("extractJson(content)");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1c. Triage severity fallback (M3) and DB guard (H-D9)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("triage resolveSeverity — unrecognized severity never becomes info (M3)", () => {
+  it("passes through valid severities", () => {
+    expect(resolveSeverity("high", 3)).toEqual({ severity: "high", fallback: false });
+    expect(resolveSeverity("info", 15)).toEqual({ severity: "info", fallback: false });
+    expect(resolveSeverity(" Critical ", 0)).toEqual({ severity: "critical", fallback: false });
+  });
+
+  it("falls back to medium when rule level implies lower", () => {
+    expect(resolveSeverity("bogus", 3)).toEqual({ severity: "medium", fallback: true });
+    expect(resolveSeverity(undefined, 0)).toEqual({ severity: "medium", fallback: true });
+    expect(resolveSeverity("severe", 8)).toEqual({ severity: "medium", fallback: true });
+  });
+
+  it("falls back to the rule-level severity when higher than medium", () => {
+    expect(resolveSeverity("bogus", 10)).toEqual({ severity: "high", fallback: true });
+    expect(resolveSeverity("bogus", 12)).toEqual({ severity: "critical", fallback: true });
+    expect(resolveSeverity(42, 15)).toEqual({ severity: "critical", fallback: true });
+  });
+
+  it("triageAgent records severityFallback metadata and uses requireDb", () => {
+    const src = readFileSync(resolve(__dirname, "triageAgent.ts"), "utf-8");
+    expect(src).toContain("severityFallback: true");
+    expect(src).toContain("await requireDb()");
+    expect(src).not.toMatch(/if \(db\) \{\s*const result = await db\.insert\(triageObjects\)/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1d. Shared JSON extraction at all four LLM parse sites (H-L3)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("LLM JSON parse sites use extractJson (H-L3)", () => {
+  const files = [
+    "triageAgent.ts",
+    "correlationAgent.ts",
+    "hypothesisAgent.ts",
+    "../enhancedLLM/enhancedLLMService.ts",
+  ];
+  for (const f of files) {
+    it(`${f} uses extractJson and no raw JSON.parse(content)`, () => {
+      const src = readFileSync(resolve(__dirname, f), "utf-8");
+      expect(src).toContain("extractJson(");
+      expect(src).not.toMatch(/JSON\.parse\((typeof content === "string" \? )?content\)/);
+    });
   }
 
-  it("forces approval for isolate_host even when model says false", () => {
-    expect(enforceApproval("isolate_host", false)).toBe(true);
-  });
-
-  it("forces approval for disable_account even when model says false", () => {
-    expect(enforceApproval("disable_account", false)).toBe(true);
-  });
-
-  it("forces approval for block_ioc even when model says false", () => {
-    expect(enforceApproval("block_ioc", false)).toBe(true);
-  });
-
-  it("forces approval for escalate_ir even when model says false", () => {
-    expect(enforceApproval("escalate_ir", false)).toBe(true);
-  });
-
-  it("forces approval for critical categories when model omits the field", () => {
-    expect(enforceApproval("isolate_host", undefined)).toBe(true);
-    expect(enforceApproval("block_ioc", undefined)).toBe(true);
-  });
-
-  it("preserves model false for non-critical categories", () => {
-    expect(enforceApproval("collect_evidence", false)).toBe(false);
-    expect(enforceApproval("tune_rule", false)).toBe(false);
-    expect(enforceApproval("add_watchlist", false)).toBe(false);
-    expect(enforceApproval("suppress_alert", false)).toBe(false);
-    expect(enforceApproval("notify_stakeholder", false)).toBe(false);
-  });
-
-  it("defaults to true for non-critical categories when model omits the field", () => {
-    expect(enforceApproval("collect_evidence", undefined)).toBe(true);
-    expect(enforceApproval("custom", undefined)).toBe(true);
-  });
-
-  it("preserves model true for non-critical categories", () => {
-    expect(enforceApproval("collect_evidence", true)).toBe(true);
+  it("classifyAlert fails closed with classified:false instead of fabricated medium", () => {
+    const src = readFileSync(resolve(__dirname, "../enhancedLLM/enhancedLLMService.ts"), "utf-8");
+    expect(src).toContain("classified: false");
+    expect(src).not.toContain('.catch("medium")');
+    expect(src).not.toMatch(/confidence: z\.number\(\)\.min\(0\)\.max\(1\)\.catch/);
   });
 });
 
@@ -179,10 +277,13 @@ describe("sanitizeForPrompt — prompt injection defense", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("wrapUntrustedData — delimiter and anti-obedience contract", () => {
-  it("wraps data with <<<UNTRUSTED_DATA_BEGIN>>> / <<<UNTRUSTED_DATA_END>>> delimiters", () => {
+  it("wraps data with nonce-tagged <<<UNTRUSTED_DATA_BEGIN id=…>>> / <<<UNTRUSTED_DATA_END id=…>>> delimiters", () => {
     const result = wrapUntrustedData({ test: "value" });
-    expect(result).toContain("<<<UNTRUSTED_DATA_BEGIN>>>");
-    expect(result).toContain("<<<UNTRUSTED_DATA_END>>>");
+    const begin = result.match(/<<<UNTRUSTED_DATA_BEGIN id=([0-9a-f]{16})>>>/);
+    const end = result.match(/<<<UNTRUSTED_DATA_END id=([0-9a-f]{16})>>>/);
+    expect(begin).not.toBeNull();
+    expect(end).not.toBeNull();
+    expect(begin![1]).toBe(end![1]);
   });
 
   it("includes anti-obedience instruction", () => {
@@ -201,8 +302,8 @@ describe("wrapUntrustedData — delimiter and anti-obedience contract", () => {
 
   it("handles null/undefined gracefully", () => {
     const result = wrapUntrustedData(null);
-    expect(result).toContain("<<<UNTRUSTED_DATA_BEGIN>>>");
-    expect(result).toContain("<<<UNTRUSTED_DATA_END>>>");
+    expect(result).toMatch(/<<<UNTRUSTED_DATA_BEGIN id=[0-9a-f]+>>>/);
+    expect(result).toMatch(/<<<UNTRUSTED_DATA_END id=[0-9a-f]+>>>/);
   });
 
   it("serializes objects into JSON within delimiters", () => {

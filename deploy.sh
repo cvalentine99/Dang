@@ -106,7 +106,7 @@ preflight() {
       warn "No .env file found. Creating from template..."
       cp env.docker.template .env
       warn "IMPORTANT: Edit .env with your actual credentials before starting!"
-      warn "  Required: JWT_SECRET, WAZUH_HOST, WAZUH_USER, WAZUH_PASS"
+      warn "  Required: JWT_SECRET, ENCRYPTION_KEY, WAZUH_HOST, WAZUH_USER, WAZUH_PASS"
       warn "  Generate JWT_SECRET with: openssl rand -hex 32"
       exit 1
     else
@@ -118,7 +118,7 @@ preflight() {
 
   # Validate required variables
   local missing=0
-  for var in JWT_SECRET; do
+  for var in JWT_SECRET ENCRYPTION_KEY; do
     val=$(grep "^${var}=" .env 2>/dev/null | cut -d'=' -f2-)
     if [ -z "$val" ] || [[ "$val" == *"CHANGE_ME"* ]]; then
       err "Required variable ${var} is not set or still has placeholder value"

@@ -19,7 +19,7 @@
  *   - LLM (returns structured JSON in raw LLM shape)
  *   - Wazuh API, Indexer, OTX
  */
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { LLMCorrelationRaw } from "./types/LLMCorrelationRaw";
 import { parseLLMCorrelation } from "./types/LLMCorrelationRaw";
 import { normalizeCorrelationBundle } from "./normalizeCorrelationBundle";
@@ -221,13 +221,18 @@ describe("normalizeCorrelationBundle — deterministic mapping", () => {
         campaignName: "Test Campaign",
         confidence: 0.7,
         reasoning: "Test",
-        indicators: ["T1059", "T1053.005", "not-a-technique", "suspicious-ip"],
+        indicators: ["T1059", "T1053.005", "not-a-technique", "suspicious-ip", "T9999", "T0000.001"],
       },
     });
     const bundle = normalizeCorrelationBundle(raw, opts);
 
-    // Only valid MITRE technique IDs should be mapped
+    // Only catalog-known MITRE technique IDs should be mapped (M4: shape-valid
+    // but unknown ids such as T9999 are dropped too). No manager catalog is
+    // loaded here, so the bundled fallback allowlist decides (T1053.005 is
+    // accepted via its parent T1053) and mitreValidated is false.
     expect(bundle.campaignAssessment.clusteredTechniques).toHaveLength(2);
+    expect(bundle.mitreValidated).toBe(false);
+    expect(bundle.cveValidated).toBe(true);
     expect(bundle.campaignAssessment.clusteredTechniques[0].techniqueId).toBe("T1059");
     expect(bundle.campaignAssessment.clusteredTechniques[1].techniqueId).toBe("T1053.005");
     // Non-technique indicators are dropped
@@ -492,17 +497,28 @@ describe("parseLLMCorrelation — Zod validation", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("runCorrelationAgent — integration with normalizer", () => {
+  // H-L7: there is exactly one correlation bundle per source triage
+  // (UNIQUE cb_sourceTriageId_uniq); a second runCorrelationAgent() call for
+  // the same triage reuses the completed bundle without invoking the LLM.
+  // Each test therefore correlates its own freshly-triaged alert so the LLM
+  // fixture it supplies is the one that is normalized.
   let testTriageId: string;
+  let triageSeq = 0;
 
-  beforeAll(async () => {
-    if (!HAS_DB) return;
-
-    // Create a triage row for the correlation agent to load
+  async function freshTriageId(): Promise<string> {
     const { runTriageAgent } = await import("./triageAgent");
     mockLLMResponse.mockResolvedValueOnce(TRIAGE_LLM_RESPONSE);
-    const result = await runTriageAgent({ rawAlert: WAZUH_ALERT_FIM, userId: 1 });
+    const result = await runTriageAgent({
+      rawAlert: { ...WAZUH_ALERT_FIM, id: `corr-test-fim-${Date.now()}-${++triageSeq}` },
+      userId: 1,
+    });
     expect(result.success).toBe(true);
-    testTriageId = result.triageId!;
+    return result.triageId!;
+  }
+
+  beforeEach(async () => {
+    if (!HAS_DB) return;
+    testTriageId = await freshTriageId();
   });
 
   it.skipIf(!HAS_DB)(
@@ -682,15 +698,42 @@ describe("runCorrelationAgent — integration with normalizer", () => {
   );
 
   it.skipIf(!HAS_DB)(
-    "generates unique correlationId for each run",
+    "reuses the completed bundle for the same triage without re-invoking the LLM (H-L7)",
+    async () => {
+      const { runCorrelationAgent } = await import("./correlationAgent");
+
+      mockLLMResponse.mockResolvedValueOnce(makeRawLLMResponse({ summary: "first run" }));
+      const result1 = await runCorrelationAgent({ triageId: testTriageId });
+
+      mockLLMResponse.mockClear();
+      const result2 = await runCorrelationAgent({ triageId: testTriageId });
+
+      expect(mockLLMResponse).not.toHaveBeenCalled();
+      expect(result2.correlationId).toBe(result1.correlationId);
+      expect(result2.bundle.synthesis.narrative).toBe("first run");
+
+      const { getDb } = await import("../db");
+      const { correlationBundles } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      const rows = await db!.select({ id: correlationBundles.id })
+        .from(correlationBundles)
+        .where(eq(correlationBundles.sourceTriageId, testTriageId));
+      expect(rows.length).toBe(1);
+    }
+  );
+
+  it.skipIf(!HAS_DB)(
+    "generates a distinct correlationId for each triage",
     async () => {
       const { runCorrelationAgent } = await import("./correlationAgent");
 
       mockLLMResponse.mockResolvedValueOnce(makeRawLLMResponse());
       const result1 = await runCorrelationAgent({ triageId: testTriageId });
 
+      const otherTriageId = await freshTriageId();
       mockLLMResponse.mockResolvedValueOnce(makeRawLLMResponse());
-      const result2 = await runCorrelationAgent({ triageId: testTriageId });
+      const result2 = await runCorrelationAgent({ triageId: otherTriageId });
 
       expect(result1.correlationId).not.toBe(result2.correlationId);
       expect(result1.correlationId).toMatch(/^corr-/);

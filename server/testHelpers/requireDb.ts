@@ -1,10 +1,13 @@
 /**
- * Audit #33: DB-gated test helper.
+ * DB-gated test helpers (Audit #33 / H-T1).
  *
- * Use `describeWithDb` instead of `describe` for any test suite that requires
- * a live database connection. The suite will be skipped (not failed) when
- * DATABASE_URL is not set, preventing false failures in CI environments
- * that don't provision a database.
+ * Use `describeWithDb` instead of `describe` for any suite that needs a real
+ * MySQL. It skips (not fails) when DATABASE_URL is unset, so `pnpm test` runs
+ * anywhere; `pnpm test:db` (and CI) set DATABASE_URL to a `*_test` database
+ * that the globalSetup in testDb.ts has migrated with the real ./drizzle chain.
+ *
+ * DATABASE_URL is read at call time, after setupFiles (loadTestEnv.ts) have
+ * loaded `.env.test`.
  *
  * Usage:
  *   import { describeWithDb } from "../testHelpers/requireDb";
@@ -12,11 +15,10 @@
  */
 import { describe } from "vitest";
 
-const hasDb = !!process.env.DATABASE_URL;
+export function hasTestDb(): boolean {
+  return !!process.env.DATABASE_URL;
+}
 
-/**
- * Like `describe`, but skips the entire suite when DATABASE_URL is not set.
- */
-export const describeWithDb: typeof describe = hasDb
-  ? describe
-  : (describe.skip as unknown as typeof describe);
+/** Like `describe`, but skips the entire suite when DATABASE_URL is not set. */
+export const describeWithDb = ((name: string, fn: () => void) =>
+  describe.skipIf(!hasTestDb())(name, fn)) as unknown as typeof describe;

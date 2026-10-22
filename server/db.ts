@@ -4,7 +4,10 @@ import mysql from "mysql2/promise";
 import { InsertUser, users, sensitiveAccessAudit, InsertSensitiveAccessAuditRow } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-let _db: ReturnType<typeof drizzle> | null = null;
+// drizzle()'s default client type is the callback Pool; we pass a mysql2/promise Pool,
+// so name the instantiation explicitly or the two unrelated `Pool` types collide.
+type Db = ReturnType<typeof drizzle<Record<string, never>, mysql.Pool>>;
+let _db: Db | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {

@@ -193,7 +193,7 @@ describe("indexerClient", () => {
     });
 
     it("has the expected vulnerability index pattern", () => {
-      expect(INDEX_PATTERNS.VULNERABILITIES).toBe("wazuh-states-vulnerabilities-*");
+      expect(INDEX_PATTERNS.VULNERABILITIES).toBe("wazuh-states-vulnerabilities*");
     });
 
     it("has the expected archives index pattern", () => {
@@ -208,8 +208,16 @@ describe("indexerClient", () => {
       expect(INDEX_PATTERNS.STATISTICS).toBe("wazuh-statistics-*");
     });
 
-    it("has exactly 5 index patterns", () => {
-      expect(Object.keys(INDEX_PATTERNS)).toHaveLength(5);
+    it("has the 5 event/vuln patterns plus 16 suffix-tolerant state patterns", () => {
+      const keys = Object.keys(INDEX_PATTERNS);
+      expect(keys).toHaveLength(21);
+      const states = keys.filter(k => k.startsWith("STATES_"));
+      expect(states).toHaveLength(16);
+      for (const k of states) {
+        const v = (INDEX_PATTERNS as Record<string, string>)[k];
+        expect(v).toMatch(/^wazuh-states-[a-z-]+\*$/);
+        expect(v.endsWith("-*")).toBe(false);
+      }
     });
   });
 
@@ -404,7 +412,7 @@ describe("indexerClient", () => {
       expect((source.agent as Record<string, unknown>).id).toBe("001");
     });
 
-    it("throws on axios error with status and message", async () => {
+    it("throws a sanitized error with status + correlation id, never the upstream body (M1)", async () => {
       const axiosError = {
         isAxiosError: true,
         response: {
@@ -415,17 +423,17 @@ describe("indexerClient", () => {
       };
       mockPost.mockRejectedValueOnce(axiosError);
 
-      await expect(
-        indexerSearch(TEST_CONFIG, "wazuh-alerts-*", { size: 1 })
-      ).rejects.toThrow("Indexer query failed (403): Forbidden");
+      const err = await indexerSearch(TEST_CONFIG, "wazuh-alerts-*", { size: 1 }).catch(e => e as Error);
+      expect(err.message).toMatch(/^Indexer upstream error \(HTTP 403\) \[[0-9a-f]{8}\]$/);
+      expect(err.message).not.toContain("Forbidden");
     });
 
-    it("throws on non-axios error", async () => {
+    it("throws on non-axios error (sanitized; detail only in server log)", async () => {
       mockPost.mockRejectedValueOnce(new Error("Network timeout"));
 
       await expect(
         indexerSearch(TEST_CONFIG, "wazuh-alerts-*", { size: 1 })
-      ).rejects.toThrow("Network timeout");
+      ).rejects.toThrow(/^Indexer upstream error \[[0-9a-f]{8}\]$/);
     });
   });
 
@@ -471,7 +479,7 @@ describe("indexerClient", () => {
       mockGet.mockRejectedValueOnce(axiosError);
 
       await expect(indexerHealth(TEST_CONFIG)).rejects.toThrow(
-        "Indexer health check failed: ECONNREFUSED"
+        /^Indexer upstream error \[[0-9a-f]{8}\]$/
       );
     });
   });
@@ -486,11 +494,16 @@ describe("indexerClient", () => {
       expect(exists).toBe(true);
     });
 
-    it("returns false when index does not exist (HEAD fails)", async () => {
-      mockHead.mockRejectedValueOnce(new Error("404 Not Found"));
+    it("returns false when index does not exist (HEAD 404)", async () => {
+      mockHead.mockRejectedValueOnce({ isAxiosError: true, response: { status: 404 }, message: "404 Not Found" });
 
       const exists = await indexerIndexExists(TEST_CONFIG, "nonexistent-index");
       expect(exists).toBe(false);
+    });
+
+    it("throws (sanitized) on non-404 failures instead of reporting 'absent'", async () => {
+      mockHead.mockRejectedValueOnce({ isAxiosError: true, response: { status: 401 }, message: "401" });
+      await expect(indexerIndexExists(TEST_CONFIG, "wazuh-alerts-*")).rejects.toThrow(/HTTP 401/);
     });
   });
 });

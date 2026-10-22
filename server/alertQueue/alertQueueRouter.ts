@@ -19,12 +19,70 @@
 import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, adminProcedure } from "../_core/trpc";
 import { alertQueue, pipelineRuns } from "../../drizzle/schema";
 import { eq, desc, asc, sql, and, inArray, gte } from "drizzle-orm";
 import { runTriageAgent } from "../agenticPipeline/triageAgent";
+import { getEffectiveIndexerConfig, indexerSearch, INDEX_PATTERNS } from "../indexer/indexerClient";
+import { recordAnalystAction, requireOwnerOrAdmin, isAdmin } from "../_core/analystAudit";
+import { getAlertTriageHistory, isTriageHistoryExhausted, MAX_TRIAGE_ATTEMPTS } from "./triageAttempts";
 
 const MAX_QUEUE_DEPTH = 10;
+
+/** Statuses that occupy a queue slot (C14/H-C2: 'triaged' is still active work). */
+const ACTIVE_QUEUE_STATUSES = ["queued", "processing", "triaged"] as const;
+
+/** C14: an item whose auto-triage LLM call is in flight must never be evicted or re-claimed. */
+const NOT_AUTO_TRIAGE_RUNNING = sql`(${alertQueue.autoTriageStatus} IS NULL OR ${alertQueue.autoTriageStatus} <> 'running')`;
+
+function affectedRowsOf(res: unknown): number {
+  const header = Array.isArray(res) ? res[0] : res;
+  return Number((header as { affectedRows?: number } | undefined)?.affectedRows ?? 0);
+}
+
+// ── Indexer confirmation for enqueue ─────────────────────────────────────────
+// Fetch the alert document by _id so severity and payload come from the source of
+// truth rather than the request body. Returns null when the indexer is not
+// configured, unreachable, or has no such document.
+async function lookupAlertInIndexer(alertId: string): Promise<{
+  ruleLevel: number;
+  ruleId: string;
+  ruleDescription?: string;
+  agentId?: string;
+  agentName?: string;
+  alertTimestamp?: string;
+  rawJson: Record<string, unknown>;
+} | null> {
+  try {
+    const config = await getEffectiveIndexerConfig();
+    if (!config) return null;
+    const res = await indexerSearch(
+      config,
+      INDEX_PATTERNS.ALERTS,
+      { size: 1, query: { ids: { values: [alertId] } } } as unknown as Parameters<typeof indexerSearch>[2],
+      "alert-queue-enqueue",
+    );
+    const hit = res?.hits?.hits?.[0];
+    const src = hit?._source as Record<string, unknown> | undefined;
+    if (!src) return null;
+    const rule = (src.rule ?? {}) as Record<string, unknown>;
+    const agent = (src.agent ?? {}) as Record<string, unknown>;
+    const level = Number(rule.level);
+    if (!Number.isInteger(level) || level < 0 || level > 15) return null;
+    return {
+      ruleLevel: level,
+      ruleId: String(rule.id ?? ""),
+      ruleDescription: typeof rule.description === "string" ? rule.description : undefined,
+      agentId: typeof agent.id === "string" ? agent.id : undefined,
+      agentName: typeof agent.name === "string" ? agent.name : undefined,
+      alertTimestamp: typeof src.timestamp === "string" ? src.timestamp : undefined,
+      rawJson: src,
+    };
+  } catch (err) {
+    console.warn("[AlertQueue] indexer lookup failed for", alertId, (err as Error).message);
+    return null;
+  }
+}
 
 export const alertQueueRouter = router({
   /**
@@ -37,7 +95,7 @@ export const alertQueueRouter = router({
       .select()
       .from(alertQueue)
       .orderBy(
-        sql`FIELD(${alertQueue.status}, 'processing', 'queued', 'completed', 'failed', 'dismissed')`,
+        sql`FIELD(${alertQueue.status}, 'processing', 'triaged', 'queued', 'completed', 'failed', 'dismissed')`,
         desc(alertQueue.ruleLevel),
         asc(alertQueue.queuedAt)
       )
@@ -46,7 +104,7 @@ export const alertQueueRouter = router({
     const [countResult] = await db
       .select({ count: sql<number>`COUNT(*)` })
       .from(alertQueue)
-      .where(inArray(alertQueue.status, ["queued", "processing"]));
+      .where(inArray(alertQueue.status, [...ACTIVE_QUEUE_STATUSES]));
 
     return {
       items,
@@ -55,7 +113,7 @@ export const alertQueueRouter = router({
   }),
 
   /**
-   * Get current queue depth (queued + processing items only).
+   * Get current queue depth (queued + processing + triaged items).
    */
   count: protectedProcedure.query(async () => {
     const db = await requireDb();
@@ -63,7 +121,7 @@ export const alertQueueRouter = router({
     const [result] = await db
       .select({ count: sql<number>`COUNT(*)` })
       .from(alertQueue)
-      .where(inArray(alertQueue.status, ["queued", "processing"]));
+      .where(inArray(alertQueue.status, [...ACTIVE_QUEUE_STATUSES]));
 
     return { count: result?.count ?? 0 };
   }),
@@ -85,7 +143,7 @@ export const alertQueueRouter = router({
       alertTimestamp: z.string().max(64).optional(),
       rawJson: z.record(z.string(), z.unknown()).optional(),
     }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input: clientInput, ctx }) => {
       const db = await requireDb();
 
       // Check for duplicate (same alertId already queued/processing)
@@ -94,8 +152,8 @@ export const alertQueueRouter = router({
         .from(alertQueue)
         .where(
           and(
-            eq(alertQueue.alertId, input.alertId),
-            inArray(alertQueue.status, ["queued", "processing"])
+            eq(alertQueue.alertId, clientInput.alertId),
+            inArray(alertQueue.status, [...ACTIVE_QUEUE_STATUSES])
           )
         )
         .limit(1);
@@ -104,31 +162,77 @@ export const alertQueueRouter = router({
         return { success: false, message: "Alert already in queue", id: existing.id };
       }
 
+      // M6: lifecycle-aware dedup — a re-enqueued alert inherits its prior attempt
+      // count, and one that exhausted MAX_TRIAGE_ATTEMPTS is not re-queued (poison
+      // loop). An admin may deliberately re-queue it with a fresh budget (audited).
+      const history = await getAlertTriageHistory(db, clientInput.alertId);
+      let inheritedAttempts = history.maxAttempts;
+      if (isTriageHistoryExhausted(history)) {
+        if (!isAdmin(ctx)) {
+          return {
+            success: false,
+            message: `Alert exhausted its ${MAX_TRIAGE_ATTEMPTS} auto-triage attempts and was parked; an admin can re-queue it`,
+            id: null,
+          };
+        }
+        await recordAnalystAction(db, {
+          userId: ctx.user.id,
+          action: "alertQueue.requeueExhausted",
+          targetType: "alert",
+          targetId: clientInput.alertId,
+          metadata: { priorAttempts: history.maxAttempts, exhaustedRows: history.exhaustedRows },
+        });
+        inheritedAttempts = 0;
+      }
+
+      // Server-authoritative alert facts. The client's ruleLevel/rawJson are hints only:
+      // a forged ruleLevel could evict every real alert, and rawJson feeds the triage
+      // prompt. When the indexer holds the alert, its document wins; when it cannot be
+      // confirmed, the hint is kept but may never evict another alert.
+      const confirmed = await lookupAlertInIndexer(clientInput.alertId);
+      const input = confirmed
+        ? { ...clientInput, ...confirmed }
+        : clientInput;
+      const severityConfirmed = confirmed !== null;
+
       // Check queue depth — evict oldest if at max
       const [countResult] = await db
         .select({ count: sql<number>`COUNT(*)` })
         .from(alertQueue)
-        .where(inArray(alertQueue.status, ["queued", "processing"]));
+        .where(inArray(alertQueue.status, [...ACTIVE_QUEUE_STATUSES]));
 
       const currentCount = countResult?.count ?? 0;
 
       if (currentCount >= MAX_QUEUE_DEPTH) {
-        // Find the lowest-severity queued item (not processing) and dismiss it.
-        // If same severity, evict the oldest (FIFO within same level).
+        // Find the lowest-severity queued item (not processing, not mid auto-triage)
+        // and dismiss it. If same severity, evict the oldest (FIFO within same level).
         const [lowestPriority] = await db
           .select({ id: alertQueue.id, ruleLevel: alertQueue.ruleLevel })
           .from(alertQueue)
-          .where(eq(alertQueue.status, "queued"))
+          .where(and(eq(alertQueue.status, "queued"), NOT_AUTO_TRIAGE_RUNNING))
           .orderBy(asc(alertQueue.ruleLevel), asc(alertQueue.queuedAt))
           .limit(1);
 
         if (lowestPriority) {
-          // Only evict if the incoming alert is higher or equal severity
+          // Only evict if the incoming alert is higher or equal severity — and only when
+          // that severity came from the indexer, not from the caller.
+          if (!severityConfirmed) {
+            return { success: false, message: "Queue is full — alert severity could not be confirmed against the indexer, so nothing was evicted", id: null };
+          }
           if (input.ruleLevel >= lowestPriority.ruleLevel) {
-            await db
+            // C14: re-assert the eviction predicate in the UPDATE — the candidate may have
+            // been claimed by a triage path between the SELECT and now.
+            const evictRes = await db
               .update(alertQueue)
               .set({ status: "dismissed" })
-              .where(eq(alertQueue.id, lowestPriority.id));
+              .where(and(
+                eq(alertQueue.id, lowestPriority.id),
+                eq(alertQueue.status, "queued"),
+                NOT_AUTO_TRIAGE_RUNNING,
+              ));
+            if (affectedRowsOf(evictRes) === 0) {
+              return { success: false, message: "Queue is full — eviction candidate was claimed for triage concurrently; retry", id: null };
+            }
           } else {
             // Incoming alert is lower severity than everything in queue — reject
             return { success: false, message: "Queue is full — all queued alerts have higher severity", id: null };
@@ -152,6 +256,7 @@ export const alertQueueRouter = router({
           rawJson: input.rawJson ?? null,
           status: "queued",
           queuedBy: ctx.user?.id ?? null,
+          triageAttempts: inheritedAttempts,
         });
 
         return { success: true, message: "Alert queued for structured triage", id: result.insertId };
@@ -175,8 +280,30 @@ export const alertQueueRouter = router({
    */
   remove: protectedProcedure
     .input(z.object({ id: z.number().int() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await requireDb();
+
+      // H-A5: dismissing an alert pre-triage is a shared-state mutation — only the
+      // analyst who queued it (or an admin) may do it, and it is always audited.
+      // Auto-queued items (queuedBy NULL) are team-owned; see below.
+      const [item] = await db
+        .select({ queuedBy: alertQueue.queuedBy, status: alertQueue.status, alertId: alertQueue.alertId })
+        .from(alertQueue)
+        .where(eq(alertQueue.id, input.id))
+        .limit(1);
+      if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "Queue item not found" });
+      // Team-global SOC model: items the poller queued (queuedBy NULL) belong to the team,
+      // so any analyst may dismiss them (always audited). Items a person queued are theirs
+      // or an admin's to dismiss.
+      if (item.queuedBy !== null) requireOwnerOrAdmin(ctx, item.queuedBy, "queued alert");
+
+      await recordAnalystAction(db, {
+        userId: ctx.user.id,
+        action: "alertQueue.remove",
+        targetType: "alert_queue",
+        targetId: input.id,
+        metadata: { priorStatus: item.status, alertId: item.alertId, queuedBy: item.queuedBy },
+      });
 
       await db
         .update(alertQueue)
@@ -234,10 +361,10 @@ export const alertQueueRouter = router({
           processedAt: new Date(),
           autoTriageStatus: "running",
         })
-        .where(and(eq(alertQueue.id, input.id), eq(alertQueue.status, "queued")));
+        // C14: also refuse while an auto-triage LLM call holds the item.
+        .where(and(eq(alertQueue.id, input.id), eq(alertQueue.status, "queued"), NOT_AUTO_TRIAGE_RUNNING));
 
-      const [resultHeader] = claimResult as unknown as [{ affectedRows: number }];
-      if (!resultHeader || resultHeader.affectedRows === 0) {
+      if (affectedRowsOf(claimResult) === 0) {
         throw new TRPCError({ code: "CONFLICT", message: "Queue item is already being processed by another session" });
       }
 
@@ -307,8 +434,9 @@ export const alertQueueRouter = router({
               completedAt: null,  // NOT complete — awaiting analyst advancement
             });
 
-            // Update queue item with triage link + backward-compatible result
-            await tx
+            // Update queue item with triage link + backward-compatible result.
+            // C14: guarded on our own claim — a dismissed item is never resurrected.
+            const doneRes = await tx
               .update(alertQueue)
               .set({
                 status: "completed",
@@ -317,7 +445,10 @@ export const alertQueueRouter = router({
                 triageResult,
                 completedAt: new Date(),
               })
-              .where(eq(alertQueue.id, input.id));
+              .where(and(eq(alertQueue.id, input.id), inArray(alertQueue.status, ["processing"])));
+            if (affectedRowsOf(doneRes) === 0) {
+              console.warn(`[AlertQueue] process: queue item ${input.id} left 'processing' during triage (dismissed/reset) — not overwriting`);
+            }
           });
 
           return {
@@ -347,18 +478,22 @@ export const alertQueueRouter = router({
               completedAt: new Date(),
             });
 
-            await tx
+            const failRes = await tx
               .update(alertQueue)
               .set({
                 status: "failed",
                 autoTriageStatus: "failed",
+                triageAttempts: sql`${alertQueue.triageAttempts} + 1`,
                 triageResult: {
                   answer: `Triage failed: ${result.error ?? "Unknown error"}`,
                   reasoning: "Pipeline error during structured triage",
                 },
                 completedAt: new Date(),
               })
-              .where(eq(alertQueue.id, input.id));
+              .where(and(eq(alertQueue.id, input.id), inArray(alertQueue.status, ["processing"])));
+            if (affectedRowsOf(failRes) === 0) {
+              console.warn(`[AlertQueue] process: queue item ${input.id} left 'processing' during triage (dismissed/reset) — not marking failed`);
+            }
           });
 
           return {
@@ -367,19 +502,23 @@ export const alertQueueRouter = router({
           };
         }
       } catch (err) {
-        // Mark as failed
-        await db
+        // Mark as failed — only if we still hold the claim (never resurrect a dismissed item)
+        const catchRes = await db
           .update(alertQueue)
           .set({
             status: "failed",
             autoTriageStatus: "failed",
+            triageAttempts: sql`${alertQueue.triageAttempts} + 1`,
             triageResult: {
               answer: `Analysis failed: ${(err as Error).message}`,
               reasoning: "Pipeline error during structured triage",
             },
             completedAt: new Date(),
           })
-          .where(eq(alertQueue.id, input.id));
+          .where(and(eq(alertQueue.id, input.id), inArray(alertQueue.status, ["processing"])));
+        if (affectedRowsOf(catchRes) === 0) {
+          console.warn(`[AlertQueue] process: queue item ${input.id} no longer 'processing' after error — not marking failed`);
+        }
 
         throw err;
       }
@@ -405,17 +544,18 @@ export const alertQueueRouter = router({
   /**
    * Get recently queued alerts since a given timestamp.
    * Used by the global QueueNotifier to detect new arrivals and trigger notifications.
-   * Returns alerts queued within the last N seconds, ordered by severity desc.
+   * H-C2: returns active alerts queued strictly after `since` (when given), newest
+   * first, up to 50 — severity no longer decides which arrivals the notifier sees.
    */
   recentAlerts: protectedProcedure
     .input(z.object({
       /** ISO timestamp — return alerts queued after this time */
-      since: z.string(),
+      since: z.string().datetime({ offset: true }).optional(),
     }))
     .query(async ({ input }) => {
       const db = await requireDb();
 
-      const sinceDate = new Date(input.since);
+      const sinceDate = input.since ? new Date(input.since) : null;
 
       const alerts = await db
         .select({
@@ -432,12 +572,13 @@ export const alertQueueRouter = router({
         .from(alertQueue)
         .where(
           and(
-            gte(alertQueue.queuedAt, sinceDate),
-            inArray(alertQueue.status, ["queued", "processing"])
+            // gte, not gt: queuedAt is second-precision, so a same-second arrival must not be lost (callers dedupe by id)
+            sinceDate ? gte(alertQueue.queuedAt, sinceDate) : undefined,
+            inArray(alertQueue.status, [...ACTIVE_QUEUE_STATUSES])
           )
         )
-        .orderBy(desc(alertQueue.ruleLevel), desc(alertQueue.queuedAt))
-        .limit(10);
+        .orderBy(desc(alertQueue.queuedAt), desc(alertQueue.id))
+        .limit(50);
 
       return { alerts };
     }),
@@ -445,12 +586,25 @@ export const alertQueueRouter = router({
   /**
    * Clear all dismissed/completed/failed items from the queue.
    */
-  clearHistory: protectedProcedure.mutation(async () => {
+  clearHistory: adminProcedure.mutation(async () => {
     const db = await requireDb();
 
-    await db
-      .delete(alertQueue)
-      .where(inArray(alertQueue.status, ["completed", "failed", "dismissed"]));
+    try {
+      await db
+        .delete(alertQueue)
+        .where(inArray(alertQueue.status, ["completed", "failed", "dismissed"]));
+    } catch (err) {
+      // ticket_artifacts.queueItemId → alert_queue(id) is ON DELETE RESTRICT (0020):
+      // history that produced a Splunk ticket is part of the forensic record.
+      const msg = (err as Error).message ?? String(err);
+      if (/foreign key|ER_ROW_IS_REFERENCED/i.test(msg)) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Some history items are referenced by ticket artifacts and cannot be deleted.",
+        });
+      }
+      throw err;
+    }
 
     return { success: true };
   }),

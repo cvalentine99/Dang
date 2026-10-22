@@ -152,7 +152,7 @@ function makeHypothesisLLMResponse() {
           recommendedActions: [
             {
               action: "Block 192.168.50.158 at firewall",
-              category: "block_ip",
+              category: "block_ioc", // prompt contract: DB category enum (C10)
               urgency: "immediate",
               targetType: "ip",
               targetValue: "192.168.50.158",
@@ -243,7 +243,7 @@ describe("Pipeline Integration — triage → correlation → hypothesis", () =>
 
     // Verify triage row exists in DB
     const { getDb } = await import("../db");
-    const { triageObjects, correlationBundles, investigationSessions, livingCaseState, responseActions } =
+    const { triageObjects, correlationBundles, investigationSessions, livingCaseState } =
       await import("../../drizzle/schema");
     const { eq } = await import("drizzle-orm");
     const db = await getDb();
@@ -282,6 +282,7 @@ describe("Pipeline Integration — triage → correlation → hypothesis", () =>
     const { runHypothesisAgent } = await import("./hypothesisAgent");
     const hypoResult = await runHypothesisAgent({
       correlationId: corrResult.correlationId,
+      userId: 1,
     });
 
     expect(hypoResult.caseId).toBeDefined();
@@ -301,8 +302,8 @@ describe("Pipeline Integration — triage → correlation → hypothesis", () =>
     expect(sessionRow).toBeDefined();
     expect(sessionRow.status).toBe("active");
     expect(sessionRow.title).toBeTruthy();
-    // userId should be NULL (system-created), not empty string
-    expect(sessionRow.userId).toBeNull();
+    // C9: the session is attributed to the triggering analyst (never NULL / "")
+    expect(sessionRow.userId).toBe(1);
 
     // ── Verify living case state ─────────────────────────────────────────
     const [caseRow] = await db!.select()
@@ -314,26 +315,41 @@ describe("Pipeline Integration — triage → correlation → hypothesis", () =>
     expect(caseRow.sessionId).toBe(hypoResult.sessionId);
     expect(caseRow.sourceCorrelationId).toBe(corrResult.correlationId);
 
-    // ── Verify response actions materialized ─────────────────────────────
-    const actionRows = await db!.select()
-      .from(responseActions)
-      .where(eq(responseActions.caseId, hypoResult.caseId));
+    // ── Recommended action in the case snapshot ──────────────────────────
+    // C10: every model-proposed action requires approval, whatever the model said.
+    expect(hypoResult.livingCase.recommendedActions).toHaveLength(1);
+    expect(hypoResult.livingCase.recommendedActions[0]).toMatchObject({
+      action: "Block 192.168.50.158 at firewall",
+      requiresApproval: true,
+      state: "proposed",
+    });
+    // Materialization into response_actions is it.todo below (genuine bug).
 
-    // The hypothesis LLM response includes 1 recommended action
-    expect(actionRows.length).toBeGreaterThanOrEqual(1);
-    expect(actionRows[0].state).toBe("proposed");
-    // The hypothesis agent maps the LLM category to a valid DB enum value
-    expect(actionRows[0].category).toBeTruthy();
-    expect(actionRows[0].proposedBy).toBe("hypothesis_agent");
-    expect(actionRows[0].targetValue).toBe("192.168.50.158");
-
-    // ── Verify no null-serialization: all int FK columns are either valid ints or actual NULL ──
-    expect(sessionRow.userId === null || typeof sessionRow.userId === "number").toBe(true);
-    expect(caseRow.sessionId === null || typeof caseRow.sessionId === "number").toBe(true);
-    for (const action of actionRows) {
-      expect(action.caseId === null || typeof action.caseId === "number").toBe(true);
-    }
+    // ── Verify no null-serialization: int FK columns are real ints ───────
+    expect(typeof sessionRow.userId).toBe("number");
+    expect(typeof caseRow.sessionId).toBe("number");
   }, 30_000);
+
+  // BUG (H-T1 burn-down): materializeResponseActions() resolves the DB category
+  // from the snapshot's display bucket (assembleLivingCase → "immediate"|"next"|
+  // "optional"), which is never a RESPONSE_ACTION_CATEGORIES value, so the
+  // block_ioc action above is skipped as unclassifiable and no response_actions
+  // row is written. Expected once fixed: one row, state "proposed",
+  // category "block_ioc", requiresApproval 1, proposedBy "hypothesis_agent",
+  // targetValue "192.168.50.158", caseId = hypoResult.caseId.
+  it.skipIf(!HAS_DB)("materializes the recommended action into response_actions (block_ioc, proposed, requiresApproval=1)", async () => {
+    const { getDb } = await import("../db");
+    const { responseActions } = await import("../../drizzle/schema");
+    const { and, eq, desc } = await import("drizzle-orm");
+    const db = await getDb();
+    // The end-to-end test above ran the pipeline for RAW_ALERT; its action targets 192.168.50.158.
+    const [row] = await db!.select().from(responseActions)
+      .where(and(eq(responseActions.targetValue, "192.168.50.158"), eq(responseActions.category, "block_ioc")))
+      .orderBy(desc(responseActions.id)).limit(1);
+    expect(row).toBeDefined();
+    expect(row).toMatchObject({ state: "proposed", requiresApproval: 1, proposedBy: "hypothesis_agent" });
+    expect(row.caseId).toBeGreaterThan(0);
+  });
 
   it.skipIf(!HAS_DB)("creates distinct triage IDs for separate alerts", async () => {
     mockLLMResponse.mockImplementation(async () => makeTriageLLMResponse());
@@ -354,7 +370,7 @@ describe("Pipeline Integration — triage → correlation → hypothesis", () =>
     expect(result2.success).toBe(true);
   }, 15_000);
 
-  it.skipIf(!HAS_DB)("hypothesis agent creates session without userId (null-serialization regression)", async () => {
+  it.skipIf(!HAS_DB)("hypothesis agent attributes the session to the triggering user (null-serialization regression)", async () => {
     // This test specifically validates the fix for the investigation_sessions insert bug
     // where Drizzle serialized userId: null as empty string
     let callCount = 0;
@@ -375,9 +391,10 @@ describe("Pipeline Integration — triage → correlation → hypothesis", () =>
       userId: 1,
     });
     const corr = await runCorrelationAgent({ triageId: triage.triageId! });
-    const hypo = await runHypothesisAgent({ correlationId: corr.correlationId });
+    const hypo = await runHypothesisAgent({ correlationId: corr.correlationId, userId: 1 });
 
-    // The critical assertion: userId must be actual NULL, not empty string
+    // C9 (2026-10-21): system-created sessions are attributed to the triggering
+    // analyst — never NULL, and never the old "" serialization bug.
     const { getDb } = await import("../db");
     const { investigationSessions } = await import("../../drizzle/schema");
     const { eq } = await import("drizzle-orm");
@@ -389,8 +406,8 @@ describe("Pipeline Integration — triage → correlation → hypothesis", () =>
       .limit(1);
 
     expect(session).toBeDefined();
-    // This was the bug: userId was "" instead of null
-    expect(session.userId).toBeNull();
+    // Original bug: userId was "" instead of null. Now it must be the triggering user.
+    expect(session.userId).toBe(1);
     expect(session.title).toBeTruthy();
     expect(session.status).toBe("active");
   }, 30_000);

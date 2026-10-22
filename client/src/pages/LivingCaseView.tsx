@@ -11,7 +11,15 @@
 
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { GlassPanel, StatCard, RawJsonViewer, ThreatBadge } from "@/components/shared";
+import {
+  GlassPanel,
+  StatCard,
+  RawJsonViewer,
+  ThreatBadge,
+  RecordManualActionForm,
+  RecordedOutcomePanel,
+  type ResponseActionState,
+} from "@/components/shared";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useLocation, useRoute } from "wouter";
 import { toast } from "sonner";
@@ -50,7 +58,7 @@ import {
   CircleDot,
   Download,
   ClipboardCopy,
-  Play,
+  ClipboardCheck,
 } from "lucide-react";
 
 // ── Severity & Priority Colors ──────────────────────────────────────────────
@@ -76,11 +84,12 @@ const EFFORT_LABELS: Record<string, { label: string; color: string }> = {
   deep_dive: { label: "Deep Dive", color: "text-orange-400 bg-orange-500/10" },
 };
 
-const ACTION_STATE_CONFIG: Record<string, { icon: typeof CheckSquare; color: string; label: string }> = {
+const ACTION_STATE_CONFIG: Record<ResponseActionState, { icon: typeof CheckSquare; color: string; label: string }> = {
   proposed: { icon: CircleDot, color: "text-amber-400", label: "Proposed" },
   approved: { icon: CheckSquare, color: "text-emerald-400", label: "Approved" },
   rejected: { icon: XSquare, color: "text-red-400", label: "Rejected" },
   deferred: { icon: PauseCircle, color: "text-yellow-400", label: "Deferred" },
+  acknowledged: { icon: ClipboardCheck, color: "text-blue-400", label: "Acknowledged" },
 };
 
 const TIMELINE_SOURCE_COLORS: Record<string, string> = {
@@ -386,6 +395,7 @@ function RecommendedActionsCard({
 }) {
   const [reasonDialogAction, setReasonDialogAction] = useState<{ actionId: string; targetState: string } | null>(null);
   const [reasonText, setReasonText] = useState("");
+  const [recordForActionId, setRecordForActionId] = useState<string | null>(null);
 
   // Fetch from the REAL source of truth: response_actions table
   const { data, isLoading, refetch } = trpc.responseActions.getByCase.useQuery(
@@ -405,13 +415,13 @@ function RecommendedActionsCard({
     onSuccess: () => { toast.success("Action deferred"); refetch(); setReasonDialogAction(null); setReasonText(""); },
     onError: (err) => toast.error("Defer failed", { description: err.message }),
   });
-  const executeMut = trpc.responseActions.execute.useMutation({
-    onSuccess: () => { toast.success("Action executed"); refetch(); },
-    onError: (err) => toast.error("Execution failed", { description: err.message }),
+  const acknowledgeMut = trpc.responseActions.acknowledge.useMutation({
+    onSuccess: () => { toast.success("Manual action recorded"); refetch(); setRecordForActionId(null); },
+    onError: (err) => toast.error("Recording the manual action failed", { description: err.message }),
   });
 
   const actions = data?.actions ?? [];
-  const isPending = approveMut.isPending || rejectMut.isPending || deferMut.isPending || executeMut.isPending;
+  const isPending = approveMut.isPending || rejectMut.isPending || deferMut.isPending || acknowledgeMut.isPending;
 
   if (isLoading) {
     return (
@@ -462,7 +472,7 @@ function RecommendedActionsCard({
             <div className={`text-[10px] uppercase tracking-wider ${urgColor} mb-2`}>{urgLabel}</div>
             <div className="space-y-2">
               {urgActions.map((action: any) => {
-                const stateConfig = ACTION_STATE_CONFIG[action.state] ?? ACTION_STATE_CONFIG.proposed;
+                const stateConfig = ACTION_STATE_CONFIG[action.state as ResponseActionState] ?? ACTION_STATE_CONFIG.proposed;
                 const StateIcon = stateConfig.icon;
 
                 return (
@@ -511,6 +521,11 @@ function RecommendedActionsCard({
                             {action.actionId}
                           </span>
                         </div>
+                        {action.state === "acknowledged" && (
+                          <div className="mt-2">
+                            <RecordedOutcomePanel action={action} />
+                          </div>
+                        )}
                       </div>
 
                       {/* State transition buttons — use the REAL responseActions endpoints */}
@@ -545,12 +560,13 @@ function RecommendedActionsCard({
                         )}
                         {action.state === "approved" && (
                           <button
-                            onClick={() => executeMut.mutate({ actionId: action.actionId })}
+                            onClick={() => setRecordForActionId(action.actionId)}
                             disabled={isPending}
                             className="p-1.5 rounded hover:bg-amber-500/15 text-amber-400/60 hover:text-amber-400 transition-colors"
-                            title="Mark Executed"
+                            title="Record manual action"
+                            aria-label="Record manual action"
                           >
-                            <Play className="w-3.5 h-3.5" />
+                            <ClipboardCheck className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
@@ -562,6 +578,24 @@ function RecommendedActionsCard({
           </div>
         );
       })}
+
+      {/* Record manual action dialog — Dang executes nothing; the analyst records outcome + what they did */}
+      {recordForActionId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[oklch(0.18_0.02_280)] border border-white/[0.08] rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <h4 className="text-sm font-semibold font-[Space_Grotesk] text-foreground/80 mb-1">
+              Record manual action
+            </h4>
+            <p className="text-[10px] text-muted-foreground/40 font-mono">{recordForActionId}</p>
+            <RecordManualActionForm
+              actionId={recordForActionId}
+              isPending={isPending}
+              onSubmit={(input) => acknowledgeMut.mutate(input)}
+              onCancel={() => setRecordForActionId(null)}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Reason dialog for reject/defer — invariant: these require a reason */}
       {reasonDialogAction && (

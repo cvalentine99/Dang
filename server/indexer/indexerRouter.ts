@@ -6,7 +6,10 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { protectedProcedure, router } from "../_core/trpc";
+import { publicUpstreamMessage } from "../wazuh/upstreamError";
 import {
   isIndexerConfigured,
   getIndexerConfig,
@@ -31,8 +34,45 @@ const timeRangeSchema = z.object({
 
 const paginationSchema = z.object({
   size: z.number().int().min(0).max(500).default(20),
-  offset: z.number().int().min(0).default(0),
+  // L2: OpenSearch's default index.max_result_window is 10 000 (from + size)
+  offset: z.number().int().min(0).max(10_000).default(0),
 });
+
+/**
+ * L2: fixed set of date-histogram buckets. A free string allowed `1ms` over a
+ * year (~3·10¹⁰ buckets). The client uses 1m/5m/15m/1h.
+ */
+const intervalSchema = z.enum(["1m", "5m", "10m", "15m", "30m", "1h", "3h", "6h", "12h", "1d", "7d"]);
+
+/** L2: free-text search inputs are bounded. */
+const freeTextQuery = z.string().max(500);
+
+// ── Per-request user context for per-user rate limiting (M6) ────────────────
+// Same pattern as wazuhRouter: the middleware runs the handler inside
+// AsyncLocalStorage so safeSearch() can key the Indexer bucket on the user
+// without threading ctx through every procedure.
+const indexerUserStore = new AsyncLocalStorage<{ userId: number }>();
+function getCurrentUserId(): number | undefined {
+  return indexerUserStore.getStore()?.userId;
+}
+const indexerProcedure = protectedProcedure.use(async (opts) => {
+  const { ctx, next } = opts;
+  if (!ctx.user) return next({ ctx });
+  return new Promise<Awaited<ReturnType<typeof next>>>((resolve, reject) => {
+    indexerUserStore.run({ userId: ctx.user!.id }, async () => {
+      try {
+        resolve(await next({ ctx }));
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+});
+
+/** Rate-limit violations propagate as 429 instead of being folded into `{ error }`. */
+function rethrowIfRateLimited(err: unknown): void {
+  if (err instanceof TRPCError && err.code === "TOO_MANY_REQUESTS") throw err;
+}
 
 // ── Helper: safe search with fallback (uses DB override → env fallback) ─────
 async function safeSearch(
@@ -45,46 +85,133 @@ async function safeSearch(
     return { configured: false, data: null };
   }
   try {
-    const data = await indexerSearch(config, index, body, rateLimitGroup);
+    const data = await indexerSearch(config, index, body, rateLimitGroup, getCurrentUserId());
     return { configured: true, data };
   } catch (err) {
-    return { configured: true, data: null, error: (err as Error).message };
+    rethrowIfRateLimited(err);
+    // M1: generic message + correlation id; the upstream body is in the server log only
+    return { configured: true, data: null, error: publicUpstreamMessage("Indexer", err, `search ${index}`) };
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INDEXER ROUTER
 // ═══════════════════════════════════════════════════════════════════════════════
+/** Aggregation response shape consumed by {@link buildGeoEnrichedCountries}. */
+export interface GeoEnrichedAggs {
+  geo_countries?: {
+    buckets?: Array<{
+      key: string;
+      doc_count: number;
+      avg_level?: { value: number | null };
+      centroid?: { location?: { lat: number; lon: number }; count?: number };
+      avg_lat?: { value: number | null };
+      avg_lon?: { value: number | null };
+      cities?: { buckets?: Array<{ key: string; doc_count: number }> };
+      top_ips?: { buckets?: Array<{ key: string; doc_count: number }> };
+    }>;
+  };
+  ungeolocated?: {
+    doc_count: number;
+    avg_level?: { value: number | null };
+    top_ips?: { buckets?: Array<{ key: string; doc_count: number }> };
+  };
+}
+
+export interface GeoEnrichedCountry {
+  country: string;
+  count: number;
+  avgLevel: number;
+  lat: number | null;
+  lng: number | null;
+  cities: string[];
+  topIps: string[];
+  /** "wazuh-geo": from the alert's GeoLocation; "unknown": source IP had no GeoLocation. */
+  source: "wazuh-geo" | "unknown";
+}
+
+export const UNKNOWN_GEO_COUNTRY = "Unknown";
+
+/**
+ * Turn the alertsGeoEnriched aggregation into the per-country rows the
+ * ThreatMap consumes. Known countries are sorted by count and capped at topN;
+ * the "Unknown" bucket (if any) is appended last with null coordinates.
+ */
+export function buildGeoEnrichedCountries(
+  aggs: GeoEnrichedAggs | undefined,
+  topN: number
+): GeoEnrichedCountry[] {
+  const round1 = (v: number | null | undefined) => Math.round((v ?? 0) * 10) / 10;
+  const countries: GeoEnrichedCountry[] = (aggs?.geo_countries?.buckets ?? []).map((bucket) => {
+    const c = bucket.centroid?.location;
+    const hasCentroid = c != null && Number.isFinite(c.lat) && Number.isFinite(c.lon) && (bucket.centroid?.count ?? 1) > 0;
+    const lat = hasCentroid ? c!.lat : (bucket.avg_lat?.value ?? null);
+    const lng = hasCentroid ? c!.lon : (bucket.avg_lon?.value ?? null);
+    return {
+      country: bucket.key,
+      count: bucket.doc_count,
+      avgLevel: round1(bucket.avg_level?.value),
+      lat: lat != null && lng != null ? lat : null,
+      lng: lat != null && lng != null ? lng : null,
+      cities: bucket.cities?.buckets?.map((x) => x.key) ?? [],
+      topIps: bucket.top_ips?.buckets?.map((x) => x.key) ?? [],
+      source: "wazuh-geo",
+    };
+  });
+  countries.sort((a, b) => b.count - a.count);
+  const out = countries.slice(0, topN);
+
+  const unk = aggs?.ungeolocated;
+  if (unk && unk.doc_count > 0) {
+    out.push({
+      country: UNKNOWN_GEO_COUNTRY,
+      count: unk.doc_count,
+      avgLevel: round1(unk.avg_level?.value),
+      lat: null,
+      lng: null,
+      cities: [],
+      topIps: unk.top_ips?.buckets?.map((x) => x.key) ?? [],
+      source: "unknown",
+    });
+  }
+  return out;
+}
+
 export const indexerRouter = router({
   // ── Status ─────────────────────────────────────────────────────────────────
-  status: protectedProcedure.query(async () => {
+  status: indexerProcedure.query(async () => {
     const config = await getEffectiveIndexerConfig();
     if (!config) {
       return { configured: false, healthy: false, data: null };
     }
     try {
-      const health = await indexerHealth(config);
+      const health = await indexerHealth(config, getCurrentUserId());
       return { configured: true, healthy: true, data: health };
     } catch (err) {
-      return { configured: true, healthy: false, data: null, error: (err as Error).message };
+      rethrowIfRateLimited(err);
+      return { configured: true, healthy: false, data: null, error: publicUpstreamMessage("Indexer", err, "health") };
     }
   }),
 
   /** Check which index patterns exist */
-  indexStatus: protectedProcedure.query(async () => {
+  indexStatus: indexerProcedure.query(async () => {
     const config = await getEffectiveIndexerConfig();
     if (!config) {
       return { configured: false, indices: {} };
     }
     const indices: Record<string, boolean> = {};
+    // M2-style envelope: a failed probe is reported, not silently shown as "absent"
+    const errors: Array<{ index: string; message: string }> = [];
     for (const [name, pattern] of Object.entries(INDEX_PATTERNS)) {
       try {
-        indices[name] = await indexerIndexExists(config, pattern);
-      } catch {
+        indices[name] = await indexerIndexExists(config, pattern, getCurrentUserId());
+      } catch (err) {
+        rethrowIfRateLimited(err);
         indices[name] = false;
+        errors.push({ index: name, message: publicUpstreamMessage("Indexer", err, `exists ${pattern}`) });
       }
     }
-    return { configured: true, indices };
+    return { configured: true, indices, errors, degraded: errors.length > 0 };
   }),
 
   // ═════════════════════════════════════════════════════════════════════════════
@@ -92,12 +219,12 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Full-text alert search with filters */
-  alertsSearch: protectedProcedure
+  alertsSearch: indexerProcedure
     .input(
       z.object({
         ...timeRangeSchema.shape,
         ...paginationSchema.shape,
-        query: z.string().optional(),
+        query: freeTextQuery.optional(),
         agentId: z.string().optional(),
         ruleLevel: z.number().int().min(0).max(16).optional(),
         ruleLevelMin: z.number().int().min(0).max(16).optional(),
@@ -148,8 +275,8 @@ export const indexerRouter = router({
     }),
 
   /** Alert severity distribution over time (date_histogram + terms on rule.level) */
-  alertsAggByLevel: protectedProcedure
-    .input(timeRangeSchema.extend({ interval: z.string().default("1h") }))
+  alertsAggByLevel: indexerProcedure
+    .input(timeRangeSchema.extend({ interval: intervalSchema.default("1h") }))
     .query(async ({ input }) => {
       return safeSearch(
         INDEX_PATTERNS.ALERTS,
@@ -171,7 +298,7 @@ export const indexerRouter = router({
     }),
 
   /** Top agents by alert count (top talkers) */
-  alertsAggByAgent: protectedProcedure
+  alertsAggByAgent: indexerProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(50).default(10) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -194,8 +321,8 @@ export const indexerRouter = router({
     }),
 
   /** MITRE ATT&CK tactic/technique distribution */
-  alertsAggByMitre: protectedProcedure
-    .input(timeRangeSchema.extend({ interval: z.string().default("1d") }))
+  alertsAggByMitre: indexerProcedure
+    .input(timeRangeSchema.extend({ interval: intervalSchema.default("1d") }))
     .query(async ({ input }) => {
       return safeSearch(
         INDEX_PATTERNS.ALERTS,
@@ -229,7 +356,7 @@ export const indexerRouter = router({
     }),
 
   /** Top triggered rules */
-  alertsAggByRule: protectedProcedure
+  alertsAggByRule: indexerProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(50).default(15) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -252,8 +379,8 @@ export const indexerRouter = router({
     }),
 
   /** Alert count timeline (date_histogram) */
-  alertsTimeline: protectedProcedure
-    .input(timeRangeSchema.extend({ interval: z.string().default("1h") }))
+  alertsTimeline: indexerProcedure
+    .input(timeRangeSchema.extend({ interval: intervalSchema.default("1h") }))
     .query(async ({ input }) => {
       return safeSearch(
         INDEX_PATTERNS.ALERTS,
@@ -269,7 +396,7 @@ export const indexerRouter = router({
     }),
 
   /** Geographic distribution by GeoLocation.country_name */
-  alertsGeoAgg: protectedProcedure
+  alertsGeoAgg: indexerProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(50).default(20) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -296,11 +423,16 @@ export const indexerRouter = router({
       );
     }),
 
-  /** GeoIP-enriched geographic distribution — resolves source IPs to coordinates */
-  alertsGeoEnriched: protectedProcedure
+  /**
+   * Geographic distribution from Wazuh's own GeoLocation enrichment.
+   * Coordinates come from a geo_centroid over GeoLocation.location (avg of
+   * GeoLocation.latitude/longitude as a fallback). Alerts that carry a
+   * data.srcip but no GeoLocation are reported in one "Unknown" bucket with
+   * null coordinates — we no longer guess with a bundled offline IP database.
+   */
+  alertsGeoEnriched: indexerProcedure
     .input(timeRangeSchema.extend({ topN: z.number().int().min(1).max(100).default(30) }))
     .query(async ({ input }) => {
-      // First, get alerts with source IPs
       const result = await safeSearch(
         INDEX_PATTERNS.ALERTS,
         {
@@ -311,22 +443,28 @@ export const indexerRouter = router({
           }),
           size: 0,
           aggs: {
-            // Try GeoLocation first (Wazuh-enriched)
             geo_countries: {
               ...termsAgg("GeoLocation.country_name", input.topN),
               aggs: {
                 avg_level: { avg: { field: "rule.level" } },
+                centroid: { geo_centroid: { field: "GeoLocation.location" } },
                 avg_lat: { avg: { field: "GeoLocation.latitude" } },
                 avg_lon: { avg: { field: "GeoLocation.longitude" } },
                 cities: termsAgg("GeoLocation.city_name", 5),
                 top_ips: termsAgg("data.srcip", 10),
               },
             },
-            // Also aggregate by source IP for GeoIP fallback
-            source_ips: {
-              ...termsAgg("data.srcip", 200),
+            // Alerts with a source IP that Wazuh could not geolocate.
+            ungeolocated: {
+              filter: {
+                bool: {
+                  filter: [{ exists: { field: "data.srcip" } }],
+                  must_not: [{ exists: { field: "GeoLocation.country_name" } }],
+                },
+              },
               aggs: {
                 avg_level: { avg: { field: "rule.level" } },
+                top_ips: termsAgg("data.srcip", 10),
               },
             },
           },
@@ -336,96 +474,15 @@ export const indexerRouter = router({
 
       if (!result.data) return result;
 
-      // Extract aggregation data
-      const aggs = (result.data as unknown as Record<string, unknown>)?.aggregations as Record<string, unknown> | undefined;
-      const geoCountries = aggs?.geo_countries as { buckets?: Array<{ key: string; doc_count: number; avg_level: { value: number }; avg_lat: { value: number | null }; avg_lon: { value: number | null }; cities: { buckets: Array<{ key: string; doc_count: number }> }; top_ips: { buckets: Array<{ key: string; doc_count: number }> } }> } | undefined;
-      const sourceIps = aggs?.source_ips as { buckets?: Array<{ key: string; doc_count: number; avg_level: { value: number } }> } | undefined;
-
-      // Build enriched results
-      const enrichedCountries: Array<{
-        country: string;
-        count: number;
-        avgLevel: number;
-        lat: number | null;
-        lng: number | null;
-        cities: string[];
-        topIps: string[];
-        source: "wazuh-geo" | "geoip-lite";
-      }> = [];
-
-      // Use Wazuh GeoLocation data if available
-      if (geoCountries?.buckets && geoCountries.buckets.length > 0) {
-        for (const bucket of geoCountries.buckets) {
-          enrichedCountries.push({
-            country: bucket.key,
-            count: bucket.doc_count,
-            avgLevel: Math.round((bucket.avg_level?.value ?? 0) * 10) / 10,
-            lat: bucket.avg_lat?.value ?? null,
-            lng: bucket.avg_lon?.value ?? null,
-            cities: bucket.cities?.buckets?.map(c => c.key) ?? [],
-            topIps: bucket.top_ips?.buckets?.map(ip => ip.key) ?? [],
-            source: "wazuh-geo",
-          });
-        }
-      }
-
-      // Enrich remaining source IPs via geoip-lite for IPs not covered by Wazuh GeoLocation
-      const coveredIps = new Set(enrichedCountries.flatMap(c => c.topIps));
-      const uncoveredIps = sourceIps?.buckets
-        ?.filter(b => !coveredIps.has(b.key))
-        ?.slice(0, 100) ?? [];
-
-      if (uncoveredIps.length > 0) {
-        const { batchLookupIPs, aggregateByCountry } = await import("../geoip/geoipService");
-        const lookups = batchLookupIPs(uncoveredIps.map(b => b.key));
-        const geoResults = Array.from(lookups.values()).filter(r => r.country !== null);
-        const countryAggs = aggregateByCountry(geoResults);
-
-        // Merge with existing or add new
-        for (const ca of countryAggs) {
-          const existing = enrichedCountries.find(e => e.country === ca.country);
-          if (existing) {
-            // Merge counts
-            const matchingIps = uncoveredIps.filter(b => {
-              const lookup = lookups.get(b.key);
-              return lookup?.country === ca.country;
-            });
-            const additionalCount = matchingIps.reduce((sum, b) => sum + b.doc_count, 0);
-            existing.count += additionalCount;
-          } else {
-            // Calculate count from matching IPs
-            const matchingIps = uncoveredIps.filter(b => {
-              const lookup = lookups.get(b.key);
-              return lookup?.country === ca.country;
-            });
-            const totalCount = matchingIps.reduce((sum, b) => sum + b.doc_count, 0);
-            const totalWeightedLevel = matchingIps.reduce((sum, b) => sum + (b.avg_level?.value ?? 0) * b.doc_count, 0);
-            const avgLevel = totalCount > 0 ? totalWeightedLevel / totalCount : 0;
-            enrichedCountries.push({
-              country: ca.country,
-              count: totalCount,
-              avgLevel: Math.round(avgLevel * 10) / 10,
-              lat: ca.lat,
-              lng: ca.lng,
-              cities: ca.cities,
-              topIps: ca.ips.slice(0, 10),
-              source: "geoip-lite",
-            });
-          }
-        }
-      }
-
-      // Sort by count descending and limit
-      enrichedCountries.sort((a, b) => b.count - a.count);
-
+      const aggs = (result.data as unknown as Record<string, unknown>)?.aggregations as GeoEnrichedAggs | undefined;
       return {
         configured: true,
-        data: enrichedCountries.slice(0, input.topN),
+        data: buildGeoEnrichedCountries(aggs, input.topN),
       };
     }),
 
   /** Compliance framework alert aggregation (PCI DSS, HIPAA, NIST, GDPR) */
-  alertsComplianceAgg: protectedProcedure
+  alertsComplianceAgg: indexerProcedure
     .input(
       timeRangeSchema.extend({
         framework: z.enum(["pci_dss", "hipaa", "nist_800_53", "gdpr", "tsc"]),
@@ -469,12 +526,12 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Global vulnerability search across all agents */
-  vulnSearch: protectedProcedure
+  vulnSearch: indexerProcedure
     .input(
       z.object({
         ...timeRangeSchema.shape,
         ...paginationSchema.shape,
-        query: z.string().optional(),
+        query: freeTextQuery.optional(),
         severity: z.enum(["Critical", "High", "Medium", "Low"]).optional(),
         agentId: z.string().optional(),
         cve: z.string().optional(),
@@ -513,7 +570,7 @@ export const indexerRouter = router({
     }),
 
   /** Vulnerability severity distribution */
-  vulnAggBySeverity: protectedProcedure.query(async () => {
+  vulnAggBySeverity: indexerProcedure.query(async () => {
     return safeSearch(
       INDEX_PATTERNS.VULNERABILITIES,
       {
@@ -540,7 +597,7 @@ export const indexerRouter = router({
   }),
 
   /** Top vulnerable agents */
-  vulnAggByAgent: protectedProcedure
+  vulnAggByAgent: indexerProcedure
     .input(z.object({ topN: z.number().int().min(1).max(50).default(10) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -564,7 +621,7 @@ export const indexerRouter = router({
     }),
 
   /** Most exploited packages */
-  vulnAggByPackage: protectedProcedure
+  vulnAggByPackage: indexerProcedure
     .input(z.object({ topN: z.number().int().min(1).max(50).default(15) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -588,7 +645,7 @@ export const indexerRouter = router({
     }),
 
   /** Top CVEs across fleet */
-  vulnAggByCVE: protectedProcedure
+  vulnAggByCVE: indexerProcedure
     .input(z.object({ topN: z.number().int().min(1).max(50).default(20) }))
     .query(async ({ input }) => {
       return safeSearch(
@@ -617,11 +674,11 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Agent connection state history */
-  monitoringAgentHistory: protectedProcedure
+  monitoringAgentHistory: indexerProcedure
     .input(
       timeRangeSchema.extend({
         agentId: z.string().optional(),
-        interval: z.string().default("1h"),
+        interval: intervalSchema.default("1h"),
       })
     )
     .query(async ({ input }) => {
@@ -666,10 +723,10 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Manager performance metrics over time */
-  statisticsPerformance: protectedProcedure
+  statisticsPerformance: indexerProcedure
     .input(
       timeRangeSchema.extend({
-        interval: z.string().default("1h"),
+        interval: intervalSchema.default("1h"),
       })
     )
     .query(async ({ input }) => {
@@ -699,12 +756,12 @@ export const indexerRouter = router({
   // ═════════════════════════════════════════════════════════════════════════════
 
   /** Raw event search for forensic investigation */
-  archivesSearch: protectedProcedure
+  archivesSearch: indexerProcedure
     .input(
       z.object({
         ...timeRangeSchema.shape,
         ...paginationSchema.shape,
-        query: z.string().optional(),
+        query: freeTextQuery.optional(),
         agentId: z.string().optional(),
       })
     )

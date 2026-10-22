@@ -8,12 +8,21 @@
 #   docker compose logs -f # Follow logs
 # ============================================================================
 
+# Log rotation for every service: the json-file driver is unbounded by default.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   # ── MySQL Database ─────────────────────────────────────────────────────────
   db:
-    image: mysql:8.0
+    # 8.4 is the current LTS (8.0 reached EOL 2026-04-30; its tag stopped receiving rebuilds).
+    image: mysql:8.4
     container_name: dang-db
     restart: unless-stopped
+    logging: *default-logging
     command: --default-time-zone=+00:00 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required — generate with openssl rand -hex 16}
@@ -40,11 +49,20 @@ services:
       dockerfile: Dockerfile
     container_name: dang-app
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       db:
         condition: service_healthy
+    # Bound to loopback by default: the UI is served over cleartext HTTP, so direct
+    # LAN exposure is opt-in via APP_BIND (or use the caddy/nginx overlays for TLS).
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    volumes:
+      # Extra CA material for upstream TLS (Wazuh root CA). Node honors NODE_EXTRA_CA_CERTS
+      # process-wide, so axios, undici fetch and https.Agent all trust it.
+      - ./certs:/app/certs:ro
+      # Automatic pre-migration mysqldump target (see docker-entrypoint.sh)
+      - dang-backups:/app/backups
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -62,16 +80,30 @@ services:
       # Auth — generate with: openssl rand -hex 32
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — generate with openssl rand -hex 32}
 
-      # Encryption — separate key for AES-256-GCM credential encryption (optional)
-      # If not set, a key is derived from JWT_SECRET via HKDF (safe but separation is best practice)
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      # Encryption — AES-256-GCM key for stored connection credentials. REQUIRED
+      # (>= 32 chars); the app refuses to start in production without it.
+      # Generate with: openssl rand -hex 32. Changing it later makes saved
+      # credentials undecryptable (re-enter them in Admin → Connection Settings).
+      # Credentials saved before this key existed (legacy v1, JWT_SECRET-derived)
+      # still decrypt and are re-encrypted under it automatically at boot.
+      # To use a Docker secret instead, replace this line with
+      #   ENCRYPTION_KEY_FILE: /run/secrets/encryption_key
+      # and uncomment the `secrets:` blocks below (JWT_SECRET_FILE works the same way).
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required — generate with openssl rand -hex 32}
 
       # Local auth — first registered user becomes admin if these are not set
       LOCAL_ADMIN_USER: ${LOCAL_ADMIN_USER:-}
       LOCAL_ADMIN_PASS: ${LOCAL_ADMIN_PASS:-}
+      # Registration is closed once a user exists; set "true" temporarily to onboard someone.
+      REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-}
+      # Session cookie `Secure` flag is on in production. Browsers accept it on http://localhost;
+      # only set COOKIE_SECURE=false if you must log in over plain HTTP from another host.
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
 
       # TLS — Wazuh/Indexer typically use self-signed certs
       SKIP_TLS_VERIFY: ${SKIP_TLS_VERIFY:-false}
+      # Trust the Wazuh root CA instead of disabling verification. Copy it to ./certs/.
+      NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-/app/certs/wazuh-root-ca.pem}
 
       # Wazuh Manager API (optional — leave blank to start without Wazuh)
       WAZUH_HOST: ${WAZUH_HOST:-}
@@ -91,6 +123,8 @@ services:
       SPLUNK_PORT: ${SPLUNK_PORT:-8089}
       SPLUNK_HEC_PORT: ${SPLUNK_HEC_PORT:-8088}
       SPLUNK_HEC_TOKEN: ${SPLUNK_HEC_TOKEN:-}
+      # Splunk is a WRITE integration: it is off unless explicitly enabled here or in Admin > Connection Settings.
+      SPLUNK_ENABLED: ${SPLUNK_ENABLED:-false}
 
       # LLM — Self-hosted OpenAI-compatible endpoint (optional)
       # Use docker-compose.gpu.yml overlay for local Nemotron, or point at external
@@ -107,9 +141,22 @@ services:
       VITE_APP_LOGO: ${VITE_APP_LOGO:-}
     networks:
       - dang-net
+    # Optional Docker secrets (keeps the keys out of `docker inspect`). The app
+    # reads <NAME>_FILE for JWT_SECRET and ENCRYPTION_KEY when <NAME> is unset.
+    # secrets:
+    #   - jwt_secret
+    #   - encryption_key
+
+# secrets:
+#   jwt_secret:
+#     file: ./secrets/jwt_secret        # openssl rand -hex 32 > secrets/jwt_secret
+#   encryption_key:
+#     file: ./secrets/encryption_key    # openssl rand -hex 32 > secrets/encryption_key
 
 volumes:
   dang-db-data:
+    driver: local
+  dang-backups:
     driver: local
 
 networks:

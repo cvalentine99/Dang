@@ -217,19 +217,38 @@ export default function Status() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // H-C8: each fetch aborts the previous one (no stale-response race) and
+  // nothing setStates after unmount.
+  const abortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      abortRef.current?.abort();
+    };
+  }, []);
+
   const fetchStatus = useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setIsLoading(true);
     setError(null);
     try {
-      const resp = await fetch("/api/status");
+      const resp = await fetch("/api/status", { signal: controller.signal });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const json: StatusResponse = await resp.json();
+      if (controller.signal.aborted || !mountedRef.current) return;
       setData(json);
       setLastChecked(new Date());
     } catch (err) {
+      if (controller.signal.aborted || !mountedRef.current) return;
       setError((err as Error).message);
     } finally {
-      setIsLoading(false);
+      if (abortRef.current === controller && mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 

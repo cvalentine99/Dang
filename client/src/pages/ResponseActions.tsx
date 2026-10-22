@@ -7,7 +7,14 @@
 
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { GlassPanel, StatCard } from "@/components/shared";
+import {
+  GlassPanel,
+  StatCard,
+  RecordManualActionForm,
+  RecordedOutcomePanel,
+  type ResponseActionState,
+  type ManualActionOutcome,
+} from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -18,7 +25,6 @@ import {
   CheckCircle2,
   XCircle,
   PauseCircle,
-  Play,
   ChevronDown,
   ChevronUp,
   Filter,
@@ -38,6 +44,7 @@ import {
   BarChart3,
   ArrowUpDown,
   ChevronRight,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -55,13 +62,22 @@ const CATEGORY_CONFIG: Record<string, { icon: LucideIcon; label: string; color: 
   custom: { icon: Zap, label: "Custom Action", color: "text-amber-300", guidance: "Custom response action. Review the description for specific instructions." },
 };
 
-const STATE_CONFIG: Record<string, { icon: LucideIcon; color: string; bg: string; label: string }> = {
+type StateConfigEntry = { icon: LucideIcon; color: string; bg: string; label: string };
+const STATE_CONFIG: Record<ResponseActionState, StateConfigEntry> = {
   proposed: { icon: Clock, color: "text-amber-400", bg: "bg-amber-500/15 border-amber-500/30", label: "Proposed" },
   approved: { icon: CheckCircle2, color: "text-emerald-400", bg: "bg-emerald-500/15 border-emerald-500/30", label: "Approved" },
   rejected: { icon: XCircle, color: "text-red-400", bg: "bg-red-500/15 border-red-500/30", label: "Rejected" },
-  executed: { icon: Play, color: "text-blue-400", bg: "bg-blue-500/15 border-blue-500/30", label: "Executed" },
+  acknowledged: { icon: ClipboardCheck, color: "text-blue-400", bg: "bg-blue-500/15 border-blue-500/30", label: "Acknowledged" },
   deferred: { icon: PauseCircle, color: "text-yellow-400", bg: "bg-yellow-500/15 border-yellow-500/30", label: "Deferred" },
 };
+
+/** Lookup tolerant of unknown/legacy values (audit rows written before the `executed` → `acknowledged` rename). */
+function getStateConfig(state: unknown): StateConfigEntry | undefined {
+  if (state === "executed") return STATE_CONFIG.acknowledged;
+  return typeof state === "string" && state in STATE_CONFIG
+    ? STATE_CONFIG[state as ResponseActionState]
+    : undefined;
+}
 
 const URGENCY_CONFIG: Record<string, { color: string; label: string; dot: string }> = {
   immediate: { color: "text-red-400", label: "Immediate", dot: "bg-red-400" },
@@ -137,15 +153,18 @@ export default function ResponseActions() {
     },
   });
 
-  const executeMut = trpc.responseActions.execute.useMutation({
+  const [showRecordFor, setShowRecordFor] = useState<string | null>(null);
+  const acknowledgeMut = trpc.responseActions.acknowledge.useMutation({
     onSuccess: (data) => {
       if (data.success) {
-        toast.success("Action marked as executed");
+        toast.success("Manual action recorded");
         invalidateAll();
+        setShowRecordFor(null);
       } else {
-        toast.error(data.error ?? "Execution failed");
+        toast.error(data.error ?? "Recording the manual action failed");
       }
     },
+    onError: (err) => toast.error("Recording the manual action failed", { description: err.message }),
   });
 
   const deferMut = trpc.responseActions.defer.useMutation({
@@ -252,9 +271,9 @@ export default function ResponseActions() {
           colorClass="text-emerald-400"
         />
         <StatCard
-          icon={Play}
-          label="Executed"
-          value={stats?.byState?.executed ?? 0}
+          icon={ClipboardCheck}
+          label="Acknowledged"
+          value={stats?.byState?.acknowledged ?? 0}
           colorClass="text-blue-400"
         />
         <StatCard
@@ -293,8 +312,20 @@ export default function ResponseActions() {
               variant="outline"
               className="border-amber-500/30 text-amber-300 hover:bg-amber-500/15"
               onClick={() => {
-                const ids = pendingActions.map(a => a.actionId);
-                bulkApproveMut.mutate({ actionIds: ids });
+                // P2-8/M12: server binds each bulk approval to ONE case
+                // (≤50 ids) — batch per case.
+                const byCase = new Map<number, string[]>();
+                for (const a of pendingActions) {
+                  if (a.caseId == null) continue;
+                  const list = byCase.get(a.caseId) ?? [];
+                  list.push(a.actionId);
+                  byCase.set(a.caseId, list);
+                }
+                byCase.forEach((ids, caseId) => {
+                  for (let i = 0; i < ids.length; i += 50) {
+                    bulkApproveMut.mutate({ caseId, actionIds: ids.slice(i, i + 50) });
+                  }
+                });
               }}
               disabled={bulkApproveMut.isPending}
             >
@@ -429,7 +460,9 @@ export default function ResponseActions() {
                   onToggle={() => setExpandedAction(expandedAction === action.actionId ? null : action.actionId)}
                   onApprove={() => approveMut.mutate({ actionId: action.actionId })}
                   onReject={(reason) => rejectMut.mutate({ actionId: action.actionId, reason })}
-                  onExecute={() => executeMut.mutate({ actionId: action.actionId })}
+                  onRecordManual={(input) => acknowledgeMut.mutate(input)}
+                  showRecord={showRecordFor === action.actionId}
+                  onShowRecord={() => setShowRecordFor(showRecordFor === action.actionId ? null : action.actionId)}
                   onDefer={(reason) => deferMut.mutate({ actionId: action.actionId, reason })}
                   onRepropose={() => reproposeMut.mutate({ actionId: action.actionId })}
                   showReject={showRejectFor === action.actionId}
@@ -440,7 +473,7 @@ export default function ResponseActions() {
                   onRejectReasonChange={setRejectReason}
                   deferReason={deferReason}
                   onDeferReasonChange={setDeferReason}
-                  isPending={approveMut.isPending || rejectMut.isPending || executeMut.isPending || deferMut.isPending || reproposeMut.isPending}
+                  isPending={approveMut.isPending || rejectMut.isPending || acknowledgeMut.isPending || deferMut.isPending || reproposeMut.isPending}
                 />
               ))
             )}
@@ -492,7 +525,9 @@ function ResponseActionCard({
   onToggle,
   onApprove,
   onReject,
-  onExecute,
+  onRecordManual,
+  showRecord,
+  onShowRecord,
   onDefer,
   onRepropose,
   showReject,
@@ -510,7 +545,9 @@ function ResponseActionCard({
   onToggle: () => void;
   onApprove: () => void;
   onReject: (reason: string) => void;
-  onExecute: () => void;
+  onRecordManual: (input: { actionId: string; outcome: ManualActionOutcome; result: string }) => void;
+  showRecord: boolean;
+  onShowRecord: () => void;
   onDefer: (reason: string) => void;
   onRepropose: () => void;
   showReject: boolean;
@@ -524,7 +561,7 @@ function ResponseActionCard({
   isPending: boolean;
 }) {
   const cat = CATEGORY_CONFIG[action.category] ?? CATEGORY_CONFIG.custom;
-  const state = STATE_CONFIG[action.state] ?? STATE_CONFIG.proposed;
+  const state = getStateConfig(action.state) ?? STATE_CONFIG.proposed;
   const urgency = URGENCY_CONFIG[action.urgency] ?? URGENCY_CONFIG.next;
   const CatIcon = cat.icon;
   const StateIcon = state.icon;
@@ -644,7 +681,7 @@ function ResponseActionCard({
             )}
             {action.executedBy && (
               <div>
-                <label className="text-[10px] text-muted-foreground/40 mb-1 block uppercase tracking-wider">Executed By</label>
+                <label className="text-[10px] text-muted-foreground/40 mb-1 block uppercase tracking-wider">Recorded By</label>
                 <span className="text-xs text-foreground/70 font-mono">{action.executedBy}</span>
               </div>
             )}
@@ -658,17 +695,8 @@ function ResponseActionCard({
             </div>
           )}
 
-          {/* Execution Result */}
-          {action.executionResult && (
-            <div>
-              <label className="text-[10px] text-muted-foreground/40 mb-1 block uppercase tracking-wider">Execution Result</label>
-              <div className={`text-xs p-2 rounded border ${
-                action.executionSuccess ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300" : "border-red-500/20 bg-red-500/5 text-red-300"
-              }`}>
-                {action.executionResult}
-              </div>
-            </div>
-          )}
+          {/* Recorded manual action (analyst-reported outcome; Dang executes nothing) */}
+          {action.state === "acknowledged" && <RecordedOutcomePanel action={action} />}
 
           {/* Category Guidance */}
           <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05]">
@@ -761,16 +789,16 @@ function ResponseActionCard({
               </>
             )}
 
-            {/* Approved → Execute / Reject (revoke) */}
+            {/* Approved → Record manual action / Reject (revoke) */}
             {action.state === "approved" && (
               <>
                 <button
-                  onClick={onExecute}
+                  onClick={onShowRecord}
                   disabled={isPending}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-medium hover:bg-blue-500/25 transition-all disabled:opacity-50"
                 >
-                  <Play className="h-3.5 w-3.5" />
-                  Mark Executed
+                  <ClipboardCheck className="h-3.5 w-3.5" />
+                  Record manual action
                 </button>
                 <button
                   onClick={onShowReject}
@@ -795,6 +823,16 @@ function ResponseActionCard({
               </button>
             )}
           </div>
+
+          {/* Record Manual Action Form */}
+          {showRecord && action.state === "approved" && (
+            <RecordManualActionForm
+              actionId={action.actionId}
+              isPending={isPending}
+              onSubmit={onRecordManual}
+              onCancel={onShowRecord}
+            />
+          )}
 
           {/* Reject Reason Input */}
           {showReject && (
@@ -874,7 +912,7 @@ function ActionAuditTrail({ actionId }: { actionId: string }) {
             <div className="text-[10px] text-muted-foreground/30">No audit entries</div>
           ) : (
             (auditQ.data?.entries ?? []).map((entry: any) => {
-              const toConfig = STATE_CONFIG[entry.toState] ?? STATE_CONFIG.proposed;
+              const toConfig = getStateConfig(entry.toState) ?? STATE_CONFIG.proposed;
               const ToIcon = toConfig.icon;
               return (
                 <div key={entry.id} className="flex items-center gap-2 text-[10px]">
@@ -1037,8 +1075,8 @@ function AuditLogView() {
                 </tr>
               ) : (
                 entries.map((entry: any) => {
-                  const toConfig = STATE_CONFIG[entry.toState] ?? STATE_CONFIG.proposed;
-                  const fromConfig = STATE_CONFIG[entry.fromState];
+                  const toConfig = getStateConfig(entry.toState) ?? STATE_CONFIG.proposed;
+                  const fromConfig = getStateConfig(entry.fromState);
                   const ToIcon = toConfig.icon;
                   return (
                     <tr key={entry.id} className="border-b border-white/[0.03] hover:bg-white/[0.02]">

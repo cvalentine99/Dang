@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { Streamdown } from "streamdown";
+import { SafeMarkdown } from "@/components/SafeMarkdown";
 import {
   Brain,
   AlertTriangle,
@@ -23,6 +23,7 @@ import {
 import { severityColor, StatusBadge, TriageRouteBadge, TriageSeverityBadge, SplunkTicketLink } from "./Badges";
 import { PipelineStageIndicator } from "./PipelineStageIndicator";
 import type { QueueItem, TriageData } from "./types";
+import { toastIfSuperseded } from "@/lib/pipelineResult";
 
 interface QueueItemCardProps {
   item: QueueItem;
@@ -56,7 +57,10 @@ export function QueueItemCard({
   // ── Stage 1 only: Auto-Triage mutation ──────────────────────────────────
   const autoTriageMutation = trpc.pipeline.autoTriageQueueItem.useMutation({
     onSuccess: (result) => {
-      if (result.success) {
+      if (toastIfSuperseded(result)) {
+        utils.alertQueue.list.invalidate();
+        utils.pipeline.getPipelineRunByQueueItem.invalidate({ queueItemId: item.id });
+      } else if (result.success) {
         toast.success("Pipeline triage complete", {
           description: `Triage ID: ${result.triageId}`,
         });
@@ -74,7 +78,9 @@ export function QueueItemCard({
   // ── Full Pipeline (all 4 stages) mutation ───────────────────────────────
   const fullPipelineMutation = trpc.pipeline.runFullPipeline.useMutation({
     onSuccess: (result) => {
-      if (result.status === "completed") {
+      if (toastIfSuperseded(result)) {
+        // benign: another worker owns/finished this run
+      } else if (result.status === "completed") {
         toast.success("Full pipeline completed", {
           description: `All 4 stages done in ${(result.totalLatencyMs / 1000).toFixed(1)}s — Run ID: ${result.runId}`,
         });
@@ -454,7 +460,7 @@ export function QueueItemCard({
                 )}
               </div>
               <div className="rounded-lg bg-black/30 border border-white/5 px-3 py-2 text-sm text-foreground prose prose-invert prose-sm max-w-none prose-headings:text-amber-200 prose-strong:text-foreground prose-code:text-cyan-300 prose-code:bg-black/30 prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
-                <Streamdown>{triage.answer}</Streamdown>
+                <SafeMarkdown>{triage.answer}</SafeMarkdown>
               </div>
               {triage.suggestedFollowUps && triage.suggestedFollowUps.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">

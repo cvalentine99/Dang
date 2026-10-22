@@ -111,7 +111,10 @@ const HYPOTHESIS_LLM_RESPONSE = {
       supportingEvidence: ["Multiple failed attempts"],
       conflictingEvidence: [],
     },
-    alternateTheories: [],
+    // C12: a valid hypothesis needs at least one alternate theory
+    alternateTheories: [
+      { statement: "Misconfigured monitoring script", confidence: 0.1, supportingEvidence: [], whyLessLikely: "Source IP is external" },
+    ],
     evidenceGaps: [],
     suggestedNextSteps: [],
     recommendedActions: [],

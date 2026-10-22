@@ -8,6 +8,7 @@
  * Cleanup: all test rows are deleted in afterAll.
  */
 import { describe, it, expect, afterAll, beforeAll } from "vitest";
+import { testDbSslOptions } from "../testHelpers/testDbConnection";
 import mysql from "mysql2/promise";
 import { SAVED_SEARCH_TYPES } from "../../shared/searchTypes";
 
@@ -24,7 +25,7 @@ const pool = HAS_DB
       user: parsed.username,
       password: parsed.password,
       database: parsed.pathname.slice(1),
-      ssl: { rejectUnauthorized: !(process.env.SKIP_TLS_VERIFY === "true" || process.env.SKIP_TLS_VERIFY === "1") },
+      ...testDbSslOptions(),
     })
   : (null as unknown as ReturnType<typeof mysql.createPool>);
 

@@ -9,20 +9,21 @@
  * in stateMachine.ts. This router is the API surface; the state machine is the enforcer.
  *
  * State Machine:
- *   proposed → approved → executed
+ *   proposed → approved → acknowledged
  *   proposed → rejected
  *   proposed → deferred → proposed (re-propose)
  *   approved → rejected (revoke approval)
  *
  * Endpoints:
- *   Mutations: propose, approve, reject, execute, defer, repropose, bulkApprove
+ *   Mutations: propose, approve, reject, acknowledge, defer, repropose, bulkApprove
  *   Queries:   getById, getByCase, listAll, stats, auditTrail
  */
 
 import { requireDb } from "../dbGuard";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, and, desc, sql, count } from "drizzle-orm";
+import { eq, and, desc, sql, count, inArray } from "drizzle-orm";
+import { recordAnalystAction } from "../_core/analystAudit";
 import { nanoid } from "nanoid";
 import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -37,7 +38,7 @@ import {
   transitionActionState,
   approveAction,
   rejectAction,
-  executeAction,
+  acknowledgeAction,
   deferAction,
   reproposeAction,
   syncCaseSummaryAfterTransition,
@@ -65,15 +66,15 @@ export const responseActionsRouter = router({
       triageId: z.string().optional(),
       linkedAlertIds: z.array(z.string()).optional(),
       linkedAgentIds: z.array(z.string()).optional(),
-      /** If proposed by an agent, specify the agent name */
-      proposedByAgent: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
       const actionId = `ra-${nanoid(12)}`;
-      const proposedBy = input.proposedByAgent ?? `user:${ctx.user.id}`;
+      // Attribution is derived from the session, never from input: agent-proposed
+      // actions are created by materializeResponseActions(), not this procedure.
+      const proposedBy = `user:${ctx.user.id}`;
 
       // Audit #48: Wrap INSERT + SELECT + audit INSERT in a single transaction
       // to prevent orphaned action rows without audit trails on partial failure.
@@ -148,26 +149,23 @@ export const responseActionsRouter = router({
       return rejectAction(input.actionId, ctx.user.id, input.reason);
     }),
 
-  // ── Execute ── (delegates to centralized state machine) ───────────────────
+  // ── Acknowledge ── (delegates to centralized state machine) ───────────────
   //
-  // Audit #48: The execution result metadata (executionResult, executionSuccess)
-  // is now stored inside the state machine's transaction via the extraUpdate
-  // field, ensuring atomicity. Previously, a separate UPDATE after the
-  // transaction could fail and leave the action in "executed" state with no
-  // result metadata.
-  execute: adminProcedure
+  // Dang performs no external action. The analyst carries the approved action out
+  // by hand and records the outcome here; outcome and result text are mandatory
+  // and there is no default success (the former `execute` defaulted
+  // executionSuccess to true with no input from the caller).
+  acknowledge: adminProcedure
     .input(z.object({
       actionId: z.string().min(1),
-      executionResult: z.string().max(5000).optional(),
-      executionSuccess: z.boolean().default(true),
+      outcome: z.enum(["success", "partial", "failed"]),
+      result: z.string().trim().min(1).max(5000),
     }))
     .mutation(async ({ input, ctx }) => {
-      const result = await executeAction(input.actionId, ctx.user.id, {
-        executionResult: input.executionResult,
-        executionSuccess: input.executionSuccess,
+      return acknowledgeAction(input.actionId, ctx.user.id, {
+        executionOutcome: input.outcome,
+        executionResult: input.result,
       });
-
-      return result;
     }),
 
   // ── Defer ── (delegates to centralized state machine) ─────────────────────
@@ -204,17 +202,44 @@ export const responseActionsRouter = router({
   // by another analyst. Per-action results are returned so the UI can show
   // exactly what succeeded and what conflicted.
   //
+  // P2-8/M12: a bulk approval is bound to ONE case — every actionId must belong to
+  // `caseId` (mismatches → BAD_REQUEST, nothing transitioned) and the batch is
+  // recorded as one analyst_action_audit row before any transition.
   bulkApprove: adminProcedure
     .input(z.object({
+      caseId: z.number().int(),
       actionIds: z.array(z.string().min(1)).min(1).max(50),
       reason: z.string().max(2000).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+      const db = await requireDb();
+      const uniqueIds = Array.from(new Set(input.actionIds));
+      const owned = await db
+        .select({ actionId: responseActions.actionId, caseId: responseActions.caseId })
+        .from(responseActions)
+        .where(inArray(responseActions.actionId, uniqueIds));
+      const caseOf = new Map(owned.map((r) => [r.actionId, r.caseId]));
+      const mismatches = uniqueIds.filter((id) => caseOf.get(id) !== input.caseId);
+      if (mismatches.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Actions not found in case ${input.caseId}: ${mismatches.join(", ")}`,
+        });
+      }
+
+      await recordAnalystAction(db, {
+        userId: ctx.user.id,
+        action: "responseActions.bulkApprove",
+        targetType: "living_case",
+        targetId: input.caseId,
+        metadata: { actionIds: uniqueIds, reason: input.reason ?? null },
+      });
+
       const results: Array<{ actionId: string; success: boolean; error?: string }> = [];
       const affectedCaseIds = new Set<number>();
 
       // Transition each action but SKIP per-action case sync
-      for (const actionId of input.actionIds) {
+      for (const actionId of uniqueIds) {
         const result = await transitionActionState({
           actionId,
           targetState: "approved",
@@ -316,7 +341,7 @@ export const responseActionsRouter = router({
           .from(responseActions)
           .where(whereClause)
           .orderBy(
-            sql`FIELD(${responseActions.state}, 'proposed', 'approved', 'deferred', 'executed', 'rejected')`,
+            sql`FIELD(${responseActions.state}, 'proposed', 'approved', 'deferred', 'acknowledged', 'rejected')`,
             sql`FIELD(${responseActions.urgency}, 'immediate', 'next', 'scheduled', 'optional')`,
             desc(responseActions.proposedAt)
           )
@@ -404,7 +429,7 @@ export const responseActionsRouter = router({
         })
           .from(responseActions)
           .where(sql`${responseActions.approvedAt} IS NOT NULL`),
-        // Compute avg time from approved → executed (seconds)
+        // Compute avg time from approved → acknowledged (seconds)
         db.select({
           avgSeconds: sql<number>`AVG(TIMESTAMPDIFF(SECOND, ${responseActions.approvedAt}, ${responseActions.executedAt}))`,
         })
@@ -432,7 +457,7 @@ export const responseActionsRouter = router({
         byUrgency,
         pendingApproval: pendingApprovalResult[0]?.count ?? 0,
         avgTimeToApproval: rawApprovalSec != null ? Math.round(rawApprovalSec) : null, // seconds, null if no approved actions yet
-        avgTimeToExecution: rawExecutionSec != null ? Math.round(rawExecutionSec) : null, // seconds, null if no executed actions yet
+        avgTimeToExecution: rawExecutionSec != null ? Math.round(rawExecutionSec) : null, // seconds, null if no acknowledged actions yet
       };
     }),
 
